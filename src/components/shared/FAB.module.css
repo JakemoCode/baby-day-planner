@@ -1,0 +1,40 @@
+.fab {
+  position: fixed;
+  right: var(--space-4);
+  /* Sit just above the bottom tab bar */
+  bottom: calc(var(--bottom-tabs-height) + var(--space-4));
+  width: 56px;
+  height: 56px;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: var(--color-accent);
+  color: var(--color-surface);
+  font-size: var(--text-2xl);
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: var(--shadow-elevated);
+  transition:
+    transform var(--motion-fast) var(--easing-out),
+    background var(--motion-fast) var(--easing-out);
+  z-index: 50;
+}
+
+.fab:hover {
+  filter: brightness(0.97);
+}
+
+.fab:active {
+  transform: scale(0.96);
+}
+
+.fab:focus-visible {
+  outline: 3px solid var(--color-accent-soft);
+  outline-offset: 3px;
+}
+
+.icon {
+  width: 24px;
+  height: 24px;
+  margin: auto;
+  display: block;
+}
