@@ -3,13 +3,7 @@ import { describe, it, expect, beforeAll, beforeEach, afterAll } from "vitest";
 import type { RulesTestEnvironment } from "@firebase/rules-unit-testing";
 import type { Firestore } from "firebase/firestore";
 import { startTestEnv, ALLOWED_USER } from "../../tests/integration/firestore-test-utils";
-import {
-  createEvent,
-  deleteEvent,
-  listEvents,
-  updateEvent,
-  watchEvents,
-} from "./events";
+import { createEvent, deleteEvent, listEvents, updateEvent, watchEvents } from "./events";
 import type { Event } from "@/domain";
 
 const ev = (overrides: Partial<Event>): Event => ({

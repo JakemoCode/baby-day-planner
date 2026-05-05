@@ -22,11 +22,7 @@ function eventsRef(db: Firestore, childId: string, dayId: string) {
   return collection(db, eventsCollectionPath(childId, dayId)).withConverter(eventConverter);
 }
 
-export async function createEvent(
-  db: Firestore,
-  childId: string,
-  event: Event,
-): Promise<void> {
+export async function createEvent(db: Firestore, childId: string, event: Event): Promise<void> {
   await setDoc(eventRef(db, childId, event.dayId, event.id), event);
 }
 
@@ -49,11 +45,7 @@ export async function deleteEvent(
   await deleteDoc(eventRef(db, childId, dayId, eventId));
 }
 
-export async function listEvents(
-  db: Firestore,
-  childId: string,
-  dayId: string,
-): Promise<Event[]> {
+export async function listEvents(db: Firestore, childId: string, dayId: string): Promise<Event[]> {
   const q = query(eventsRef(db, childId, dayId), orderBy("startTime"));
   const snap = await getDocs(q);
   return snap.docs.map((d) => d.data());

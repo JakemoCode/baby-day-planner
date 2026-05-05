@@ -1,11 +1,4 @@
-import {
-  collection,
-  deleteDoc,
-  doc,
-  getDocs,
-  setDoc,
-  type Firestore,
-} from "firebase/firestore";
+import { collection, deleteDoc, doc, getDocs, setDoc, type Firestore } from "firebase/firestore";
 import type { OwnershipTemplate } from "@/domain";
 import { templateConverter } from "@/lib/firestore/converters";
 import { templatePath, templatesCollectionPath } from "@/lib/firestore/paths";
@@ -26,10 +19,7 @@ export async function saveTemplate(
   await setDoc(templateRef(db, childId, template.id), template);
 }
 
-export async function listTemplates(
-  db: Firestore,
-  childId: string,
-): Promise<OwnershipTemplate[]> {
+export async function listTemplates(db: Firestore, childId: string): Promise<OwnershipTemplate[]> {
   const snap = await getDocs(templatesRef(db, childId));
   return snap.docs.map((d) => d.data());
 }
