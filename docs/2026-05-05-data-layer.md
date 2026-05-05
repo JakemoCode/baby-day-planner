@@ -195,7 +195,7 @@ Append `Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>`.
 // To add a third user, add their email to the array AND to firestore.rules.
 export const ALLOWLISTED_EMAILS: readonly string[] = [
   "jake136@yahoo.com",
-  // Add Kelly's email here
+  "kellyrbarber@gmail.com",
 ] as const;
 
 export function isAllowlisted(email: string | null | undefined): boolean {
@@ -1841,8 +1841,8 @@ service cloud.firestore {
   match /databases/{database}/documents {
     function isAllowlisted() {
       return request.auth != null && request.auth.token.email in [
-        "jake136@yahoo.com"
-        // Add Kelly's email here when ready, then update src/lib/auth/allowlist.ts in lockstep.
+        "jake136@yahoo.com",
+        "kellyrbarber@gmail.com"
       ];
     }
 
