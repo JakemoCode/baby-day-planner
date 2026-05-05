@@ -1,20 +1,45 @@
+/*
+ * Baby Day Planner — design tokens
+ *
+ * Theme A: calm earth tones (sage, terracotta, warm cream, dusty blue).
+ * Light mode default; dark mode auto-applied via prefers-color-scheme,
+ * also overridable by setting [data-theme="dark"] on <html>.
+ *
+ * Designed for 5 AM groggy use on a phone — soft contrast, warm palette,
+ * spacious touch targets (≥44pt).
+ */
+
 :root {
-  /* Color */
-  --color-bg: #ffffff;
-  --color-fg: #111111;
-  --color-muted: #6b6b6b;
-  --color-border: #e3e3e3;
-  --color-accent: #2c6ef2;
-  --color-success: #1f8a3a;
-  --color-warning: #c47f00;
-  --color-danger: #c0392b;
+  /* ─────── Surfaces ─────── */
+  --color-bg: #fbf8f3; /* warm cream */
+  --color-surface: #ffffff; /* card surface */
+  --color-surface-raised: #fefcf7; /* slight warm tint for elevation */
 
-  /* Owner colors */
-  --color-owner-jake: #2c6ef2;
-  --color-owner-kelly: #b14fb1;
-  --color-owner-daycare: #6b6b6b;
+  /* ─────── Foreground ─────── */
+  --color-fg: #2a2520; /* warm near-black */
+  --color-fg-soft: #4a4138; /* subordinate text */
+  --color-muted: #7a716a; /* warm gray, captions */
+  --color-border: #e9e3d8; /* soft warm border */
+  --color-border-strong: #d4ccbf; /* visible separators */
 
-  /* Spacing (4px base) */
+  /* ─────── Brand / accents ─────── */
+  --color-accent: #7d9a7a; /* sage green — primary action */
+  --color-accent-soft: #b5c8b3; /* tinted backgrounds, hover */
+  --color-success: #5e7c5b; /* deeper sage */
+  --color-warning: #c97e5b; /* terracotta */
+  --color-danger: #a64f3a; /* deep rust */
+
+  /* ─────── Owner colors ─────── */
+  --color-owner-jake: #7a8fa8; /* dusty blue */
+  --color-owner-kelly: #ce8e7e; /* warm coral */
+  --color-owner-daycare: #9a8e82; /* warm gray */
+
+  /* Owner tints (lighter shades — backgrounds for owned cards/blocks) */
+  --color-owner-jake-tint: #e1e8ef;
+  --color-owner-kelly-tint: #f3dcd2;
+  --color-owner-daycare-tint: #ece7e1;
+
+  /* ─────── Spacing (4 px base) ─────── */
   --space-1: 0.25rem;
   --space-2: 0.5rem;
   --space-3: 0.75rem;
@@ -22,33 +47,108 @@
   --space-5: 1.5rem;
   --space-6: 2rem;
   --space-8: 3rem;
+  --space-10: 4rem;
 
-  /* Radius */
+  /* ─────── Radius ─────── */
   --radius-sm: 4px;
   --radius-md: 8px;
   --radius-lg: 16px;
+  --radius-xl: 24px;
+  --radius-pill: 999px;
 
-  /* Type */
-  --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  /* ─────── Type ─────── */
+  --font-sans: ui-rounded, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+  --text-xs: 0.75rem;
   --text-sm: 0.875rem;
   --text-base: 1rem;
   --text-lg: 1.25rem;
   --text-xl: 1.5rem;
   --text-2xl: 2rem;
+  --text-3xl: 2.5rem;
+  --line-tight: 1.2;
+  --line-normal: 1.4;
+  --line-loose: 1.6;
+  --weight-regular: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
 
-  /* Shadow */
-  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.06), 0 2px 8px rgba(0, 0, 0, 0.04);
+  /* ─────── Shadow ─────── */
+  --shadow-sm: 0 1px 2px rgba(42, 37, 32, 0.05);
+  --shadow-card: 0 1px 2px rgba(42, 37, 32, 0.06), 0 2px 8px rgba(42, 37, 32, 0.04);
+  --shadow-elevated: 0 4px 12px rgba(42, 37, 32, 0.08), 0 2px 4px rgba(42, 37, 32, 0.04);
 
-  /* Layout */
-  --content-max: 480px;
+  /* ─────── Layout ─────── */
+  --content-max: 480px; /* mobile-first cap */
+  --tap-target-min: 44px; /* per Apple HIG */
+  --header-height: 56px;
+  --bottom-tabs-height: 64px;
+
+  /* ─────── Motion ─────── */
+  --motion-fast: 120ms;
+  --motion-base: 200ms;
+  --motion-slow: 320ms;
+  --easing-out: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
+/* Dark mode — auto-applied via prefers-color-scheme.
+   Same palette, slightly desaturated and lifted to keep warmth. */
 @media (prefers-color-scheme: dark) {
   :root {
-    --color-bg: #111111;
-    --color-fg: #f5f5f5;
-    --color-muted: #a0a0a0;
-    --color-border: #2a2a2a;
+    --color-bg: #1c1916;
+    --color-surface: #26221d;
+    --color-surface-raised: #2e2924;
+
+    --color-fg: #f0e9dd;
+    --color-fg-soft: #c5bcaf;
+    --color-muted: #9a8e82;
+    --color-border: #3a3530;
+    --color-border-strong: #4a443d;
+
+    --color-accent: #94b291;
+    --color-accent-soft: #4a5e48;
+    --color-success: #7c9a78;
+    --color-warning: #d99878;
+    --color-danger: #c47659;
+
+    --color-owner-jake: #94a8c0;
+    --color-owner-kelly: #e0a695;
+    --color-owner-daycare: #aea295;
+
+    --color-owner-jake-tint: #2c333d;
+    --color-owner-kelly-tint: #3d2f29;
+    --color-owner-daycare-tint: #2f2c28;
+
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+    --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.35), 0 2px 8px rgba(0, 0, 0, 0.25);
+    --shadow-elevated: 0 4px 12px rgba(0, 0, 0, 0.45), 0 2px 4px rgba(0, 0, 0, 0.3);
   }
+}
+
+/* Manual override (forces dark mode regardless of system preference).
+   Apply [data-theme="dark"] to <html> from a user toggle in Settings. */
+:root[data-theme="dark"] {
+  --color-bg: #1c1916;
+  --color-surface: #26221d;
+  --color-surface-raised: #2e2924;
+
+  --color-fg: #f0e9dd;
+  --color-fg-soft: #c5bcaf;
+  --color-muted: #9a8e82;
+  --color-border: #3a3530;
+  --color-border-strong: #4a443d;
+
+  --color-accent: #94b291;
+  --color-accent-soft: #4a5e48;
+  --color-success: #7c9a78;
+  --color-warning: #d99878;
+  --color-danger: #c47659;
+
+  --color-owner-jake: #94a8c0;
+  --color-owner-kelly: #e0a695;
+  --color-owner-daycare: #aea295;
+
+  --color-owner-jake-tint: #2c333d;
+  --color-owner-kelly-tint: #3d2f29;
+  --color-owner-daycare-tint: #2f2c28;
 }
