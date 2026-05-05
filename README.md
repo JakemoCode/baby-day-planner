@@ -18,6 +18,7 @@ pnpm install
 cp .env.local.example .env.local   # fill in values from Firebase console
 pnpm dev                            # Next.js on :3000
 firebase emulators:start            # Firestore :8080, Auth :9099, UI :4000 (separate terminal)
+                                    # Requires Java JRE: `brew install --cask temurin`
 ```
 
 ## Scripts
