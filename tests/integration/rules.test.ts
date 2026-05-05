@@ -1,16 +1,12 @@
 // @vitest-environment node
-import { describe, it, expect, beforeAll, beforeEach, afterAll } from "vitest";
+import { describe, it, beforeAll, beforeEach, afterAll } from "vitest";
 import {
   assertFails,
   assertSucceeds,
   type RulesTestEnvironment,
 } from "@firebase/rules-unit-testing";
 import { doc, getDoc, setDoc } from "firebase/firestore";
-import {
-  startTestEnv,
-  ALLOWED_USER,
-  FORBIDDEN_USER,
-} from "./firestore-test-utils";
+import { startTestEnv, ALLOWED_USER, FORBIDDEN_USER } from "./firestore-test-utils";
 
 describe("Firestore security rules", () => {
   let env: RulesTestEnvironment;
