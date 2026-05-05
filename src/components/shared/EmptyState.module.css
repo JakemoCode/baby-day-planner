@@ -1,0 +1,24 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: var(--space-2);
+  padding: var(--space-6) var(--space-4);
+  color: var(--color-muted);
+}
+
+.title {
+  margin: 0;
+  font-size: var(--text-base);
+  font-weight: var(--weight-medium);
+  color: var(--color-fg-soft);
+}
+
+.body {
+  margin: 0;
+  font-size: var(--text-sm);
+  line-height: var(--line-normal);
+  color: var(--color-muted);
+  max-width: 32ch;
+}
