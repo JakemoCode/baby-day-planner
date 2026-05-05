@@ -1,8 +1,48 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /{document=**} {
-      allow read, write: if false;
+    function isAllowlisted() {
+      return request.auth != null && request.auth.token.email in [
+        "jake136@yahoo.com",
+        "kellyrbarber@gmail.com"
+      ];
+    }
+
+    function isString(value) {
+      return value is string && value.size() > 0;
+    }
+
+    match /children/{childId} {
+      allow read, write: if isAllowlisted();
+
+      match /settings/current {
+        allow read: if isAllowlisted();
+        allow write: if isAllowlisted()
+          && request.resource.data.childId == childId;
+      }
+
+      match /days/{dayId} {
+        allow read: if isAllowlisted();
+        allow create: if isAllowlisted()
+          && request.resource.data.childId == childId
+          && request.resource.data.id == dayId
+          && isString(request.resource.data.date)
+          && request.resource.data.status in ["planned", "active", "archived"];
+        allow update, delete: if isAllowlisted();
+
+        match /events/{eventId} {
+          allow read: if isAllowlisted();
+          allow create: if isAllowlisted()
+            && request.resource.data.dayId == dayId
+            && request.resource.data.id == eventId
+            && isString(request.resource.data.startTime);
+          allow update, delete: if isAllowlisted();
+        }
+      }
+
+      match /templates/{templateId} {
+        allow read, write: if isAllowlisted();
+      }
     }
   }
 }
