@@ -16,7 +16,6 @@ export function useTemplates(childId: string): UseTemplatesResult {
 
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
     listTemplates(db, childId).then((tt) => {
       if (!cancelled) {
         setTemplates(tt);

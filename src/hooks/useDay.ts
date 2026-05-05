@@ -15,7 +15,6 @@ export function useDay(childId: string): UseDayResult {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    setLoading(true);
     return watchActiveDay(db, childId, (d) => {
       setDay(d);
       setLoading(false);

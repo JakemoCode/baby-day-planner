@@ -23,7 +23,6 @@ export function useEvents(childId: string, dayId: string): UseEventsResult {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    setLoading(true);
     return watchEvents(db, childId, dayId, (next) => {
       setEvents(next);
       setLoading(false);
@@ -32,9 +31,7 @@ export function useEvents(childId: string, dayId: string): UseEventsResult {
 
   const createOptimistic = useCallback(
     async (event: Event) => {
-      setEvents((prev) =>
-        [...prev, event].sort((a, b) => a.startTime.localeCompare(b.startTime)),
-      );
+      setEvents((prev) => [...prev, event].sort((a, b) => a.startTime.localeCompare(b.startTime)));
       await createEventRepo(db, childId, event);
     },
     [childId],
