@@ -56,11 +56,7 @@ describe("resolveBottleNapOverlap", () => {
   });
 
   it("re-anchors subsequent projected bottles using the moved bottle's time", () => {
-    const events = [
-      nap(1, "12:05", "12:50"),
-      projBottle(2, "12:40"),
-      projBottle(3, "15:10"),
-    ];
+    const events = [nap(1, "12:05", "12:50"), projBottle(2, "12:40"), projBottle(3, "15:10")];
     const result = resolveBottleNapOverlap(events, sampleSettings, sampleDay, 0);
     expect(result.find((e) => e.eventKey === "bottle_3")?.startTime).toBe("15:20");
   });

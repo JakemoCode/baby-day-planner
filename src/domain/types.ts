@@ -20,7 +20,7 @@ export type Event = {
   eventKey: string;
   type: EventType;
   label: string;
-  startTime: string;     // "HH:MM" or "HH:MM" with hours 24+ for cross-midnight
+  startTime: string; // "HH:MM" or "HH:MM" with hours 24+ for cross-midnight
   endTime?: string;
   owner?: Owner;
   amountOz?: number;
@@ -30,15 +30,15 @@ export type Event = {
 
 export type BottleRule = {
   minOz: number;
-  maxOz?: number;        // open-ended if undefined
+  maxOz?: number; // open-ended if undefined
   intervalMinutes: number;
 };
 
 export type DreamFeedSettings = {
   enabled: boolean;
-  earliestTime: string;            // "HH:MM"
-  latestTime: string;              // "HH:MM" (cap, max 21:00 per PRD)
-  minMinutesAfterBedtime: number;  // default 90
+  earliestTime: string; // "HH:MM"
+  latestTime: string; // "HH:MM" (cap, max 21:00 per PRD)
+  minMinutesAfterBedtime: number; // default 90
 };
 
 export type Settings = {
@@ -47,21 +47,21 @@ export type Settings = {
   defaultBottleIntervalMinutes: number; // fallback when no rule matches
   defaultNapLengthMinutes: number;
   putdownLeadMinutes: number;
-  bedtimeThreshold: string;             // "HH:MM"
+  bedtimeThreshold: string; // "HH:MM"
   shortNapThresholdMinutes: number;
   shortNapAdjustmentMinutes: number;
   wakeWindowsMinutes: number[];
   bottleRules: BottleRule[];
   dreamFeed: DreamFeedSettings;
-  pumpTimes: string[];                  // "HH:MM"[]
+  pumpTimes: string[]; // "HH:MM"[]
 };
 
 export type Day = {
   id: string;
   childId: string;
-  date: string;          // "YYYY-MM-DD"
+  date: string; // "YYYY-MM-DD"
   status: "planned" | "active" | "archived";
-  wakeTime?: string;     // "HH:MM"
+  wakeTime?: string; // "HH:MM"
   ownershipTemplateId?: string;
   createdAt: string;
   archivedAt?: string;
@@ -69,15 +69,15 @@ export type Day = {
 
 export type OwnershipTemplate = {
   id: string;
-  label: string;            // e.g. "Saturday"
-  napOwners: Owner[];       // index = nap N - 1
-  wakeWindowOwners: Owner[];// index = ww N - 1
+  label: string; // e.g. "Saturday"
+  napOwners: Owner[]; // index = nap N - 1
+  wakeWindowOwners: Owner[]; // index = ww N - 1
 };
 
 export type ProjectInput = {
   day: Day;
   settings: Settings;
-  actuals: Event[];                 // events with source: "actual" | "manual"
+  actuals: Event[]; // events with source: "actual" | "manual"
   template?: OwnershipTemplate;
-  nowMinutes?: number;              // for "now" comparisons in overlap rule; default = end of day
+  nowMinutes?: number; // for "now" comparisons in overlap rule; default = end of day
 };

@@ -4,7 +4,7 @@ import { sampleSettings, sampleDay } from "./__fixtures__/sample";
 
 describe("projectNapChain", () => {
   it("returns empty when wakeTime is undefined", () => {
-    const dayWithoutWake = ({ ...sampleDay, wakeTime: undefined }) as any;
+    const { wakeTime: _wt, ...dayWithoutWake } = sampleDay;
     expect(projectNapChain(dayWithoutWake, sampleSettings)).toEqual([]);
   });
 

@@ -19,10 +19,4 @@ export { addDreamFeed } from "./dreamFeed";
 export { mergePumpsAndExtras } from "./extras";
 export { applyTemplate, flipTemplate, copyToOtherDay } from "./owners";
 export { projectDay } from "./project";
-export {
-  nextEvent,
-  nextBottle,
-  nextNap,
-  currentWakeWindow,
-  projectedBedtime,
-} from "./selectors";
+export { nextEvent, nextBottle, nextNap, currentWakeWindow, projectedBedtime } from "./selectors";

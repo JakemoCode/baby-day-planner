@@ -1,11 +1,5 @@
 import { describe, it, expect } from "vitest";
-import {
-  nextEvent,
-  nextBottle,
-  nextNap,
-  currentWakeWindow,
-  projectedBedtime,
-} from "./selectors";
+import { nextEvent, nextBottle, nextNap, currentWakeWindow, projectedBedtime } from "./selectors";
 import { projectDay } from "./project";
 import { sampleSettings, sampleDay } from "./__fixtures__/sample";
 import { parseTime } from "./time";

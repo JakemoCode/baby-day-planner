@@ -40,7 +40,10 @@ describe("addPutdownEvents", () => {
       owner: "Jake",
       source: "projected",
     });
-    expect(putdowns[1]).toMatchObject({ startTime: "12:00", label: "Start putting down for Nap 2" });
+    expect(putdowns[1]).toMatchObject({
+      startTime: "12:00",
+      label: "Start putting down for Nap 2",
+    });
   });
 
   it("inserts a putdown event 15 min before projected bedtime, same mechanic as naps", () => {

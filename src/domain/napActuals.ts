@@ -1,11 +1,7 @@
 import type { Event, Settings } from "./types";
 import { addMinutes, diffMinutes, parseTime } from "./time";
 
-export function applyNapActuals(
-  projected: Event[],
-  actuals: Event[],
-  settings: Settings,
-): Event[] {
+export function applyNapActuals(projected: Event[], actuals: Event[], settings: Settings): Event[] {
   const napActualsByKey = new Map<string, Event>();
   for (const a of actuals) {
     if (a.type === "nap") napActualsByKey.set(a.eventKey, a);
@@ -32,8 +28,7 @@ export function applyNapActuals(
       prevNapActual && prevNapActual.endTime
         ? diffMinutes(prevNapActual.endTime, prevNapActual.startTime)
         : undefined;
-    const isShortPrev =
-      prevDur !== undefined && prevDur < settings.shortNapThresholdMinutes;
+    const isShortPrev = prevDur !== undefined && prevDur < settings.shortNapThresholdMinutes;
     const wwMinutes = isShortPrev
       ? projWwMinutes - settings.shortNapAdjustmentMinutes
       : projWwMinutes;
@@ -49,8 +44,7 @@ export function applyNapActuals(
     const napActual = napActualsByKey.get(napKey);
     if (napActual) {
       const napStart = napActual.startTime;
-      const napEnd =
-        napActual.endTime ?? addMinutes(napStart, settings.defaultNapLengthMinutes);
+      const napEnd = napActual.endTime ?? addMinutes(napStart, settings.defaultNapLengthMinutes);
       result.push({ ...projNap, ...napActual, startTime: napStart, endTime: napEnd });
       cursor = napEnd;
     } else {

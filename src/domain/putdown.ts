@@ -28,7 +28,5 @@ export function addPutdownEvents(events: Event[], settings: Settings): Event[] {
       status: "projected",
     });
   }
-  return [...events, ...additions].sort(
-    (a, b) => parseTime(a.startTime) - parseTime(b.startTime),
-  );
+  return [...events, ...additions].sort((a, b) => parseTime(a.startTime) - parseTime(b.startTime));
 }

@@ -3,11 +3,7 @@ import type { Event, OwnershipTemplate } from "./types";
 import { applyTemplate, flipTemplate, copyToOtherDay } from "./owners";
 import { saturdayTemplate, sampleDay } from "./__fixtures__/sample";
 
-const evt = (
-  type: Event["type"],
-  eventKey: string,
-  start = "07:00",
-): Event => ({
+const evt = (type: Event["type"], eventKey: string, start = "07:00"): Event => ({
   id: eventKey,
   dayId: sampleDay.id,
   eventKey,

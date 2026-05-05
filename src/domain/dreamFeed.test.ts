@@ -33,7 +33,10 @@ describe("addDreamFeed", () => {
   });
 
   it("emits no dream feed when disabled", () => {
-    const settings = { ...sampleSettings, dreamFeed: { ...sampleSettings.dreamFeed, enabled: false } };
+    const settings = {
+      ...sampleSettings,
+      dreamFeed: { ...sampleSettings.dreamFeed, enabled: false },
+    };
     const result = addDreamFeed([bedtime("19:00")], settings, sampleDay);
     expect(result.find((e) => e.type === "dream_feed")).toBeUndefined();
   });

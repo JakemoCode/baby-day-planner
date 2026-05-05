@@ -4,11 +4,7 @@ import { intervalForAmount } from "./bottleRules";
 
 const HARD_STOP_MINUTES = 23 * 60;
 
-export function projectBottleChain(
-  actuals: Event[],
-  settings: Settings,
-  day: Day,
-): Event[] {
+export function projectBottleChain(actuals: Event[], settings: Settings, day: Day): Event[] {
   const bottleActuals = actuals
     .filter((e) => e.type === "bottle" && (e.source === "actual" || e.source === "manual"))
     .sort((a, b) => parseTime(a.startTime) - parseTime(b.startTime));

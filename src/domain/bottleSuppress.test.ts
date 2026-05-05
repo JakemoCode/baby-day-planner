@@ -18,7 +18,13 @@ const ev = (overrides: Partial<Event>): Event => ({
 describe("suppressBottlesAfterBedtime", () => {
   it("drops projected regular bottles at or after bedtime threshold", () => {
     const events = [
-      ev({ id: "b1", eventKey: "bottle_1", startTime: "07:00", source: "actual", status: "actual" }),
+      ev({
+        id: "b1",
+        eventKey: "bottle_1",
+        startTime: "07:00",
+        source: "actual",
+        status: "actual",
+      }),
       ev({ id: "b6", eventKey: "bottle_6", startTime: "19:00", source: "projected" }),
       ev({ id: "b7", eventKey: "bottle_7", startTime: "21:30", source: "projected" }),
     ];
@@ -30,15 +36,29 @@ describe("suppressBottlesAfterBedtime", () => {
 
   it("does not drop actual or manual bottles even past bedtime", () => {
     const events = [
-      ev({ id: "b6", eventKey: "bottle_6", startTime: "19:30", source: "actual", status: "actual" }),
-      ev({ id: "b7", eventKey: "bottle_7", startTime: "20:00", source: "manual", status: "overridden" }),
+      ev({
+        id: "b6",
+        eventKey: "bottle_6",
+        startTime: "19:30",
+        source: "actual",
+        status: "actual",
+      }),
+      ev({
+        id: "b7",
+        eventKey: "bottle_7",
+        startTime: "20:00",
+        source: "manual",
+        status: "overridden",
+      }),
     ];
     const result = suppressBottlesAfterBedtime(events, sampleSettings);
     expect(result).toHaveLength(2);
   });
 
   it("does not affect dream feed events", () => {
-    const events = [ev({ id: "df", eventKey: "dream_feed", type: "dream_feed", startTime: "20:30" })];
+    const events = [
+      ev({ id: "df", eventKey: "dream_feed", type: "dream_feed", startTime: "20:30" }),
+    ];
     const result = suppressBottlesAfterBedtime(events, sampleSettings);
     expect(result).toHaveLength(1);
   });

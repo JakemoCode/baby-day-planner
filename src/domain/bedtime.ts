@@ -12,10 +12,7 @@ export function applyBedtime(events: Event[], settings: Settings): Event[] {
     .filter((e) => {
       if (e.id === napToReplace.id) return false;
       if (e.type === "nap" && parseTime(e.startTime) >= bedtimeMins) return false;
-      if (
-        e.type === "wake_window" &&
-        parseTime(e.startTime) >= parseTime(napToReplace.startTime)
-      ) {
+      if (e.type === "wake_window" && parseTime(e.startTime) >= parseTime(napToReplace.startTime)) {
         return false;
       }
       return true;

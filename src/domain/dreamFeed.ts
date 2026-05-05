@@ -22,7 +22,5 @@ export function addDreamFeed(events: Event[], settings: Settings, day: Day): Eve
     source: "projected",
     status: "projected",
   };
-  return [...events, dreamFeed].sort(
-    (a, b) => parseTime(a.startTime) - parseTime(b.startTime),
-  );
+  return [...events, dreamFeed].sort((a, b) => parseTime(a.startTime) - parseTime(b.startTime));
 }
