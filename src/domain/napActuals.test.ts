@@ -72,4 +72,38 @@ describe("applyNapActuals", () => {
     const ww2 = result.find((e) => e.eventKey === "wake_window_2");
     expect(ww2?.startTime).toBe("10:00");
   });
+
+  it("uses 00:00 as cursor when no wake event is present in projected list", () => {
+    // Build a minimal projected list with no wake event, just ww_1 and nap_1
+    const noWakeProj: Event[] = [
+      {
+        id: "ww1",
+        dayId: sampleDay.id,
+        eventKey: "wake_window_1",
+        type: "wake_window",
+        label: "Wake Window 1",
+        startTime: "07:00",
+        endTime: "09:00",
+        source: "projected",
+        status: "projected",
+      },
+      {
+        id: "nap1",
+        dayId: sampleDay.id,
+        eventKey: "nap_1",
+        type: "nap",
+        label: "Nap 1",
+        startTime: "09:00",
+        endTime: "10:00",
+        source: "projected",
+        status: "projected",
+      },
+    ];
+    const actuals = [actualNap(1, "09:10", "10:10")];
+    const result = applyNapActuals(noWakeProj, actuals, sampleSettings);
+    // ww_1 should start from "00:00" (cursor fallback) with the projected duration (120 min)
+    const ww1 = result.find((e) => e.eventKey === "wake_window_1");
+    expect(ww1?.startTime).toBe("00:00");
+    expect(ww1?.endTime).toBe("02:00");
+  });
 });

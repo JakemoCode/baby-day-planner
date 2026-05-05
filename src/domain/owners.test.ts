@@ -69,3 +69,61 @@ describe("copyToOtherDay", () => {
     expect(sunday.napOwners[1]).toBe("Kelly");
   });
 });
+
+describe("applyTemplate edge cases", () => {
+  it("leaves nap event unchanged when index is out of template range", () => {
+    const t: OwnershipTemplate = {
+      id: "t",
+      label: "T",
+      napOwners: ["Kelly"],
+      wakeWindowOwners: ["Jake"],
+    };
+    // nap_5 → index 4, template only has 1 entry → o is undefined → event unchanged
+    const events = [evt("nap", "nap_5")];
+    const result = applyTemplate(events, t);
+    expect(result[0]?.owner).toBeUndefined();
+  });
+
+  it("leaves wake_window unchanged when index is out of template range", () => {
+    const t: OwnershipTemplate = {
+      id: "t",
+      label: "T",
+      napOwners: ["Kelly"],
+      wakeWindowOwners: ["Jake"],
+    };
+    const events = [evt("wake_window", "wake_window_5")];
+    const result = applyTemplate(events, t);
+    expect(result[0]?.owner).toBeUndefined();
+  });
+
+  it("leaves unrecognised eventKey unchanged (napIndex returns -1)", () => {
+    const t: OwnershipTemplate = {
+      id: "t",
+      label: "T",
+      napOwners: ["Kelly"],
+      wakeWindowOwners: ["Jake"],
+    };
+    // eventKey "nap_x" does not match /^nap_(\d+)/ → index -1 → event unchanged
+    const events = [evt("nap", "nap_x")];
+    const result = applyTemplate(events, t);
+    expect(result[0]?.owner).toBeUndefined();
+  });
+
+  it("leaves putdown unchanged when putdown eventKey has no digit", () => {
+    const t: OwnershipTemplate = {
+      id: "t",
+      label: "T",
+      napOwners: ["Kelly"],
+      wakeWindowOwners: [],
+    };
+    const events = [evt("putdown", "putdown_misc")];
+    const result = applyTemplate(events, t);
+    expect(result[0]?.owner).toBeUndefined();
+  });
+
+  it("passes non-nap/ww/putdown events through unchanged", () => {
+    const events = [evt("bottle", "bottle_1")];
+    const result = applyTemplate(events, saturdayTemplate);
+    expect(result[0]?.owner).toBeUndefined();
+  });
+});

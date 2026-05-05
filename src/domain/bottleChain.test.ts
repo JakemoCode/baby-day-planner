@@ -60,4 +60,12 @@ describe("projectBottleChain", () => {
     const [hh] = lastBottle.startTime.split(":");
     expect(Number(hh)).toBeLessThan(23);
   });
+
+  it("caps at 12 total bottles even when time allows more", () => {
+    // Very short interval + early anchor → n > 12 guard triggers before 23:00
+    const shortInterval = { ...sampleSettings, bottleRules: [{ minOz: 0, intervalMinutes: 15 }] };
+    const result = projectBottleChain([bottle(1, "07:00", 5)], shortInterval, sampleDay);
+    // anchor (bottle_1) + up to 11 projected = 12 max
+    expect(result.length).toBeLessThanOrEqual(12);
+  });
 });

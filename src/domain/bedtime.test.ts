@@ -42,4 +42,21 @@ describe("applyBedtime", () => {
     const result = applyBedtime(proj, earlyBedtime);
     expect(result.find((e) => e.type === "bedtime")).toBeUndefined();
   });
+
+  it("removes wake_window events that start at or after the bedtime nap's start time", () => {
+    // Set threshold early enough that nap_3 becomes bedtime (nap_3 starts at 15:30)
+    // nap_3 napToReplace.startTime = "15:30"; WW4 starts at cursor after nap_3 = 16:30
+    // 16:30 >= 15:30 → WW4 should be removed
+    const earlyThreshold = { ...sampleSettings, bedtimeThreshold: "15:00" };
+    const proj = projectNapChain(sampleDay, earlyThreshold);
+    const result = applyBedtime(proj, earlyThreshold);
+
+    // WW4 starts after napToReplace (nap_3 at 15:30), so it must be removed
+    expect(result.find((e) => e.eventKey === "wake_window_4")).toBeUndefined();
+    // WW3 starts at 13:15, before 15:30, so it should remain
+    expect(result.find((e) => e.eventKey === "wake_window_3")).toBeDefined();
+    // bedtime should be at nap_3's start
+    const bedtime = result.find((e) => e.type === "bedtime");
+    expect(bedtime?.startTime).toBe("15:30");
+  });
 });

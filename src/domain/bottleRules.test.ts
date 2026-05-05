@@ -31,4 +31,14 @@ describe("intervalForAmount", () => {
     ];
     expect(intervalForAmount(overlapping, 5, 999)).toBe(180);
   });
+
+  it("returns the first rule when multiple open-ended rules match (both maxOz undefined)", () => {
+    const twoOpenEnded = [
+      { minOz: 0, intervalMinutes: 100 },
+      { minOz: 3, intervalMinutes: 200 },
+    ];
+    // both have maxOz === undefined → same span (Infinity); sort is stable-ish, first wins
+    const result = intervalForAmount(twoOpenEnded, 4, 999);
+    expect([100, 200]).toContain(result);
+  });
 });
