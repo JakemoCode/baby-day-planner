@@ -19,7 +19,7 @@ All under `src/domain/`:
 | File | Responsibility |
 |---|---|
 | `types.ts` | All public types (`Settings`, `Day`, `Event`, `BottleRule`, `DreamFeedSettings`, `OwnershipTemplate`, `ProjectInput`) |
-| `time.ts` | `parseTime`, `formatTime`, `addMinutes`, `diffMinutes`, `nowMinutes` |
+| `time.ts` | `parseTime`, `formatTime`, `formatTimeForDisplay`, `addMinutes`, `diffMinutes`, `clampTime` |
 | `bottleRules.ts` | `intervalForAmount(rules, amountOz, defaultMinutes)` |
 | `napChain.ts` | Project wake event + wake-window + nap chain from wake time and settings |
 | `napActuals.ts` | Apply actual nap start/end overrides; compute short-nap adjustment |
@@ -161,7 +161,14 @@ Create `src/domain/time.test.ts`:
 
 ```ts
 import { describe, it, expect } from "vitest";
-import { parseTime, formatTime, addMinutes, diffMinutes, clampTime } from "./time";
+import {
+  parseTime,
+  formatTime,
+  formatTimeForDisplay,
+  addMinutes,
+  diffMinutes,
+  clampTime,
+} from "./time";
 
 describe("parseTime", () => {
   it("converts HH:MM to minutes from day start", () => {
@@ -215,6 +222,22 @@ describe("clampTime", () => {
     expect(clampTime("15:00", "10:00", "14:00")).toBe("14:00");
   });
 });
+
+describe("formatTimeForDisplay", () => {
+  it("converts 24h HH:MM to 12h with AM/PM", () => {
+    expect(formatTimeForDisplay("00:00")).toBe("12:00 AM");
+    expect(formatTimeForDisplay("00:30")).toBe("12:30 AM");
+    expect(formatTimeForDisplay("07:05")).toBe("7:05 AM");
+    expect(formatTimeForDisplay("12:00")).toBe("12:00 PM");
+    expect(formatTimeForDisplay("13:45")).toBe("1:45 PM");
+    expect(formatTimeForDisplay("23:59")).toBe("11:59 PM");
+  });
+
+  it("normalizes cross-midnight values into 12h equivalents", () => {
+    // 25:30 == 01:30 next day → "1:30 AM"
+    expect(formatTimeForDisplay("25:30")).toBe("1:30 AM");
+  });
+});
 ```
 
 - [ ] **Step 2: Run tests to confirm failure**
@@ -264,6 +287,15 @@ export function clampTime(time: string, min: string, max: string): string {
   if (t < lo) return min;
   if (t > hi) return max;
   return time;
+}
+
+export function formatTimeForDisplay(time: string): string {
+  const totalMinutes = parseTime(time) % (24 * 60);
+  const h24 = Math.floor(totalMinutes / 60);
+  const m = totalMinutes % 60;
+  const period = h24 >= 12 ? "PM" : "AM";
+  const h12 = h24 % 12 === 0 ? 12 : h24 % 12;
+  return `${h12}:${String(m).padStart(2, "0")} ${period}`;
 }
 ```
 
@@ -904,6 +936,8 @@ git commit -m "feat(domain): substitute Bedtime for projected nap past threshold
 **Files:**
 - Create: `src/domain/putdown.ts`, `src/domain/putdown.test.ts`
 
+**Note:** Putdowns are emitted for both projected naps AND projected bedtime, using the same `putdownLeadMinutes`. Bedtime gets the same mechanic on purpose — same parent action, same lead time. If bedtime ever needs a different lead time (e.g., a separate `bedtimeRoutineLeadMinutes`), the `putdownLeadFor(event, settings)` helper is the one place to branch. Don't sprinkle bedtime-vs-nap conditionals throughout the engine.
+
 - [ ] **Step 1: Write failing tests**
 
 Create `src/domain/putdown.test.ts`:
@@ -927,6 +961,17 @@ const napProjected = (n: number, start: string): Event => ({
   status: "projected",
 });
 
+const bedtimeProjected = (start: string): Event => ({
+  id: "proj-day-1-bedtime",
+  dayId: "day-1",
+  eventKey: "bedtime",
+  type: "bedtime",
+  label: "Bedtime",
+  startTime: start,
+  source: "projected",
+  status: "projected",
+});
+
 describe("addPutdownEvents", () => {
   it("inserts a putdown event 15 min before each projected nap", () => {
     const events: Event[] = [napProjected(1, "09:00"), napProjected(2, "12:15")];
@@ -943,6 +988,19 @@ describe("addPutdownEvents", () => {
     expect(putdowns[1]).toMatchObject({ startTime: "12:00", label: "Start putting down for Nap 2" });
   });
 
+  it("inserts a putdown event 15 min before projected bedtime, same mechanic as naps", () => {
+    const events: Event[] = [bedtimeProjected("19:00")];
+    const result = addPutdownEvents(events, sampleSettings);
+    const putdowns = result.filter((e) => e.type === "putdown");
+    expect(putdowns).toHaveLength(1);
+    expect(putdowns[0]).toMatchObject({
+      type: "putdown",
+      label: "Start putting down for Bedtime",
+      startTime: "18:45",
+      source: "projected",
+    });
+  });
+
   it("uses configured putdownLeadMinutes", () => {
     const events: Event[] = [napProjected(1, "09:00")];
     const result = addPutdownEvents(events, { ...sampleSettings, putdownLeadMinutes: 30 });
@@ -956,7 +1014,7 @@ describe("addPutdownEvents", () => {
     expect(result.filter((e) => e.type === "putdown")).toHaveLength(0);
   });
 
-  it("leaves non-nap events untouched", () => {
+  it("leaves non-sleep events untouched (no putdown for bottles, pumps, extras)", () => {
     const events: Event[] = [
       napProjected(1, "09:00"),
       {
@@ -971,6 +1029,7 @@ describe("addPutdownEvents", () => {
       },
     ];
     const result = addPutdownEvents(events, sampleSettings);
+    expect(result.filter((e) => e.type === "putdown")).toHaveLength(1);
     expect(result.find((e) => e.type === "bottle")).toBeDefined();
   });
 });
@@ -990,18 +1049,28 @@ Expected: module not found.
 import type { Event, Settings } from "./types";
 import { addMinutes, parseTime } from "./time";
 
+// Escape hatch: any event type returning a number gets a putdown emitted at that lead time.
+// Today nap and bedtime share a lead time. If they ever diverge, branch here — don't
+// scatter conditionals through the rest of the engine.
+function putdownLeadFor(event: Event, settings: Settings): number | undefined {
+  if (event.type === "nap") return settings.putdownLeadMinutes;
+  if (event.type === "bedtime") return settings.putdownLeadMinutes;
+  return undefined;
+}
+
 export function addPutdownEvents(events: Event[], settings: Settings): Event[] {
   const additions: Event[] = [];
   for (const e of events) {
-    if (e.type !== "nap") continue;
     if (e.source !== "projected") continue;
+    const lead = putdownLeadFor(e, settings);
+    if (lead === undefined) continue;
     additions.push({
       id: `${e.id}-putdown`,
       dayId: e.dayId,
       eventKey: `${e.eventKey}_putdown`,
       type: "putdown",
       label: `Start putting down for ${e.label}`,
-      startTime: addMinutes(e.startTime, -settings.putdownLeadMinutes),
+      startTime: addMinutes(e.startTime, -lead),
       ...(e.owner !== undefined ? { owner: e.owner } : {}),
       source: "projected",
       status: "projected",
@@ -1019,7 +1088,7 @@ export function addPutdownEvents(events: Event[], settings: Settings): Event[] {
 pnpm test src/domain/putdown.test.ts
 ```
 
-Expected: 4 passed.
+Expected: 5 passed.
 
 - [ ] **Step 5: Commit**
 
@@ -1969,7 +2038,7 @@ describe("projectDay (integration)", () => {
     expect(counts.wake_window).toBe(4);
     expect(counts.nap).toBe(3);
     expect(counts.bedtime).toBe(1);
-    expect(counts.putdown).toBe(3); // one per remaining projected nap
+    expect(counts.putdown).toBe(4); // one per projected nap (3) + one for bedtime
     expect(counts.dream_feed).toBe(1);
     expect(counts.pump).toBe(2);
   });
@@ -2277,7 +2346,14 @@ Expected: HTML report under `coverage/`. Branch coverage on `src/domain/**` shou
 
 ```ts
 export * from "./types";
-export { parseTime, formatTime, addMinutes, diffMinutes, clampTime } from "./time";
+export {
+  parseTime,
+  formatTime,
+  formatTimeForDisplay,
+  addMinutes,
+  diffMinutes,
+  clampTime,
+} from "./time";
 export { intervalForAmount } from "./bottleRules";
 export { projectNapChain } from "./napChain";
 export { applyNapActuals } from "./napActuals";
