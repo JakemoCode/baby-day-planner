@@ -117,33 +117,43 @@ export function BottleRulesEditor({ value, onChange }: BottleRulesEditorProps) {
             const intId = `rule-int-${i}`;
             return (
               <div key={i} className={styles.ruleRow}>
-                <div className={styles.ruleField}>
-                  <label htmlFor={minId} className={styles.smallLabel}>
-                    Min oz
-                  </label>
-                  <input
-                    id={minId}
-                    type="number"
-                    step="0.1"
-                    min="0"
-                    className={styles.smallInput}
-                    value={rule.minOz}
-                    onChange={(e) => updateNumberField(i, "minOz", e.target.value)}
-                  />
-                </div>
-                <div className={styles.ruleField}>
-                  <label htmlFor={maxId} className={styles.smallLabel}>
-                    Max oz (open-ended)
-                  </label>
-                  <input
-                    id={maxId}
-                    type="number"
-                    step="0.1"
-                    min="0"
-                    className={styles.smallInput}
-                    value={rule.maxOz ?? ""}
-                    onChange={(e) => updateMaxOz(i, e.target.value)}
-                  />
+                <div className={styles.ruleTopRow}>
+                  <div className={styles.ruleField}>
+                    <label htmlFor={minId} className={styles.smallLabel}>
+                      Min oz
+                    </label>
+                    <input
+                      id={minId}
+                      type="number"
+                      step="0.1"
+                      min="0"
+                      className={styles.smallInput}
+                      value={rule.minOz}
+                      onChange={(e) => updateNumberField(i, "minOz", e.target.value)}
+                    />
+                  </div>
+                  <div className={styles.ruleField}>
+                    <label htmlFor={maxId} className={styles.smallLabel}>
+                      Max oz (blank = open)
+                    </label>
+                    <input
+                      id={maxId}
+                      type="number"
+                      step="0.1"
+                      min="0"
+                      className={styles.smallInput}
+                      value={rule.maxOz ?? ""}
+                      onChange={(e) => updateMaxOz(i, e.target.value)}
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    className={fieldStyles.dangerButton}
+                    aria-label={`Remove rule ${i + 1}`}
+                    onClick={() => removeRule(i)}
+                  >
+                    ×
+                  </button>
                 </div>
                 <div className={styles.ruleField}>
                   <label htmlFor={intId} className={styles.smallLabel}>
@@ -158,14 +168,6 @@ export function BottleRulesEditor({ value, onChange }: BottleRulesEditorProps) {
                     onChange={(e) => updateNumberField(i, "intervalMinutes", e.target.value)}
                   />
                 </div>
-                <button
-                  type="button"
-                  className={fieldStyles.dangerButton}
-                  aria-label={`Remove rule ${i + 1}`}
-                  onClick={() => removeRule(i)}
-                >
-                  ×
-                </button>
               </div>
             );
           })}

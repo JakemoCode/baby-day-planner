@@ -1,18 +1,25 @@
 .ruleRow {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr auto;
+  display: flex;
+  flex-direction: column;
   gap: var(--space-2);
-  align-items: end;
   padding: var(--space-3);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   background: var(--color-bg);
 }
 
+.ruleTopRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: var(--space-2);
+  align-items: end;
+}
+
 .ruleField {
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
+  min-width: 0; /* allow shrinking inside grid cells on narrow widths */
 }
 
 .smallLabel {
@@ -30,6 +37,8 @@
   color: var(--color-fg);
   font-size: var(--text-sm);
   font-family: inherit;
+  width: 100%;
+  min-width: 0;
 }
 
 .smallInput:focus-visible {
