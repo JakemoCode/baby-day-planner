@@ -42,7 +42,7 @@ export default function TimelinePage() {
     createOptimistic,
     updateOptimistic,
     deleteOptimistic,
-  } = useEvents(CHILD_ID, day?.id ?? "__no_day__");
+  } = useEvents(CHILD_ID, day?.id ?? "");
   const { templates } = useTemplates(CHILD_ID);
   const [drawer, setDrawer] = useState<DrawerState>({ open: false });
 

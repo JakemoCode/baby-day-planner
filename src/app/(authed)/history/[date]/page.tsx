@@ -33,7 +33,7 @@ export default function ArchivedDayPage() {
     };
   }, [date]);
 
-  const { events } = useEvents(CHILD_ID, day?.id ?? "__no_day__");
+  const { events } = useEvents(CHILD_ID, day?.id ?? "");
 
   if (loading) {
     return (
