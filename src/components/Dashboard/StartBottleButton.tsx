@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import type { Event } from "@/domain";
 import { formatTime } from "@/domain";
 import styles from "./ActionButton.module.css";
@@ -12,10 +13,11 @@ export type StartBottleButtonProps = {
 };
 
 function currentLocalMinutes(): number {
-  // Called from a click handler — Date.now() is fine here (handlers aren't render).
   const now = new Date();
   return now.getHours() * 60 + now.getMinutes();
 }
+
+const FEEDBACK_DURATION_MS = 1500;
 
 export function StartBottleButton({
   defaultAmountOz,
@@ -23,7 +25,19 @@ export function StartBottleButton({
   nextNumber,
   onLog,
 }: StartBottleButtonProps) {
-  const handleClick = () => {
+  const [logged, setLogged] = useState(false);
+  const [pending, setPending] = useState(false);
+
+  // Auto-clear the "Logged ✓" state after a beat.
+  useEffect(() => {
+    if (!logged) return;
+    const t = setTimeout(() => setLogged(false), FEEDBACK_DURATION_MS);
+    return () => clearTimeout(t);
+  }, [logged]);
+
+  const handleClick = async () => {
+    if (pending) return;
+    setPending(true);
     const startTime = formatTime(currentLocalMinutes());
     const bottle: Event = {
       id: `actual-${dayId}-bottle-${nextNumber}-${Date.now()}`,
@@ -36,12 +50,25 @@ export function StartBottleButton({
       source: "actual",
       status: "actual",
     };
-    void onLog(bottle);
+    try {
+      await onLog(bottle);
+      setLogged(true);
+    } finally {
+      setPending(false);
+    }
   };
 
+  const label = logged ? "✓ Bottle logged" : "Start Bottle Now";
+
   return (
-    <button type="button" className={styles.button} onClick={handleClick}>
-      Start Bottle Now
+    <button
+      type="button"
+      className={styles.button}
+      onClick={handleClick}
+      disabled={pending}
+      aria-live="polite"
+    >
+      {label}
     </button>
   );
 }
