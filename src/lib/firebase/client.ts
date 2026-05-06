@@ -26,9 +26,7 @@ let _authEmulatorConnected = false;
 let _dbEmulatorConnected = false;
 
 function shouldUseEmulators(): boolean {
-  return (
-    process.env.NEXT_PUBLIC_USE_FIREBASE_EMULATORS === "1" && typeof window !== "undefined"
-  );
+  return process.env.NEXT_PUBLIC_USE_FIREBASE_EMULATORS === "1" && typeof window !== "undefined";
 }
 
 function getOrInitApp(): FirebaseApp {
