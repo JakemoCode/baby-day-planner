@@ -54,6 +54,13 @@ export type Settings = {
   bottleRules: BottleRule[];
   dreamFeed: DreamFeedSettings;
   pumpTimes: string[]; // "HH:MM"[]
+  /**
+   * "Are you sure?" guard: if Start Bottle Now is tapped within this many
+   * minutes of the most recent bottle, the UI shows a confirm dialog before
+   * recording the new event. Optional to keep older Settings docs valid;
+   * UI falls back to 20 when missing.
+   */
+  minBottleIntervalMinutes?: number;
 };
 
 export type Day = {

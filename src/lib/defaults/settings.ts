@@ -31,5 +31,6 @@ export function defaultSettings(childId: string): Settings {
       minMinutesAfterBedtime: 90,
     },
     pumpTimes: ["10:30", "14:30"],
+    minBottleIntervalMinutes: 20,
   };
 }

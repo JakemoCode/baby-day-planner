@@ -109,6 +109,7 @@ export default function DashboardPage() {
   const bottle1Pending = !actuals.some((e) => e.type === "bottle");
   const nextBottleNumber = countByType(actuals, "bottle") + 1;
   const nextNapNumber = countByType(actuals, "nap") + 1;
+  const lastBottleTime = lastTimeForType(actuals, "bottle");
 
   const handleLogBottle = async (bottle: Event) => {
     await createOptimistic(bottle);
@@ -145,6 +146,8 @@ export default function DashboardPage() {
           dayId={day.id}
           nextNumber={nextBottleNumber}
           onLog={handleLogBottle}
+          minIntervalMinutes={settings.minBottleIntervalMinutes ?? 20}
+          {...(lastBottleTime ? { lastBottleTime } : {})}
         />
         <div className={styles.actionsRow}>
           <NapActionButton
@@ -181,6 +184,13 @@ export default function DashboardPage() {
 
 function countByType(events: Event[], type: Event["type"]): number {
   return events.filter((e) => e.type === type).length;
+}
+
+function lastTimeForType(events: Event[], type: Event["type"]): string | undefined {
+  const matches = events
+    .filter((e) => e.type === type)
+    .sort((a, b) => parseTime(b.startTime) - parseTime(a.startTime));
+  return matches[0]?.startTime;
 }
 
 function formatNowAsHHMM(): string {
