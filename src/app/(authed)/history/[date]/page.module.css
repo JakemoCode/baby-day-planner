@@ -1,0 +1,13 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+}
+
+.backLink {
+  font-size: var(--text-sm);
+  color: var(--color-accent);
+  text-decoration: none;
+  padding: var(--space-2) 0;
+}
