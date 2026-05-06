@@ -1,0 +1,37 @@
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  text-decoration: none;
+  color: inherit;
+  min-height: var(--tap-target-min);
+  cursor: pointer;
+  transition:
+    background var(--motion-fast) var(--easing-out),
+    border-color var(--motion-fast) var(--easing-out);
+}
+
+.card:hover {
+  background: var(--color-bg);
+  border-color: var(--color-border-strong);
+}
+
+.card:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.date {
+  font-size: var(--text-base);
+  font-weight: var(--weight-semibold);
+  color: var(--color-fg);
+}
+
+.summary {
+  font-size: var(--text-sm);
+  color: var(--color-muted);
+}
