@@ -11,11 +11,11 @@ describe("CurrentTimeIndicator", () => {
 
   it("renders the time label", () => {
     renderWithAuth(<CurrentTimeIndicator topPx={120} timeLabel="7:05 AM" />);
-    expect(screen.getByText("7:05 AM")).toBeInTheDocument();
+    expect(screen.getByText("7:05 AM")).toBeVisible();
   });
 
   it("includes accessible name", () => {
     renderWithAuth(<CurrentTimeIndicator topPx={0} timeLabel="12:00 AM" />);
-    expect(screen.getByLabelText(/current time/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/current time/i)).toBeVisible();
   });
 });

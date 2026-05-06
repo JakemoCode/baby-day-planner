@@ -5,15 +5,13 @@ import { PromoteTomorrowButton } from "./PromoteTomorrowButton";
 describe("PromoteTomorrowButton", () => {
   it("renders 'Promote to today' label", () => {
     renderWithAuth(<PromoteTomorrowButton onPromote={() => {}} />);
-    expect(screen.getByRole("button", { name: /promote to today/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /promote to today/i })).toBeVisible();
   });
 
   it("opens a confirm dialog when tapped", async () => {
     renderWithAuth(<PromoteTomorrowButton onPromote={() => {}} />);
     await userEvent.click(screen.getByRole("button", { name: /promote to today/i }));
-    expect(
-      screen.getByRole("dialog", { name: /promote.*today|archive today/i }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: /promote.*today|archive today/i })).toBeVisible();
   });
 
   it("calls onPromote when confirmed", async () => {

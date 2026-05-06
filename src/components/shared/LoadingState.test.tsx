@@ -5,7 +5,7 @@ import { LoadingState } from "./LoadingState";
 describe("LoadingState", () => {
   it("has accessible status role", () => {
     renderWithAuth(<LoadingState />);
-    expect(screen.getByRole("status")).toBeInTheDocument();
+    expect(screen.getByRole("status")).toBeVisible();
   });
 
   it("provides an accessible label", () => {

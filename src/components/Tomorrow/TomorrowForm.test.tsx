@@ -93,10 +93,10 @@ describe("TomorrowForm", () => {
       />,
     );
     const select = screen.getByLabelText(/template/i);
-    expect(select).toBeInTheDocument();
-    expect(screen.getByRole("option", { name: /none/i })).toBeInTheDocument();
-    expect(screen.getByRole("option", { name: /saturday/i })).toBeInTheDocument();
-    expect(screen.getByRole("option", { name: /sunday/i })).toBeInTheDocument();
+    expect(select).toBeVisible();
+    expect(screen.getByRole("option", { name: /none/i })).toBeVisible();
+    expect(screen.getByRole("option", { name: /saturday/i })).toBeVisible();
+    expect(screen.getByRole("option", { name: /sunday/i })).toBeVisible();
   });
 
   it("calls onChange when template changes", async () => {
@@ -130,8 +130,8 @@ describe("TomorrowForm", () => {
         onRemoveExtra={() => {}}
       />,
     );
-    expect(screen.getByText("Pediatrician")).toBeInTheDocument();
-    expect(screen.getByText("11:00 AM")).toBeInTheDocument();
+    expect(screen.getByText("Pediatrician")).toBeVisible();
+    expect(screen.getByText("11:00 AM")).toBeVisible();
   });
 
   it("calls onAddExtra when + Add extra is tapped", async () => {

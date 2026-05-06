@@ -16,7 +16,7 @@ vi.mock("./useAuth", () => ({
 describe("SignIn", () => {
   it("renders a Google sign-in button", () => {
     render(<SignIn />);
-    expect(screen.getByRole("button", { name: /sign in with google/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /sign in with google/i })).toBeVisible();
   });
 
   it("invokes signIn when clicked", async () => {

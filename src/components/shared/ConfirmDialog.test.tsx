@@ -20,8 +20,8 @@ describe("ConfirmDialog", () => {
         onCancel={() => {}}
       />,
     );
-    expect(screen.getByRole("dialog", { name: /archive today/i })).toBeInTheDocument();
-    expect(screen.getByText(/Today's data will be moved/)).toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: /archive today/i })).toBeVisible();
+    expect(screen.getByText(/Today's data will be moved/)).toBeVisible();
   });
 
   it("invokes onConfirm when Confirm is clicked", async () => {
@@ -49,8 +49,8 @@ describe("ConfirmDialog", () => {
         onCancel={() => {}}
       />,
     );
-    expect(screen.getByRole("button", { name: "Delete" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Keep" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Delete" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Keep" })).toBeVisible();
   });
 
   it("closes on Escape key", async () => {

@@ -11,9 +11,9 @@ describe("BottomTabs", () => {
   it("renders three primary tabs", () => {
     usePathnameMock.mockReturnValue("/");
     renderWithAuth(<BottomTabs />);
-    expect(screen.getByRole("link", { name: /dashboard/i })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /timeline/i })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /tomorrow/i })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /dashboard/i })).toBeVisible();
+    expect(screen.getByRole("link", { name: /timeline/i })).toBeVisible();
+    expect(screen.getByRole("link", { name: /tomorrow/i })).toBeVisible();
   });
 
   it("marks Dashboard as current when on /", () => {

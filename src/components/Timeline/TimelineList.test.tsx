@@ -41,7 +41,7 @@ const bottle = (n: number, start: string): Event => ({
 describe("TimelineList", () => {
   it("renders an empty state when no events", () => {
     renderWithAuth(<TimelineList events={[]} />);
-    expect(screen.getByText(/nothing scheduled|no events/i)).toBeInTheDocument();
+    expect(screen.getByText(/nothing scheduled|no events/i)).toBeVisible();
   });
 
   it("renders a DurationBlock for each nap", () => {
@@ -77,7 +77,7 @@ describe("TimelineList", () => {
       status: "completed",
     };
     renderWithAuth(<TimelineList events={[extra]} />);
-    expect(screen.getByTestId("duration-block")).toBeInTheDocument();
+    expect(screen.getByTestId("duration-block")).toBeVisible();
   });
 
   it("renders extras without endTime as PointMarkers", () => {
@@ -92,14 +92,14 @@ describe("TimelineList", () => {
       status: "completed",
     };
     renderWithAuth(<TimelineList events={[extra]} />);
-    expect(screen.getByTestId("point-marker")).toBeInTheDocument();
+    expect(screen.getByTestId("point-marker")).toBeVisible();
   });
 
   it("renders a current time indicator when nowMinutes is provided", () => {
     renderWithAuth(
       <TimelineList events={[wake(), nap(1, "09:00", "10:00")]} nowMinutes={8 * 60 + 30} />,
     );
-    expect(screen.getByLabelText(/current time/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/current time/i)).toBeVisible();
   });
 
   it("positions later events with a higher topPx than earlier events", () => {

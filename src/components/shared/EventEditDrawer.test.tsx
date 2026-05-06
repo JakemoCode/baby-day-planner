@@ -40,9 +40,9 @@ describe("EventEditDrawer", () => {
         onCancel={() => {}}
       />,
     );
-    expect(screen.getByLabelText(/start time/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/amount/i)).toBeInTheDocument();
-    expect(screen.getByRole("group", { name: /owner/i })).toBeInTheDocument();
+    expect(screen.getByLabelText(/start time/i)).toBeVisible();
+    expect(screen.getByLabelText(/amount/i)).toBeVisible();
+    expect(screen.getByRole("group", { name: /owner/i })).toBeVisible();
   });
 
   it("renders nap form with start time, end time, and owner fields", () => {
@@ -60,9 +60,9 @@ describe("EventEditDrawer", () => {
         onCancel={() => {}}
       />,
     );
-    expect(screen.getByLabelText(/start time/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/end time/i)).toBeInTheDocument();
-    expect(screen.getByRole("group", { name: /owner/i })).toBeInTheDocument();
+    expect(screen.getByLabelText(/start time/i)).toBeVisible();
+    expect(screen.getByLabelText(/end time/i)).toBeVisible();
+    expect(screen.getByRole("group", { name: /owner/i })).toBeVisible();
   });
 
   it("renders wake_window form with only owner field", () => {
@@ -80,7 +80,7 @@ describe("EventEditDrawer", () => {
         onCancel={() => {}}
       />,
     );
-    expect(screen.getByRole("group", { name: /owner/i })).toBeInTheDocument();
+    expect(screen.getByRole("group", { name: /owner/i })).toBeVisible();
     expect(screen.queryByLabelText(/start time/i)).toBeNull();
     expect(screen.queryByLabelText(/end time/i)).toBeNull();
   });
@@ -101,9 +101,9 @@ describe("EventEditDrawer", () => {
         onCancel={() => {}}
       />,
     );
-    expect(screen.getByLabelText(/label/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/start time/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/end time/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/label/i)).toBeVisible();
+    expect(screen.getByLabelText(/start time/i)).toBeVisible();
+    expect(screen.getByLabelText(/end time/i)).toBeVisible();
   });
 
   it("calls onSave with updated values when Save is clicked", async () => {
@@ -164,7 +164,7 @@ describe("EventEditDrawer", () => {
         onDelete={onDelete}
       />,
     );
-    expect(screen.getByRole("button", { name: /delete/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /delete/i })).toBeVisible();
   });
 
   it("hides Delete for projected events", () => {
@@ -196,7 +196,7 @@ describe("EventEditDrawer", () => {
     await userEvent.click(screen.getByRole("button", { name: /delete/i }));
     // Confirm dialog appears
     const confirmDialog = screen.getByRole("dialog", { name: /delete this/i });
-    expect(confirmDialog).toBeInTheDocument();
+    expect(confirmDialog).toBeVisible();
     await userEvent.click(within(confirmDialog).getByRole("button", { name: /^delete$/i }));
     expect(onDelete).toHaveBeenCalledTimes(1);
   });
@@ -212,7 +212,7 @@ describe("EventEditDrawer", () => {
         onCancel={() => {}}
       />,
     );
-    expect(screen.getByLabelText(/label/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/start time/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/label/i)).toBeVisible();
+    expect(screen.getByLabelText(/start time/i)).toBeVisible();
   });
 });

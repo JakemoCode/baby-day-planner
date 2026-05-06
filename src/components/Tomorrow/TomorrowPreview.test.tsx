@@ -39,7 +39,7 @@ describe("TomorrowPreview", () => {
   it("prompts for wake time when none is set", () => {
     const { wakeTime: _omit, ...incomplete } = tomorrowDay;
     renderWithAuth(<TomorrowPreview day={incomplete} settings={settings} />);
-    expect(screen.getByText(/set.*wake time/i)).toBeInTheDocument();
+    expect(screen.getByText(/set.*wake time/i)).toBeVisible();
   });
 
   it("renders a TimelineList when day is complete", () => {
@@ -72,7 +72,7 @@ describe("TomorrowPreview", () => {
 
   it("includes Bottle 1 in the preview when bottle1Time is provided", () => {
     renderWithAuth(<TomorrowPreview day={tomorrowDay} settings={settings} bottle1Time="07:05" />);
-    expect(screen.getByText(/Bottle 1/)).toBeInTheDocument();
+    expect(screen.getByText(/Bottle 1/)).toBeVisible();
   });
 
   it("includes user-added extras in the preview", () => {
@@ -89,6 +89,6 @@ describe("TomorrowPreview", () => {
       },
     ];
     renderWithAuth(<TomorrowPreview day={tomorrowDay} settings={settings} extras={extras} />);
-    expect(screen.getByText("Pediatrician")).toBeInTheDocument();
+    expect(screen.getByText("Pediatrician")).toBeVisible();
   });
 });
