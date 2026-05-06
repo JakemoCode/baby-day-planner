@@ -1,10 +1,18 @@
 #!/usr/bin/env sh
 
 # Run emulator-backed integration tests before pushing.
-# Uses `firebase emulators:exec` which boots the Firestore emulator,
-# runs the tests, and tears it down afterwards. Requires Java JRE.
 #
-# To skip in an emergency: `git push --no-verify`
+# If a Firestore emulator is already running on :8080 (e.g. you've got
+# `firebase emulators:start` open in another terminal for local dev),
+# we reuse it. Otherwise we boot a fresh one via `firebase emulators:exec`.
+#
+# Requires Java JRE for the boot path. To skip in an emergency:
+# `git push --no-verify`.
 
-echo "→ Running emulator-backed integration tests…"
-pnpm test:integration
+if nc -z localhost 8080 2>/dev/null; then
+  echo "→ Reusing existing Firestore emulator on :8080"
+  exec pnpm exec vitest run src/repositories tests/integration
+else
+  echo "→ Starting Firestore emulator + running integration tests"
+  exec pnpm test:integration
+fi
