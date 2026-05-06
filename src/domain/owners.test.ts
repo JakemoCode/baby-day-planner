@@ -117,9 +117,58 @@ describe("applyTemplate edge cases", () => {
     expect(result[0]?.owner).toBeUndefined();
   });
 
-  it("passes non-nap/ww/putdown events through unchanged", () => {
+  it("leaves bottle event unchanged when template has no bottleOwners", () => {
     const events = [evt("bottle", "bottle_1")];
     const result = applyTemplate(events, saturdayTemplate);
     expect(result[0]?.owner).toBeUndefined();
+  });
+
+  it("assigns bottle owners by index when bottleOwners is set", () => {
+    const t: OwnershipTemplate = {
+      ...saturdayTemplate,
+      bottleOwners: ["Kelly", "Jake", "Daycare"],
+    };
+    const events = [
+      evt("bottle", "bottle_1"),
+      evt("bottle", "bottle_2"),
+      evt("bottle", "bottle_3"),
+    ];
+    const result = applyTemplate(events, t);
+    expect(result[0]?.owner).toBe("Kelly");
+    expect(result[1]?.owner).toBe("Jake");
+    expect(result[2]?.owner).toBe("Daycare");
+  });
+
+  it("leaves bottle unchanged when index is out of bottleOwners range", () => {
+    const t: OwnershipTemplate = {
+      ...saturdayTemplate,
+      bottleOwners: ["Kelly"],
+    };
+    const events = [evt("bottle", "bottle_5")];
+    const result = applyTemplate(events, t);
+    expect(result[0]?.owner).toBeUndefined();
+  });
+});
+
+describe("flipTemplate with bottleOwners", () => {
+  it("flips Jake ↔ Kelly in bottleOwners and preserves Daycare", () => {
+    const t: OwnershipTemplate = {
+      id: "x",
+      label: "Y",
+      napOwners: [],
+      wakeWindowOwners: [],
+      bottleOwners: ["Jake", "Kelly", "Daycare"],
+    };
+    expect(flipTemplate(t).bottleOwners).toEqual(["Kelly", "Jake", "Daycare"]);
+  });
+
+  it("omits bottleOwners in output when input has none", () => {
+    const t: OwnershipTemplate = {
+      id: "x",
+      label: "Y",
+      napOwners: ["Jake"],
+      wakeWindowOwners: ["Kelly"],
+    };
+    expect(flipTemplate(t).bottleOwners).toBeUndefined();
   });
 });

@@ -79,6 +79,7 @@ export type OwnershipTemplate = {
   label: string; // e.g. "Saturday"
   napOwners: Owner[]; // index = nap N - 1
   wakeWindowOwners: Owner[]; // index = ww N - 1
+  bottleOwners?: Owner[]; // index = bottle N - 1; optional for back-compat
 };
 
 export type ProjectInput = {
