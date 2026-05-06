@@ -1,11 +1,21 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useAuth } from "./useAuth";
 
 export function SignIn() {
   const { signIn, status } = useAuth();
+  const router = useRouter();
   const [error, setError] = useState<string | null>(null);
+
+  // Once Firebase Auth confirms the user is authorized, leave /sign-in.
+  // Without this, signing in succeeds but the SignIn page stays mounted.
+  useEffect(() => {
+    if (status === "authorized") {
+      router.replace("/");
+    }
+  }, [status, router]);
 
   async function handleClick() {
     setError(null);
