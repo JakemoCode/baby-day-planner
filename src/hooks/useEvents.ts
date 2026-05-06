@@ -23,6 +23,10 @@ export function useEvents(childId: string, dayId: string): UseEventsResult {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Skip subscription when there's no day yet (e.g. dashboard before
+    // "Start New Day" is tapped). Avoids hitting Firestore with a placeholder
+    // doc ID, which trips reserved-id validation (`__.*__`).
+    if (!dayId) return;
     return watchEvents(db, childId, dayId, (next) => {
       setEvents(next);
       setLoading(false);

@@ -34,7 +34,7 @@ export default function DashboardPage() {
   const nowMinutes = useNowMinutes();
   const { day, loading: dayLoading } = useDay(CHILD_ID);
   const { settings, loading: settingsLoading } = useSettings(CHILD_ID);
-  const { events: actuals, createOptimistic } = useEvents(CHILD_ID, day?.id ?? "__no_day__");
+  const { events: actuals, createOptimistic } = useEvents(CHILD_ID, day?.id ?? "");
   const { templates } = useTemplates(CHILD_ID);
   const [drawer, setDrawer] = useState<DrawerState>({ open: false });
 
