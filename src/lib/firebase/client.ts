@@ -1,88 +1,47 @@
 /*
- * Lazy Firebase client.
+ * Firebase client (eager init, direct env access).
  *
- * IMPORTANT: NEXT_PUBLIC_* env vars must be accessed via direct property
- * (`process.env.NEXT_PUBLIC_FIREBASE_API_KEY`), not via dynamic key
- * (`process.env[name]`). The Next.js compiler statically replaces direct
- * accesses at build time with literal values for the client bundle. Dynamic
- * key access ships unchanged and reads as undefined in the browser, where
- * `process.env` is essentially empty. This was the cause of the
- * "Missing Firebase env var" runtime error during local dev.
+ * Two non-obvious rules baked in:
  *
- * `auth`, `db`, and `firebaseApp` are exposed as Proxies that initialise
- * Firebase on first property access. Server-render can traverse the module
- * graph without throwing; client-side init happens lazily when AuthProvider
- * mounts in the browser.
+ * 1. NEXT_PUBLIC_* env vars MUST be accessed via direct property
+ *    (`process.env.NEXT_PUBLIC_FIREBASE_API_KEY`), never via dynamic key
+ *    (`process.env[name]`). Next.js's compiler statically replaces direct
+ *    accesses with literal values at build/dev compile time for both server
+ *    and client bundles. Dynamic key access ships unchanged and reads as
+ *    undefined in the browser.
+ *
+ * 2. We expose `auth` and `db` as real Firebase instances, NOT Proxies.
+ *    The Firestore SDK does `instanceof` checks on these handles internally
+ *    ("Type does not match the expected instance. Did you pass a reference
+ *    from a different Firestore SDK?"); a Proxy fails those checks.
  */
 
 import { getApps, initializeApp, type FirebaseApp } from "firebase/app";
 import { connectAuthEmulator, getAuth, type Auth } from "firebase/auth";
 import { connectFirestoreEmulator, getFirestore, type Firestore } from "firebase/firestore";
 
-let _app: FirebaseApp | undefined;
-let _auth: Auth | undefined;
-let _db: Firestore | undefined;
-let _authEmulatorConnected = false;
-let _dbEmulatorConnected = false;
+const apiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
+const authDomain = process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN;
+const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
+const appId = process.env.NEXT_PUBLIC_FIREBASE_APP_ID;
 
-function shouldUseEmulators(): boolean {
-  return process.env.NEXT_PUBLIC_USE_FIREBASE_EMULATORS === "1" && typeof window !== "undefined";
-}
+if (!apiKey) throw new Error("Missing Firebase env var: NEXT_PUBLIC_FIREBASE_API_KEY");
+if (!authDomain) throw new Error("Missing Firebase env var: NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN");
+if (!projectId) throw new Error("Missing Firebase env var: NEXT_PUBLIC_FIREBASE_PROJECT_ID");
+if (!appId) throw new Error("Missing Firebase env var: NEXT_PUBLIC_FIREBASE_APP_ID");
 
-function getOrInitApp(): FirebaseApp {
-  if (_app) return _app;
-  const existing = getApps()[0];
-  if (existing) {
-    _app = existing;
-    return _app;
+export const firebaseApp: FirebaseApp =
+  getApps()[0] ?? initializeApp({ apiKey, authDomain, projectId, appId });
+export const auth: Auth = getAuth(firebaseApp);
+export const db: Firestore = getFirestore(firebaseApp);
+
+// Connect to local emulators when the env flag is set.
+// Browser-only — emulator suite runs on localhost which isn't reachable in SSR.
+if (process.env.NEXT_PUBLIC_USE_FIREBASE_EMULATORS === "1" && typeof window !== "undefined") {
+  const w = window as unknown as { __firebaseEmulatorsConnected?: boolean };
+  if (!w.__firebaseEmulatorsConnected) {
+    connectAuthEmulator(auth, "http://localhost:9099", { disableWarnings: true });
+    connectFirestoreEmulator(db, "localhost", 8080);
+    w.__firebaseEmulatorsConnected = true;
   }
-
-  // Direct property access — required for Next.js compile-time inlining
-  // in the client bundle. Do NOT change to process.env[name].
-  const apiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
-  const authDomain = process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN;
-  const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
-  const appId = process.env.NEXT_PUBLIC_FIREBASE_APP_ID;
-
-  if (!apiKey) throw new Error("Missing Firebase env var: NEXT_PUBLIC_FIREBASE_API_KEY");
-  if (!authDomain) throw new Error("Missing Firebase env var: NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN");
-  if (!projectId) throw new Error("Missing Firebase env var: NEXT_PUBLIC_FIREBASE_PROJECT_ID");
-  if (!appId) throw new Error("Missing Firebase env var: NEXT_PUBLIC_FIREBASE_APP_ID");
-
-  _app = initializeApp({ apiKey, authDomain, projectId, appId });
-  return _app;
 }
-
-function getAuthInstance(): Auth {
-  if (!_auth) {
-    _auth = getAuth(getOrInitApp());
-    if (shouldUseEmulators() && !_authEmulatorConnected) {
-      connectAuthEmulator(_auth, "http://localhost:9099", { disableWarnings: true });
-      _authEmulatorConnected = true;
-    }
-  }
-  return _auth;
-}
-
-function getDbInstance(): Firestore {
-  if (!_db) {
-    _db = getFirestore(getOrInitApp());
-    if (shouldUseEmulators() && !_dbEmulatorConnected) {
-      connectFirestoreEmulator(_db, "localhost", 8080);
-      _dbEmulatorConnected = true;
-    }
-  }
-  return _db;
-}
-
-export const firebaseApp: FirebaseApp = new Proxy({} as FirebaseApp, {
-  get: (_t, prop) => Reflect.get(getOrInitApp(), prop),
-});
-
-export const auth: Auth = new Proxy({} as Auth, {
-  get: (_t, prop) => Reflect.get(getAuthInstance(), prop),
-});
-
-export const db: Firestore = new Proxy({} as Firestore, {
-  get: (_t, prop) => Reflect.get(getDbInstance(), prop),
-});
