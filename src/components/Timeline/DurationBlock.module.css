@@ -1,0 +1,106 @@
+.block {
+  position: absolute;
+  left: 64px;
+  right: var(--space-3);
+  border-radius: var(--radius-md);
+  padding: var(--space-2) var(--space-3);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  overflow: hidden;
+  text-align: left;
+  font: inherit;
+  color: var(--color-fg);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  cursor: pointer;
+  transition:
+    background var(--motion-fast) var(--easing-out),
+    border-color var(--motion-fast) var(--easing-out);
+}
+
+.block[data-static="true"] {
+  cursor: default;
+}
+
+.block:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+/* Type-specific treatments */
+.block[data-event-type="nap"] {
+  background: var(--color-accent-soft);
+  border-color: transparent;
+}
+
+.block[data-event-type="wake_window"] {
+  background: transparent;
+  border-color: var(--color-border-strong);
+  border-style: dashed;
+}
+
+.block[data-event-type="extra"] {
+  background: var(--color-surface);
+  border-color: var(--color-warning);
+}
+
+/* Owner tints for naps */
+.block[data-event-type="nap"][data-owner="Jake"] {
+  background: var(--color-owner-jake-tint);
+}
+.block[data-event-type="nap"][data-owner="Kelly"] {
+  background: var(--color-owner-kelly-tint);
+}
+.block[data-event-type="nap"][data-owner="Daycare"] {
+  background: var(--color-owner-daycare-tint);
+}
+
+/* Owner tints for wake windows (subtle border color) */
+.block[data-event-type="wake_window"][data-owner="Jake"] {
+  border-color: var(--color-owner-jake);
+}
+.block[data-event-type="wake_window"][data-owner="Kelly"] {
+  border-color: var(--color-owner-kelly);
+}
+.block[data-event-type="wake_window"][data-owner="Daycare"] {
+  border-color: var(--color-owner-daycare);
+}
+
+/* Source treatments */
+.block[data-source="projected"] {
+  border-style: dashed;
+  opacity: 0.85;
+}
+
+.block[data-source="actual"],
+.block[data-source="manual"] {
+  border-style: solid;
+  opacity: 1;
+}
+
+.label {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.range {
+  font-size: var(--text-xs);
+  color: var(--color-fg-soft);
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.owner {
+  font-size: var(--text-xs);
+  color: var(--color-muted);
+}
+
+.editMark {
+  font-size: var(--text-xs);
+  color: var(--color-muted);
+}
