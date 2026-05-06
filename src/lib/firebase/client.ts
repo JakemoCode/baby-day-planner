@@ -22,7 +22,14 @@ import { connectFirestoreEmulator, getFirestore, type Firestore } from "firebase
 let _app: FirebaseApp | undefined;
 let _auth: Auth | undefined;
 let _db: Firestore | undefined;
-let _emulatorsConnected = false;
+let _authEmulatorConnected = false;
+let _dbEmulatorConnected = false;
+
+function shouldUseEmulators(): boolean {
+  return (
+    process.env.NEXT_PUBLIC_USE_FIREBASE_EMULATORS === "1" && typeof window !== "undefined"
+  );
+}
 
 function getOrInitApp(): FirebaseApp {
   if (_app) return _app;
@@ -48,21 +55,13 @@ function getOrInitApp(): FirebaseApp {
   return _app;
 }
 
-function maybeConnectEmulators(): void {
-  if (_emulatorsConnected) return;
-  // Direct property access (see file header).
-  if (process.env.NEXT_PUBLIC_USE_FIREBASE_EMULATORS !== "1") return;
-  if (typeof window === "undefined") return;
-  if (!_auth || !_db) return;
-  connectAuthEmulator(_auth, "http://localhost:9099", { disableWarnings: true });
-  connectFirestoreEmulator(_db, "localhost", 8080);
-  _emulatorsConnected = true;
-}
-
 function getAuthInstance(): Auth {
   if (!_auth) {
     _auth = getAuth(getOrInitApp());
-    maybeConnectEmulators();
+    if (shouldUseEmulators() && !_authEmulatorConnected) {
+      connectAuthEmulator(_auth, "http://localhost:9099", { disableWarnings: true });
+      _authEmulatorConnected = true;
+    }
   }
   return _auth;
 }
@@ -70,7 +69,10 @@ function getAuthInstance(): Auth {
 function getDbInstance(): Firestore {
   if (!_db) {
     _db = getFirestore(getOrInitApp());
-    maybeConnectEmulators();
+    if (shouldUseEmulators() && !_dbEmulatorConnected) {
+      connectFirestoreEmulator(_db, "localhost", 8080);
+      _dbEmulatorConnected = true;
+    }
   }
   return _db;
 }
