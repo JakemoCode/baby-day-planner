@@ -7,7 +7,10 @@ import styles from "./BottleRulesEditor.module.css";
 
 export type BottleSettings = Pick<
   Settings,
-  "defaultBottleAmountOz" | "defaultBottleIntervalMinutes" | "bottleRules"
+  | "defaultBottleAmountOz"
+  | "defaultBottleIntervalMinutes"
+  | "bottleRules"
+  | "minBottleIntervalMinutes"
 >;
 
 export type BottleRulesEditorProps = {
@@ -16,7 +19,7 @@ export type BottleRulesEditorProps = {
 };
 
 export function BottleRulesEditor({ value, onChange }: BottleRulesEditorProps) {
-  const ids = { amount: useId(), interval: useId() };
+  const ids = { amount: useId(), interval: useId(), guard: useId() };
 
   const replaceRule = (index: number, next: BottleRule) => {
     const list = [...value.bottleRules];
@@ -103,6 +106,25 @@ export function BottleRulesEditor({ value, onChange }: BottleRulesEditorProps) {
           onChange={(e) => {
             const n = Number(e.target.value);
             if (Number.isFinite(n)) onChange({ ...value, defaultBottleIntervalMinutes: n });
+          }}
+        />
+      </label>
+
+      <label className={fieldStyles.field} htmlFor={ids.guard}>
+        <span className={fieldStyles.label}>Confirm bottle within (minutes)</span>
+        <span className={fieldStyles.hint}>
+          Tapping &ldquo;Start Bottle Now&rdquo; sooner than this asks &ldquo;are you sure?&rdquo; —
+          protects against accidental double-taps.
+        </span>
+        <input
+          id={ids.guard}
+          type="number"
+          min="0"
+          className={fieldStyles.input}
+          value={value.minBottleIntervalMinutes ?? 20}
+          onChange={(e) => {
+            const n = Number(e.target.value);
+            if (Number.isFinite(n)) onChange({ ...value, minBottleIntervalMinutes: n });
           }}
         />
       </label>
