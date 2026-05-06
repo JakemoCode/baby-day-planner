@@ -13,6 +13,10 @@ export function applyTemplate(events: Event[], template: OwnershipTemplate): Eve
     const m = /^nap_(\d+)_putdown/.exec(key);
     return m ? Number(m[1]) - 1 : -1;
   };
+  const bottleIndex = (key: string) => {
+    const m = /^bottle_(\d+)/.exec(key);
+    return m ? Number(m[1]) - 1 : -1;
+  };
 
   return events.map((e) => {
     if (e.owner !== undefined) return e;
@@ -31,6 +35,11 @@ export function applyTemplate(events: Event[], template: OwnershipTemplate): Eve
       const o = i >= 0 ? template.napOwners[i] : undefined;
       return o ? { ...e, owner: o } : e;
     }
+    if (e.type === "bottle") {
+      const i = bottleIndex(e.eventKey);
+      const o = i >= 0 ? template.bottleOwners?.[i] : undefined;
+      return o ? { ...e, owner: o } : e;
+    }
     return e;
   });
 }
@@ -42,6 +51,7 @@ export function flipTemplate(t: OwnershipTemplate): OwnershipTemplate {
     ...t,
     napOwners: t.napOwners.map(flipOwner),
     wakeWindowOwners: t.wakeWindowOwners.map(flipOwner),
+    ...(t.bottleOwners ? { bottleOwners: t.bottleOwners.map(flipOwner) } : {}),
   };
 }
 

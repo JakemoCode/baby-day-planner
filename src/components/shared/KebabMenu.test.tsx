@@ -12,11 +12,12 @@ describe("KebabMenu", () => {
     expect(screen.getByRole("button", { name: /more options/i })).toBeVisible();
   });
 
-  it("opens a menu with History, Settings, and Sign out when clicked", async () => {
+  it("opens a menu with History, Day templates, Settings, and Sign out when clicked", async () => {
     renderWithAuth(<KebabMenu />);
     await userEvent.click(screen.getByRole("button", { name: /more options/i }));
     expect(screen.getByRole("menuitem", { name: /history/i })).toBeVisible();
-    expect(screen.getByRole("menuitem", { name: /settings/i })).toBeVisible();
+    expect(screen.getByRole("menuitem", { name: /day templates/i })).toBeVisible();
+    expect(screen.getByRole("menuitem", { name: /^settings$/i })).toBeVisible();
     expect(screen.getByRole("menuitem", { name: /sign out/i })).toBeVisible();
   });
 

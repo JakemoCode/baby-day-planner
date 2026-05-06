@@ -55,6 +55,14 @@ export function KebabMenu() {
             History
           </Link>
           <Link
+            href="/day-templates"
+            role="menuitem"
+            className={styles.item}
+            onClick={() => setOpen(false)}
+          >
+            Day templates
+          </Link>
+          <Link
             href="/settings"
             role="menuitem"
             className={styles.item}
