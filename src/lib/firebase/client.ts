@@ -1,29 +1,23 @@
 /*
  * Lazy Firebase client.
  *
- * The previous version constructed the FirebaseApp at module-load time, which
- * meant any module in the import graph (e.g. AuthProvider) caused requireEnv()
- * to fire during SSR — before NEXT_PUBLIC_* values were always available. This
- * threw a hard "Missing Firebase env var" runtime error on the very first
- * request.
+ * IMPORTANT: NEXT_PUBLIC_* env vars must be accessed via direct property
+ * (`process.env.NEXT_PUBLIC_FIREBASE_API_KEY`), not via dynamic key
+ * (`process.env[name]`). The Next.js compiler statically replaces direct
+ * accesses at build time with literal values for the client bundle. Dynamic
+ * key access ships unchanged and reads as undefined in the browser, where
+ * `process.env` is essentially empty. This was the cause of the
+ * "Missing Firebase env var" runtime error during local dev.
  *
- * This version exposes `auth` and `db` as Proxies that initialise the
- * Firebase app on first property access. Server-rendered code can evaluate
- * the module without touching env vars; the client (where NEXT_PUBLIC_* is
- * inlined at build/dev compile time) initialises lazily on first use.
+ * `auth`, `db`, and `firebaseApp` are exposed as Proxies that initialise
+ * Firebase on first property access. Server-render can traverse the module
+ * graph without throwing; client-side init happens lazily when AuthProvider
+ * mounts in the browser.
  */
 
 import { getApps, initializeApp, type FirebaseApp } from "firebase/app";
 import { connectAuthEmulator, getAuth, type Auth } from "firebase/auth";
 import { connectFirestoreEmulator, getFirestore, type Firestore } from "firebase/firestore";
-
-function requireEnv(name: string): string {
-  const value = process.env[name];
-  if (!value) {
-    throw new Error(`Missing Firebase env var: ${name}`);
-  }
-  return value;
-}
 
 let _app: FirebaseApp | undefined;
 let _auth: Auth | undefined;
@@ -37,17 +31,26 @@ function getOrInitApp(): FirebaseApp {
     _app = existing;
     return _app;
   }
-  _app = initializeApp({
-    apiKey: requireEnv("NEXT_PUBLIC_FIREBASE_API_KEY"),
-    authDomain: requireEnv("NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN"),
-    projectId: requireEnv("NEXT_PUBLIC_FIREBASE_PROJECT_ID"),
-    appId: requireEnv("NEXT_PUBLIC_FIREBASE_APP_ID"),
-  });
+
+  // Direct property access — required for Next.js compile-time inlining
+  // in the client bundle. Do NOT change to process.env[name].
+  const apiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
+  const authDomain = process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN;
+  const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
+  const appId = process.env.NEXT_PUBLIC_FIREBASE_APP_ID;
+
+  if (!apiKey) throw new Error("Missing Firebase env var: NEXT_PUBLIC_FIREBASE_API_KEY");
+  if (!authDomain) throw new Error("Missing Firebase env var: NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN");
+  if (!projectId) throw new Error("Missing Firebase env var: NEXT_PUBLIC_FIREBASE_PROJECT_ID");
+  if (!appId) throw new Error("Missing Firebase env var: NEXT_PUBLIC_FIREBASE_APP_ID");
+
+  _app = initializeApp({ apiKey, authDomain, projectId, appId });
   return _app;
 }
 
 function maybeConnectEmulators(): void {
   if (_emulatorsConnected) return;
+  // Direct property access (see file header).
   if (process.env.NEXT_PUBLIC_USE_FIREBASE_EMULATORS !== "1") return;
   if (typeof window === "undefined") return;
   if (!_auth || !_db) return;
