@@ -19,24 +19,24 @@ const nap = (overrides: Partial<Event> = {}): Event => ({
 describe("NextNapPreview", () => {
   it("renders the nap time range and label", () => {
     renderWithAuth(<NextNapPreview nap={nap()} />);
-    expect(screen.getByText(/next nap/i)).toBeInTheDocument();
-    expect(screen.getByText("9:45–10:30 AM")).toBeInTheDocument();
-    expect(screen.getByText(/Nap 2/)).toBeInTheDocument();
+    expect(screen.getByText(/next nap/i)).toBeVisible();
+    expect(screen.getByText("9:45–10:30 AM")).toBeVisible();
+    expect(screen.getByText(/Nap 2/)).toBeVisible();
   });
 
   it("includes owner in subtitle when set", () => {
     renderWithAuth(<NextNapPreview nap={nap({ owner: "Jake" })} />);
-    expect(screen.getByText(/Nap 2 · Jake/)).toBeInTheDocument();
+    expect(screen.getByText(/Nap 2 · Jake/)).toBeVisible();
   });
 
   it("renders calm empty state when no nap scheduled", () => {
     renderWithAuth(<NextNapPreview nap={undefined} />);
-    expect(screen.getByText(/no more naps today|nothing scheduled/i)).toBeInTheDocument();
+    expect(screen.getByText(/no more naps today|nothing scheduled/i)).toBeVisible();
   });
 
   it("only shows start time when endTime is missing (in-progress)", () => {
     const { endTime: _omit, ...inProgress } = nap();
     renderWithAuth(<NextNapPreview nap={inProgress} />);
-    expect(screen.getByText("9:45 AM")).toBeInTheDocument();
+    expect(screen.getByText("9:45 AM")).toBeVisible();
   });
 });

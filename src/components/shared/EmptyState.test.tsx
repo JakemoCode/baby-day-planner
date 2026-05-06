@@ -5,12 +5,12 @@ import { EmptyState } from "./EmptyState";
 describe("EmptyState", () => {
   it("renders the title", () => {
     renderWithAuth(<EmptyState title="No bottles yet" />);
-    expect(screen.getByText("No bottles yet")).toBeInTheDocument();
+    expect(screen.getByText("No bottles yet")).toBeVisible();
   });
 
   it("renders an optional body", () => {
     renderWithAuth(<EmptyState title="Day's done" body="Have a good night" />);
-    expect(screen.getByText("Have a good night")).toBeInTheDocument();
+    expect(screen.getByText("Have a good night")).toBeVisible();
   });
 
   it("renders only the title when no body", () => {

@@ -5,12 +5,12 @@ import { StartDayButton } from "./StartDayButton";
 describe("StartDayButton", () => {
   it("renders 'Start New Day' when no Tomorrow Plan exists", () => {
     renderWithAuth(<StartDayButton hasTomorrowPlan={false} onStart={() => {}} />);
-    expect(screen.getByRole("button", { name: /^start new day$/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^start new day$/i })).toBeVisible();
   });
 
   it("renders 'Start Day from Plan' when a Tomorrow Plan exists", () => {
     renderWithAuth(<StartDayButton hasTomorrowPlan={true} onStart={() => {}} />);
-    expect(screen.getByRole("button", { name: /^start day from plan$/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^start day from plan$/i })).toBeVisible();
   });
 
   it("shows a confirm dialog and calls onStart with useTomorrowPlan=false when confirmed without a plan", async () => {
@@ -44,7 +44,7 @@ describe("StartDayButton", () => {
     const onStart = vi.fn();
     renderWithAuth(<StartDayButton hasTomorrowPlan={true} onStart={onStart} />);
     await userEvent.click(screen.getByRole("button", { name: /more.*start/i }));
-    expect(screen.getByRole("menuitem", { name: /start blank instead/i })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: /start blank instead/i })).toBeVisible();
   });
 
   it("'Start blank instead' triggers the same flow but with useTomorrowPlan=false", async () => {

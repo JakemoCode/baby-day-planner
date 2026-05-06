@@ -5,10 +5,10 @@ import { OwnerPicker } from "./OwnerPicker";
 describe("OwnerPicker", () => {
   it("renders four options: None, Jake, Kelly, Daycare", () => {
     renderWithAuth(<OwnerPicker value={undefined} onChange={() => {}} />);
-    expect(screen.getByRole("button", { name: "None" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Jake" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Kelly" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Daycare" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "None" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Jake" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Kelly" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Daycare" })).toBeVisible();
   });
 
   it("marks the current value with aria-pressed=true", () => {
@@ -38,6 +38,6 @@ describe("OwnerPicker", () => {
 
   it("supports a label", () => {
     renderWithAuth(<OwnerPicker value={undefined} onChange={() => {}} label="Owner" />);
-    expect(screen.getByText("Owner")).toBeInTheDocument();
+    expect(screen.getByText("Owner")).toBeVisible();
   });
 });

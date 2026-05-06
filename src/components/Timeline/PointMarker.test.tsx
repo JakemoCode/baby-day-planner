@@ -25,18 +25,18 @@ describe("PointMarker", () => {
 
   it("shows the time and label", () => {
     renderWithAuth(<PointMarker event={bottle()} topPx={0} />);
-    expect(screen.getByText("7:05 AM")).toBeInTheDocument();
-    expect(screen.getByText(/Bottle 1/)).toBeInTheDocument();
+    expect(screen.getByText("7:05 AM")).toBeVisible();
+    expect(screen.getByText(/Bottle 1/)).toBeVisible();
   });
 
   it("includes amount oz subtitle for bottles", () => {
     renderWithAuth(<PointMarker event={bottle({ amountOz: 5.5 })} topPx={0} />);
-    expect(screen.getByText(/5.5 oz/)).toBeInTheDocument();
+    expect(screen.getByText(/5.5 oz/)).toBeVisible();
   });
 
   it("includes owner when set", () => {
     renderWithAuth(<PointMarker event={bottle({ owner: "Kelly" })} topPx={0} />);
-    expect(screen.getByText(/kelly/i)).toBeInTheDocument();
+    expect(screen.getByText(/kelly/i)).toBeVisible();
   });
 
   it("calls onClick when tapped", async () => {

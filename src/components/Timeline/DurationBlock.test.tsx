@@ -28,13 +28,13 @@ describe("DurationBlock", () => {
 
   it("shows the label and time range", () => {
     renderWithAuth(<DurationBlock event={nap()} topPx={0} heightPx={120} />);
-    expect(screen.getByText("Nap 1")).toBeInTheDocument();
-    expect(screen.getByText(/9:00.*10:00/i)).toBeInTheDocument();
+    expect(screen.getByText("Nap 1")).toBeVisible();
+    expect(screen.getByText(/9:00.*10:00/i)).toBeVisible();
   });
 
   it("includes owner when assigned", () => {
     renderWithAuth(<DurationBlock event={nap({ owner: "Kelly" })} topPx={0} heightPx={120} />);
-    expect(screen.getByText(/kelly/i)).toBeInTheDocument();
+    expect(screen.getByText(/kelly/i)).toBeVisible();
   });
 
   it("calls onClick when tapped", async () => {

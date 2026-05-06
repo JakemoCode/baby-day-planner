@@ -8,7 +8,7 @@ describe("StartBottleButton", () => {
     renderWithAuth(
       <StartBottleButton defaultAmountOz={5} dayId="d1" nextNumber={1} onLog={() => {}} />,
     );
-    expect(screen.getByRole("button", { name: /start bottle now/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /start bottle now/i })).toBeVisible();
   });
 
   it("calls onLog with a bottle event at current time + default amount", async () => {

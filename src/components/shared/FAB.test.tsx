@@ -5,7 +5,7 @@ import { FAB } from "./FAB";
 describe("FAB", () => {
   it("renders an accessible button with the given label", () => {
     renderWithAuth(<FAB label="Add extra event" onClick={() => {}} />);
-    expect(screen.getByRole("button", { name: /add extra event/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /add extra event/i })).toBeVisible();
   });
 
   it("invokes onClick when tapped", async () => {

@@ -7,20 +7,20 @@ describe("EndOfDayCard", () => {
     renderWithAuth(
       <EndOfDayCard afterMidnight={false} hasTomorrowPlan={false} onStart={() => {}} />,
     );
-    expect(screen.getByText(/have a good night/i)).toBeInTheDocument();
+    expect(screen.getByText(/have a good night/i)).toBeVisible();
   });
 
   it("shows 'Tap to start day' prompt + StartDayButton after midnight", () => {
     renderWithAuth(
       <EndOfDayCard afterMidnight={true} hasTomorrowPlan={false} onStart={() => {}} />,
     );
-    expect(screen.getByText(/tap to start day/i)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /start new day/i })).toBeInTheDocument();
+    expect(screen.getByText(/tap to start day/i)).toBeVisible();
+    expect(screen.getByRole("button", { name: /start new day/i })).toBeVisible();
   });
 
   it("uses 'Tap to start plan' wording when a Tomorrow Plan exists", () => {
     renderWithAuth(<EndOfDayCard afterMidnight={true} hasTomorrowPlan={true} onStart={() => {}} />);
-    expect(screen.getByText(/tap to start plan/i)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /start day from plan/i })).toBeInTheDocument();
+    expect(screen.getByText(/tap to start plan/i)).toBeVisible();
+    expect(screen.getByRole("button", { name: /start day from plan/i })).toBeVisible();
   });
 });

@@ -19,13 +19,13 @@ const ww = (overrides: Partial<Event> = {}): Event => ({
 describe("CurrentWakeWindowStatus", () => {
   it("renders 'In WW1 · ends 9:00 AM' when in a window", () => {
     renderWithAuth(<CurrentWakeWindowStatus wakeWindow={ww()} />);
-    expect(screen.getByText(/in wake window 1/i)).toBeInTheDocument();
-    expect(screen.getByText(/ends 9:00 AM/i)).toBeInTheDocument();
+    expect(screen.getByText(/in wake window 1/i)).toBeVisible();
+    expect(screen.getByText(/ends 9:00 AM/i)).toBeVisible();
   });
 
   it("includes owner when set", () => {
     renderWithAuth(<CurrentWakeWindowStatus wakeWindow={ww({ owner: "Kelly" })} />);
-    expect(screen.getByText(/kelly/i)).toBeInTheDocument();
+    expect(screen.getByText(/kelly/i)).toBeVisible();
   });
 
   it("renders nothing when not in a wake window", () => {

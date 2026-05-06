@@ -21,7 +21,7 @@ describe("AppShell", () => {
         <p>page content</p>
       </AppShell>,
     );
-    expect(screen.getByText(/Aden's Day/i)).toBeInTheDocument();
+    expect(screen.getByText(/Aden's Day/i)).toBeVisible();
   });
 
   it("renders bottom tabs nav", () => {
@@ -30,7 +30,7 @@ describe("AppShell", () => {
         <p>x</p>
       </AppShell>,
     );
-    expect(screen.getByRole("navigation", { name: /primary/i })).toBeInTheDocument();
+    expect(screen.getByRole("navigation", { name: /primary/i })).toBeVisible();
   });
 
   it("renders the children inside main", () => {
@@ -49,8 +49,8 @@ describe("AppShell", () => {
         <p>x</p>
       </AppShell>,
     );
-    expect(screen.getByRole("button", { name: /sync|synced/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /more options/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /sync|synced/i })).toBeVisible();
+    expect(screen.getByRole("button", { name: /more options/i })).toBeVisible();
   });
 
   it("falls back to today's date when no active day exists", () => {
