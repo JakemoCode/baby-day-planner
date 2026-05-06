@@ -42,4 +42,13 @@ describe("StartBottleButton", () => {
     expect(arg.eventKey).toBe("bottle_2");
     expect(arg.label).toBe("Bottle 2");
   });
+
+  it("shows '✓ Bottle logged' feedback after a successful tap", async () => {
+    const onLog = vi.fn().mockResolvedValue(undefined);
+    renderWithAuth(
+      <StartBottleButton defaultAmountOz={5} dayId="d1" nextNumber={1} onLog={onLog} />,
+    );
+    await userEvent.click(screen.getByRole("button"));
+    expect(screen.getByRole("button")).toHaveTextContent(/bottle logged/i);
+  });
 });
