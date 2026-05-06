@@ -5,6 +5,7 @@ import {
   getDocs,
   limit,
   onSnapshot,
+  orderBy,
   query,
   setDoc,
   updateDoc,
@@ -58,6 +59,17 @@ export async function updateDay(
   patch: Partial<Day>,
 ): Promise<void> {
   await updateDoc(dayRef(db, childId, dayId), patch);
+}
+
+export async function listArchivedDays(db: Firestore, childId: string, max = 7): Promise<Day[]> {
+  const q = query(
+    daysRef(db, childId),
+    where("status", "==", "archived"),
+    orderBy("date", "desc"),
+    limit(max),
+  );
+  const snap = await getDocs(q);
+  return snap.docs.map((d) => d.data());
 }
 
 export function watchActiveDay(

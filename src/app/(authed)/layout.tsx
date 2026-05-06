@@ -3,6 +3,9 @@
 import { useEffect, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth/useAuth";
+import { AppShell } from "@/components/shared/AppShell";
+
+const CHILD_NAME = process.env.NEXT_PUBLIC_DEFAULT_CHILD_NAME ?? "Aden";
 
 export default function AuthedLayout({ children }: { children: ReactNode }) {
   const { status } = useAuth();
@@ -22,5 +25,5 @@ export default function AuthedLayout({ children }: { children: ReactNode }) {
     );
   }
 
-  return <>{children}</>;
+  return <AppShell childName={CHILD_NAME}>{children}</AppShell>;
 }
