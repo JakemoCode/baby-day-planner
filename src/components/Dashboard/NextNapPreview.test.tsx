@@ -39,4 +39,30 @@ describe("NextNapPreview", () => {
     renderWithAuth(<NextNapPreview nap={inProgress} />);
     expect(screen.getByText("9:45 AM")).toBeVisible();
   });
+
+  it("shows last-nap subtext with duration when endTime is set", () => {
+    const last = nap({
+      id: "nap-1",
+      eventKey: "nap_1",
+      label: "Nap 1",
+      startTime: "08:30",
+      endTime: "09:35",
+      source: "actual",
+      status: "completed",
+    });
+    renderWithAuth(<NextNapPreview nap={nap()} lastNap={last} />);
+    expect(screen.getByText("Last: 8:30–9:35 AM · 1h 5m")).toBeVisible();
+  });
+
+  it("shows last-nap subtext as in-progress when endTime missing", () => {
+    const { endTime: _omit, ...inProgress } = nap({
+      id: "nap-1",
+      eventKey: "nap_1",
+      startTime: "13:10",
+      source: "actual",
+      status: "actual",
+    });
+    renderWithAuth(<NextNapPreview nap={undefined} lastNap={inProgress} />);
+    expect(screen.getByText("Last: started 1:10 PM · in progress")).toBeVisible();
+  });
 });

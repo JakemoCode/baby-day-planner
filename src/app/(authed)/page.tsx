@@ -110,6 +110,8 @@ export default function DashboardPage() {
   const nextBottleNumber = countByType(actuals, "bottle") + 1;
   const nextNapNumber = countByType(actuals, "nap") + 1;
   const lastBottleTime = lastTimeForType(actuals, "bottle");
+  const lastBottle = lastEventOfType(actuals, "bottle");
+  const lastNap = lastEventOfType(actuals, "nap");
 
   const handleLogBottle = async (bottle: Event) => {
     await createOptimistic(bottle);
@@ -136,8 +138,12 @@ export default function DashboardPage() {
   return (
     <div className={styles.page}>
       <NextEventCard event={next} nowMinutes={nowMinutes} />
-      <NextBottlePreview bottle={nb} bottle1Pending={bottle1Pending} />
-      <NextNapPreview nap={nn} />
+      <NextBottlePreview
+        bottle={nb}
+        bottle1Pending={bottle1Pending}
+        {...(lastBottle ? { lastBottle } : {})}
+      />
+      <NextNapPreview nap={nn} {...(lastNap ? { lastNap } : {})} />
       <CurrentWakeWindowStatus wakeWindow={cww} />
 
       <div className={styles.actions}>
@@ -187,10 +193,13 @@ function countByType(events: Event[], type: Event["type"]): number {
 }
 
 function lastTimeForType(events: Event[], type: Event["type"]): string | undefined {
-  const matches = events
-    .filter((e) => e.type === type)
-    .sort((a, b) => parseTime(b.startTime) - parseTime(a.startTime));
-  return matches[0]?.startTime;
+  return lastEventOfType(events, type)?.startTime;
+}
+
+function lastEventOfType(events: Event[], type: Event["type"]): Event | undefined {
+  return events
+    .filter((e) => e.type === type && (e.source === "actual" || e.source === "manual"))
+    .sort((a, b) => parseTime(b.startTime) - parseTime(a.startTime))[0];
 }
 
 function formatNowAsHHMM(): string {
