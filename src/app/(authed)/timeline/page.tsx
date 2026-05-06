@@ -12,7 +12,9 @@ import { useTemplates } from "@/hooks/useTemplates";
 import { LoadingState } from "@/components/shared/LoadingState";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { FAB } from "@/components/shared/FAB";
+import { FABTypePicker } from "@/components/shared/FABTypePicker";
 import { EventEditDrawer } from "@/components/shared/EventEditDrawer";
+import { buildCreateTemplate, type CreatableType } from "@/components/shared/createEventTemplate";
 import { TimelineList } from "@/components/Timeline/TimelineList";
 import styles from "./page.module.css";
 
@@ -20,7 +22,7 @@ const CHILD_ID = process.env.NEXT_PUBLIC_DEFAULT_CHILD_ID ?? "aden";
 
 type DrawerState =
   | { open: false }
-  | { open: true; mode: "create-extra" }
+  | { open: true; mode: "create"; template: Event }
   | { open: true; mode: "edit"; event: Event };
 
 function yesterdayDate(today: string): string {
@@ -45,6 +47,7 @@ export default function TimelinePage() {
   } = useEvents(CHILD_ID, day?.id ?? "");
   const { templates } = useTemplates(CHILD_ID);
   const [drawer, setDrawer] = useState<DrawerState>({ open: false });
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   const template = useMemo<OwnershipTemplate | undefined>(() => {
     if (!day?.ownershipTemplateId) return undefined;
@@ -70,7 +73,7 @@ export default function TimelinePage() {
     );
   }
 
-  if (!day) {
+  if (!day || !settings) {
     return (
       <div className={styles.page}>
         <EmptyState title="No active day" body="Start a new day from the dashboard." />
@@ -92,17 +95,35 @@ export default function TimelinePage() {
         onEventTap={(event) => setDrawer({ open: true, mode: "edit", event })}
       />
 
-      <FAB
-        label="Add extra event"
-        onClick={() => setDrawer({ open: true, mode: "create-extra" })}
+      <FAB label="Add an event" onClick={() => setPickerOpen(true)} />
+
+      <FABTypePicker
+        open={pickerOpen}
+        onSelect={(type: CreatableType) => {
+          setPickerOpen(false);
+          const tpl = buildCreateTemplate({
+            type,
+            dayId: day.id,
+            actuals,
+            settings,
+            nowHHMM: formatNowAsHHMM(nowMinutes),
+          });
+          setDrawer({ open: true, mode: "create", template: tpl });
+        }}
+        onCancel={() => setPickerOpen(false)}
       />
 
       <EventEditDrawer
-        key={drawer.open && drawer.mode === "edit" ? drawer.event.id : "new"}
+        key={
+          drawer.open && drawer.mode === "edit"
+            ? drawer.event.id
+            : drawer.open && drawer.mode === "create"
+              ? drawer.template.id
+              : "closed"
+        }
         open={drawer.open}
-        event={drawer.open && drawer.mode === "edit" ? drawer.event : null}
-        mode={drawer.open && drawer.mode === "edit" ? "edit" : "create-extra"}
-        dayId={day.id}
+        event={drawer.open ? (drawer.mode === "edit" ? drawer.event : drawer.template) : null}
+        mode={drawer.open && drawer.mode === "edit" ? "edit" : "create"}
         onSave={async (event) => {
           if (drawer.open && drawer.mode === "edit") {
             await updateOptimistic(event.id, event);
@@ -119,4 +140,10 @@ export default function TimelinePage() {
       />
     </div>
   );
+}
+
+function formatNowAsHHMM(nowMinutes: number): string {
+  const h = Math.floor(nowMinutes / 60);
+  const m = nowMinutes % 60;
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
 }

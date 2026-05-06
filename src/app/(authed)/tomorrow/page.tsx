@@ -9,6 +9,7 @@ import { startNewDay } from "@/repositories/startNewDay";
 import { db } from "@/lib/firebase/client";
 import { LoadingState } from "@/components/shared/LoadingState";
 import { EventEditDrawer } from "@/components/shared/EventEditDrawer";
+import { buildCreateTemplate } from "@/components/shared/createEventTemplate";
 import { TomorrowForm, type TomorrowFormState } from "@/components/Tomorrow/TomorrowForm";
 import { TomorrowPreview } from "@/components/Tomorrow/TomorrowPreview";
 import { PromoteTomorrowButton } from "@/components/Tomorrow/PromoteTomorrowButton";
@@ -18,7 +19,7 @@ const CHILD_ID = process.env.NEXT_PUBLIC_DEFAULT_CHILD_ID ?? "aden";
 
 type DrawerState =
   | { open: false }
-  | { open: true; mode: "create-extra" }
+  | { open: true; mode: "create"; template: Event }
   | { open: true; mode: "edit"; event: Event };
 
 function tomorrowDateString(): string {
@@ -84,7 +85,16 @@ export default function TomorrowPage() {
           value={form}
           templates={templates}
           onChange={setForm}
-          onAddExtra={() => setDrawer({ open: true, mode: "create-extra" })}
+          onAddExtra={() => {
+            const tpl = buildCreateTemplate({
+              type: "extra",
+              dayId: tomorrowDay.id,
+              actuals: form.extras,
+              settings,
+              nowHHMM: "12:00",
+            });
+            setDrawer({ open: true, mode: "create", template: tpl });
+          }}
           onEditExtra={(event) => setDrawer({ open: true, mode: "edit", event })}
           onRemoveExtra={(id) =>
             setForm({ ...form, extras: form.extras.filter((e) => e.id !== id) })
@@ -106,11 +116,16 @@ export default function TomorrowPage() {
       <PromoteTomorrowButton onPromote={handlePromote} disabled={!form.wakeTime} />
 
       <EventEditDrawer
-        key={drawer.open && drawer.mode === "edit" ? drawer.event.id : "new"}
+        key={
+          drawer.open && drawer.mode === "edit"
+            ? drawer.event.id
+            : drawer.open && drawer.mode === "create"
+              ? drawer.template.id
+              : "closed"
+        }
         open={drawer.open}
-        event={drawer.open && drawer.mode === "edit" ? drawer.event : null}
-        mode={drawer.open && drawer.mode === "edit" ? "edit" : "create-extra"}
-        dayId={tomorrowDay.id}
+        event={drawer.open ? (drawer.mode === "edit" ? drawer.event : drawer.template) : null}
+        mode={drawer.open && drawer.mode === "edit" ? "edit" : "create"}
         onSave={(event) => {
           setForm((prev) => {
             const others = prev.extras.filter((e) => e.id !== event.id);
