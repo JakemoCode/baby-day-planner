@@ -1,0 +1,15 @@
+.shell {
+  min-height: 100dvh;
+  background: var(--color-bg);
+  display: flex;
+  flex-direction: column;
+}
+
+.main {
+  flex: 1;
+  /* Bottom padding accounts for fixed bottom tab bar + safe-area */
+  padding-bottom: calc(var(--bottom-tabs-height) + env(safe-area-inset-bottom) + var(--space-4));
+  max-width: var(--content-max);
+  width: 100%;
+  margin: 0 auto;
+}
