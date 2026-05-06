@@ -10,6 +10,9 @@
  */
 
 :root {
+  /* Force browser UA (scrollbars, native form controls) to light. */
+  color-scheme: light;
+
   /* ─────── Surfaces ─────── */
   --color-bg: #fbf8f3; /* warm cream */
   --color-surface: #ffffff; /* card surface */
@@ -91,8 +94,13 @@
   --easing-out: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-/* Dark mode — auto-applied via prefers-color-scheme.
-   Same palette, slightly desaturated and lifted to keep warmth. */
+/* Dark mode — disabled for now (Jake's preference; system preference
+   was forcing dark and that's not the look we want). To re-enable,
+   uncomment the @media block below.
+   The `:root[data-theme="dark"]` selector below still works as a
+   manual opt-in for whoever wants it. */
+
+/*
 @media (prefers-color-scheme: dark) {
   :root {
     --color-bg: #1c1916;
@@ -124,6 +132,7 @@
     --shadow-elevated: 0 4px 12px rgba(0, 0, 0, 0.45), 0 2px 4px rgba(0, 0, 0, 0.3);
   }
 }
+*/
 
 /* Manual override (forces dark mode regardless of system preference).
    Apply [data-theme="dark"] to <html> from a user toggle in Settings. */
