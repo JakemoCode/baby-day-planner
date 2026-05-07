@@ -12,14 +12,15 @@ export type InstantChipProps = {
 
 /**
  * Chip label rules:
- *   - bottle / nap-numbered types keep their event.label ("Bottle 1") so
- *     the per-event ordinal stays visible — Jake explicitly wants this.
- *   - dream_feed visually collapses to "Pump" (§3 mapping).
+ *   - bottle keeps its event.label ("Bottle 1") so the per-event ordinal
+ *     stays visible.
+ *   - dream_feed shows "Dream Feed" (distinct from pump even though it
+ *     uses pump-style chip styling).
  *   - other routine types (pump / bedtime / wake) collapse to a short form.
  *   - user-defined `extra` events use event.label.
  */
 function chipText(event: Event): string {
-  if (event.type === "dream_feed") return "Pump";
+  if (event.type === "dream_feed") return "Dream Feed";
   if (event.type === "bedtime") return "Bed";
   if (event.type === "wake") return "Wake";
   if (event.type === "pump") return event.label.startsWith("Pump") ? event.label : "Pump";

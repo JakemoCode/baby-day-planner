@@ -38,7 +38,7 @@ describe("<InstantChip />", () => {
     expect(screen.getByText("7a")).toBeVisible();
   });
 
-  it("collapses dream_feed to the same visible label as pump", () => {
+  it("renders dream_feed with its own label (not collapsed to Pump)", () => {
     const df = makeEvent({
       ...bottle,
       type: "dream_feed",
@@ -46,7 +46,7 @@ describe("<InstantChip />", () => {
       label: "Dream Feed",
     });
     render(<InstantChip event={df} colorMode="type" />);
-    expect(screen.getByText("Pump")).toBeVisible();
+    expect(screen.getByText("Dream Feed")).toBeVisible();
   });
 
   it("propagates colorMode + owner via data-attributes", () => {

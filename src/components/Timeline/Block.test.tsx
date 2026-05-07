@@ -68,9 +68,10 @@ describe("<Block />", () => {
     expect(screen.getByText("· Jake")).toBeVisible();
   });
 
-  it("abbreviates putdown labels", () => {
+  it("abbreviates putdown labels to 'Putdown' (parent nap is positionally obvious)", () => {
     render(<Block event={putdown} {...baseGeom} colorMode="type" past={false} />);
-    expect(screen.getByText(/Putdown · Nap 1/)).toBeVisible();
+    // Just "Putdown" plus the inline time — not "Putdown · Nap 1".
+    expect(screen.getByText(/^Putdown$/)).toBeVisible();
   });
 
   it("renders extra-block start/end marker lines for custom blocks", () => {

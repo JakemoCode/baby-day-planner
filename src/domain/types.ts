@@ -172,6 +172,9 @@ export type OwnershipTemplate = {
   napOwners: Owner[]; // index = nap N - 1
   wakeWindowOwners: Owner[]; // index = ww N - 1
   bottleOwners?: Owner[]; // index = bottle N - 1; optional for back-compat
+  /** Optional explicit bedtime owner. When omitted, bedtime + bedtime_putdown
+   *  inherit from the last napOwner. When present, this overrides. */
+  bedtimeOwner?: Owner;
 };
 
 export type ProjectInput = {

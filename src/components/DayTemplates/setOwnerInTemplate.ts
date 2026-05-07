@@ -1,7 +1,12 @@
 import type { Event, Owner, OwnershipTemplate } from "@/domain";
 
 /** Event types that carry an owner via the OwnershipTemplate. */
-export const ASSIGNABLE_TYPES: ReadonlyArray<Event["type"]> = ["nap", "wake_window", "bottle"];
+export const ASSIGNABLE_TYPES: ReadonlyArray<Event["type"]> = [
+  "nap",
+  "wake_window",
+  "bottle",
+  "bedtime",
+];
 
 function indexFromKey(eventKey: string, prefix: string): number {
   const m = new RegExp(`^${prefix}_(\\d+)`).exec(eventKey);
@@ -40,6 +45,8 @@ export function setOwnerInTemplate(
     while (arr.length <= i) arr.push("Jake");
     arr[i] = owner;
     next.bottleOwners = arr;
+  } else if (event.type === "bedtime") {
+    next.bedtimeOwner = owner;
   }
   return next;
 }

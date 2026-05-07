@@ -203,7 +203,12 @@ export function EventEditDrawer({
   );
   const showAmount = type === "bottle" || type === "dream_feed";
   const showOwner =
-    type === "nap" || type === "wake_window" || type === "bottle" || type === "extra";
+    type === "nap" ||
+    type === "wake_window" ||
+    type === "bottle" ||
+    type === "extra" ||
+    type === "bedtime" ||
+    type === "dream_feed";
   const showLabel = type === "extra";
 
   return (

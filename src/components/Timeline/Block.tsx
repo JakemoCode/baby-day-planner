@@ -40,7 +40,10 @@ function formatRange(start: string, end: string): string {
 
 function blockLabel(event: Event): string {
   if (event.type === "putdown") {
-    return event.label.replace(/^Start putting down for /, "Putdown · ");
+    // The parent nap is visually obvious from the block's position —
+    // "Putdown · 1:05p" reads cleanly without truncation. Time gets
+    // appended inline below; this returns just the prefix.
+    return "Putdown";
   }
   // Naps show their duration inline so users can read length at a glance:
   // "Nap 2 (42 min)". When the actual nap hasn't ended yet (no endTime),
@@ -110,7 +113,7 @@ export function Block({
          * (in compact form so it doesn't crowd the label) and the owner. */}
         {event.type === "putdown" && (
           <>
-            <span className={styles.inlineTime}> {formatTimeShort(event.startTime)}</span>
+            <span className={styles.inlineTime}> · {formatTimeShort(event.startTime)}</span>
             {event.owner && (
               <span className={styles.owner} data-owner={event.owner}>
                 · {event.owner}
