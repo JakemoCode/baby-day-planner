@@ -1,7 +1,7 @@
 "use client";
 
 import type { Event } from "@/domain";
-import { formatTimeForDisplay } from "@/domain";
+import { formatTimeForDisplay, formatTimeShort } from "@/domain";
 import styles from "./Block.module.css";
 
 export type BlockProps = {
@@ -88,13 +88,17 @@ export function Block({
       )}
       <span className={styles.label}>
         {blockLabel(event)}
-        {/* Putdown blocks are ~30px tall — owner inline with the label
-         * keeps them single-row legible against the diagonal stripes.
-         * Other blocks render owner in the range row below. */}
-        {event.type === "putdown" && event.owner && (
-          <span className={styles.owner} data-owner={event.owner}>
-            · {event.owner}
-          </span>
+        {/* Putdown blocks are single-row — append the start time inline
+         * (in compact form so it doesn't crowd the label) and the owner. */}
+        {event.type === "putdown" && (
+          <>
+            <span className={styles.inlineTime}> {formatTimeShort(event.startTime)}</span>
+            {event.owner && (
+              <span className={styles.owner} data-owner={event.owner}>
+                · {event.owner}
+              </span>
+            )}
+          </>
         )}
       </span>
       {/* Range row is dropped for putdown blocks (too tall for ~30px height,
