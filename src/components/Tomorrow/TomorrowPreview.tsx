@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import type { Day, Event, OwnershipTemplate, Settings } from "@/domain";
 import { makeEvent, projectDay } from "@/domain";
-import { TimelineList } from "@/components/Timeline/TimelineList";
+import { TimelineV2 } from "@/components/Timeline/TimelineV2";
 import styles from "./TomorrowPreview.module.css";
 
 export type TomorrowPreviewProps = {
@@ -57,5 +57,7 @@ export function TomorrowPreview({
     );
   }
 
-  return <TimelineList events={events} {...(onEventTap ? { onEventTap } : {})} />;
+  // Tomorrow has no "now" — dimPast is meaningless and nowMinutes is omitted
+  // (TIMELINE_V2_PLAN.md §11.F).
+  return <TimelineV2 events={events} dimPast={false} {...(onEventTap ? { onEventTap } : {})} />;
 }

@@ -10,17 +10,23 @@ export type InstantChipProps = {
   onClick?: () => void;
 };
 
-const NICE_LABELS: Partial<Record<Event["type"], string>> = {
+/**
+ * Routine event types collapse to their type name in chip form (the time +
+ * dot color carry the rest of the signal). User-defined `extra` events use
+ * the supplied label so things like "Pediatrician" or "Friend visit" stay
+ * informative. event.label is the fallback for anything not covered here.
+ */
+const TYPE_NAMES: Partial<Record<Event["type"], string>> = {
   bottle: "Bottle",
   pump: "Pump",
   dream_feed: "Pump", // visually identical per §3
   bedtime: "Bed",
   wake: "Wake",
-  extra: "Custom",
 };
 
 function chipText(event: Event): string {
-  return NICE_LABELS[event.type] ?? event.label;
+  if (event.type === "extra") return event.label;
+  return TYPE_NAMES[event.type] ?? event.label;
 }
 
 /**

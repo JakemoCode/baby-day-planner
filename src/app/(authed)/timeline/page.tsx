@@ -15,7 +15,8 @@ import { FAB } from "@/components/shared/FAB";
 import { FABTypePicker } from "@/components/shared/FABTypePicker";
 import { EventEditDrawer } from "@/components/shared/EventEditDrawer";
 import { buildCreateTemplate, type CreatableType } from "@/components/shared/createEventTemplate";
-import { TimelineList } from "@/components/Timeline/TimelineList";
+import { TimelineV2 } from "@/components/Timeline/TimelineV2";
+import { TIMELINE_DEFAULTS } from "@/domain";
 import styles from "./page.module.css";
 
 const CHILD_ID = process.env.NEXT_PUBLIC_DEFAULT_CHILD_ID ?? "aden";
@@ -89,10 +90,13 @@ export default function TimelinePage() {
         </Link>
       </header>
 
-      <TimelineList
+      <TimelineV2
         events={projected}
         nowMinutes={nowMinutes}
         scrollToNowOnMount
+        pxPerHour={settings?.timelinePxPerHour ?? TIMELINE_DEFAULTS.pxPerHour}
+        dimPast={settings?.timelineDimPast ?? TIMELINE_DEFAULTS.dimPast}
+        colorMode={settings?.timelineColorMode ?? TIMELINE_DEFAULTS.colorMode}
         onEventTap={(event) => setDrawer({ open: true, mode: "edit", event })}
       />
 

@@ -8,7 +8,7 @@ import { useTemplates } from "@/hooks/useTemplates";
 import { saveTemplate } from "@/repositories/templates";
 import { db } from "@/lib/firebase/client";
 import { LoadingState } from "@/components/shared/LoadingState";
-import { TimelineList } from "@/components/Timeline/TimelineList";
+import { TimelineV2 } from "@/components/Timeline/TimelineV2";
 import { TemplateOwnerPicker } from "@/components/DayTemplates/TemplateOwnerPicker";
 import { ASSIGNABLE_TYPES, setOwnerInTemplate } from "@/components/DayTemplates/setOwnerInTemplate";
 import styles from "./page.module.css";
@@ -151,8 +151,9 @@ export default function DayTemplatesPage() {
         </button>
       </div>
 
-      <TimelineList
+      <TimelineV2
         events={projected}
+        dimPast={false}
         onEventTap={(event) => {
           if (!ASSIGNABLE_TYPES.includes(event.type)) return;
           setSelectedEventId(event.id);
