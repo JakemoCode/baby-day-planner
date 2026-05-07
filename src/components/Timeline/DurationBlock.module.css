@@ -6,7 +6,8 @@
   padding: var(--space-2) var(--space-3);
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
+  justify-content: flex-start;
+  gap: 2px;
   overflow: hidden;
   text-align: left;
   font: inherit;

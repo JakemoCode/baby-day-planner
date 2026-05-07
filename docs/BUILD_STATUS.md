@@ -38,13 +38,14 @@ The app **runs locally** against the Firebase emulator suite. Sign-in works (Goo
 
 | # | Item | Notes |
 |---|---|---|
-| 1 | **PR E** — Day Templates page | Dedicated route via kebab menu. Day picker (Sat/Sun, no side-by-side per Jake). Timeline rendering with **inline** owner picker per event tap (Jake/Kelly/Daycare). Replaces `WeekendTemplateEditor` in Settings. Includes **bottle owners in templates** (was PR C, folded in): predicted bottle slots from `predictBottleCount(settings)` running engine on a synthetic day. |
-| 2 | **PR B** — FAB type picker | Tap FAB → bottom-sheet menu: Bottle / Nap / Pump / Custom (custom == extra). Drawer create-mode supports all types. **Past-time entry only allowed within today.** |
-| 3 | **Visual stacking in TimelineList** | Overlapping point markers should fan out vertically with offset, not stack at identical y-coordinates. |
-| 4 | **Engine sanity dedup with badge** | Per Jake: option (b) — render duplicates with a small "duplicate" badge so user can tap each and delete. Plus the preventative UX (bottle interval guard, etc.) prevents recurrence. Naps are already protected by context-aware NapActionButton. |
-| 5 | **Palette refresh + button tinting** (visual polish, deferred) | `--color-surface: #ffffff` is too stark against warm cream `--color-bg`. NapActionButton (`secondary` style) renders pure white — should pick up earth-tone tints. Most palette colors only show as small dots; UI dominated by sage + white. |
-| 6 | **Settings accordion** (visual polish, deferred) | Sections collapsible. Day Templates extracted to its own page (PR E) helps. |
-| 7 | **Wave 9** — PWA + E2E + design audit | Original Plan C roadmap final wave. |
+| 1 | **Settings duration inputs as HH:MM** | Wake windows / bottle interval / nap length / putdown lead / dream-feed offsets currently take raw minutes. Build a reusable DurationInput (h:mm) and apply across editors. Persist as minutes — no schema change. |
+| 2 | **Visual stacking in TimelineList** | Overlapping point markers stack at identical y-coordinates. DurationBlock label position fix landed; point-marker fan-out still pending. |
+| 3 | **Engine sanity dedup with badge** | Per Jake: option (b) — render duplicates with a small "duplicate" badge so user can tap each and delete. Naps are already protected by NapActionButton; bottles are protected by interval guard. |
+| 4 | **🔥 Palette refresh + button tinting** (Jake has flagged twice — bumped) | `--color-surface: #ffffff` is too stark against warm cream `--color-bg`. NapActionButton renders pure white. Most owner-tint colors only appear as small dots. UI dominated by sage + white; user wants more soft earth-tones throughout. |
+| 5 | **Settings accordion** (visual polish, deferred) | Sections collapsible. |
+| 6 | **Wave 9** — PWA + E2E + design audit | Original Plan C roadmap final wave. |
+
+PRs E (#22), B (#23), bottle/nap subtext (#24), and end-of-day messaging + timeline label fix all merged.
 
 ## Decisions locked (do not re-ask)
 

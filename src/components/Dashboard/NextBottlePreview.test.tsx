@@ -68,6 +68,32 @@ describe("NextBottlePreview", () => {
     expect(screen.getByText("Last: 1:45 PM · 5 oz")).toBeVisible();
   });
 
+  it("shows dream feed in place of empty state when no next bottle", () => {
+    const dream: Event = bottle({
+      id: "df1",
+      eventKey: "dream_feed",
+      type: "dream_feed",
+      label: "Dream feed",
+      startTime: "20:45",
+      source: "projected",
+      status: "projected",
+    });
+    renderWithAuth(<NextBottlePreview bottle={undefined} dreamFeed={dream} />);
+    expect(screen.getByText("Dream feed at 8:45 PM")).toBeVisible();
+    expect(screen.queryByText(/no more bottles today/i)).toBeNull();
+  });
+
+  it("falls back to empty state when bottle1Pending even if dreamFeed exists", () => {
+    const dream: Event = bottle({
+      id: "df1",
+      type: "dream_feed",
+      label: "Dream feed",
+      startTime: "20:45",
+    });
+    renderWithAuth(<NextBottlePreview bottle={undefined} bottle1Pending dreamFeed={dream} />);
+    expect(screen.getByText(/start first bottle for schedule/i)).toBeVisible();
+  });
+
   it("shows last-bottle subtext even with empty next state", () => {
     const last = bottle({
       id: "b1",

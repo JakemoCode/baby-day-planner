@@ -6,6 +6,11 @@ export type NextNapPreviewProps = {
   nap: Event | undefined;
   /** Most recent logged nap, shown as subtext when present. */
   lastNap?: Event;
+  /**
+   * Projected bedtime ("HH:MM"). Shown in place of the empty state when no
+   * more daytime naps are scheduled — bedtime is the next "sleep" event.
+   */
+  bedtime?: string;
 };
 
 /**
@@ -36,8 +41,17 @@ function formatLast(n: Event): string {
   return `Last: ${formatNapRange(n.startTime, n.endTime)} · ${formatDuration(diffMinutes(n.endTime, n.startTime))}`;
 }
 
-export function NextNapPreview({ nap, lastNap }: NextNapPreviewProps) {
+export function NextNapPreview({ nap, lastNap, bedtime }: NextNapPreviewProps) {
   if (!nap) {
+    if (bedtime) {
+      return (
+        <article className={styles.card} aria-label="Next nap">
+          <p className={styles.heading}>Next nap</p>
+          <p className={styles.primary}>Bedtime at {formatTimeForDisplay(bedtime)}</p>
+          {lastNap && <p className={styles.meta}>{formatLast(lastNap)}</p>}
+        </article>
+      );
+    }
     return (
       <article className={styles.card} aria-label="Next nap">
         <p className={styles.heading}>Next nap</p>

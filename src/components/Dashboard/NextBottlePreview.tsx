@@ -8,6 +8,12 @@ export type NextBottlePreviewProps = {
   bottle1Pending?: boolean;
   /** Most recent logged bottle, shown as subtext when present. */
   lastBottle?: Event;
+  /**
+   * Upcoming dream feed (projected). When the regular-bottle chain is
+   * exhausted, the card shows this as the next "feeding" instead of an
+   * empty state.
+   */
+  dreamFeed?: Event;
 };
 
 function formatOz(oz: number): string {
@@ -23,8 +29,20 @@ export function NextBottlePreview({
   bottle,
   bottle1Pending = false,
   lastBottle,
+  dreamFeed,
 }: NextBottlePreviewProps) {
   if (!bottle) {
+    if (dreamFeed && !bottle1Pending) {
+      return (
+        <article className={styles.card} aria-label="Next bottle">
+          <p className={styles.heading}>Next bottle</p>
+          <p className={styles.primary}>
+            Dream feed at {formatTimeForDisplay(dreamFeed.startTime)}
+          </p>
+          {lastBottle && <p className={styles.meta}>{formatLast(lastBottle)}</p>}
+        </article>
+      );
+    }
     const message = bottle1Pending ? "Start first bottle for schedule" : "No more bottles today";
     return (
       <article className={styles.card} aria-label="Next bottle">
