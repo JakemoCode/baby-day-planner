@@ -54,16 +54,16 @@ export function DurationBlock({ event, topPx, heightPx, onClick }: DurationBlock
         ? { type: "button" as const, onClick, "aria-label": accessibleName }
         : { role: "presentation" as const })}
     >
-      <span className={styles.label}>{blockLabel(event)}</span>
-      <div className={styles.range}>
-        <span>{range}</span>
+      <span className={styles.label}>
+        {blockLabel(event)}
         {event.owner && <span className={styles.owner}>· {event.owner}</span>}
         {event.status === "overridden" && (
           <span className={styles.editMark} aria-label="edited">
             ✎
           </span>
         )}
-      </div>
+      </span>
+      <span className={styles.range}>{range}</span>
     </Tag>
   );
 }

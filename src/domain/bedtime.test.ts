@@ -43,6 +43,31 @@ describe("applyBedtime", () => {
     expect(result.find((e) => e.type === "bedtime")).toBeUndefined();
   });
 
+  it("honors a manual bedtime override from actuals over the projection", () => {
+    const proj = projectNapChain(sampleDay, sampleSettings);
+    const manualBedtime = {
+      id: "manual-bedtime-1",
+      dayId: sampleDay.id,
+      eventKey: "bedtime",
+      type: "bedtime" as const,
+      label: "Bedtime",
+      startTime: "18:30",
+      source: "manual" as const,
+      status: "completed" as const,
+    };
+    const result = applyBedtime(proj, sampleSettings, [manualBedtime]);
+    const bedtimes = result.filter((e) => e.type === "bedtime");
+    // Only the manual bedtime should be present — no projected duplicate.
+    expect(bedtimes).toHaveLength(1);
+    expect(bedtimes[0]).toMatchObject({
+      source: "manual",
+      startTime: "18:30",
+    });
+    // Naps and wake_windows after the override should be trimmed.
+    expect(result.find((e) => e.type === "nap" && e.startTime >= "18:30")).toBeUndefined();
+    expect(result.find((e) => e.type === "wake_window" && e.startTime >= "18:30")).toBeUndefined();
+  });
+
   it("removes wake_window events that start at or after the bedtime nap's start time", () => {
     // Set threshold early enough that nap_3 becomes bedtime (nap_3 starts at 15:30)
     // nap_3 napToReplace.startTime = "15:30"; WW4 starts at cursor after nap_3 = 16:30

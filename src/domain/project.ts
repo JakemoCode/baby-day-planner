@@ -20,8 +20,8 @@ export function projectDay(input: ProjectInput): Event[] {
   // 2. Apply nap actuals + short-nap adjustment
   events = applyNapActuals(events, actuals, settings);
 
-  // 3. Substitute bedtime for late naps
-  events = applyBedtime(events, settings);
+  // 3. Substitute bedtime for late naps (or honor a user override from actuals)
+  events = applyBedtime(events, settings, actuals);
 
   // 4. Generate putdown events for remaining projected naps + bedtime
   events = addPutdownEvents(events, settings);
