@@ -1,6 +1,7 @@
 "use client";
 
 import type { Settings } from "@/domain";
+import { TIMELINE_DEFAULTS } from "@/domain";
 import { useSettings } from "@/hooks/useSettings";
 import { saveSettings } from "@/repositories/settings";
 import { db } from "@/lib/firebase/client";
@@ -11,6 +12,7 @@ import { DreamFeedEditor } from "@/components/Settings/DreamFeedEditor";
 import { WakeWindowsEditor } from "@/components/Settings/WakeWindowsEditor";
 import { PumpTimesEditor } from "@/components/Settings/PumpTimesEditor";
 import { BottleRulesEditor } from "@/components/Settings/BottleRulesEditor";
+import { TimelineDisplayEditor } from "@/components/Settings/TimelineDisplayEditor";
 import { SettingsAccount } from "@/components/Settings/SettingsAccount";
 import styles from "./page.module.css";
 
@@ -71,6 +73,22 @@ export default function SettingsPage() {
       <PumpTimesEditor
         value={value.pumpTimes}
         onChange={(next) => persist({ ...value, pumpTimes: next })}
+      />
+
+      <TimelineDisplayEditor
+        value={{
+          colorMode: value.timelineColorMode ?? TIMELINE_DEFAULTS.colorMode,
+          pxPerHour: value.timelinePxPerHour ?? TIMELINE_DEFAULTS.pxPerHour,
+          dimPast: value.timelineDimPast ?? TIMELINE_DEFAULTS.dimPast,
+        }}
+        onChange={(next) =>
+          persist({
+            ...value,
+            timelineColorMode: next.colorMode,
+            timelinePxPerHour: next.pxPerHour,
+            timelineDimPast: next.dimPast,
+          })
+        }
       />
 
       <SettingsAccount />

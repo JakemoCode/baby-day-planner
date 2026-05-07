@@ -8,10 +8,14 @@
  */
 
 import type { Settings } from "@/domain";
+import { TIMELINE_DEFAULTS } from "@/domain";
 
 export function defaultSettings(childId: string): Settings {
   return {
     childId,
+    timelineColorMode: TIMELINE_DEFAULTS.colorMode,
+    timelinePxPerHour: TIMELINE_DEFAULTS.pxPerHour,
+    timelineDimPast: TIMELINE_DEFAULTS.dimPast,
     defaultBottleAmountOz: 5,
     defaultBottleIntervalMinutes: 180,
     defaultNapLengthMinutes: 60,

@@ -94,6 +94,21 @@ export type Settings = {
    * UI falls back to 20 when missing.
    */
   minBottleIntervalMinutes?: number;
+  /**
+   * Timeline v2 display settings. All optional so legacy Settings docs
+   * remain valid; the timeline component falls back to the defaults below
+   * when a field is missing. See TIMELINE_V2_PLAN.md §8.
+   */
+  timelineColorMode?: "type" | "owner"; // default "type"
+  timelinePxPerHour?: number; // default 120, valid range 70-220
+  timelineDimPast?: boolean; // default true
+};
+
+/** Defaults for the optional Timeline v2 display fields. */
+export const TIMELINE_DEFAULTS = {
+  colorMode: "type" as const,
+  pxPerHour: 120,
+  dimPast: true,
 };
 
 export type Day = {
