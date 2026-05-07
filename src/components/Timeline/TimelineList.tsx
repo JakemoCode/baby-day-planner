@@ -55,7 +55,14 @@ export function TimelineList({
       };
     }
 
-    const sortedEvents = [...events].sort(
+    const allBlocks = events.filter(isDurationEvent);
+    // Wake events always coincide with the start of Wake Window 1, so a
+    // chip for them is pure redundancy. Drop them from the timeline.
+    const filtered = events.filter((e) => {
+      if (e.type !== "wake") return true;
+      return !allBlocks.some((b) => b.startTime === e.startTime);
+    });
+    const sortedEvents = [...filtered].sort(
       (a, b) => parseTime(a.startTime) - parseTime(b.startTime),
     );
 

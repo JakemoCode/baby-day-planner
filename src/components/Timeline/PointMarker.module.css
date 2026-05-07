@@ -128,6 +128,13 @@
   transition: background var(--motion-fast) var(--easing-out);
 }
 
+/* Within a compact chip, the body takes whatever space remains so the
+ * label can ellipsize cleanly while the time stays at the right edge. */
+.markerCompact .body {
+  flex: 1;
+  min-width: 0;
+}
+
 .markerCompact:hover {
   background: var(--color-bg);
 }
@@ -142,7 +149,8 @@
 }
 
 .compactTime {
+  flex-shrink: 0;
+  white-space: nowrap;
   font-size: var(--text-xs);
   color: var(--color-muted);
-  margin-left: var(--space-1);
 }

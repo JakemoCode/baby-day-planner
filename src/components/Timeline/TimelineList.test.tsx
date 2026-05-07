@@ -127,10 +127,59 @@ describe("TimelineList", () => {
     expect(top2 - top1).toBe(top3 - top2);
   });
 
+  it("suppresses the wake event when a duration block starts at the same time", () => {
+    // Wake always coincides with Wake Window 1 start — the chip is pure
+    // redundancy, so the renderer drops it.
+    renderWithAuth(<TimelineList events={[wake(), wakeWindow(1, "07:00", "08:25")]} />);
+    expect(screen.queryByTestId("point-marker")).toBeNull();
+    expect(screen.getByTestId("duration-block")).toBeVisible();
+  });
+
+  it("keeps a wake event that does not coincide with any block start", () => {
+    renderWithAuth(<TimelineList events={[wake(), wakeWindow(1, "07:30", "08:25")]} />);
+    expect(screen.getByTestId("point-marker")).toBeVisible();
+  });
+
+  it("abbreviates putdown labels in chip mode", () => {
+    const putdown: Event = {
+      id: "pd1",
+      dayId: "d1",
+      eventKey: "nap_1_putdown",
+      type: "putdown",
+      label: "Start putting down for Nap 1",
+      startTime: "07:30",
+      source: "projected",
+      status: "projected",
+    };
+    renderWithAuth(<TimelineList events={[wakeWindow(1, "07:00", "08:25"), putdown]} />);
+    const chip = screen.getByTestId("point-marker");
+    expect(chip.getAttribute("data-compact")).toBe("true");
+    expect(chip.textContent).toContain("Putdown · Nap 1");
+    expect(chip.textContent).not.toContain("Start putting down");
+  });
+
+  it("keeps the full putdown label when not embedded in a block", () => {
+    const putdown: Event = {
+      id: "pd1",
+      dayId: "d1",
+      eventKey: "nap_1_putdown",
+      type: "putdown",
+      label: "Start putting down for Nap 1",
+      startTime: "07:30",
+      source: "projected",
+      status: "projected",
+    };
+    renderWithAuth(<TimelineList events={[putdown]} />);
+    const marker = screen.getByTestId("point-marker");
+    expect(marker.getAttribute("data-compact")).toBe("false");
+    expect(marker.textContent).toContain("Start putting down for Nap 1");
+  });
+
   it("renders point markers inside their containing block as compact chips", () => {
-    // Wake, Bottle 1, and Pump all happen at 07:00, inside Wake Window 1
-    // (07:00-08:25). They should each render with data-compact="true" and
-    // distinct topPx (stacked inside the block, not overlapping).
+    // Bottle 1 and Pump happen at 07:00, inside Wake Window 1 (07:00-08:25).
+    // They should each render with data-compact="true" and distinct topPx
+    // (stacked inside the block, not overlapping). Wake is intentionally
+    // omitted because it would be suppressed by the WW1-coincidence rule.
     const pump: Event = {
       id: "p1",
       dayId: "d1",
@@ -142,15 +191,14 @@ describe("TimelineList", () => {
       status: "projected",
     };
     renderWithAuth(
-      <TimelineList events={[wake(), wakeWindow(1, "07:00", "08:25"), bottle(1, "07:00"), pump]} />,
+      <TimelineList events={[wakeWindow(1, "07:00", "08:25"), bottle(1, "07:00"), pump]} />,
     );
     const chips = screen
       .getAllByTestId("point-marker")
       .filter((el) => el.getAttribute("data-compact") === "true");
-    expect(chips).toHaveLength(3);
+    expect(chips).toHaveLength(2);
     const tops = chips.map((c) => parseFloat((c as HTMLElement).style.top)).sort((a, b) => a - b);
     expect(tops[1]!).toBeGreaterThan(tops[0]!);
-    expect(tops[2]!).toBeGreaterThan(tops[1]!);
   });
 
   it("keeps the duration block at its natural time-anchored position", () => {

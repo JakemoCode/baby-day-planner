@@ -27,11 +27,24 @@ function buildSubtitle(event: Event): string {
   return parts.join(" · ");
 }
 
+/**
+ * Engine emits long, conversational putdown labels ("Start putting down for
+ * Bedtime"). Inside a compact chip we have ~half the horizontal space, so
+ * trim down to the essential "Putdown · {target}".
+ */
+function chipLabel(event: Event): string {
+  if (event.type === "putdown") {
+    return event.label.replace(/^Start putting down for /, "Putdown · ");
+  }
+  return event.label;
+}
+
 export function PointMarker({ event, topPx, onClick, compact = false }: PointMarkerProps) {
   const interactive = !!onClick;
   const Tag = interactive ? "button" : "div";
   const subtitle = buildSubtitle(event);
   const time = formatTimeForDisplay(event.startTime);
+  const visibleLabel = compact ? chipLabel(event) : event.label;
   const accessibleName = `${event.label} at ${time}${subtitle ? `, ${subtitle}` : ""}`;
 
   return (
@@ -50,15 +63,15 @@ export function PointMarker({ event, topPx, onClick, compact = false }: PointMar
       {!compact && <span className={styles.time}>{time}</span>}
       <span className={styles.body}>
         <span className={styles.dot} aria-hidden="true" />
-        <span className={styles.label}>{event.label}</span>
-        {compact && <span className={styles.compactTime}>{time}</span>}
-        {subtitle && <span className={styles.subtitle}>· {subtitle}</span>}
+        <span className={styles.label}>{visibleLabel}</span>
+        {!compact && subtitle && <span className={styles.subtitle}>· {subtitle}</span>}
         {event.status === "overridden" && (
           <span className={styles.editMark} aria-label="edited">
             ✎
           </span>
         )}
       </span>
+      {compact && <span className={styles.compactTime}>{time}</span>}
     </Tag>
   );
 }
