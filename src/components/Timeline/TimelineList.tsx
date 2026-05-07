@@ -13,9 +13,8 @@ export type TimelineListProps = {
   nowMinutes?: number;
   onEventTap?: (event: Event) => void;
   /**
-   * When true, on first mount the page is scrolled so the current-time
-   * indicator (or the event currently in progress) is in view. Defaults
-   * to false so existing usages don't change behavior.
+   * One-shot scroll on mount to bring the current time (or the event in
+   * progress) into view. Off by default; the Timeline page opts in.
    */
   scrollToNowOnMount?: boolean;
 };
@@ -23,10 +22,15 @@ export type TimelineListProps = {
 const PX_PER_MIN = 2;
 const VIEWPORT_PADDING_MIN = 30;
 const MIN_BLOCK_HEIGHT = 32;
-/** Approximate rendered height of a PointMarker, used for frontier tracking. */
-const POINT_MARKER_HEIGHT = 32;
-/** Minimum gap between a stacked event and the previous one. */
-const STACK_GAP_PX = 4;
+/** Vertical space inside a block reserved for label + range row. */
+const BLOCK_HEADER_PX = 56;
+/** Vertical step between stacked chips inside a block. */
+const CHIP_STEP_PX = 28;
+/** Breathing room below a duration block before a free-standing event below it. */
+const BLOCK_BOTTOM_GAP_PX = 8;
+/** Minimum gap between two consecutive free-standing point markers so they
+ *  don't visually overlap when they fall close together in time. */
+const FREE_MARKER_GAP_PX = 4;
 /** Padding above the current time when auto-scrolling so context is visible. */
 const SCROLL_TOP_PADDING_PX = 80;
 const DEFAULT_VIEWPORT = { start: 7 * 60, end: 21 * 60 };
@@ -35,7 +39,14 @@ type BlockEvent = Event & { endTime: string };
 const isDurationEvent = (e: Event): e is BlockEvent =>
   (e.type === "nap" || e.type === "wake_window" || e.type === "extra") && e.endTime !== undefined;
 
-type Position = { topPx: number; heightPx: number };
+type Position = { topPx: number; heightPx: number; embeddedIn?: string };
+
+function formatHourLabel(hour24: number): string {
+  const h = ((hour24 % 24) + 24) % 24;
+  const period = h < 12 ? "AM" : "PM";
+  const display = h % 12 === 0 ? 12 : h % 12;
+  return `${display} ${period}`;
+}
 
 export function TimelineList({
   events,
@@ -56,7 +67,14 @@ export function TimelineList({
       };
     }
 
-    const sortedEvents = [...events].sort(
+    const allBlocks = events.filter(isDurationEvent);
+    // Wake events always coincide with the start of Wake Window 1, so a
+    // chip for them is pure redundancy. Drop them from the timeline.
+    const filtered = events.filter((e) => {
+      if (e.type !== "wake") return true;
+      return !allBlocks.some((b) => b.startTime === e.startTime);
+    });
+    const sortedEvents = [...filtered].sort(
       (a, b) => parseTime(a.startTime) - parseTime(b.startTime),
     );
 
@@ -68,31 +86,85 @@ export function TimelineList({
     const maxMin = Math.max(...endTimes, DEFAULT_VIEWPORT.end);
     const origin = Math.max(0, minMin - VIEWPORT_PADDING_MIN);
 
-    // Forward-walking "frontier": each event is placed at max(naturalTop,
-    // frontier + gap) so events that follow a stacked cluster are pushed
-    // past the cluster rather than rendering inside it. Initial frontier
-    // is -GAP so a single event at the viewport origin keeps its natural
-    // (un-bumped) position.
+    // Time axis stays absolute. Each block sits at its natural y. Point
+    // markers contained by a block become "chips" stacked inside that block,
+    // not separate rows on the timeline. Free-standing point markers render
+    // normally at their time-anchored y.
+    const blocks = sortedEvents.filter(isDurationEvent);
     const positions = new Map<string, Position>();
-    let frontier = -STACK_GAP_PX;
+    const chipCountByBlock = new Map<string, number>();
+    const chipFrontierByBlock = new Map<string, number>();
+    let lastFreeMarkerBottom = -Infinity;
+
     for (const e of sortedEvents) {
       const startMin = parseTime(e.startTime);
       const naturalTop = (startMin - origin) * PX_PER_MIN;
-      const topPx = Math.max(naturalTop, frontier + STACK_GAP_PX);
-      const blockHeight = e.endTime
-        ? Math.max(MIN_BLOCK_HEIGHT, (parseTime(e.endTime) - startMin) * PX_PER_MIN)
-        : POINT_MARKER_HEIGHT;
-      positions.set(e.id, { topPx, heightPx: blockHeight });
-      frontier = topPx + blockHeight;
+
+      if (isDurationEvent(e)) {
+        const blockHeight = Math.max(
+          MIN_BLOCK_HEIGHT,
+          (parseTime(e.endTime) - startMin) * PX_PER_MIN,
+        );
+        positions.set(e.id, { topPx: naturalTop, heightPx: blockHeight });
+        continue;
+      }
+
+      // Point marker — does it fall inside any block's time range?
+      const container = blocks.find((b) => {
+        const bs = parseTime(b.startTime);
+        const be = parseTime(b.endTime);
+        return bs <= startMin && startMin < be;
+      });
+
+      if (container) {
+        // Time-anchored chip: place at its actual time position, but with two
+        // floors to keep the layout readable —
+        //   1. Below the block's header (label + range row).
+        //   2. Below the previous chip in this block (so dense clusters stack).
+        const containerPos = positions.get(container.id);
+        const containerTop = containerPos?.topPx ?? naturalTop;
+        const headerFloor = containerTop + BLOCK_HEADER_PX;
+        const prevChipBottom = chipFrontierByBlock.get(container.id) ?? -Infinity;
+        const topPx = Math.max(naturalTop, headerFloor, prevChipBottom);
+        chipFrontierByBlock.set(container.id, topPx + CHIP_STEP_PX);
+        chipCountByBlock.set(container.id, (chipCountByBlock.get(container.id) ?? 0) + 1);
+        positions.set(e.id, {
+          topPx,
+          heightPx: CHIP_STEP_PX,
+          embeddedIn: container.id,
+        });
+      } else {
+        // Free-standing markers respect two spacing rules so adjacent labels
+        // don't visually collide:
+        //   1. Sit at least BLOCK_BOTTOM_GAP_PX below any preceding block's bottom.
+        //   2. Sit at least FREE_MARKER_GAP_PX below the previous free-standing marker.
+        let topPx = naturalTop;
+        for (const b of blocks) {
+          const bPos = positions.get(b.id);
+          if (!bPos) continue;
+          const blockBottom = bPos.topPx + bPos.heightPx;
+          if (naturalTop >= bPos.topPx && naturalTop < blockBottom + BLOCK_BOTTOM_GAP_PX) {
+            topPx = Math.max(topPx, blockBottom + BLOCK_BOTTOM_GAP_PX);
+          }
+        }
+        if (topPx - lastFreeMarkerBottom < FREE_MARKER_GAP_PX) {
+          topPx = lastFreeMarkerBottom + FREE_MARKER_GAP_PX;
+        }
+        positions.set(e.id, { topPx, heightPx: CHIP_STEP_PX });
+        lastFreeMarkerBottom = topPx + CHIP_STEP_PX;
+      }
     }
 
     const baseEnd = (maxMin + VIEWPORT_PADDING_MIN - origin) * PX_PER_MIN;
-    const totalHeight = Math.max(baseEnd, frontier + STACK_GAP_PX);
+    const maxBottom = Math.max(
+      baseEnd,
+      ...Array.from(positions.values()).map((p) => p.topPx + p.heightPx),
+    );
 
     return {
       sorted: sortedEvents,
       originMinutes: origin,
-      heightPx: totalHeight,
+      heightPx: maxBottom,
       positionById: positions,
     };
   }, [events]);
@@ -130,31 +202,70 @@ export function TimelineList({
     );
   }
 
+  // Render blocks first, then markers, so embedded chips paint on top of
+  // their containing block (browsers paint later siblings above earlier ones
+  // when z-indexes are equal; markerCompact also has z-index: 2 as a belt).
+  const blocks = sorted.filter(isDurationEvent);
+  const markers = sorted.filter((e) => !isDurationEvent(e));
+
+  // Hour ticks: from the first whole hour at/after origin, up through the
+  // last whole hour visible. Each gets a hairline + a left-gutter label.
+  const endMinutes = originMinutes + heightPx / PX_PER_MIN;
+  const firstHour = Math.ceil(originMinutes / 60);
+  const lastHour = Math.floor(endMinutes / 60);
+  const hourTicks: { hour: number; topPx: number; label: string }[] = [];
+  for (let h = firstHour; h <= lastHour; h++) {
+    const hourLabel = formatHourLabel(h);
+    hourTicks.push({
+      hour: h,
+      topPx: (h * 60 - originMinutes) * PX_PER_MIN,
+      label: hourLabel,
+    });
+  }
+
   return (
     <div ref={rootRef} className={styles.list} style={{ height: `${heightPx}px` }}>
-      {sorted.map((event) => {
+      {hourTicks.map((tick) => (
+        <span
+          key={`tick-${tick.hour}`}
+          className={styles.hourTick}
+          style={{ top: `${tick.topPx}px` }}
+          aria-hidden="true"
+        />
+      ))}
+      {hourTicks.map((tick) => (
+        <span
+          key={`label-${tick.hour}`}
+          className={styles.hourLabel}
+          style={{ top: `${tick.topPx}px` }}
+        >
+          {tick.label}
+        </span>
+      ))}
+
+      {blocks.map((event) => {
         const pos = positionById.get(event.id);
-        const topPx = pos?.topPx ?? 0;
         const tap = onEventTap ? () => onEventTap(event) : undefined;
+        return (
+          <DurationBlock
+            key={event.id}
+            event={event}
+            topPx={pos?.topPx ?? 0}
+            heightPx={pos?.heightPx ?? MIN_BLOCK_HEIGHT}
+            {...(tap ? { onClick: tap } : {})}
+          />
+        );
+      })}
 
-        if (isDurationEvent(event)) {
-          const blockHeight = pos?.heightPx ?? MIN_BLOCK_HEIGHT;
-          return (
-            <DurationBlock
-              key={event.id}
-              event={event}
-              topPx={topPx}
-              heightPx={blockHeight}
-              {...(tap ? { onClick: tap } : {})}
-            />
-          );
-        }
-
+      {markers.map((event) => {
+        const pos = positionById.get(event.id);
+        const tap = onEventTap ? () => onEventTap(event) : undefined;
         return (
           <PointMarker
             key={event.id}
             event={event}
-            topPx={topPx}
+            topPx={pos?.topPx ?? 0}
+            compact={!!pos?.embeddedIn}
             {...(tap ? { onClick: tap } : {})}
           />
         );

@@ -38,14 +38,14 @@ The app **runs locally** against the Firebase emulator suite. Sign-in works (Goo
 
 | # | Item | Notes |
 |---|---|---|
-| 1 | **Settings duration inputs as HH:MM** | Wake windows / bottle interval / nap length / putdown lead / dream-feed offsets currently take raw minutes. Build a reusable DurationInput (h:mm) and apply across editors. Persist as minutes — no schema change. |
-| 2 | **Visual stacking in TimelineList** | Overlapping point markers stack at identical y-coordinates. DurationBlock label position fix landed; point-marker fan-out still pending. |
+| 1 | **Timeline polish v2** (3 items, queued together) | (a) Hourly tick line should clip behind the hour-text label, not run through it. (b) On-the-hour events: when ≤3 events share the same hour, render them as a single line (one dot, no per-event time prefix) — the hour tick already announces the time. (c) Putdown as its own visual block: occupy the requisite vertical space (settings.putdownLeadMinutes) between the wake window and the next nap. Try as a small block to see how it feels. |
+| 2 | **Settings duration inputs as HH:MM** | Wake windows / bottle interval / nap length / putdown lead / dream-feed offsets currently take raw minutes. Build a reusable DurationInput (h:mm) and apply across editors. Persist as minutes — no schema change. |
 | 3 | **Engine sanity dedup with badge** | Per Jake: option (b) — render duplicates with a small "duplicate" badge so user can tap each and delete. Naps are already protected by NapActionButton; bottles are protected by interval guard. |
 | 4 | **🔥 Palette refresh + button tinting** (Jake has flagged twice — bumped) | `--color-surface: #ffffff` is too stark against warm cream `--color-bg`. NapActionButton renders pure white. Most owner-tint colors only appear as small dots. UI dominated by sage + white; user wants more soft earth-tones throughout. |
 | 5 | **Settings accordion** (visual polish, deferred) | Sections collapsible. |
 | 6 | **Wave 9** — PWA + E2E + design audit | Original Plan C roadmap final wave. |
 
-PRs E (#22), B (#23), bottle/nap subtext (#24), and end-of-day messaging + timeline label fix all merged.
+Timeline rebuild (chips-in-blocks + polish + spacing + time-anchored chips + hour ticks) merged as a single PR after #25, #26, #27, #28. Earlier #29/#30/#31 superseded.
 
 ## Decisions locked (do not re-ask)
 
