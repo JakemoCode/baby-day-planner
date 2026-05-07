@@ -16,7 +16,7 @@ describe("DreamFeedEditor", () => {
     expect(screen.getByRole("checkbox", { name: /enabled/i })).toBeChecked();
     expect(screen.getByLabelText(/earliest time/i)).toHaveValue("20:30");
     expect(screen.getByLabelText(/latest time/i)).toHaveValue("21:00");
-    expect(screen.getByLabelText(/minimum minutes after bedtime/i)).toHaveValue(90);
+    expect(screen.getByLabelText(/minimum time after bedtime/i)).toHaveValue("1:30");
   });
 
   it("disables time fields when not enabled", () => {
@@ -25,7 +25,7 @@ describe("DreamFeedEditor", () => {
     );
     expect(screen.getByLabelText(/earliest time/i)).toBeDisabled();
     expect(screen.getByLabelText(/latest time/i)).toBeDisabled();
-    expect(screen.getByLabelText(/minimum minutes after bedtime/i)).toBeDisabled();
+    expect(screen.getByLabelText(/minimum time after bedtime/i)).toBeDisabled();
   });
 
   it("calls onChange when toggle is flipped", () => {

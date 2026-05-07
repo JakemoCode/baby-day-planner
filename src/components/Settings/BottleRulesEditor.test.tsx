@@ -16,7 +16,7 @@ describe("BottleRulesEditor", () => {
   it("renders default amount + default interval", () => {
     renderWithAuth(<BottleRulesEditor value={baseValue} onChange={() => {}} />);
     expect(screen.getByLabelText(/default amount/i)).toHaveValue(5);
-    expect(screen.getByLabelText(/default interval/i)).toHaveValue(180);
+    expect(screen.getByLabelText(/default interval/i)).toHaveValue("3:00");
   });
 
   it("renders one row per rule", () => {
@@ -24,11 +24,13 @@ describe("BottleRulesEditor", () => {
     expect(screen.getAllByLabelText(/^min oz$/i)).toHaveLength(2);
   });
 
-  it("calls onChange when a rule's interval is edited", () => {
+  it("calls onChange when a rule's interval is edited", async () => {
     const onChange = vi.fn();
     renderWithAuth(<BottleRulesEditor value={baseValue} onChange={onChange} />);
-    const intervalInputs = screen.getAllByLabelText(/^interval \(minutes\)$/i);
-    fireEvent.change(intervalInputs[0] as HTMLElement, { target: { value: "165" } });
+    const intervalInputs = screen.getAllByLabelText(/^interval$/i);
+    await userEvent.clear(intervalInputs[0] as HTMLElement);
+    await userEvent.type(intervalInputs[0] as HTMLElement, "2:45");
+    await userEvent.tab();
     const arg = onChange.mock.calls[0]?.[0] as BottleSettings;
     expect(arg.bottleRules[0]?.intervalMinutes).toBe(165);
   });

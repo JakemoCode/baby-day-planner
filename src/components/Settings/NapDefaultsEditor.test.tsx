@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { renderWithAuth, screen, fireEvent } from "@/test-utils";
+import { renderWithAuth, screen, fireEvent, userEvent } from "@/test-utils";
 import { NapDefaultsEditor, type NapDefaults } from "./NapDefaultsEditor";
 
 const baseValue: NapDefaults = {
@@ -13,19 +13,20 @@ const baseValue: NapDefaults = {
 describe("NapDefaultsEditor", () => {
   it("renders all five fields with current values", () => {
     renderWithAuth(<NapDefaultsEditor value={baseValue} onChange={() => {}} />);
-    expect(screen.getByLabelText(/default nap length/i)).toHaveValue(60);
-    expect(screen.getByLabelText(/short nap threshold/i)).toHaveValue(35);
-    expect(screen.getByLabelText(/short nap adjustment/i)).toHaveValue(10);
+    expect(screen.getByLabelText(/default nap length/i)).toHaveValue("1:00");
+    expect(screen.getByLabelText(/short nap threshold/i)).toHaveValue("0:35");
+    expect(screen.getByLabelText(/short nap adjustment/i)).toHaveValue("0:10");
     expect(screen.getByLabelText(/bedtime threshold/i)).toHaveValue("19:00");
-    expect(screen.getByLabelText(/putdown lead/i)).toHaveValue(15);
+    expect(screen.getByLabelText(/putdown lead/i)).toHaveValue("0:15");
   });
 
-  it("calls onChange when default nap length is edited", () => {
+  it("calls onChange when default nap length is edited", async () => {
     const onChange = vi.fn();
     renderWithAuth(<NapDefaultsEditor value={baseValue} onChange={onChange} />);
-    fireEvent.change(screen.getByLabelText(/default nap length/i), {
-      target: { value: "90" },
-    });
+    const input = screen.getByLabelText(/default nap length/i);
+    await userEvent.clear(input);
+    await userEvent.type(input, "1:30");
+    await userEvent.tab();
     expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ defaultNapLengthMinutes: 90 }));
   });
 

@@ -1,18 +1,22 @@
 import { describe, it, expect, vi } from "vitest";
-import { renderWithAuth, screen, userEvent, fireEvent } from "@/test-utils";
+import { renderWithAuth, screen, userEvent } from "@/test-utils";
 import { WakeWindowsEditor } from "./WakeWindowsEditor";
 
 describe("WakeWindowsEditor", () => {
-  it("renders one row per wake window", () => {
+  it("renders one row per wake window as h:mm", () => {
     renderWithAuth(<WakeWindowsEditor value={[120, 135, 135, 150]} onChange={() => {}} />);
-    expect(screen.getAllByRole("spinbutton")).toHaveLength(4);
+    const inputs = screen.getAllByRole("textbox") as HTMLInputElement[];
+    expect(inputs).toHaveLength(4);
+    expect(inputs.map((i) => i.value)).toEqual(["2:00", "2:15", "2:15", "2:30"]);
   });
 
-  it("calls onChange with the new array when a value is edited", () => {
+  it("calls onChange with the new array when a value is edited", async () => {
     const onChange = vi.fn();
     renderWithAuth(<WakeWindowsEditor value={[120, 135, 135, 150]} onChange={onChange} />);
-    const inputs = screen.getAllByRole("spinbutton");
-    fireEvent.change(inputs[1] as HTMLElement, { target: { value: "150" } });
+    const inputs = screen.getAllByRole("textbox");
+    await userEvent.clear(inputs[1] as HTMLElement);
+    await userEvent.type(inputs[1] as HTMLElement, "2:30");
+    await userEvent.tab();
     expect(onChange).toHaveBeenCalledWith([120, 150, 135, 150]);
   });
 
