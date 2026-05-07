@@ -69,7 +69,7 @@ describe("<InstantCluster />", () => {
       <InstantCluster
         items={[bottle, pump]}
         topPx={100}
-        leftPx={300}
+        rightPx={0}
         widthPx={104}
         leaderWidthPx={8}
         colorMode="type"
@@ -86,7 +86,7 @@ describe("<InstantCluster />", () => {
       <InstantCluster
         items={[bottle]}
         topPx={100}
-        leftPx={300}
+        rightPx={0}
         widthPx={104}
         leaderWidthPx={8}
         colorMode="type"
@@ -102,7 +102,7 @@ describe("<InstantCluster />", () => {
       <InstantCluster
         items={[bottle, pump]}
         topPx={100}
-        leftPx={300}
+        rightPx={0}
         widthPx={104}
         leaderWidthPx={8}
         colorMode="type"

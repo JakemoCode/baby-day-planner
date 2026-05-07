@@ -9,8 +9,8 @@ export type InstantClusterProps = {
   items: Event[];
   /** Vertical position (px from timeline origin) for the cluster's center. */
   topPx: number;
-  /** Horizontal position (px from left). Caller anchors to gutter origin. */
-  leftPx: number;
+  /** Right inset from the parent container (the gutter is right-anchored). */
+  rightPx: number;
   /** Container width — caps wrap so chips reflow within the gutter. */
   widthPx: number;
   /** Pixels for the leader line from block lane's right edge. */
@@ -31,7 +31,7 @@ export type InstantClusterProps = {
 export function InstantCluster({
   items,
   topPx,
-  leftPx,
+  rightPx,
   widthPx,
   leaderWidthPx,
   colorMode,
@@ -46,7 +46,7 @@ export function InstantCluster({
       style={
         {
           top: `${topPx}px`,
-          left: `${leftPx}px`,
+          right: `${rightPx}px`,
           width: `${widthPx}px`,
           // CSS variable consumed by the ::before leader line.
           ["--leader-width" as string]: `${leaderWidthPx}px`,
