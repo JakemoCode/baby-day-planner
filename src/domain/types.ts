@@ -94,12 +94,13 @@ export function deriveRecorded(source: EventSource, status: EventStatus): boolea
  * truth for legacy docs (which predate the explicit `kind` field) and for
  * engine code that constructs events without copy-pasting the rule.
  *
- *   - wake_window / nap / putdown → always block
+ *   - wake_window / nap / putdown / bedtime → always block
  *   - extra → block if endTime is set, instant otherwise
- *   - everything else (bottle/pump/bedtime/dream_feed/wake) → instant
+ *   - everything else (bottle/pump/dream_feed/wake) → instant
  */
 export function deriveKind(type: EventType, endTime?: string): EventKind {
-  if (type === "wake_window" || type === "nap" || type === "putdown") return "block";
+  if (type === "wake_window" || type === "nap" || type === "putdown" || type === "bedtime")
+    return "block";
   if (type === "extra" && endTime !== undefined) return "block";
   return "instant";
 }

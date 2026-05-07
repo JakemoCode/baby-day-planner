@@ -231,6 +231,6 @@ export function TimelineV2({
 function zOrder(e: Event): number {
   if (e.type === "extra") return 4;
   if (e.type === "putdown") return 3;
-  if (e.type === "nap") return 2;
+  if (e.type === "nap" || e.type === "bedtime") return 2;
   return 1; // wake_window and everything else
 }

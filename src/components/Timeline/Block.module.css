@@ -53,6 +53,14 @@
   border-color: var(--color-success);
 }
 
+/* Bedtime is a sleep block like a nap, but extends through the night.
+ * Same fill family (sage tint) with a slightly darker stroke to read as
+ * "deeper sleep" — and to distinguish it from a regular nap at a glance. */
+.block[data-type="bedtime"][data-color-mode="type"] {
+  background: var(--color-accent-soft);
+  border-color: var(--color-fg-soft);
+}
+
 .block[data-type="putdown"][data-color-mode="type"] {
   /* Low-contrast diagonal stripes — surface-raised matches wake's fill
    * so putdown reads as "still wake, but transitioning." --color-border
