@@ -118,15 +118,26 @@ export default function DashboardPage() {
   const cww = currentWakeWindow(projected, nowMinutes);
   const inProgressNap = actuals.find((e) => e.type === "nap" && !e.endTime);
   const bottle1Pending = !actuals.some((e) => e.type === "bottle");
-  // "Next" ordinals reflect what's been *recorded* — not what's been
-  // *edited* (owner change via /timeline). The drawer serialises edits
-  // with status: "overridden"; explicit recordings (Start/End Nap, Start
-  // Bottle Now, FAB-create) carry "actual" or "completed". Filtering by
-  // status is more robust than source — End Nap creates a doc with
-  // source="actual" but End-recordings via FAB carry source="manual".
-  const isRecorded = (e: Event) => e.status === "actual" || e.status === "completed";
-  const nextBottleNumber = actuals.filter((e) => e.type === "bottle" && isRecorded(e)).length + 1;
-  const nextNapNumber = actuals.filter((e) => e.type === "nap" && isRecorded(e)).length + 1;
+  // "Next" ordinals = number of unique nap/bottle slots that have a
+  // user-created doc, plus one. We dedupe by eventKey so the Start/End
+  // pair (which produces two docs with the same eventKey via
+  // createOptimistic) doesn't double-count. We exclude pure projections
+  // (those never appear in actuals anyway, but the filter is safe).
+  // Owner-only annotations save with status "overridden" — the drawer
+  // now distinguishes those from time-recording edits, but legacy data
+  // may have either, so we accept any non-projected nap doc as "this
+  // slot has been touched, the next available is N+1".
+  const uniqueRecordedKeys = (type: Event["type"]) => {
+    const seen = new Set<string>();
+    for (const e of actuals) {
+      if (e.type !== type) continue;
+      if (e.status === "projected") continue;
+      seen.add(e.eventKey);
+    }
+    return seen.size;
+  };
+  const nextBottleNumber = uniqueRecordedKeys("bottle") + 1;
+  const nextNapNumber = uniqueRecordedKeys("nap") + 1;
   const lastBottleTime = lastTimeForType(actuals, "bottle");
   const lastBottle = lastEventOfType(actuals, "bottle");
   const lastNap = lastEventOfType(actuals, "nap");
