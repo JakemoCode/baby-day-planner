@@ -26,6 +26,11 @@ const MIN_BLOCK_HEIGHT = 32;
 const BLOCK_HEADER_PX = 44;
 /** Vertical step between stacked chips inside a block. */
 const CHIP_STEP_PX = 28;
+/** Breathing room below a duration block before a free-standing event below it. */
+const BLOCK_BOTTOM_GAP_PX = 8;
+/** Minimum gap between two consecutive free-standing point markers so they
+ *  don't visually overlap when they fall close together in time. */
+const FREE_MARKER_GAP_PX = 4;
 /** Padding above the current time when auto-scrolling so context is visible. */
 const SCROLL_TOP_PADDING_PX = 80;
 const DEFAULT_VIEWPORT = { start: 7 * 60, end: 21 * 60 };
@@ -81,6 +86,7 @@ export function TimelineList({
     const blocks = sortedEvents.filter(isDurationEvent);
     const positions = new Map<string, Position>();
     const chipCountByBlock = new Map<string, number>();
+    let lastFreeMarkerBottom = -Infinity;
 
     for (const e of sortedEvents) {
       const startMin = parseTime(e.startTime);
@@ -113,16 +119,37 @@ export function TimelineList({
           embeddedIn: container.id,
         });
       } else {
-        positions.set(e.id, { topPx: naturalTop, heightPx: CHIP_STEP_PX });
+        // Free-standing markers respect two spacing rules so adjacent labels
+        // don't visually collide:
+        //   1. Sit at least BLOCK_BOTTOM_GAP_PX below any preceding block's bottom.
+        //   2. Sit at least FREE_MARKER_GAP_PX below the previous free-standing marker.
+        let topPx = naturalTop;
+        for (const b of blocks) {
+          const bPos = positions.get(b.id);
+          if (!bPos) continue;
+          const blockBottom = bPos.topPx + bPos.heightPx;
+          if (naturalTop >= bPos.topPx && naturalTop < blockBottom + BLOCK_BOTTOM_GAP_PX) {
+            topPx = Math.max(topPx, blockBottom + BLOCK_BOTTOM_GAP_PX);
+          }
+        }
+        if (topPx - lastFreeMarkerBottom < FREE_MARKER_GAP_PX) {
+          topPx = lastFreeMarkerBottom + FREE_MARKER_GAP_PX;
+        }
+        positions.set(e.id, { topPx, heightPx: CHIP_STEP_PX });
+        lastFreeMarkerBottom = topPx + CHIP_STEP_PX;
       }
     }
 
     const baseEnd = (maxMin + VIEWPORT_PADDING_MIN - origin) * PX_PER_MIN;
+    const maxBottom = Math.max(
+      baseEnd,
+      ...Array.from(positions.values()).map((p) => p.topPx + p.heightPx),
+    );
 
     return {
       sorted: sortedEvents,
       originMinutes: origin,
-      heightPx: baseEnd,
+      heightPx: maxBottom,
       positionById: positions,
     };
   }, [events]);

@@ -226,6 +226,59 @@ describe("TimelineList", () => {
     expect(napTop - wwTop).toBe(170);
   });
 
+  it("pushes a free-standing marker below a preceding block by at least 8px", () => {
+    // Wake Window 1 ends at 08:25 (170px from 07:00 origin). A point marker
+    // at 08:25 would naturally land at the same y as the block's bottom edge.
+    // It should be pushed down by BLOCK_BOTTOM_GAP_PX (8) for breathing room.
+    const bottleAtBlockEnd: Event = {
+      id: "b-edge",
+      dayId: "d1",
+      eventKey: "bottle_edge",
+      type: "bottle",
+      label: "Bottle",
+      startTime: "08:25",
+      amountOz: 5,
+      source: "actual",
+      status: "actual",
+    };
+    renderWithAuth(<TimelineList events={[wakeWindow(1, "07:00", "08:25"), bottleAtBlockEnd]} />);
+    const block = screen.getByTestId("duration-block");
+    const marker = screen.getByTestId("point-marker");
+    const blockTop = parseFloat((block as HTMLElement).style.top);
+    const blockHeight = parseFloat((block as HTMLElement).style.height);
+    const markerTop = parseFloat((marker as HTMLElement).style.top);
+    expect(markerTop).toBeGreaterThanOrEqual(blockTop + blockHeight + 8);
+  });
+
+  it("stacks consecutive free-standing markers so they don't overlap", () => {
+    // Two free-standing markers very close in time (Pump and Dream Feed both
+    // after bedtime). Must not render at the same y.
+    const pump: Event = {
+      id: "p1",
+      dayId: "d1",
+      eventKey: "pump_21",
+      type: "pump",
+      label: "Pump",
+      startTime: "21:00",
+      source: "projected",
+      status: "projected",
+    };
+    const dream: Event = {
+      id: "df1",
+      dayId: "d1",
+      eventKey: "dream_feed",
+      type: "dream_feed",
+      label: "Dream Feed",
+      startTime: "21:00",
+      source: "projected",
+      status: "projected",
+    };
+    renderWithAuth(<TimelineList events={[pump, dream]} />);
+    const markers = screen.getAllByTestId("point-marker");
+    const tops = markers.map((m) => parseFloat((m as HTMLElement).style.top)).sort((a, b) => a - b);
+    expect(tops[1]!).toBeGreaterThan(tops[0]!);
+  });
+
   it("renders free-standing point markers (no block container) without compact chrome", () => {
     renderWithAuth(<TimelineList events={[bottle(1, "13:00")]} />);
     const marker = screen.getByTestId("point-marker");
