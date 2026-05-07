@@ -82,6 +82,7 @@ describe("TomorrowPreview", () => {
         dayId: tomorrowDay.id,
         eventKey: "extra_1",
         type: "extra" as const,
+        kind: "instant" as const,
         label: "Pediatrician",
         startTime: "11:00",
         source: "manual" as const,

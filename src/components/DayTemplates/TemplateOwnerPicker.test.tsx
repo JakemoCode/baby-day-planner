@@ -8,6 +8,7 @@ const napEvent: Event = {
   dayId: "day-1",
   eventKey: "nap_1",
   type: "nap",
+  kind: "block",
   label: "Nap 1",
   startTime: "09:00",
   endTime: "10:00",

@@ -1,4 +1,5 @@
 import type { Event, Settings } from "./types";
+import { makeEvent } from "./types";
 import { addMinutes, parseTime } from "./time";
 
 // Escape hatch: any event type returning a number gets a putdown emitted at that lead time.
@@ -16,18 +17,20 @@ export function addPutdownEvents(events: Event[], settings: Settings): Event[] {
     if (e.source !== "projected") continue;
     const lead = putdownLeadFor(e, settings);
     if (lead === undefined) continue;
-    additions.push({
-      id: `${e.id}-putdown`,
-      dayId: e.dayId,
-      eventKey: `${e.eventKey}_putdown`,
-      type: "putdown",
-      label: `Start putting down for ${e.label}`,
-      startTime: addMinutes(e.startTime, -lead),
-      endTime: e.startTime,
-      ...(e.owner !== undefined ? { owner: e.owner } : {}),
-      source: "projected",
-      status: "projected",
-    });
+    additions.push(
+      makeEvent({
+        id: `${e.id}-putdown`,
+        dayId: e.dayId,
+        eventKey: `${e.eventKey}_putdown`,
+        type: "putdown",
+        label: `Start putting down for ${e.label}`,
+        startTime: addMinutes(e.startTime, -lead),
+        endTime: e.startTime,
+        ...(e.owner !== undefined ? { owner: e.owner } : {}),
+        source: "projected",
+        status: "projected",
+      }),
+    );
   }
   return [...events, ...additions].sort((a, b) => parseTime(a.startTime) - parseTime(b.startTime));
 }

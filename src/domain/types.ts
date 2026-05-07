@@ -14,11 +14,20 @@ export type EventType =
 export type EventSource = "actual" | "projected" | "manual" | "template";
 export type EventStatus = "projected" | "actual" | "overridden" | "completed";
 
+/**
+ * Discriminator for Timeline v2 layout: blocks have duration and render in the
+ * center lane; instants have no duration and render as chips in the right
+ * gutter. Persisted on every new write; legacy docs without `kind` are coerced
+ * via `deriveKind` in the Firestore converter.
+ */
+export type EventKind = "block" | "instant";
+
 export type Event = {
   id: string;
   dayId: string;
   eventKey: string;
   type: EventType;
+  kind: EventKind;
   label: string;
   startTime: string; // "HH:MM" or "HH:MM" with hours 24+ for cross-midnight
   endTime?: string;
@@ -27,6 +36,30 @@ export type Event = {
   source: EventSource;
   status: EventStatus;
 };
+
+/**
+ * Convenience builder for Event values: takes everything except `kind` and
+ * fills it in via `deriveKind`. Use anywhere code constructs an Event from
+ * a literal so the kind discriminator stays in sync with type + endTime.
+ */
+export function makeEvent(props: Omit<Event, "kind">): Event {
+  return { ...props, kind: deriveKind(props.type, props.endTime) };
+}
+
+/**
+ * Derive the layout `kind` from an event's `type` and `endTime`. Source of
+ * truth for legacy docs (which predate the explicit `kind` field) and for
+ * engine code that constructs events without copy-pasting the rule.
+ *
+ *   - wake_window / nap / putdown → always block
+ *   - extra → block if endTime is set, instant otherwise
+ *   - everything else (bottle/pump/bedtime/dream_feed/wake) → instant
+ */
+export function deriveKind(type: EventType, endTime?: string): EventKind {
+  if (type === "wake_window" || type === "nap" || type === "putdown") return "block";
+  if (type === "extra" && endTime !== undefined) return "block";
+  return "instant";
+}
 
 export type BottleRule = {
   minOz: number;

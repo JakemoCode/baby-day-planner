@@ -8,6 +8,7 @@ const nap = (overrides: Partial<Event> = {}): Event => ({
   dayId: "d1",
   eventKey: "nap_1",
   type: "nap",
+  kind: "block",
   label: "Nap 1",
   startTime: "09:00",
   endTime: "10:00",
@@ -58,6 +59,7 @@ describe("DurationBlock", () => {
     const ww: Event = {
       ...nap(),
       type: "wake_window",
+      kind: "block",
       eventKey: "wake_window_1",
       label: "Wake Window 1",
     };

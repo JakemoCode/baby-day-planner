@@ -1,4 +1,5 @@
 import type { Event, EventType, Settings } from "@/domain";
+import { makeEvent } from "@/domain";
 
 export type CreatableType = "bottle" | "nap" | "pump" | "extra";
 
@@ -27,7 +28,7 @@ export function buildCreateTemplate({
 
   if (type === "bottle") {
     const nextN = countByType(actuals, "bottle") + 1;
-    return {
+    return makeEvent({
       id: `bottle-${idStamp}`,
       dayId,
       eventKey: `bottle_${nextN}`,
@@ -37,12 +38,12 @@ export function buildCreateTemplate({
       amountOz: settings.defaultBottleAmountOz,
       source: "manual",
       status: "completed",
-    };
+    });
   }
 
   if (type === "nap") {
     const nextN = countByType(actuals, "nap") + 1;
-    return {
+    return makeEvent({
       id: `nap-${idStamp}`,
       dayId,
       eventKey: `nap_${nextN}`,
@@ -51,11 +52,11 @@ export function buildCreateTemplate({
       startTime: nowHHMM,
       source: "manual",
       status: "completed",
-    };
+    });
   }
 
   if (type === "pump") {
-    return {
+    return makeEvent({
       id: `pump-${idStamp}`,
       dayId,
       eventKey: `pump_${idStamp}`,
@@ -64,10 +65,10 @@ export function buildCreateTemplate({
       startTime: nowHHMM,
       source: "manual",
       status: "completed",
-    };
+    });
   }
 
-  return {
+  return makeEvent({
     id: `extra-${idStamp}`,
     dayId,
     eventKey: `extra_${idStamp}`,
@@ -76,7 +77,7 @@ export function buildCreateTemplate({
     startTime: nowHHMM,
     source: "manual",
     status: "completed",
-  };
+  });
 }
 
 function countByType(events: Event[], type: EventType): number {

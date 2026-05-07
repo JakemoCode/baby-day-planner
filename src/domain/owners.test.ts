@@ -1,18 +1,20 @@
 import { describe, it, expect } from "vitest";
 import type { Event, OwnershipTemplate } from "./types";
+import { makeEvent } from "./types";
 import { applyTemplate, flipTemplate, copyToOtherDay } from "./owners";
 import { saturdayTemplate, sampleDay } from "./__fixtures__/sample";
 
-const evt = (type: Event["type"], eventKey: string, start = "07:00"): Event => ({
-  id: eventKey,
-  dayId: sampleDay.id,
-  eventKey,
-  type,
-  label: eventKey,
-  startTime: start,
-  source: "projected",
-  status: "projected",
-});
+const evt = (type: Event["type"], eventKey: string, start = "07:00"): Event =>
+  makeEvent({
+    id: eventKey,
+    dayId: sampleDay.id,
+    eventKey,
+    type,
+    label: eventKey,
+    startTime: start,
+    source: "projected",
+    status: "projected",
+  });
 
 describe("applyTemplate", () => {
   it("assigns nap and wake-window owners by index", () => {

@@ -26,6 +26,7 @@ describe("nextBottle", () => {
         dayId: sampleDay.id,
         eventKey: "bottle_2",
         type: "bottle",
+        kind: "instant",
         label: "Bottle 2",
         startTime: "11:05",
         amountOz: 5,

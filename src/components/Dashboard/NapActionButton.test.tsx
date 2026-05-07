@@ -8,6 +8,7 @@ const napInProgress = (): Event => ({
   dayId: "d1",
   eventKey: "nap_1",
   type: "nap",
+  kind: "block",
   label: "Nap 1",
   startTime: "09:00",
   source: "actual",
@@ -57,6 +58,7 @@ describe("NapActionButton", () => {
     const arg = onStart.mock.calls[0]?.[0] as Event;
     expect(arg).toMatchObject({
       type: "nap",
+      kind: "block",
       eventKey: "nap_1",
       label: "Nap 1",
       source: "actual",

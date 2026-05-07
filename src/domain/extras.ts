@@ -1,4 +1,5 @@
 import type { Day, Event, Settings } from "./types";
+import { makeEvent } from "./types";
 import { parseTime } from "./time";
 
 export function mergePumpsAndExtras(
@@ -30,16 +31,18 @@ export function mergePumpsAndExtras(
     if (actual) {
       out.push(actual);
     } else {
-      out.push({
-        id: `proj-${day.id}-pump-${time}`,
-        dayId: day.id,
-        eventKey: key,
-        type: "pump",
-        label: "Pump",
-        startTime: time,
-        source: "projected",
-        status: "projected",
-      });
+      out.push(
+        makeEvent({
+          id: `proj-${day.id}-pump-${time}`,
+          dayId: day.id,
+          eventKey: key,
+          type: "pump",
+          label: "Pump",
+          startTime: time,
+          source: "projected",
+          status: "projected",
+        }),
+      );
     }
   }
 

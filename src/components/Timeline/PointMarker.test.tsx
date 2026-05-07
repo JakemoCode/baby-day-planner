@@ -8,6 +8,7 @@ const bottle = (overrides: Partial<Event> = {}): Event => ({
   dayId: "d1",
   eventKey: "bottle_1",
   type: "bottle",
+  kind: "instant",
   label: "Bottle 1",
   startTime: "07:05",
   amountOz: 5,
@@ -52,6 +53,7 @@ describe("PointMarker", () => {
         event={{
           ...bottle(),
           type: "bedtime",
+          kind: "instant",
           label: "Bedtime",
           eventKey: "bedtime",
         }}

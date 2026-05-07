@@ -1,4 +1,5 @@
 import type { Event, Settings } from "./types";
+import { makeEvent } from "./types";
 import { parseTime } from "./time";
 
 export function applyBedtime(events: Event[], settings: Settings, actuals: Event[] = []): Event[] {
@@ -47,7 +48,7 @@ export function applyBedtime(events: Event[], settings: Settings, actuals: Event
       return true;
     })
     .concat([
-      {
+      makeEvent({
         id: `proj-${napToReplace.dayId}-bedtime`,
         dayId: napToReplace.dayId,
         eventKey: "bedtime",
@@ -56,7 +57,7 @@ export function applyBedtime(events: Event[], settings: Settings, actuals: Event
         startTime: napToReplace.startTime,
         source: "projected",
         status: "projected",
-      },
+      }),
     ]);
 
   return out.sort((a, b) => parseTime(a.startTime) - parseTime(b.startTime));

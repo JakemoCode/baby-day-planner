@@ -8,6 +8,7 @@ const napProjected = (n: number, start: string): Event => ({
   dayId: "day-1",
   eventKey: `nap_${n}`,
   type: "nap",
+  kind: "block",
   label: `Nap ${n}`,
   startTime: start,
   endTime: "00:00",
@@ -21,6 +22,7 @@ const bedtimeProjected = (start: string): Event => ({
   dayId: "day-1",
   eventKey: "bedtime",
   type: "bedtime",
+  kind: "instant",
   label: "Bedtime",
   startTime: start,
   source: "projected",
@@ -35,6 +37,7 @@ describe("addPutdownEvents", () => {
     expect(putdowns).toHaveLength(2);
     expect(putdowns[0]).toMatchObject({
       type: "putdown",
+      kind: "block",
       label: "Start putting down for Nap 1",
       startTime: "08:45",
       endTime: "09:00",
@@ -55,6 +58,7 @@ describe("addPutdownEvents", () => {
     expect(putdowns).toHaveLength(1);
     expect(putdowns[0]).toMatchObject({
       type: "putdown",
+      kind: "block",
       label: "Start putting down for Bedtime",
       startTime: "18:45",
       endTime: "19:00",
@@ -83,6 +87,7 @@ describe("addPutdownEvents", () => {
         dayId: "day-1",
         eventKey: "bottle_1",
         type: "bottle",
+        kind: "instant",
         label: "Bottle 1",
         startTime: "07:05",
         source: "projected",

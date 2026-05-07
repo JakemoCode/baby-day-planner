@@ -1,7 +1,7 @@
 "use client";
 
 import type { Event } from "@/domain";
-import { formatTime } from "@/domain";
+import { formatTime, makeEvent } from "@/domain";
 import styles from "./ActionButton.module.css";
 
 export type NapActionButtonProps = {
@@ -29,7 +29,7 @@ export function NapActionButton({
     if (inProgressNap) {
       void onEnd(inProgressNap, time);
     } else {
-      const nap: Event = {
+      const nap: Event = makeEvent({
         id: `actual-${dayId}-nap-${nextNumber}-${Date.now()}`,
         dayId,
         eventKey: `nap_${nextNumber}`,
@@ -38,7 +38,7 @@ export function NapActionButton({
         startTime: time,
         source: "actual",
         status: "actual",
-      };
+      });
       void onStart(nap);
     }
   };

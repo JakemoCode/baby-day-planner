@@ -18,6 +18,7 @@ const bottle: Event = {
   dayId: day.id,
   eventKey: "bottle_1",
   type: "bottle",
+  kind: "instant",
   label: "Bottle 1",
   startTime: "07:05",
   amountOz: 5,

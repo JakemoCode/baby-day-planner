@@ -14,6 +14,7 @@ describe("applyBedtime", () => {
     const bedtime = result.find((e) => e.type === "bedtime");
     expect(bedtime).toMatchObject({
       type: "bedtime",
+      kind: "instant",
       label: "Bedtime",
       startTime: "19:00",
       source: "projected",
@@ -50,6 +51,7 @@ describe("applyBedtime", () => {
       dayId: sampleDay.id,
       eventKey: "bedtime",
       type: "bedtime" as const,
+      kind: "instant" as const,
       label: "Bedtime",
       startTime: "18:30",
       source: "manual" as const,
@@ -81,6 +83,7 @@ describe("applyBedtime", () => {
         dayId: sampleDay.id,
         eventKey: "bedtime",
         type: "bedtime" as const,
+        kind: "instant" as const,
         label: "Bedtime",
         startTime: "18:30",
         source: "manual" as const,
@@ -100,6 +103,7 @@ describe("applyBedtime", () => {
       dayId: sampleDay.id,
       eventKey: "bedtime",
       type: "bedtime" as const,
+      kind: "instant" as const,
       label: "Bedtime",
       startTime: "18:30",
       source: "manual" as const,

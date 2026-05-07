@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import type { Day, Event, OwnershipTemplate, Settings } from "@/domain";
-import { projectDay } from "@/domain";
+import { makeEvent, projectDay } from "@/domain";
 import { TimelineList } from "@/components/Timeline/TimelineList";
 import styles from "./TomorrowPreview.module.css";
 
@@ -27,17 +27,19 @@ export function TomorrowPreview({
     if (!day.wakeTime) return [];
     const actuals: Event[] = [...extras];
     if (bottle1Time) {
-      actuals.push({
-        id: `${day.id}-planned-bottle-1`,
-        dayId: day.id,
-        eventKey: "bottle_1",
-        type: "bottle",
-        label: "Bottle 1",
-        startTime: bottle1Time,
-        amountOz: settings.defaultBottleAmountOz,
-        source: "manual",
-        status: "overridden",
-      });
+      actuals.push(
+        makeEvent({
+          id: `${day.id}-planned-bottle-1`,
+          dayId: day.id,
+          eventKey: "bottle_1",
+          type: "bottle",
+          label: "Bottle 1",
+          startTime: bottle1Time,
+          amountOz: settings.defaultBottleAmountOz,
+          source: "manual",
+          status: "overridden",
+        }),
+      );
     }
     return projectDay({
       day,

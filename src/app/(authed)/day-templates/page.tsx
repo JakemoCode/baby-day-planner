@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import type { Day, Event, Owner, OwnershipTemplate } from "@/domain";
-import { projectDay } from "@/domain";
+import { makeEvent, projectDay } from "@/domain";
 import { useSettings } from "@/hooks/useSettings";
 import { useTemplates } from "@/hooks/useTemplates";
 import { saveTemplate } from "@/repositories/templates";
@@ -64,7 +64,7 @@ export default function DayTemplatesPage() {
     if (!settings) return [];
     // Seed bottle_1 at wake time so the bottle chain projects a typical day's
     // worth of bottles to assign owners against.
-    const seed: Event = {
+    const seed: Event = makeEvent({
       id: `${SYNTHETIC_DAY_ID}-bottle-1-seed`,
       dayId: SYNTHETIC_DAY_ID,
       eventKey: "bottle_1",
@@ -74,7 +74,7 @@ export default function DayTemplatesPage() {
       amountOz: settings.defaultBottleAmountOz,
       source: "actual",
       status: "actual",
-    };
+    });
     return projectDay({
       day: syntheticDay,
       settings,

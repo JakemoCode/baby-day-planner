@@ -1,4 +1,5 @@
 import type { Day, Event, Settings } from "./types";
+import { makeEvent } from "./types";
 import { addMinutes, formatTime, parseTime } from "./time";
 
 export function addDreamFeed(events: Event[], settings: Settings, day: Day): Event[] {
@@ -12,7 +13,7 @@ export function addDreamFeed(events: Event[], settings: Settings, day: Day): Eve
     parseTime(earliestAllowed) > parseTime(cfg.earliestTime) ? earliestAllowed : cfg.earliestTime;
   const finalStart = parseTime(earliest) > parseTime(cfg.latestTime) ? cfg.latestTime : earliest;
 
-  const dreamFeed: Event = {
+  const dreamFeed: Event = makeEvent({
     id: `proj-${day.id}-dream-feed`,
     dayId: day.id,
     eventKey: "dream_feed",
@@ -21,6 +22,6 @@ export function addDreamFeed(events: Event[], settings: Settings, day: Day): Eve
     startTime: formatTime(parseTime(finalStart)),
     source: "projected",
     status: "projected",
-  };
+  });
   return [...events, dreamFeed].sort((a, b) => parseTime(a.startTime) - parseTime(b.startTime));
 }

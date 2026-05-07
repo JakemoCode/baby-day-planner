@@ -13,6 +13,7 @@ const bottle = (
   dayId: sampleDay.id,
   eventKey: `bottle_${n}`,
   type: "bottle",
+  kind: "instant",
   label: `Bottle ${n}`,
   startTime: start,
   amountOz: oz,

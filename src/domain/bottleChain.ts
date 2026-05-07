@@ -1,4 +1,5 @@
 import type { Day, Event, Settings } from "./types";
+import { makeEvent } from "./types";
 import { addMinutes, parseTime } from "./time";
 import { intervalForAmount } from "./bottleRules";
 
@@ -27,17 +28,19 @@ export function projectBottleChain(actuals: Event[], settings: Settings, day: Da
     );
     const nextStart = addMinutes(cursorTime, interval);
     if (parseTime(nextStart) >= HARD_STOP_MINUTES) break;
-    out.push({
-      id: `proj-${day.id}-bottle-${n}`,
-      dayId: day.id,
-      eventKey: `bottle_${n}`,
-      type: "bottle",
-      label: `Bottle ${n}`,
-      startTime: nextStart,
-      amountOz: settings.defaultBottleAmountOz,
-      source: "projected",
-      status: "projected",
-    });
+    out.push(
+      makeEvent({
+        id: `proj-${day.id}-bottle-${n}`,
+        dayId: day.id,
+        eventKey: `bottle_${n}`,
+        type: "bottle",
+        label: `Bottle ${n}`,
+        startTime: nextStart,
+        amountOz: settings.defaultBottleAmountOz,
+        source: "projected",
+        status: "projected",
+      }),
+    );
     cursorTime = nextStart;
     cursorAmount = settings.defaultBottleAmountOz;
     n++;
