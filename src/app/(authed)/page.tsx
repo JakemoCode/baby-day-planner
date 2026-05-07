@@ -128,6 +128,20 @@ export default function DashboardPage() {
   );
   const bedtime = projectedBedtime(projected);
 
+  // Smart suppression: when NextEventCard already announces the same fact a
+  // preview card would, hide the preview to avoid three cards saying "bedtime
+  // is coming" in different words.
+  const nextType = next?.type;
+  const hideBottlePreview = nextType === "bottle" || nextType === "dream_feed";
+  const hideNapPreview = nextType === "nap" || nextType === "bedtime" || nextType === "putdown";
+
+  // Putdown events name their parent via eventKey suffix (`${parent}_putdown`).
+  // Look up the parent so the next-event label can include "…at 6:35 PM".
+  const nextTargetEvent =
+    next && next.type === "putdown"
+      ? projected.find((e) => `${e.eventKey}_putdown` === next.eventKey)
+      : undefined;
+
   const handleLogBottle = async (bottle: Event) => {
     await createOptimistic(bottle);
   };
@@ -152,18 +166,26 @@ export default function DashboardPage() {
 
   return (
     <div className={styles.page}>
-      <NextEventCard event={next} nowMinutes={nowMinutes} />
-      <NextBottlePreview
-        bottle={nb}
-        bottle1Pending={bottle1Pending}
-        {...(lastBottle ? { lastBottle } : {})}
-        {...(upcomingDreamFeed ? { dreamFeed: upcomingDreamFeed } : {})}
+      <NextEventCard
+        event={next}
+        nowMinutes={nowMinutes}
+        {...(nextTargetEvent ? { targetEvent: nextTargetEvent } : {})}
       />
-      <NextNapPreview
-        nap={nn}
-        {...(lastNap ? { lastNap } : {})}
-        {...(bedtime ? { bedtime } : {})}
-      />
+      {!hideBottlePreview && (
+        <NextBottlePreview
+          bottle={nb}
+          bottle1Pending={bottle1Pending}
+          {...(lastBottle ? { lastBottle } : {})}
+          {...(upcomingDreamFeed ? { dreamFeed: upcomingDreamFeed } : {})}
+        />
+      )}
+      {!hideNapPreview && (
+        <NextNapPreview
+          nap={nn}
+          {...(lastNap ? { lastNap } : {})}
+          {...(bedtime ? { bedtime } : {})}
+        />
+      )}
       <CurrentWakeWindowStatus wakeWindow={cww} />
 
       <div className={styles.actions}>
