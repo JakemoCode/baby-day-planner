@@ -64,3 +64,34 @@ export function projectBottleChain(actuals: Event[], settings: Settings, day: Da
 
   return out.sort((a, b) => parseTime(a.startTime) - parseTime(b.startTime));
 }
+
+/**
+ * Renumber bottles so eventKey + label always reflect chronological
+ * order. Manual overrides + projection cascades can produce gaps or
+ * non-monotonic numbering (e.g. a stray bottle_4 manual sitting before a
+ * bottle_3 actual). This pass canonicalizes display: bottle_1 is the
+ * earliest, bottle_2 next, regardless of how the docs got created.
+ *
+ * Important: this changes the displayed eventKey only (in the engine's
+ * in-memory event list). Firestore docs retain their original eventKey;
+ * lookups by id stay intact.
+ */
+export function renumberBottles(events: Event[]): Event[] {
+  const bottles = events
+    .filter((e) => e.type === "bottle")
+    .sort((a, b) => parseTime(a.startTime) - parseTime(b.startTime));
+  if (bottles.length === 0) return events;
+
+  const idToNewKey = new Map<string, { key: string; label: string }>();
+  bottles.forEach((b, i) => {
+    const n = i + 1;
+    idToNewKey.set(b.id, { key: `bottle_${n}`, label: `Bottle ${n}` });
+  });
+
+  return events.map((e) => {
+    if (e.type !== "bottle") return e;
+    const next = idToNewKey.get(e.id);
+    if (!next) return e;
+    return { ...e, eventKey: next.key, label: next.label };
+  });
+}

@@ -13,7 +13,7 @@ export { projectNapChain } from "./napChain";
 export { applyNapActuals } from "./napActuals";
 export { applyBedtime } from "./bedtime";
 export { addPutdownEvents } from "./putdown";
-export { projectBottleChain } from "./bottleChain";
+export { projectBottleChain, renumberBottles } from "./bottleChain";
 export { resolveBottleNapOverlap } from "./bottleOverlap";
 export { suppressBottlesAfterBedtime } from "./bottleSuppress";
 export { addDreamFeed } from "./dreamFeed";
