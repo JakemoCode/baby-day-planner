@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Baby Schedule — Wireframes</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;700&family=Kalam:wght@300;400;700&display=swap" rel="stylesheet">
+<style>
+  html, body { margin: 0; padding: 0; background: #f5efe1; font-family: 'Kalam', sans-serif; color: #2a2620; }
+  * { box-sizing: border-box; }
+  .legend {
+    display: flex; flex-wrap: wrap; gap: 10px; padding: 6px 8px;
+    background: #fdfbf4; border: 1.5px solid #2a2620; border-radius: 6px;
+    box-shadow: 2px 2px 0 #2a2620; font-size: 11px; margin-bottom: 8px;
+  }
+  .legend-item { display: inline-flex; align-items: center; gap: 4px; }
+  .legend-swatch { width: 12px; height: 12px; border: 1.5px solid #2a2620; }
+  .frame-note { font-family: 'Caveat', cursive; font-size: 14px; color: #5a5040; padding: 4px 8px; line-height: 1.2; }
+</style>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script type="text/babel" src="design-canvas.jsx"></script>
+<script type="text/babel" src="tweaks-panel.jsx"></script>
+<script type="text/babel" src="data.jsx"></script>
+<script type="text/babel" src="phone.jsx"></script>
+<script type="text/babel" src="v1-gutter.jsx"></script>
+<script type="text/babel" src="v2-twocol.jsx"></script>
+<script type="text/babel" src="v3-tick.jsx"></script>
+<script type="text/babel" src="v4-spine.jsx"></script>
+<script type="text/babel" src="v5-ribbon.jsx"></script>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel">
+const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+  "colorMode": "type",
+  "dataset": "busy",
+  "dimPast": true,
+  "density": 120
+}/*EDITMODE-END*/;
+
+function Legend({ colorMode }) {
+  const types = [
+    ['wake', 'Wake'], ['nap', 'Nap'], ['putdown', 'Putdown'],
+    ['bottle', 'Bottle'], ['pump', 'Pump'], ['cook', 'Cook'], ['bedtime', 'Bedtime'],
+  ];
+  return (
+    <div className="legend">
+      {colorMode === 'type' ? types.map(([k, label]) => {
+        const t = window.TYPES[k];
+        const isBlock = t.fill !== undefined;
+        return (
+          <span className="legend-item" key={k}>
+            <span className="legend-swatch" style={{
+              background: isBlock ? t.fill : '#fdfbf4',
+              borderColor: isBlock ? t.stroke : t.dot,
+              borderRadius: isBlock ? 2 : '50%',
+            }} />
+            {label}
+          </span>
+        );
+      }) : Object.entries(window.OWNERS).map(([k, o]) => (
+        <span className="legend-item" key={k}>
+          <span className="legend-swatch" style={{ background: o.color, borderRadius: 2 }} />
+          {o.name}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function App() {
+  const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
+  const events = t.dataset === 'busy' ? window.BUSY_DAY : window.SIMPLE_DAY;
+  const sharedProps = { events, density: t.density, dimPast: t.dimPast, colorMode: t.colorMode };
+
+  const wrap = (note, comp) => (
+    <div>
+      <div className="frame-note">{note}</div>
+      <Legend colorMode={t.colorMode} />
+      {comp}
+    </div>
+  );
+
+  return (
+    <>
+      <DesignCanvas defaultZoom={0.85}>
+        <DCSection id="convention" title="Conventional vertical timelines">
+          <DCArtboard id="v1" label="V1 · Inline gutter — instants pinned right with leader" width={420} height={1780}>
+            <PhoneFrame title="Aden's Day" subtitle="Thu, May 7 · V1 Gutter" height={1740}>
+              {wrap('Instants live in a fixed right gutter. Leader line ties them to exact time. Concurrent events fan horizontally.', <V1_InlineGutter {...sharedProps} />)}
+            </PhoneFrame>
+          </DCArtboard>
+
+          <DCArtboard id="v2" label="V2 · Two-column split — separate lanes" width={420} height={1780}>
+            <PhoneFrame title="Aden's Day" subtitle="Thu, May 7 · V2 Two-column" height={1740}>
+              {wrap('Blocks and instants in separate columns. Putdown becomes a striped sub-bar on the wake-window edge — never blocks text.', <V2_TwoColumn {...sharedProps} />)}
+            </PhoneFrame>
+          </DCArtboard>
+
+          <DCArtboard id="v3" label="V3 · Tick on axis — instants ARE the axis" width={420} height={1780}>
+            <PhoneFrame title="Aden's Day" subtitle="Thu, May 7 · V3 Tick axis" height={1740}>
+              {wrap('Instants become tick marks on the axis itself. Block content area is fully theirs. Concurrent ticks fan left.', <V3_TickAxis {...sharedProps} />)}
+            </PhoneFrame>
+          </DCArtboard>
+        </DCSection>
+
+      </DesignCanvas>
+
+      <TweaksPanel title="Tweaks">
+        <TweakSection title="Data">
+          <TweakRadio
+            label="Dataset"
+            value={t.dataset}
+            options={[{value:'busy', label:'Busy'}, {value:'simple', label:'Simple'}]}
+            onChange={(v) => setTweak('dataset', v)}
+          />
+          <TweakRadio
+            label="Color encodes"
+            value={t.colorMode}
+            options={[{value:'type', label:'Type'}, {value:'owner', label:'Owner'}]}
+            onChange={(v) => setTweak('colorMode', v)}
+          />
+          <TweakToggle
+            label="Dim past events"
+            value={t.dimPast}
+            onChange={(v) => setTweak('dimPast', v)}
+          />
+        </TweakSection>
+        <TweakSection title="Density">
+          <TweakSlider
+            label="Hour height (px)"
+            value={t.density}
+            min={70} max={220} step={10}
+            onChange={(v) => setTweak('density', v)}
+          />
+        </TweakSection>
+      </TweaksPanel>
+    </>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>
