@@ -118,8 +118,13 @@ export default function DashboardPage() {
   const cww = currentWakeWindow(projected, nowMinutes);
   const inProgressNap = actuals.find((e) => e.type === "nap" && !e.endTime);
   const bottle1Pending = !actuals.some((e) => e.type === "bottle");
-  const nextBottleNumber = countByType(actuals, "bottle") + 1;
-  const nextNapNumber = countByType(actuals, "nap") + 1;
+  // "Next" ordinals must reflect what's been *recorded* (Daycare pressed
+  // Start) — not what's been *edited* (owner change on /timeline). Manual
+  // edits inflate countByType because they live as manual-source docs in
+  // Firestore. Filter to source: "actual" so the ordinals match reality.
+  const nextBottleNumber =
+    actuals.filter((e) => e.type === "bottle" && e.source === "actual").length + 1;
+  const nextNapNumber = actuals.filter((e) => e.type === "nap" && e.source === "actual").length + 1;
   const lastBottleTime = lastTimeForType(actuals, "bottle");
   const lastBottle = lastEventOfType(actuals, "bottle");
   const lastNap = lastEventOfType(actuals, "nap");
@@ -246,10 +251,6 @@ export default function DashboardPage() {
       />
     </div>
   );
-}
-
-function countByType(events: Event[], type: Event["type"]): number {
-  return events.filter((e) => e.type === type).length;
 }
 
 function lastTimeForType(events: Event[], type: Event["type"]): string | undefined {

@@ -14,7 +14,11 @@ function putdownLeadFor(event: Event, settings: Settings): number | undefined {
 export function addPutdownEvents(events: Event[], settings: Settings): Event[] {
   const additions: Event[] = [];
   for (const e of events) {
-    if (e.source !== "projected") continue;
+    // Emit a putdown for every nap/bedtime regardless of source. A manual
+    // override (e.g. owner change via /timeline) leaves the nap with
+    // source: "manual"; the putdown visual marker is still meaningful for
+    // those. Source-filtering was a hangover from when putdowns were
+    // treated as forward-looking predictions.
     const lead = putdownLeadFor(e, settings);
     if (lead === undefined) continue;
     additions.push(

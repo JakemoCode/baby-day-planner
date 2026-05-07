@@ -176,7 +176,12 @@ export function TimelineV2({
             const { leftPx, rightPx } = blockGeometry(event);
             const top = yOf(parseTime(event.startTime));
             const end = event.endTime ? parseTime(event.endTime) : parseTime(event.startTime);
-            const heightPxBlock = Math.max(2, (end - parseTime(event.startTime)) * pxPerMin);
+            // Minimum tappable height for very short blocks. A 1-minute
+            // nap (e.g. accidental Start/End in quick succession) would
+            // render at 2px and be invisible/untappable; clamp to 24px so
+            // the user can always tap to edit / fix it.
+            const naturalH = (end - parseTime(event.startTime)) * pxPerMin;
+            const heightPxBlock = Math.max(24, naturalH);
             const tap = onEventTap ? () => onEventTap(event) : undefined;
             return (
               <Block

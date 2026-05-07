@@ -20,6 +20,11 @@ export function applyTemplate(events: Event[], template: OwnershipTemplate): Eve
 
   return events.map((e) => {
     if (e.owner !== undefined) return e;
+    // User-curated events (manual edits or actual recordings) own their
+    // owner state. If the user explicitly cleared the owner on one of
+    // these, the template must NOT re-stamp it back. Only projected /
+    // template-source events get template defaults.
+    if (e.source === "manual" || e.source === "actual") return e;
     if (e.type === "nap") {
       const i = napIndex(e.eventKey);
       const o = i >= 0 ? template.napOwners[i] : undefined;

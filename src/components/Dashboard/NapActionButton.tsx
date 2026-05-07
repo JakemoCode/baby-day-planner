@@ -43,9 +43,15 @@ export function NapActionButton({
     }
   };
 
+  // When a nap is in progress, the button "ends" it — label with that
+  // nap's actual ordinal (parsed from its eventKey, e.g. nap_2 → 2).
+  const inProgressN = inProgressNap
+    ? Number(/^nap_(\d+)/.exec(inProgressNap.eventKey)?.[1] ?? nextNumber - 1)
+    : null;
+
   return (
     <button type="button" className={`${styles.button} ${styles.secondary}`} onClick={handleClick}>
-      {inProgressNap ? "End Nap" : "Start Nap Now"}
+      {inProgressNap ? `End Nap ${inProgressN}` : `Start Nap ${nextNumber}`}
     </button>
   );
 }

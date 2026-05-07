@@ -26,7 +26,7 @@ describe("NapActionButton", () => {
         onEnd={() => {}}
       />,
     );
-    expect(screen.getByRole("button", { name: /start nap now/i })).toBeVisible();
+    expect(screen.getByRole("button", { name: /start nap 1/i })).toBeVisible();
   });
 
   it("renders 'End Nap' when a nap is in progress", () => {
@@ -39,7 +39,7 @@ describe("NapActionButton", () => {
         onEnd={() => {}}
       />,
     );
-    expect(screen.getByRole("button", { name: /end nap/i })).toBeVisible();
+    expect(screen.getByRole("button", { name: /end nap 1/i })).toBeVisible();
   });
 
   it("calls onStart with a nap event when starting", async () => {

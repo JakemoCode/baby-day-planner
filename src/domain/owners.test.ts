@@ -52,6 +52,22 @@ describe("applyTemplate", () => {
     expect(result[0]?.owner).toBe("Daycare");
   });
 
+  it("respects an explicitly-cleared owner on a manual event (does not re-stamp from template)", () => {
+    // Regression: when user edits an event and clears owner via the drawer,
+    // the saved doc has source: "manual" with no owner field. The template
+    // pass MUST treat manual/actual events as user-curated and skip them,
+    // otherwise the cleared owner is re-stamped on every projection.
+    const cleared: Event = { ...evt("nap", "nap_1"), source: "manual" };
+    const result = applyTemplate([cleared], saturdayTemplate);
+    expect(result[0]?.owner).toBeUndefined();
+  });
+
+  it("also respects a cleared owner on an actual-source event", () => {
+    const cleared: Event = { ...evt("nap", "nap_1"), source: "actual" };
+    const result = applyTemplate([cleared], saturdayTemplate);
+    expect(result[0]?.owner).toBeUndefined();
+  });
+
   it("propagates nap owner to corresponding putdown event", () => {
     const events = [evt("nap", "nap_1"), evt("putdown", "nap_1_putdown")];
     const result = applyTemplate(events, saturdayTemplate);

@@ -34,14 +34,23 @@ export function applyNapActuals(projected: Event[], actuals: Event[], settings: 
       : projWwMinutes;
 
     const wwStart = cursor;
-    const wwEnd = addMinutes(wwStart, wwMinutes);
+    let wwEnd = addMinutes(wwStart, wwMinutes);
+
+    const napActual = napActualsByKey.get(napKey);
+    // If the actual nap started later than the projected wake-window end,
+    // stretch the wake window to match reality. The baby was awake until
+    // the nap actually started; visually closing the gap removes the
+    // confusing "dead zone" between projected WW end and actual nap start.
+    if (napActual && parseTime(napActual.startTime) > parseTime(wwEnd)) {
+      wwEnd = napActual.startTime;
+    }
+
     result.push({
       ...projWw,
       startTime: wwStart,
       endTime: wwEnd,
     });
 
-    const napActual = napActualsByKey.get(napKey);
     if (napActual) {
       const napStart = napActual.startTime;
       const napEnd = napActual.endTime ?? addMinutes(napStart, settings.defaultNapLengthMinutes);
