@@ -55,17 +55,15 @@ export function DurationBlock({ event, topPx, heightPx, onClick }: DurationBlock
         : { role: "presentation" as const })}
     >
       <span className={styles.label}>{blockLabel(event)}</span>
-      {event.type !== "putdown" && (
-        <div className={styles.range}>
-          <span>{range}</span>
-          {event.owner && <span className={styles.owner}>· {event.owner}</span>}
-          {event.status === "overridden" && (
-            <span className={styles.editMark} aria-label="edited">
-              ✎
-            </span>
-          )}
-        </div>
-      )}
+      <div className={styles.range}>
+        <span>{range}</span>
+        {event.owner && <span className={styles.owner}>· {event.owner}</span>}
+        {event.status === "overridden" && (
+          <span className={styles.editMark} aria-label="edited">
+            ✎
+          </span>
+        )}
+      </div>
     </Tag>
   );
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import type { Event } from "@/domain";
-import { formatTimeForDisplay } from "@/domain";
+import { formatTimeForDisplay, parseTime } from "@/domain";
 import styles from "./PointMarker.module.css";
 
 export type PointMarkerProps = {
@@ -46,6 +46,10 @@ export function PointMarker({ event, topPx, onClick, compact = false }: PointMar
   const time = formatTimeForDisplay(event.startTime);
   const visibleLabel = compact ? chipLabel(event) : event.label;
   const accessibleName = `${event.label} at ${time}${subtitle ? `, ${subtitle}` : ""}`;
+  // On-the-hour events get their time announced by the adjacent hour tick;
+  // showing it inside the marker too is noisy redundancy.
+  const isOnHour = parseTime(event.startTime) % 60 === 0;
+  const showTime = !isOnHour;
 
   return (
     <Tag
@@ -60,7 +64,8 @@ export function PointMarker({ event, topPx, onClick, compact = false }: PointMar
         ? { type: "button" as const, onClick, "aria-label": accessibleName }
         : { role: "presentation" as const })}
     >
-      {!compact && <span className={styles.time}>{time}</span>}
+      {!compact && showTime && <span className={styles.time}>{time}</span>}
+      {!compact && !showTime && <span className={styles.time} aria-hidden="true" />}
       <span className={styles.body}>
         <span className={styles.dot} aria-hidden="true" />
         <span className={styles.label}>{visibleLabel}</span>
@@ -71,7 +76,7 @@ export function PointMarker({ event, topPx, onClick, compact = false }: PointMar
           </span>
         )}
       </span>
-      {compact && <span className={styles.compactTime}>{time}</span>}
+      {compact && showTime && <span className={styles.compactTime}>{time}</span>}
     </Tag>
   );
 }

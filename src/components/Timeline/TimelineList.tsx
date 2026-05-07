@@ -22,8 +22,13 @@ export type TimelineListProps = {
 const PX_PER_MIN = 2;
 const VIEWPORT_PADDING_MIN = 30;
 const MIN_BLOCK_HEIGHT = 32;
-/** Vertical space inside a block reserved for label + range row. */
-const BLOCK_HEADER_PX = 56;
+/**
+ * Vertical space inside a block reserved for the label + range row before a
+ * chip can overlap it. Kept small so chips sit close to their actual time
+ * within the block — chips have a raised z-index so any minor overlap with
+ * the label paints cleanly on top.
+ */
+const BLOCK_HEADER_PX = 32;
 /** Vertical step between stacked chips inside a block. */
 const CHIP_STEP_PX = 28;
 /** Breathing room below a duration block before a free-standing event below it. */
