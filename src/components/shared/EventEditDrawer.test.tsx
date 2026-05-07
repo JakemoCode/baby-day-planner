@@ -8,6 +8,8 @@ const baseEvent = (overrides: Partial<Event>): Event => ({
   dayId: "day-1",
   eventKey: "bottle_1",
   type: "bottle",
+  kind: "instant",
+  recorded: false,
   label: "Bottle 1",
   startTime: "07:05",
   amountOz: 5,
@@ -51,6 +53,8 @@ describe("EventEditDrawer", () => {
         open
         event={baseEvent({
           type: "nap",
+          kind: "block",
+          recorded: false,
           eventKey: "nap_1",
           label: "Nap 1",
           endTime: "10:00",
@@ -71,6 +75,8 @@ describe("EventEditDrawer", () => {
         open
         event={baseEvent({
           type: "wake_window",
+          kind: "block",
+          recorded: false,
           eventKey: "wake_window_1",
           label: "Wake Window 1",
           endTime: "09:00",
@@ -91,6 +97,8 @@ describe("EventEditDrawer", () => {
         open
         event={baseEvent({
           type: "extra",
+          kind: "instant",
+          recorded: false,
           eventKey: "extra_1",
           label: "Pediatrician",
           startTime: "11:00",
@@ -206,6 +214,8 @@ describe("EventEditDrawer", () => {
       id: "extra-new",
       eventKey: "extra_new",
       type: "extra",
+      kind: "instant",
+      recorded: false,
       label: "",
       startTime: "12:00",
       source: "manual",

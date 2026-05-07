@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { Event } from "@/domain";
-import { formatTime, parseTime } from "@/domain";
+import { formatTime, makeEvent, parseTime } from "@/domain";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import styles from "./ActionButton.module.css";
 
@@ -45,7 +45,7 @@ export function StartBottleButton({
 
   const buildBottle = (): Event => {
     const startTime = formatTime(currentLocalMinutes());
-    return {
+    return makeEvent({
       id: `actual-${dayId}-bottle-${nextNumber}-${Date.now()}`,
       dayId,
       eventKey: `bottle_${nextNumber}`,
@@ -55,7 +55,7 @@ export function StartBottleButton({
       amountOz: defaultAmountOz,
       source: "actual",
       status: "actual",
-    };
+    });
   };
 
   const performLog = async () => {

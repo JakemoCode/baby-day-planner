@@ -1,4 +1,5 @@
 import type { Day, Event, Settings } from "./types";
+import { makeEvent } from "./types";
 import { parseTime } from "./time";
 
 export function mergePumpsAndExtras(
@@ -30,21 +31,46 @@ export function mergePumpsAndExtras(
     if (actual) {
       out.push(actual);
     } else {
-      out.push({
-        id: `proj-${day.id}-pump-${time}`,
-        dayId: day.id,
-        eventKey: key,
-        type: "pump",
-        label: "Pump",
-        startTime: time,
-        source: "projected",
-        status: "projected",
-      });
+      out.push(
+        makeEvent({
+          id: `proj-${day.id}-pump-${time}`,
+          dayId: day.id,
+          eventKey: key,
+          type: "pump",
+          label: "Pump",
+          startTime: time,
+          source: "projected",
+          status: "projected",
+        }),
+      );
     }
   }
 
   for (const a of actuals) {
     if (a.type === "extra") out.push(a);
+  }
+
+  // Recurring "Cook Dinner" reminder. Emitted as a projected extra event
+  // (kind: instant — no endTime) when enabled in settings. If the user
+  // has already overridden it for today (a manual extra with the same
+  // eventKey already in actuals), don't double-up.
+  if (settings.cookDinner?.enabled) {
+    const cookKey = "cook_dinner";
+    const alreadyHave = out.some((e) => e.eventKey === cookKey);
+    if (!alreadyHave) {
+      out.push(
+        makeEvent({
+          id: `proj-${day.id}-cook-dinner`,
+          dayId: day.id,
+          eventKey: cookKey,
+          type: "extra",
+          label: "Cook Dinner",
+          startTime: settings.cookDinner.time,
+          source: "projected",
+          status: "projected",
+        }),
+      );
+    }
   }
 
   return out.sort((a, b) => parseTime(a.startTime) - parseTime(b.startTime));

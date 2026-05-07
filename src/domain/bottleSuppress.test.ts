@@ -8,6 +8,8 @@ const ev = (overrides: Partial<Event>): Event => ({
   dayId: "day-1",
   eventKey: "x",
   type: "bottle",
+  kind: "instant",
+  recorded: false,
   label: "x",
   startTime: "00:00",
   source: "projected",

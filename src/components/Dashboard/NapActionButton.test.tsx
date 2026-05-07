@@ -8,6 +8,8 @@ const napInProgress = (): Event => ({
   dayId: "d1",
   eventKey: "nap_1",
   type: "nap",
+  kind: "block",
+  recorded: true,
   label: "Nap 1",
   startTime: "09:00",
   source: "actual",

@@ -118,8 +118,21 @@ export default function DashboardPage() {
   const cww = currentWakeWindow(projected, nowMinutes);
   const inProgressNap = actuals.find((e) => e.type === "nap" && !e.endTime);
   const bottle1Pending = !actuals.some((e) => e.type === "bottle");
-  const nextBottleNumber = countByType(actuals, "bottle") + 1;
-  const nextNapNumber = countByType(actuals, "nap") + 1;
+  // "Next" ordinals = unique nap/bottle slots that are RECORDED (the
+  // user committed a specific time). Owner-only annotations have
+  // recorded: false and don't bump the ordinal. Dedupe by eventKey so
+  // the Start/End pair (two docs, same key) doesn't double-count.
+  const uniqueRecordedKeys = (type: Event["type"]) => {
+    const seen = new Set<string>();
+    for (const e of actuals) {
+      if (e.type !== type) continue;
+      if (!e.recorded) continue;
+      seen.add(e.eventKey);
+    }
+    return seen.size;
+  };
+  const nextBottleNumber = uniqueRecordedKeys("bottle") + 1;
+  const nextNapNumber = uniqueRecordedKeys("nap") + 1;
   const lastBottleTime = lastTimeForType(actuals, "bottle");
   const lastBottle = lastEventOfType(actuals, "bottle");
   const lastNap = lastEventOfType(actuals, "nap");
@@ -235,6 +248,7 @@ export default function DashboardPage() {
               ? drawer.template.id
               : "closed"
         }
+        existingEvents={projected}
         open={drawer.open}
         event={drawer.open ? (drawer.mode === "edit" ? drawer.event : drawer.template) : null}
         mode={drawer.open && drawer.mode === "edit" ? "edit" : "create"}
@@ -246,10 +260,6 @@ export default function DashboardPage() {
       />
     </div>
   );
-}
-
-function countByType(events: Event[], type: Event["type"]): number {
-  return events.filter((e) => e.type === type).length;
 }
 
 function lastTimeForType(events: Event[], type: Event["type"]): string | undefined {

@@ -2,13 +2,13 @@
 
 import { useMemo, useState } from "react";
 import type { Day, Event, Owner, OwnershipTemplate } from "@/domain";
-import { projectDay } from "@/domain";
+import { makeEvent, projectDay } from "@/domain";
 import { useSettings } from "@/hooks/useSettings";
 import { useTemplates } from "@/hooks/useTemplates";
 import { saveTemplate } from "@/repositories/templates";
 import { db } from "@/lib/firebase/client";
 import { LoadingState } from "@/components/shared/LoadingState";
-import { TimelineList } from "@/components/Timeline/TimelineList";
+import { TimelineV2 } from "@/components/Timeline/TimelineV2";
 import { TemplateOwnerPicker } from "@/components/DayTemplates/TemplateOwnerPicker";
 import { ASSIGNABLE_TYPES, setOwnerInTemplate } from "@/components/DayTemplates/setOwnerInTemplate";
 import styles from "./page.module.css";
@@ -64,7 +64,7 @@ export default function DayTemplatesPage() {
     if (!settings) return [];
     // Seed bottle_1 at wake time so the bottle chain projects a typical day's
     // worth of bottles to assign owners against.
-    const seed: Event = {
+    const seed: Event = makeEvent({
       id: `${SYNTHETIC_DAY_ID}-bottle-1-seed`,
       dayId: SYNTHETIC_DAY_ID,
       eventKey: "bottle_1",
@@ -74,7 +74,7 @@ export default function DayTemplatesPage() {
       amountOz: settings.defaultBottleAmountOz,
       source: "actual",
       status: "actual",
-    };
+    });
     return projectDay({
       day: syntheticDay,
       settings,
@@ -151,8 +151,9 @@ export default function DayTemplatesPage() {
         </button>
       </div>
 
-      <TimelineList
+      <TimelineV2
         events={projected}
+        dimPast={false}
         onEventTap={(event) => {
           if (!ASSIGNABLE_TYPES.includes(event.type)) return;
           setSelectedEventId(event.id);

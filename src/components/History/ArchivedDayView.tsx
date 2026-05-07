@@ -1,5 +1,5 @@
 import type { Day, Event } from "@/domain";
-import { TimelineList } from "@/components/Timeline/TimelineList";
+import { TimelineV2 } from "@/components/Timeline/TimelineV2";
 import styles from "./ArchivedDayView.module.css";
 
 export type ArchivedDayViewProps = {
@@ -32,7 +32,13 @@ export function ArchivedDayView({ day, events, onEditEvent }: ArchivedDayViewPro
           No events recorded for this day.
         </div>
       ) : (
-        <TimelineList events={events} {...(onEditEvent ? { onEventTap: onEditEvent } : {})} />
+        // Archived days are entirely past; dimPast=true would render
+        // everything faded. Hard-coded false per §11.F. nowMinutes omitted.
+        <TimelineV2
+          events={events}
+          dimPast={false}
+          {...(onEditEvent ? { onEventTap: onEditEvent } : {})}
+        />
       )}
     </div>
   );

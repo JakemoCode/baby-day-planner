@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import type { Day, Event, OwnershipTemplate, Settings } from "@/domain";
-import { projectDay } from "@/domain";
-import { TimelineList } from "@/components/Timeline/TimelineList";
+import { makeEvent, projectDay } from "@/domain";
+import { TimelineV2 } from "@/components/Timeline/TimelineV2";
 import styles from "./TomorrowPreview.module.css";
 
 export type TomorrowPreviewProps = {
@@ -27,17 +27,19 @@ export function TomorrowPreview({
     if (!day.wakeTime) return [];
     const actuals: Event[] = [...extras];
     if (bottle1Time) {
-      actuals.push({
-        id: `${day.id}-planned-bottle-1`,
-        dayId: day.id,
-        eventKey: "bottle_1",
-        type: "bottle",
-        label: "Bottle 1",
-        startTime: bottle1Time,
-        amountOz: settings.defaultBottleAmountOz,
-        source: "manual",
-        status: "overridden",
-      });
+      actuals.push(
+        makeEvent({
+          id: `${day.id}-planned-bottle-1`,
+          dayId: day.id,
+          eventKey: "bottle_1",
+          type: "bottle",
+          label: "Bottle 1",
+          startTime: bottle1Time,
+          amountOz: settings.defaultBottleAmountOz,
+          source: "manual",
+          status: "overridden",
+        }),
+      );
     }
     return projectDay({
       day,
@@ -55,5 +57,7 @@ export function TomorrowPreview({
     );
   }
 
-  return <TimelineList events={events} {...(onEventTap ? { onEventTap } : {})} />;
+  // Tomorrow has no "now" — dimPast is meaningless and nowMinutes is omitted
+  // (TIMELINE_V2_PLAN.md §11.F).
+  return <TimelineV2 events={events} dimPast={false} {...(onEventTap ? { onEventTap } : {})} />;
 }

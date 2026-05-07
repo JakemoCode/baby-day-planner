@@ -8,6 +8,8 @@ const ww = (overrides: Partial<Event> = {}): Event => ({
   dayId: "d1",
   eventKey: "wake_window_1",
   type: "wake_window",
+  kind: "block",
+  recorded: false,
   label: "Wake Window 1",
   startTime: "07:00",
   endTime: "09:00",

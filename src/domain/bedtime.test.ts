@@ -4,7 +4,7 @@ import { sampleSettings, sampleDay } from "./__fixtures__/sample";
 import { projectNapChain } from "./napChain";
 
 describe("applyBedtime", () => {
-  it("replaces last projected nap with a bedtime point event when its start ≥ threshold", () => {
+  it("replaces last projected nap with a bedtime block when its start ≥ threshold", () => {
     const proj = projectNapChain(sampleDay, sampleSettings);
     const result = applyBedtime(proj, sampleSettings);
 
@@ -14,11 +14,15 @@ describe("applyBedtime", () => {
     const bedtime = result.find((e) => e.type === "bedtime");
     expect(bedtime).toMatchObject({
       type: "bedtime",
+      kind: "block",
+      recorded: false,
       label: "Bedtime",
       startTime: "19:00",
       source: "projected",
     });
-    expect(bedtime?.endTime).toBeUndefined();
+    // Bedtime extends through the night until next morning's wake;
+    // BEDTIME_DEFAULT_END = "30:00" (6 AM next day) covers the gap.
+    expect(bedtime?.endTime).toBe("30:00");
   });
 
   it("does not affect naps before threshold", () => {
@@ -50,6 +54,8 @@ describe("applyBedtime", () => {
       dayId: sampleDay.id,
       eventKey: "bedtime",
       type: "bedtime" as const,
+      kind: "block" as const,
+      recorded: false as const,
       label: "Bedtime",
       startTime: "18:30",
       source: "manual" as const,
@@ -81,6 +87,8 @@ describe("applyBedtime", () => {
         dayId: sampleDay.id,
         eventKey: "bedtime",
         type: "bedtime" as const,
+        kind: "block" as const,
+        recorded: false as const,
         label: "Bedtime",
         startTime: "18:30",
         source: "manual" as const,
@@ -89,6 +97,32 @@ describe("applyBedtime", () => {
       const result = applyBedtime(proj, sampleSettings, [manualBedtime]);
       expect(result.find((e) => e.id === napCrossing.id)).toBeUndefined();
     }
+  });
+
+  it("stretches the wake window leading into a dropped nap to meet bedtime (no gap)", () => {
+    // Regression: when a nap is dropped because it crosses a manual
+    // bedtime, the wake_window leading into it shouldn't keep its old
+    // (now-dangling) endTime — it should stretch to bedtime so the
+    // bedtime putdown chip doesn't render in a visual gap.
+    const proj = projectNapChain(sampleDay, sampleSettings);
+    const lateNap = proj.find((e) => e.eventKey === "nap_4");
+    if (!lateNap?.endTime) return; // fixture sanity guard
+    const manualBedtime = {
+      id: "manual-bed-stretch",
+      dayId: sampleDay.id,
+      eventKey: "bedtime",
+      type: "bedtime" as const,
+      kind: "block" as const,
+      recorded: true as const,
+      label: "Bedtime",
+      startTime: "18:45",
+      source: "manual" as const,
+      status: "completed" as const,
+    };
+    const result = applyBedtime(proj, sampleSettings, [manualBedtime]);
+    expect(result.find((e) => e.eventKey === "nap_4")).toBeUndefined();
+    const ww4 = result.find((e) => e.eventKey === "wake_window_4");
+    expect(ww4?.endTime).toBe("18:45");
   });
 
   it("clips a wake_window that crosses a manual bedtime override", () => {
@@ -100,6 +134,8 @@ describe("applyBedtime", () => {
       dayId: sampleDay.id,
       eventKey: "bedtime",
       type: "bedtime" as const,
+      kind: "block" as const,
+      recorded: false as const,
       label: "Bedtime",
       startTime: "18:30",
       source: "manual" as const,
@@ -108,6 +144,34 @@ describe("applyBedtime", () => {
     const result = applyBedtime(proj, sampleSettings, [manualBedtime]);
     const ww4 = result.find((e) => e.eventKey === "wake_window_4");
     expect(ww4).toMatchObject({ startTime: "16:30", endTime: "18:30" });
+  });
+
+  it("emits bedtime with kind 'block' so Timeline v2 renders it through the night", () => {
+    // Bedtime is rendered as a block (not an instant chip) and extends to
+    // a default endTime so it visually carries through the morning until
+    // the next "Start New Day" wake.
+    const proj = projectNapChain(sampleDay, sampleSettings);
+    const projected = applyBedtime(proj, sampleSettings).find((e) => e.type === "bedtime");
+    expect(projected?.kind).toBe("block");
+    expect(projected?.endTime).toBe("30:00");
+
+    const manual = applyBedtime(proj, sampleSettings, [
+      {
+        id: "manual-bedtime-x",
+        dayId: sampleDay.id,
+        eventKey: "bedtime",
+        type: "bedtime" as const,
+        kind: "block" as const,
+        recorded: true as const,
+        label: "Bedtime",
+        startTime: "18:30",
+        source: "manual" as const,
+        status: "completed" as const,
+      },
+    ]).find((e) => e.type === "bedtime");
+    expect(manual?.kind).toBe("block");
+    // Manual bedtime without endTime gets BEDTIME_DEFAULT_END for cascade.
+    expect(manual?.endTime).toBe("30:00");
   });
 
   it("removes wake_window events that start at or after the bedtime nap's start time", () => {

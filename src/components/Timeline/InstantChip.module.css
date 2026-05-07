@@ -1,0 +1,125 @@
+/*
+ * Pill chip with two-row layout when owner is set:
+ *   [dot] [ Bottle 1   7:00a ]
+ *         [ Jake             ]
+ * Dot color = owner color (sage default if no owner).
+ * Border color = owner color (default border if no owner).
+ */
+
+.chip {
+  display: inline-flex;
+  /* Top-align so the dot sits with the label row, not centered against
+   * a tall two-row chip. */
+  align-items: flex-start;
+  gap: 6px;
+  padding: 3px 8px;
+  border-radius: 12px;
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  font: inherit;
+  color: var(--color-fg);
+  cursor: pointer;
+  white-space: nowrap;
+  line-height: 1;
+  transition:
+    background var(--motion-fast) var(--easing-out),
+    border-color var(--motion-fast) var(--easing-out);
+}
+
+.chip[data-static="true"] {
+  cursor: default;
+}
+
+.chip:hover {
+  background: var(--color-bg);
+}
+
+.chip:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  /* Default: sage when no owner. Owner color overrides via data-owner. */
+  background: var(--color-accent);
+  /* Nudge down 2px so the dot lines up with the label row's optical
+   * mid-x-height instead of sitting at the very top of the chip. */
+  margin-top: 3px;
+}
+
+/* === Owner dot color (applies in BOTH color modes per Jake) ======= */
+
+.chip[data-owner="Jake"] .dot {
+  background: var(--color-owner-jake);
+}
+.chip[data-owner="Kelly"] .dot {
+  background: var(--color-owner-kelly);
+}
+.chip[data-owner="Daycare"] .dot {
+  background: var(--color-owner-daycare);
+}
+
+/* === Owner border (applies in both color modes) ================== */
+
+.chip[data-owner="Jake"] {
+  border-color: var(--color-owner-jake);
+}
+.chip[data-owner="Kelly"] {
+  border-color: var(--color-owner-kelly);
+}
+.chip[data-owner="Daycare"] {
+  border-color: var(--color-owner-daycare);
+}
+
+/* === Content layout ================================================ */
+
+.body {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.topRow {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.label {
+  font-size: 12px;
+  font-weight: var(--weight-semibold);
+  white-space: nowrap;
+  line-height: 1;
+}
+
+.time {
+  font-size: 11px;
+  color: var(--color-muted);
+  white-space: nowrap;
+  line-height: 1;
+}
+
+.ownerName {
+  font-size: 11px;
+  font-weight: var(--weight-medium);
+  line-height: 1;
+  /* Owner name should hug the left edge of the chip body, not center
+   * itself by stretching to the chip's flex cross-axis width. */
+  align-self: flex-start;
+  text-align: left;
+}
+
+.ownerName[data-owner="Jake"] {
+  color: var(--color-owner-jake);
+}
+.ownerName[data-owner="Kelly"] {
+  color: var(--color-owner-kelly);
+}
+.ownerName[data-owner="Daycare"] {
+  color: var(--color-owner-daycare);
+}

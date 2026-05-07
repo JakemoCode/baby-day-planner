@@ -42,12 +42,12 @@ describe("TomorrowPreview", () => {
     expect(screen.getByText(/set.*wake time/i)).toBeVisible();
   });
 
-  it("renders a TimelineList when day is complete", () => {
+  it("renders a Timeline when day is complete", () => {
     renderWithAuth(<TomorrowPreview day={tomorrowDay} settings={settings} />);
-    // At least one DurationBlock (Nap 1) should exist
-    expect(screen.getAllByTestId("duration-block").length).toBeGreaterThan(0);
-    // At least one PointMarker (Wake) should exist
-    expect(screen.getAllByTestId("point-marker").length).toBeGreaterThan(0);
+    // At least one block (Nap 1, etc.)
+    expect(screen.getAllByTestId("timeline-block").length).toBeGreaterThan(0);
+    // At least one instant cluster (Bottle / Pump)
+    expect(screen.getAllByTestId("instant-cluster").length).toBeGreaterThan(0);
   });
 
   it("applies template owners to naps", () => {
@@ -58,21 +58,24 @@ describe("TomorrowPreview", () => {
       wakeWindowOwners: ["Jake", "Kelly", "Jake", "Kelly"],
     };
     renderWithAuth(<TomorrowPreview day={tomorrowDay} settings={settings} template={template} />);
-    // Find Nap 1 specifically (first nap-typed block)
     const napBlocks = screen
-      .getAllByTestId("duration-block")
-      .filter((el) => el.dataset.eventType === "nap");
+      .getAllByTestId("timeline-block")
+      .filter((el) => el.dataset.type === "nap");
     expect(napBlocks[0]?.dataset.owner).toBe("Kelly");
-    // And Wake Window 1 should be tinted Jake
+    // Wake Window N inherits Nap N's owner now (see applyTemplate test).
     const wwBlocks = screen
-      .getAllByTestId("duration-block")
-      .filter((el) => el.dataset.eventType === "wake_window");
-    expect(wwBlocks[0]?.dataset.owner).toBe("Jake");
+      .getAllByTestId("timeline-block")
+      .filter((el) => el.dataset.type === "wake_window");
+    expect(wwBlocks[0]?.dataset.owner).toBe("Kelly");
   });
 
-  it("includes Bottle 1 in the preview when bottle1Time is provided", () => {
+  it("includes a Bottle chip in the preview when bottle1Time is provided", () => {
     renderWithAuth(<TomorrowPreview day={tomorrowDay} settings={settings} bottle1Time="07:05" />);
-    expect(screen.getByText(/Bottle 1/)).toBeVisible();
+    // V2 chips show the type name; the per-bottle ordinal is conveyed by
+    // position + time, not by label.
+    expect(
+      screen.getAllByTestId("instant-chip").filter((c) => c.dataset.type === "bottle").length,
+    ).toBeGreaterThan(0);
   });
 
   it("includes user-added extras in the preview", () => {
@@ -82,6 +85,8 @@ describe("TomorrowPreview", () => {
         dayId: tomorrowDay.id,
         eventKey: "extra_1",
         type: "extra" as const,
+        kind: "instant" as const,
+        recorded: false as const,
         label: "Pediatrician",
         startTime: "11:00",
         source: "manual" as const,

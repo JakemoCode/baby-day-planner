@@ -12,6 +12,8 @@ function actualNap(n: number, start: string, end: string): Event {
     dayId: sampleDay.id,
     eventKey: `nap_${n}`,
     type: "nap",
+    kind: "block",
+    recorded: true,
     label: `Nap ${n}`,
     startTime: start,
     endTime: end,
@@ -63,6 +65,8 @@ describe("applyNapActuals", () => {
       dayId: sampleDay.id,
       eventKey: `nap_1`,
       type: "nap",
+      kind: "block",
+      recorded: true,
       label: `Nap 1`,
       startTime: "09:00",
       source: "actual",
@@ -81,6 +85,8 @@ describe("applyNapActuals", () => {
         dayId: sampleDay.id,
         eventKey: "wake_window_1",
         type: "wake_window",
+        kind: "block",
+        recorded: false,
         label: "Wake Window 1",
         startTime: "07:00",
         endTime: "09:00",
@@ -92,6 +98,8 @@ describe("applyNapActuals", () => {
         dayId: sampleDay.id,
         eventKey: "nap_1",
         type: "nap",
+        kind: "block",
+        recorded: false,
         label: "Nap 1",
         startTime: "09:00",
         endTime: "10:00",
@@ -101,9 +109,49 @@ describe("applyNapActuals", () => {
     ];
     const actuals = [actualNap(1, "09:10", "10:10")];
     const result = applyNapActuals(noWakeProj, actuals, sampleSettings);
-    // ww_1 should start from "00:00" (cursor fallback) with the projected duration (120 min)
     const ww1 = result.find((e) => e.eventKey === "wake_window_1");
+    // ww_1 starts from "00:00" (cursor fallback). Its end stretches to the
+    // actual nap_1 start (09:10) since the projected duration (120min →
+    // 02:00) is well before reality — the stretch behavior keeps the
+    // timeline visually contiguous.
     expect(ww1?.startTime).toBe("00:00");
-    expect(ww1?.endTime).toBe("02:00");
+    expect(ww1?.endTime).toBe("09:10");
+  });
+
+  it("stretches the wake window when the actual nap starts later than projected", () => {
+    // Daycare-late-nap scenario: WW2 was projected to end at 11:25; actual
+    // Nap 2 didn't start until 13:30. WW2 should stretch to 13:30 so the
+    // timeline doesn't show a confusing gap between WW2 end and Nap 2 start.
+    const actuals = [actualNap(2, "13:30", "14:30")];
+    const result = applyNapActuals(baseProj, actuals, sampleSettings);
+
+    const ww2 = result.find((e) => e.eventKey === "wake_window_2");
+    expect(ww2?.endTime).toBe("13:30");
+
+    const nap2 = result.find((e) => e.eventKey === "nap_2");
+    expect(nap2).toMatchObject({ startTime: "13:30", endTime: "14:30" });
+  });
+
+  it("shrinks the wake window when the actual nap starts earlier than projected", () => {
+    // Early nap: WW2 was projected to end at 11:25; actual Nap 2 went down
+    // at 11:00. WW2 must clamp back to 11:00 so the timeline doesn't show
+    // WW2 extending past Nap 2's start (which would create a wake/nap
+    // overlap on screen — the symptom in Jake's screenshot).
+    const actuals = [actualNap(2, "11:00", "12:00")];
+    const result = applyNapActuals(baseProj, actuals, sampleSettings);
+    const ww2 = result.find((e) => e.eventKey === "wake_window_2");
+    expect(ww2?.endTime).toBe("11:00");
+  });
+
+  it("collapses the wake window to zero length when the actual nap starts before the previous nap ended", () => {
+    // Data inconsistency guard: if Nap 1 actual ended at 09:30 and Nap 2
+    // actual starts at 09:00 (before that), don't render an inverted WW
+    // (start > end). Collapse WW to zero length so the timeline stays
+    // monotonic — the bad data is still fixable via /timeline edit.
+    const actuals = [actualNap(1, "07:30", "09:30"), actualNap(2, "09:00", "09:45")];
+    const result = applyNapActuals(baseProj, actuals, sampleSettings);
+    const ww2 = result.find((e) => e.eventKey === "wake_window_2");
+    expect(ww2?.startTime).toBe("09:30");
+    expect(ww2?.endTime).toBe("09:30");
   });
 });

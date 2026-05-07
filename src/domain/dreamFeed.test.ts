@@ -8,6 +8,8 @@ const bedtime = (start: string): Event => ({
   dayId: sampleDay.id,
   eventKey: "bedtime",
   type: "bedtime",
+  kind: "instant",
+  recorded: false,
   label: "Bedtime",
   startTime: start,
   source: "projected",

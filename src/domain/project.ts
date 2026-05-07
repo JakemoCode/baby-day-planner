@@ -3,7 +3,7 @@ import { projectNapChain } from "./napChain";
 import { applyNapActuals } from "./napActuals";
 import { applyBedtime } from "./bedtime";
 import { addPutdownEvents } from "./putdown";
-import { projectBottleChain } from "./bottleChain";
+import { projectBottleChain, renumberBottles } from "./bottleChain";
 import { resolveBottleNapOverlap } from "./bottleOverlap";
 import { suppressBottlesAfterBedtime } from "./bottleSuppress";
 import { addDreamFeed } from "./dreamFeed";
@@ -41,8 +41,13 @@ export function projectDay(input: ProjectInput): Event[] {
   // 7. Suppress projected bottles past bedtime
   events = suppressBottlesAfterBedtime(events, settings);
 
-  // 8. Dream feed
-  events = addDreamFeed(events, settings, day);
+  // 7b. Renumber bottles so eventKey/label always reflect chronological
+  //     order — manual overrides + cascade can produce non-monotonic
+  //     numbering otherwise.
+  events = renumberBottles(events);
+
+  // 8. Dream feed (honors a user override if present)
+  events = addDreamFeed(events, settings, day, actuals);
 
   // 9. Pumps + extras
   events = mergePumpsAndExtras(events, actuals, settings, day);

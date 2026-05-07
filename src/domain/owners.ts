@@ -18,22 +18,46 @@ export function applyTemplate(events: Event[], template: OwnershipTemplate): Eve
     return m ? Number(m[1]) - 1 : -1;
   };
 
+  // Bedtime / bedtime_putdown owner resolution:
+  //   1. explicit template.bedtimeOwner if set
+  //   2. last napOwner (Aden's caregiver-on-duty for the day's last shift
+  //      is the natural default for bedtime)
+  const lastNapOwner = template.napOwners.length
+    ? template.napOwners[template.napOwners.length - 1]
+    : undefined;
+  const bedtimeOwner = template.bedtimeOwner ?? lastNapOwner;
+
   return events.map((e) => {
     if (e.owner !== undefined) return e;
+    // User-curated events (manual edits or actual recordings) own their
+    // owner state. If the user explicitly cleared the owner on one of
+    // these, the template must NOT re-stamp it back. Only projected /
+    // template-source events get template defaults.
+    if (e.source === "manual" || e.source === "actual") return e;
     if (e.type === "nap") {
       const i = napIndex(e.eventKey);
       const o = i >= 0 ? template.napOwners[i] : undefined;
       return o ? { ...e, owner: o } : e;
     }
     if (e.type === "wake_window") {
+      // Wake Window N inherits its owner from Nap N — the parent watching
+      // during the wake window is the same parent putting baby down for
+      // the upcoming nap. Falls back to the legacy wakeWindowOwners array
+      // only if napOwners is empty for this index (back-compat).
       const i = wwIndex(e.eventKey);
-      const o = i >= 0 ? template.wakeWindowOwners[i] : undefined;
+      const o = i >= 0 ? (template.napOwners[i] ?? template.wakeWindowOwners[i]) : undefined;
       return o ? { ...e, owner: o } : e;
     }
     if (e.type === "putdown") {
+      if (e.eventKey === "bedtime_putdown") {
+        return bedtimeOwner ? { ...e, owner: bedtimeOwner } : e;
+      }
       const i = putdownNapIndex(e.eventKey);
       const o = i >= 0 ? template.napOwners[i] : undefined;
       return o ? { ...e, owner: o } : e;
+    }
+    if (e.type === "bedtime") {
+      return bedtimeOwner ? { ...e, owner: bedtimeOwner } : e;
     }
     if (e.type === "bottle") {
       const i = bottleIndex(e.eventKey);
@@ -52,6 +76,7 @@ export function flipTemplate(t: OwnershipTemplate): OwnershipTemplate {
     napOwners: t.napOwners.map(flipOwner),
     wakeWindowOwners: t.wakeWindowOwners.map(flipOwner),
     ...(t.bottleOwners ? { bottleOwners: t.bottleOwners.map(flipOwner) } : {}),
+    ...(t.bedtimeOwner ? { bedtimeOwner: flipOwner(t.bedtimeOwner) } : {}),
   };
 }
 

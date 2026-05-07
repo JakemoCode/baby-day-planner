@@ -8,10 +8,14 @@
  */
 
 import type { Settings } from "@/domain";
+import { TIMELINE_DEFAULTS } from "@/domain";
 
 export function defaultSettings(childId: string): Settings {
   return {
     childId,
+    timelineColorMode: TIMELINE_DEFAULTS.colorMode,
+    timelinePxPerHour: TIMELINE_DEFAULTS.pxPerHour,
+    timelineDimPast: TIMELINE_DEFAULTS.dimPast,
     defaultBottleAmountOz: 5,
     defaultBottleIntervalMinutes: 180,
     defaultNapLengthMinutes: 60,
@@ -32,5 +36,6 @@ export function defaultSettings(childId: string): Settings {
     },
     pumpTimes: ["10:30", "14:30"],
     minBottleIntervalMinutes: 20,
+    cookDinner: { enabled: false, time: "17:00" },
   };
 }
