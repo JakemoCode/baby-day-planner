@@ -21,9 +21,7 @@ export function mergePumpsAndExtras(
   // stay as configured. User can still edit/override after the fact.
   const sortedTimes = [...settings.pumpTimes].sort((a, b) => parseTime(a) - parseTime(b));
   const pumpTimes =
-    sortedTimes.length > 0 && day.wakeTime
-      ? [day.wakeTime, ...sortedTimes.slice(1)]
-      : sortedTimes;
+    sortedTimes.length > 0 && day.wakeTime ? [day.wakeTime, ...sortedTimes.slice(1)] : sortedTimes;
 
   for (const time of pumpTimes) {
     const key = `pump_${time}`;

@@ -73,10 +73,7 @@ describe("applyBedtime", () => {
     // A nap that crosses bedtime should be removed entirely — bedtime wins.
     const napCrossing = proj.find(
       (e) =>
-        e.type === "nap" &&
-        e.endTime !== undefined &&
-        e.startTime < "18:30" &&
-        e.endTime > "18:30",
+        e.type === "nap" && e.endTime !== undefined && e.startTime < "18:30" && e.endTime > "18:30",
     );
     if (napCrossing) {
       const manualBedtime = {
