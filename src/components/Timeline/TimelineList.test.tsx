@@ -109,4 +109,29 @@ describe("TimelineList", () => {
     const top2 = parseFloat((markers[1] as HTMLElement).style.top);
     expect(top2).toBeGreaterThan(top1);
   });
+
+  it("stacks same-time events vertically instead of overlapping", () => {
+    renderWithAuth(<TimelineList events={[wake(), bottle(1, "07:00"), bottle(2, "07:00")]} />);
+    const markers = screen.getAllByTestId("point-marker");
+    const tops = markers.map((m) => parseFloat((m as HTMLElement).style.top)).sort((a, b) => a - b);
+    // All three start at 07:00 so naively they would share the same topPx;
+    // each subsequent event should be offset further down.
+    expect(tops[0]).toBe(tops[0]);
+    expect(tops[1]!).toBeGreaterThan(tops[0]!);
+    expect(tops[2]!).toBeGreaterThan(tops[1]!);
+  });
+
+  it("does not stack events that are well-separated in time", () => {
+    renderWithAuth(
+      <TimelineList events={[bottle(1, "07:00"), bottle(2, "08:00"), bottle(3, "09:00")]} />,
+    );
+    const markers = screen.getAllByTestId("point-marker");
+    // With 60-min gaps, each marker keeps its natural time-anchored position
+    // (no stack offset added).
+    const top1 = parseFloat((markers[0] as HTMLElement).style.top);
+    const top2 = parseFloat((markers[1] as HTMLElement).style.top);
+    const top3 = parseFloat((markers[2] as HTMLElement).style.top);
+    // Equal time deltas → equal pixel deltas (no stacking) confirms no offset crept in.
+    expect(top2 - top1).toBe(top3 - top2);
+  });
 });
