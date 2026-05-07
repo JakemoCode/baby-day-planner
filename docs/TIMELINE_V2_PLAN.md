@@ -1,7 +1,7 @@
 # Timeline v2 — Implementation Plan
 
-> Status: **DRAFT — awaiting Jake review before implementation begins.**
-> Source: `docs/design_handoff_baby_schedule/` (V1 Inline-Gutter direction).
+> Status: **APPROVED — implementation gated only on §10 phase ordering.**
+> Source: `docs/design_handoff_baby_schedule-v1_only/` (V1 Inline-Gutter direction; the only design Jake selected).
 > Branch: `feat/timeline-v2-redesign`.
 
 This document captures every decision driving the Timeline v2 implementation. Anything not specified here is open and should be added before the relevant code lands.
@@ -69,6 +69,8 @@ Add `kind: 'block' | 'instant'` to the `Event` type in `src/domain/types.ts`.
   ```
 - No migration script. Old docs read fine; new docs persist `kind`. Within a few weeks of normal use, all active docs will have it.
 
+> **TODO — cleanup ticket**: Once Firestore confirms zero docs without a `kind` field (run a one-shot query in a few weeks), delete the `deriveKind` fallback in the converter. Added to backlog in `docs/BUILD_STATUS.md` after this PR merges.
+
 ### Engine
 - All engine pipeline steps already infer block-ness from `endTime`. The `kind` field is set when the engine emits an event; existing logic continues to work because `kind` is derivable from `(type, endTime)`.
 
@@ -117,34 +119,51 @@ type TimelineV2Props = {
 
 ---
 
-## 6. Token additions
+## 6. Token mapping (no new tokens)
 
-Add to `src/styles/tokens.css`:
+**Per Jake's directive: do not add new color tokens.** Map every visual role to an existing token in `src/styles/tokens.css`. The palette refresh in the next backlog item will tune all surfaces in one pass; introducing more variation here works against that.
 
-```css
-/* === Timeline v2 — type fills/strokes === */
---color-timeline-wake-fill:    /* warm cream, distinct from --color-bg */
---color-timeline-wake-stroke:  /* warm tan */
---color-timeline-nap-fill:     /* sage tint (lighter than --color-accent-soft) */
---color-timeline-nap-stroke:   /* deeper sage */
---color-timeline-putdown-fill-a: /* primary stripe color */
---color-timeline-putdown-fill-b: /* alternate stripe color */
---color-timeline-putdown-stroke: /* tan */
---color-timeline-custom-stroke:  /* event-type accent for custom blocks */
+### Block fills + strokes
 
-/* Instant dot colors per type */
---color-instant-bottle:  /* dusty blue or close — sample data uses #7c9bbd */
---color-instant-pump:    /* warm purple/lavender — sample uses #a37ab8 */
---color-instant-bedtime: /* deep navy — sample uses #3a3a55 */
---color-instant-custom:  /* sage-ish — sample uses #7a9479 */
+| Role | Token |
+|---|---|
+| Wake fill | `--color-surface-raised` (warm cream tint) |
+| Wake stroke | `--color-border-strong` |
+| Nap fill | `--color-accent-soft` (sage tint) |
+| Nap stroke | `--color-success` (deeper sage) |
+| Putdown stripe A | `--color-surface-raised` |
+| Putdown stripe B | `--color-accent-soft` |
+| Putdown stroke | `--color-border-strong` |
+| Custom block fill | transparent (outline only) |
+| Custom block stroke + 1px markers | `--color-muted` |
 
-/* Now line */
---color-now: var(--color-danger); /* reuse existing --color-danger or alias */
-```
+### Instant dots (type-mode)
 
-Owner colors already exist (`--color-owner-jake/kelly/daycare`); reuse them for the 5px left stripe and the "owner-fill" mode (using `-tint` variants for fills).
+Constraint: 4 distinct hues for bottle / pump / bedtime / custom that don't collide with owner colors (so owner-mode reads as a separate signal). Existing tokens we can repurpose:
 
-The exact hex values will be tuned during implementation against the screen — they should harmonize with the existing palette, not replicate the wireframe's hand-drawn pastels.
+| Type | Token | Rationale |
+|---|---|---|
+| Bottle | `--color-warning` (terracotta) | Warm, food-coded |
+| Pump | `--color-muted` (warm gray) | Utilitarian, neutral |
+| Bedtime | `--color-fg` (warm near-black) | Sleep / dark |
+| Custom (instant) | `--color-accent` (sage) | Neutral generic |
+| Dream-feed | `--color-muted` (visual = pump) | Same dot as pump per §3 mapping |
+
+### Owner colors (already exist)
+
+| Owner | Stripe / dot | Tint (owner-fill mode) |
+|---|---|---|
+| Jake | `--color-owner-jake` | `--color-owner-jake-tint` |
+| Kelly | `--color-owner-kelly` | `--color-owner-kelly-tint` |
+| Daycare | `--color-owner-daycare` | `--color-owner-daycare-tint` |
+
+### Now line
+
+Use `--color-danger` (existing). The bedtime dot uses `--color-fg`, so visual collision with the now line is avoided.
+
+---
+
+If a visual gap shows up during implementation (e.g. wake fill blends into page bg), I'll flag it and propose a token-level fix in the palette PR — not patch it in this one.
 
 ---
 
@@ -185,9 +204,9 @@ Default values populated by first-run defaults (existing `applyDefaults` path).
 ### Unit tests on `groupInstants` (5 cases)
 - Empty events → empty.
 - Single instant → one group of one.
-- Two instants at the same `at` → one group of two (concurrent fan).
+- Two instants at the same `at` → one group of two (these are what fan horizontally).
 - Two instants at different `at` → two groups, sorted by time.
-- Mixed block + instant → blocks ignored.
+- Input mixes blocks and instants → returned groups contain only instants; blocks are filtered out by the helper. (`groupInstants` consumes the full event list and is responsible for ignoring `kind === 'block'`.)
 
 ### Component tests on `TimelineV2`
 - Renders one block per duration event, positioned by start/height.
@@ -231,48 +250,27 @@ Each phase ends in a passing test suite. Single PR (#TBD), but commits are atomi
 
 ---
 
-## 11. Open questions (defaults proposed)
+## 11. Open questions — resolved
 
-These are smaller calls; defaults will be used unless Jake objects.
+### A. The `wake` event (the morning wake-up) — ✅ Confirmed
+Keep filtering wake events that coincide with WW1 start.
 
-### A. The `wake` event (the morning wake-up)
+### B. Custom block left/right marker lines (1px) — ✅ Confirmed
+Implement as specified. Color: `--color-muted` (per §6).
 
-Today, `wake` events are filtered when they coincide with WW1 start (the chip would duplicate the block). In v2 the gutter handles density well, so the rule could change.
+### C. Owner color in "owner = fill" mode — ✅ Confirmed
+Stripe disappears in owner-fill mode. Owner is encoded by fill alone.
 
-**Proposed default**: keep filtering. Rendering a "Wake" instant chip at the same time as Wake Window 1's left edge is still redundant.
+### D. Long block labels — ✅ Confirmed with experimentation budget
+Ellipsize the label, drop the range to a second row, keep owner inline as a colored dot + name.
 
-### B. Custom block left/right marker lines (1px)
+**Truncation experiment plan**: start by allowing the label to use the **full block-lane width** (axis edge → gutter edge). If that reads as too much horizontal travel on long names, fall back to truncating at the **gutter inner edge** — i.e. clamp the label's max width to align with the leader-line origin. Document the choice in code with a comment so future-me knows which one shipped.
 
-The handoff says custom blocks have 1px horizontal lines extending past their left and right edges to make start/end times visually clear (because custom blocks don't span a "natural" boundary like wake/nap do).
+### E. Mobile vs. desktop layout — ✅ Confirmed with cap
+Mobile keeps the design as-is. **Desktop caps the timeline's max content width at 640px** and centers it on wider viewports. The axis (50px) + gutter (110px) ratios stay constant inside that 640px ceiling, so the design language is identical at every breakpoint — desktop just stops growing.
 
-**Proposed default**: implement as specified. Use `--color-timeline-custom-stroke` for the line color.
-
-### C. Owner color in "owner = fill" mode
-
-When color mode is `owner`, the block's fill becomes the owner's color (light tint), and the type stroke becomes the type color. Stripe disappears (or moves — the handoff is ambiguous).
-
-**Proposed default**: stripe disappears. Owner is encoded by fill alone in this mode. Less visual noise.
-
-### D. Long block labels
-
-Wake Window 4 owner names + putdown nested blocks may push label/range past the right edge of the block lane (≈ width minus gutter). Today we ellipsize.
-
-**Proposed default**: ellipsize the label, drop the range to a second row, keep owner inline as a colored dot + name (no fallback truncation).
-
-### E. Mobile breakpoint
-
-The 110px gutter is fine on phones (default mobile width 375px → 50 axis + ~215 block + 110 gutter = balanced). On a desktop monitor, 110px gutter looks tiny against a wide block lane.
-
-**Proposed default**: ship the same gutter width everywhere. Reconsider if it looks bad on desktop after the first build.
-
-### F. Dim-past on `/day-templates`, `/tomorrow`, `/history`
-
-`dimPast` is meaningful only for "today." On the other three:
-- **Day-templates**: no "now" — `dimPast` should be off / ignored.
-- **Tomorrow**: nothing is past — also off / ignored.
-- **History**: the entire day is past; `dimPast` would mean "everything dimmed," which is silly. Off there too.
-
-**Proposed default**: each call site passes `dimPast` explicitly. Only `/timeline` consults the user setting; the others hard-code `dimPast: false`. Same for `nowMinutes` (omit on the other three).
+### F. Dim-past on the other three call sites — ✅ Confirmed
+Each call site passes `dimPast` and `nowMinutes` explicitly. Only `/timeline` consults the user setting; `/day-templates`, `/tomorrow`, and `/history` hard-code `dimPast: false` and omit `nowMinutes`.
 
 ---
 
@@ -302,10 +300,8 @@ These will be encoded as RTL assertions where feasible (e.g. wake's label is `.t
 
 ## 14. Approval gate
 
-Before code on the `feat/timeline-v2-redesign` branch goes beyond this document:
+- [x] §3 mapping table — confirmed.
+- [x] §11 open questions — all six resolved (defaults A/B/C/F as proposed; D and E with refinements above).
+- [ ] §10 phasing — pending Jake's OK on commit boundaries.
 
-- [ ] Jake reviews §3 (mapping table) and confirms or amends.
-- [ ] Jake reviews §11 (open questions) and signs off on each default, or specifies alternatives.
-- [ ] Jake confirms the §10 phasing is OK as-is, or wants different commit boundaries.
-
-When all three are checked, implementation phases (10.1 → 10.11) can begin.
+Once §10 is green, implementation phases (10.1 → 10.11) begin.

@@ -252,7 +252,6 @@ From back to front:
 - `data.jsx` — sample event data + helpers (`fmt`, `fmtShort`, `groupInstants`, `OWNERS`, `TYPES`, `BUSY_DAY`, `SIMPLE_DAY`, `NOW_MIN`).
 - `phone.jsx` — purely presentational mobile frame for the wireframe; ignore in production.
 - `v1-gutter.jsx` — **the V1 design** you are recreating. This is the file to study closely.
-- `v2-twocol.jsx`, `v3-tick.jsx` — alternate explorations the user did not select. Not for implementation; included only for reference if questions arise about why V1 was chosen.
 - `tweaks-panel.jsx`, `design-canvas.jsx` — wireframe tooling, not part of the design.
 
 ## Implementation Notes for Claude Code
