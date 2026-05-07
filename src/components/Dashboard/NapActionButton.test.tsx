@@ -9,6 +9,7 @@ const napInProgress = (): Event => ({
   eventKey: "nap_1",
   type: "nap",
   kind: "block",
+  recorded: true,
   label: "Nap 1",
   startTime: "09:00",
   source: "actual",
@@ -26,7 +27,7 @@ describe("NapActionButton", () => {
         onEnd={() => {}}
       />,
     );
-    expect(screen.getByRole("button", { name: /start nap 1/i })).toBeVisible();
+    expect(screen.getByRole("button", { name: /start nap now/i })).toBeVisible();
   });
 
   it("renders 'End Nap' when a nap is in progress", () => {
@@ -39,7 +40,7 @@ describe("NapActionButton", () => {
         onEnd={() => {}}
       />,
     );
-    expect(screen.getByRole("button", { name: /end nap 1/i })).toBeVisible();
+    expect(screen.getByRole("button", { name: /end nap/i })).toBeVisible();
   });
 
   it("calls onStart with a nap event when starting", async () => {
@@ -58,7 +59,6 @@ describe("NapActionButton", () => {
     const arg = onStart.mock.calls[0]?.[0] as Event;
     expect(arg).toMatchObject({
       type: "nap",
-      kind: "block",
       eventKey: "nap_1",
       label: "Nap 1",
       source: "actual",

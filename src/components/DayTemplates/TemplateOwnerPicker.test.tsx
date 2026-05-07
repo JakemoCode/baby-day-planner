@@ -9,6 +9,7 @@ const napEvent: Event = {
   eventKey: "nap_1",
   type: "nap",
   kind: "block",
+  recorded: false,
   label: "Nap 1",
   startTime: "09:00",
   endTime: "10:00",

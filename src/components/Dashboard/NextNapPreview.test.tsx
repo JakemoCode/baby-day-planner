@@ -9,6 +9,7 @@ const nap = (overrides: Partial<Event> = {}): Event => ({
   eventKey: "nap_2",
   type: "nap",
   kind: "block",
+  recorded: false,
   label: "Nap 2",
   startTime: "09:45",
   endTime: "10:30",

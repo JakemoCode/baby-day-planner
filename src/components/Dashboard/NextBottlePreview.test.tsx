@@ -9,6 +9,7 @@ const bottle = (overrides: Partial<Event> = {}): Event => ({
   eventKey: "bottle_2",
   type: "bottle",
   kind: "instant",
+  recorded: false,
   label: "Bottle 2",
   startTime: "11:05",
   amountOz: 5,
@@ -75,6 +76,7 @@ describe("NextBottlePreview", () => {
       eventKey: "dream_feed",
       type: "dream_feed",
       kind: "instant",
+      recorded: false,
       label: "Dream feed",
       startTime: "20:45",
       source: "projected",
@@ -90,6 +92,7 @@ describe("NextBottlePreview", () => {
       id: "df1",
       type: "dream_feed",
       kind: "instant",
+      recorded: false,
       label: "Dream feed",
       startTime: "20:45",
     });

@@ -22,6 +22,7 @@ const baseEvent = (overrides: Partial<Event>): Event => ({
   eventKey: "bottle_1",
   type: "bottle",
   kind: "instant",
+  recorded: false,
   label: "Bottle 1",
   startTime: "07:05",
   amountOz: 5,

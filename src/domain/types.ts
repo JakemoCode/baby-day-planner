@@ -35,15 +35,58 @@ export type Event = {
   amountOz?: number;
   source: EventSource;
   status: EventStatus;
+  /**
+   * Single source of truth for "did the user actually commit this event?"
+   *
+   *   - false: a projection from the engine, OR a stale annotation that
+   *            shouldn't count toward dashboard ordinals or block overlap
+   *            validation. Engine recalculates around these freely.
+   *   - true:  user explicitly recorded this — Start/End Nap, Start
+   *            Bottle Now, FAB-create on /timeline, or any drawer save.
+   *            Counters, overlap validation, and applyNapActuals/etc. all
+   *            anchor against `recorded: true` events only.
+   *
+   * Independent from `source` (provenance) and `status` (lifecycle stage).
+   * Legacy docs without this field are coerced via deriveRecorded in the
+   * Firestore converter.
+   */
+  recorded: boolean;
 };
 
 /**
  * Convenience builder for Event values: takes everything except `kind` and
- * fills it in via `deriveKind`. Use anywhere code constructs an Event from
- * a literal so the kind discriminator stays in sync with type + endTime.
+ * (optionally) `recorded`, filling them in via the helpers. `recorded`
+ * defaults via `deriveRecorded` based on source — engine projections come
+ * out false, explicit user actions (source: "actual") come out true.
+ * Callers can pass an explicit `recorded` to override (e.g. drawer save).
  */
-export function makeEvent(props: Omit<Event, "kind">): Event {
-  return { ...props, kind: deriveKind(props.type, props.endTime) };
+export function makeEvent(props: Omit<Event, "kind" | "recorded"> & { recorded?: boolean }): Event {
+  const { recorded, ...rest } = props;
+  return {
+    ...rest,
+    kind: deriveKind(props.type, props.endTime),
+    recorded: recorded ?? deriveRecorded(props.source, props.status),
+  };
+}
+
+/**
+ * Derive `recorded` for legacy docs that predate the explicit field, and
+ * for engine emissions via makeEvent. Conservative on ambiguous statuses:
+ *
+ *   - source "projected" → false (engine output)
+ *   - source "actual"    → true  (user pressed Start/End buttons)
+ *   - status "overridden" → false (legacy drawer annotation; new code
+ *                                  saves "completed" instead, so this
+ *                                  branch only catches old garbage)
+ *   - status "completed" → true (explicit completion)
+ *   - status "actual"    → true (in-progress recording)
+ *   - everything else    → false
+ */
+export function deriveRecorded(source: EventSource, status: EventStatus): boolean {
+  if (source === "projected") return false;
+  if (source === "actual") return true;
+  if (status === "actual" || status === "completed") return true;
+  return false;
 }
 
 /**

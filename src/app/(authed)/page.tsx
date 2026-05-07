@@ -118,18 +118,15 @@ export default function DashboardPage() {
   const cww = currentWakeWindow(projected, nowMinutes);
   const inProgressNap = actuals.find((e) => e.type === "nap" && !e.endTime);
   const bottle1Pending = !actuals.some((e) => e.type === "bottle");
-  // "Next" ordinals = unique nap/bottle slots with a non-projected doc.
-  // Going forward, any drawer save of a projected event sets status to
-  // "completed"; Start Nap → "actual"; End Nap → "completed". Legacy
-  // docs may carry "overridden" — count those too so existing data
-  // still flows through correctly.
-  // Dedupe by eventKey so the Start/End pair (two docs, same key)
-  // doesn't double-count.
+  // "Next" ordinals = unique nap/bottle slots that are RECORDED (the
+  // user committed a specific time). Owner-only annotations have
+  // recorded: false and don't bump the ordinal. Dedupe by eventKey so
+  // the Start/End pair (two docs, same key) doesn't double-count.
   const uniqueRecordedKeys = (type: Event["type"]) => {
     const seen = new Set<string>();
     for (const e of actuals) {
       if (e.type !== type) continue;
-      if (e.status === "projected") continue;
+      if (!e.recorded) continue;
       seen.add(e.eventKey);
     }
     return seen.size;

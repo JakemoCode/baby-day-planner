@@ -1,8 +1,14 @@
 "use client";
 
 import type { Event } from "@/domain";
-import { formatTimeForDisplay, formatTimeShort } from "@/domain";
+import { diffMinutes, formatTimeForDisplay, formatTimeShort } from "@/domain";
 import styles from "./Block.module.css";
+
+/** Below this block height, drop the range row and inline owner with the
+ *  label so a short nap stays single-row legible. Sized so two rows of
+ *  text-sm + text-xs (≈ 14 + 12 + line-heights + padding ≈ 38-44px) don't
+ *  fit; below that we collapse. */
+const NAP_TWO_ROW_THRESHOLD_PX = 50;
 
 export type BlockProps = {
   event: Event;
@@ -36,6 +42,13 @@ function blockLabel(event: Event): string {
   if (event.type === "putdown") {
     return event.label.replace(/^Start putting down for /, "Putdown · ");
   }
+  // Naps show their duration inline so users can read length at a glance:
+  // "Nap 2 (42 min)". When the actual nap hasn't ended yet (no endTime),
+  // omit the duration — there's nothing to measure.
+  if (event.type === "nap" && event.endTime) {
+    const mins = diffMinutes(event.endTime, event.startTime);
+    if (mins > 0) return `${event.label} (${mins} min)`;
+  }
   return event.label;
 }
 
@@ -59,6 +72,11 @@ export function Block({
   const Tag = interactive ? "button" : "div";
   const range = event.endTime ? formatRange(event.startTime, event.endTime) : "";
   const a11y = `${event.label}${range ? ` ${range}` : ""}${event.owner ? ` ${event.owner}` : ""}`;
+  // Short naps collapse to a single-row layout (label + owner inline) so the
+  // text doesn't get clipped against the next block. Other block types
+  // already handle their own short-form rules (putdown is always single-row,
+  // wake_window has more vertical room by design).
+  const napShortForm = event.type === "nap" && heightPx < NAP_TWO_ROW_THRESHOLD_PX;
 
   return (
     <Tag
@@ -100,11 +118,18 @@ export function Block({
             )}
           </>
         )}
+        {/* Short naps: inline owner with the label so the block's content
+         * fits in a single row. Range is dropped (the duration in parens
+         * after "Nap 2" already conveys length). */}
+        {napShortForm && event.owner && (
+          <span className={styles.owner} data-owner={event.owner}>
+            · {event.owner}
+          </span>
+        )}
       </span>
-      {/* Range row is dropped for putdown blocks (too tall for ~30px height,
-       * and the time is already conveyed by the block's geometry — last
-       * 15min of its parent wake window). */}
-      {range && event.type !== "putdown" && (
+      {/* Range row dropped for: putdown (too short, time is implicit), and
+       * short naps (the (N min) suffix on the label conveys duration). */}
+      {range && event.type !== "putdown" && !napShortForm && (
         <span className={styles.range}>
           {range}
           {event.owner && (

@@ -4,7 +4,7 @@ import type {
   SnapshotOptions,
 } from "firebase/firestore";
 import type { Day, Event, OwnershipTemplate, Settings } from "@/domain";
-import { deriveKind } from "@/domain";
+import { deriveKind, deriveRecorded } from "@/domain";
 
 function passthrough<T extends object>(): FirestoreDataConverter<T> {
   return {
@@ -32,12 +32,16 @@ export const templateConverter = passthrough<OwnershipTemplate>();
 export const eventConverter: FirestoreDataConverter<Event> = {
   toFirestore: (data) => {
     const next = data as Event;
-    if (next.kind) return next;
-    return { ...next, kind: deriveKind(next.type, next.endTime) };
+    const out = { ...next };
+    if (!out.kind) out.kind = deriveKind(out.type, out.endTime);
+    if (out.recorded === undefined) out.recorded = deriveRecorded(out.source, out.status);
+    return out;
   },
   fromFirestore: (snap: QueryDocumentSnapshot, opts?: SnapshotOptions) => {
     const data = snap.data(opts) as Event;
-    if (data.kind) return data;
-    return { ...data, kind: deriveKind(data.type, data.endTime) };
+    const out = { ...data };
+    if (!out.kind) out.kind = deriveKind(out.type, out.endTime);
+    if (out.recorded === undefined) out.recorded = deriveRecorded(out.source, out.status);
+    return out;
   },
 };

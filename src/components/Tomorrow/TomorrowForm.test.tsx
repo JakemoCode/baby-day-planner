@@ -30,6 +30,7 @@ const extra = (overrides: Partial<Event> = {}): Event => ({
   eventKey: "extra_1",
   type: "extra",
   kind: "instant",
+  recorded: false,
   label: "Pediatrician",
   startTime: "11:00",
   source: "manual",

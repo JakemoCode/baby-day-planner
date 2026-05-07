@@ -49,16 +49,13 @@ function validateForm(
   if (type === "nap" && endTime && existingEvents) {
     const start = parseTime(startTime);
     const end = parseTime(endTime);
-    // Only flag overlap against *recorded* naps (status actual/completed).
-    // A projected nap that overlaps will get recomputed by the engine when
-    // this manual nap saves — projected naps haven't happened yet, so
-    // they're fair game to displace. Same for owner-only annotations
-    // (status="overridden"): those carry stale projection times.
+    // Only flag overlap against RECORDED naps. Projected and unrecorded
+    // annotations get freely recalculated by the engine after save.
     const overlap = existingEvents.find((e) => {
       if (e.id === editingId) return false;
       if (e.type !== "nap") return false;
       if (!e.endTime) return false;
-      if (e.status !== "actual" && e.status !== "completed") return false;
+      if (!e.recorded) return false;
       const a = parseTime(e.startTime);
       const b = parseTime(e.endTime);
       return a < end && start < b;
@@ -91,13 +88,17 @@ function eventToForm(event: Event | null): FormState {
 }
 
 function formToEvent(form: FormState, source: Event, type: EventType): Event {
-  // Saving the drawer for a previously-projected event always counts as a
-  // recording — opening the drawer + tapping Save = "I'm committing this
-  // event as actually happening (or planned to happen at this time)."
-  // Owner-only edits without time changes belong on /day-templates
-  // (which updates the template, not events). status -> "completed" so
-  // the dashboard ordinal counter recognizes the recording.
-  const nextStatus = source.status === "projected" ? "completed" : source.status;
+  // Recording = the user committed a specific time for this event.
+  // Owner-only edits on a not-yet-happened event are annotations: they
+  // persist owner via a manual doc, but `recorded: false` keeps the
+  // engine free to recalculate time around real recordings before it.
+  const startTimeChanged = source.startTime !== form.startTime;
+  const endTimeChanged = (source.endTime ?? "") !== form.endTime;
+  const timeChanged = startTimeChanged || endTimeChanged;
+  // Once recorded, always recorded (owner-only re-edit can't un-record).
+  const recorded = source.recorded || timeChanged;
+  const nextStatus =
+    source.status === "projected" ? (recorded ? "completed" : "overridden") : source.status;
 
   const next: Event = {
     ...source,
@@ -106,6 +107,7 @@ function formToEvent(form: FormState, source: Event, type: EventType): Event {
     label: form.label || source.label,
     source: source.source === "projected" ? "manual" : source.source,
     status: nextStatus,
+    recorded,
   };
 
   if (form.endTime) {

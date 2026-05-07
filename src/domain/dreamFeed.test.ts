@@ -9,6 +9,7 @@ const bedtime = (start: string): Event => ({
   eventKey: "bedtime",
   type: "bedtime",
   kind: "instant",
+  recorded: false,
   label: "Bedtime",
   startTime: start,
   source: "projected",

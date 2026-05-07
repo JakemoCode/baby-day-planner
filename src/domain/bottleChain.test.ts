@@ -14,6 +14,7 @@ const bottle = (
   eventKey: `bottle_${n}`,
   type: "bottle",
   kind: "instant",
+  recorded: false,
   label: `Bottle ${n}`,
   startTime: start,
   amountOz: oz,
