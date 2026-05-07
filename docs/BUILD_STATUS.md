@@ -34,18 +34,46 @@ The app **runs locally** against the Firebase emulator suite. Sign-in works (Goo
 
 - **#20** — `feat(ui): bottle interval guard` — confirms before logging a new bottle if last bottle was within `minBottleIntervalMinutes` (default 20). Prevents the "mash 12 times in 10s" incident.
 
-## Active backlog (in priority order)
+## Active work — Timeline polish v2 (PR #33, in flight)
+
+**Branch:** `feat/timeline-polish-v2` · **PR:** [#33](https://github.com/JakemoCode/baby-day-planner/pull/33) · **Status:** open, accepting more polish per Jake until he calls it done. **342 tests passing**, lint + typecheck clean.
+
+### What's landed on PR #33 so far
+- Hour tick line clipped behind label (not through text)
+- ≤3 free-standing on-hour events collapse to one row (single dot, no per-event time)
+- Putdown emits `endTime` from engine → renders as its own short DurationBlock between wake window and nap (with single-row label · range layout)
+- "Putdown · X" abbreviation in both chip and block contexts
+- Manual bedtime overrides flow through `applyBedtime` (engine consumes actuals)
+- Manual wake-window overrides flow through new `applyWakeWindowOverrides` (engine step before `applyTemplate`)
+- Owner badge moved inline with block label ("Wake Window 2 · Kelly"), not in the secondary range row
+- Tighter single-line title in blocks; range as small subtitle that chips may overlap
+- BLOCK_HEADER_PX 56 → 30 (chips sit close to actual time)
+- "Edited" ✎ icon dropped from blocks and markers (was firing on owner-only edits)
+- On-hour markers/chips drop their inline time (hour tick announces it)
+- Editing a projected event creates a fresh manual doc with new id (was throwing NOT_FOUND on Firestore)
+- Tomorrow's preview is tap-to-pick-owner: tap a nap/wake-window/bottle → `TemplateOwnerPicker` opens, picks owner, persists to selected template; tap an extra → existing edit drawer
+- Shared `setOwnerInTemplate` helper at `src/components/DayTemplates/setOwnerInTemplate.ts` (used by `/day-templates` and `/tomorrow`)
+
+### Known open issues (Jake's screenshots, awaiting next iteration)
+- **Wake-window owner not always visible after edit** — engine step now merges manual overrides, should be working but verify after restart.
+- **Chip-on-block-name overlap on edited blocks** — bumped `BLOCK_HEADER_PX` to 30. May still happen on blocks edited to start times that put a chip right at the title row. Check post-restart.
+- **Image paste in iTerm sometimes pastes path string instead of image data** — client-side issue, not project. Workaround: drag-drop file into chat or use cmd+ctrl+shift+4.
+
+### Resume here
+1. `git checkout feat/timeline-polish-v2 && git pull`
+2. Restart the dev server
+3. Send next screenshot; iterate on the same branch + same PR
+4. Merge PR #33 only when Jake says it's done
+
+## Backlog (after PR #33 merges)
 
 | # | Item | Notes |
 |---|---|---|
-| 1 | **Timeline polish v2** (3 items, queued together) | (a) Hourly tick line should clip behind the hour-text label, not run through it. (b) On-the-hour events: when ≤3 events share the same hour, render them as a single line (one dot, no per-event time prefix) — the hour tick already announces the time. (c) Putdown as its own visual block: occupy the requisite vertical space (settings.putdownLeadMinutes) between the wake window and the next nap. Try as a small block to see how it feels. |
-| 2 | **Settings duration inputs as HH:MM** | Wake windows / bottle interval / nap length / putdown lead / dream-feed offsets currently take raw minutes. Build a reusable DurationInput (h:mm) and apply across editors. Persist as minutes — no schema change. |
-| 3 | **Engine sanity dedup with badge** | Per Jake: option (b) — render duplicates with a small "duplicate" badge so user can tap each and delete. Naps are already protected by NapActionButton; bottles are protected by interval guard. |
-| 4 | **🔥 Palette refresh + button tinting** (Jake has flagged twice — bumped) | `--color-surface: #ffffff` is too stark against warm cream `--color-bg`. NapActionButton renders pure white. Most owner-tint colors only appear as small dots. UI dominated by sage + white; user wants more soft earth-tones throughout. |
-| 5 | **Settings accordion** (visual polish, deferred) | Sections collapsible. |
-| 6 | **Wave 9** — PWA + E2E + design audit | Original Plan C roadmap final wave. |
-
-Timeline rebuild (chips-in-blocks + polish + spacing + time-anchored chips + hour ticks) merged as a single PR after #25, #26, #27, #28. Earlier #29/#30/#31 superseded.
+| 1 | **Settings duration inputs as HH:MM** | Wake windows / bottle interval / nap length / putdown lead / dream-feed offsets currently take raw minutes. Build a reusable DurationInput (h:mm) and apply across editors. Persist as minutes — no schema change. |
+| 2 | **Engine sanity dedup with badge** | Per Jake: option (b) — render duplicates with a small "duplicate" badge so user can tap each and delete. Naps are already protected by NapActionButton; bottles are protected by interval guard. |
+| 3 | **🔥 Palette refresh + button tinting** (Jake has flagged twice — bumped) | `--color-surface: #ffffff` is too stark against warm cream `--color-bg`. NapActionButton renders pure white. Most owner-tint colors only appear as small dots. UI dominated by sage + white; user wants more soft earth-tones throughout. |
+| 4 | **Settings accordion** (visual polish, deferred) | Sections collapsible. |
+| 5 | **Wave 9** — PWA + E2E + design audit | Original Plan C roadmap final wave. |
 
 ## Decisions locked (do not re-ask)
 
