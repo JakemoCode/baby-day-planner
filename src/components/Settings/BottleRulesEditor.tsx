@@ -2,6 +2,7 @@
 
 import { useId } from "react";
 import type { BottleRule, Settings } from "@/domain";
+import { DurationInput } from "@/components/shared/DurationInput";
 import fieldStyles from "./SettingsField.module.css";
 import styles from "./BottleRulesEditor.module.css";
 
@@ -95,37 +96,29 @@ export function BottleRulesEditor({ value, onChange }: BottleRulesEditorProps) {
       </label>
 
       <label className={fieldStyles.field} htmlFor={ids.interval}>
-        <span className={fieldStyles.label}>Default interval (minutes)</span>
+        <span className={fieldStyles.label}>Default interval</span>
         <span className={fieldStyles.hint}>Used when amount is unknown or no rule matches.</span>
-        <input
+        <DurationInput
           id={ids.interval}
-          type="number"
-          min="0"
           className={fieldStyles.input}
           value={value.defaultBottleIntervalMinutes}
-          onChange={(e) => {
-            const n = Number(e.target.value);
-            if (Number.isFinite(n)) onChange({ ...value, defaultBottleIntervalMinutes: n });
-          }}
+          onChange={(n) => onChange({ ...value, defaultBottleIntervalMinutes: n })}
+          min={0}
         />
       </label>
 
       <label className={fieldStyles.field} htmlFor={ids.guard}>
-        <span className={fieldStyles.label}>Confirm bottle within (minutes)</span>
+        <span className={fieldStyles.label}>Confirm bottle within</span>
         <span className={fieldStyles.hint}>
           Tapping &ldquo;Start Bottle Now&rdquo; sooner than this asks &ldquo;are you sure?&rdquo; —
           protects against accidental double-taps.
         </span>
-        <input
+        <DurationInput
           id={ids.guard}
-          type="number"
-          min="0"
           className={fieldStyles.input}
           value={value.minBottleIntervalMinutes ?? 20}
-          onChange={(e) => {
-            const n = Number(e.target.value);
-            if (Number.isFinite(n)) onChange({ ...value, minBottleIntervalMinutes: n });
-          }}
+          onChange={(n) => onChange({ ...value, minBottleIntervalMinutes: n })}
+          min={0}
         />
       </label>
 
@@ -179,15 +172,14 @@ export function BottleRulesEditor({ value, onChange }: BottleRulesEditorProps) {
                 </div>
                 <div className={styles.ruleField}>
                   <label htmlFor={intId} className={styles.smallLabel}>
-                    Interval (minutes)
+                    Interval
                   </label>
-                  <input
+                  <DurationInput
                     id={intId}
-                    type="number"
-                    min="0"
                     className={styles.smallInput}
                     value={rule.intervalMinutes}
-                    onChange={(e) => updateNumberField(i, "intervalMinutes", e.target.value)}
+                    onChange={(n) => replaceRule(i, { ...rule, intervalMinutes: n })}
+                    min={0}
                   />
                 </div>
               </div>

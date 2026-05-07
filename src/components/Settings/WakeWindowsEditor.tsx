@@ -1,5 +1,6 @@
 "use client";
 
+import { DurationInput } from "@/components/shared/DurationInput";
 import styles from "./SettingsField.module.css";
 
 export type WakeWindowsEditorProps = {
@@ -34,8 +35,8 @@ export function WakeWindowsEditor({ value, onChange }: WakeWindowsEditorProps) {
         </button>
       </header>
       <p className={styles.sectionDescription}>
-        Time awake (in minutes) before each nap. The number of windows determines the number of naps
-        in the projected day.
+        Time awake before each nap. The number of windows determines the number of naps in the
+        projected day.
       </p>
 
       {value.length === 0 ? (
@@ -47,17 +48,13 @@ export function WakeWindowsEditor({ value, onChange }: WakeWindowsEditorProps) {
             return (
               <div key={i} className={styles.row}>
                 <label className={styles.field} htmlFor={inputId} style={{ flex: 1 }}>
-                  <span className={styles.label}>Wake Window {i + 1} (minutes)</span>
-                  <input
+                  <span className={styles.label}>Wake Window {i + 1}</span>
+                  <DurationInput
                     id={inputId}
-                    type="number"
-                    min="0"
                     className={styles.input}
                     value={minutes}
-                    onChange={(e) => {
-                      const n = Number(e.target.value);
-                      if (Number.isFinite(n)) update(i, n);
-                    }}
+                    onChange={(n) => update(i, n)}
+                    min={0}
                   />
                 </label>
                 <button

@@ -2,6 +2,7 @@
 
 import { useId } from "react";
 import type { DreamFeedSettings } from "@/domain";
+import { DurationInput } from "@/components/shared/DurationInput";
 import styles from "./SettingsField.module.css";
 
 export type DreamFeedEditorProps = {
@@ -67,18 +68,14 @@ export function DreamFeedEditor({ value, onChange }: DreamFeedEditorProps) {
       </label>
 
       <label className={styles.field} htmlFor={ids.minAfter}>
-        <span className={styles.label}>Minimum minutes after bedtime</span>
-        <input
+        <span className={styles.label}>Minimum time after bedtime</span>
+        <DurationInput
           id={ids.minAfter}
-          type="number"
-          min="0"
           className={styles.input}
           value={value.minMinutesAfterBedtime}
+          onChange={(n) => update({ minMinutesAfterBedtime: n })}
           disabled={!value.enabled}
-          onChange={(e) => {
-            const n = Number(e.target.value);
-            if (Number.isFinite(n)) update({ minMinutesAfterBedtime: n });
-          }}
+          min={0}
         />
       </label>
     </section>

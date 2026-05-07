@@ -2,6 +2,7 @@
 
 import { useId } from "react";
 import type { Settings } from "@/domain";
+import { DurationInput } from "@/components/shared/DurationInput";
 import styles from "./SettingsField.module.css";
 
 export type NapDefaults = Pick<
@@ -27,9 +28,8 @@ export function NapDefaultsEditor({ value, onChange }: NapDefaultsEditorProps) {
     putdown: useId(),
   };
 
-  const updateNumber = (key: keyof NapDefaults) => (e: React.ChangeEvent<HTMLInputElement>) => {
-    const n = Number(e.target.value);
-    if (Number.isFinite(n)) onChange({ ...value, [key]: n });
+  const updateDuration = (key: keyof NapDefaults) => (n: number) => {
+    onChange({ ...value, [key]: n });
   };
 
   return (
@@ -44,42 +44,39 @@ export function NapDefaultsEditor({ value, onChange }: NapDefaultsEditorProps) {
       </p>
 
       <label className={styles.field} htmlFor={ids.nap}>
-        <span className={styles.label}>Default nap length (minutes)</span>
-        <input
+        <span className={styles.label}>Default nap length</span>
+        <DurationInput
           id={ids.nap}
-          type="number"
-          min="0"
           className={styles.input}
           value={value.defaultNapLengthMinutes}
-          onChange={updateNumber("defaultNapLengthMinutes")}
+          onChange={updateDuration("defaultNapLengthMinutes")}
+          min={0}
         />
       </label>
 
       <label className={styles.field} htmlFor={ids.short}>
-        <span className={styles.label}>Short nap threshold (minutes)</span>
+        <span className={styles.label}>Short nap threshold</span>
         <span className={styles.hint}>
           Naps under this length trigger the wake-window adjustment below.
         </span>
-        <input
+        <DurationInput
           id={ids.short}
-          type="number"
-          min="0"
           className={styles.input}
           value={value.shortNapThresholdMinutes}
-          onChange={updateNumber("shortNapThresholdMinutes")}
+          onChange={updateDuration("shortNapThresholdMinutes")}
+          min={0}
         />
       </label>
 
       <label className={styles.field} htmlFor={ids.adj}>
-        <span className={styles.label}>Short nap adjustment (minutes)</span>
+        <span className={styles.label}>Short nap adjustment</span>
         <span className={styles.hint}>Subtracted from the next wake window after a short nap.</span>
-        <input
+        <DurationInput
           id={ids.adj}
-          type="number"
-          min="0"
           className={styles.input}
           value={value.shortNapAdjustmentMinutes}
-          onChange={updateNumber("shortNapAdjustmentMinutes")}
+          onChange={updateDuration("shortNapAdjustmentMinutes")}
+          min={0}
         />
       </label>
 
@@ -96,17 +93,14 @@ export function NapDefaultsEditor({ value, onChange }: NapDefaultsEditorProps) {
       </label>
 
       <label className={styles.field} htmlFor={ids.putdown}>
-        <span className={styles.label}>Putdown lead time (minutes)</span>
-        <span className={styles.hint}>
-          Heads-up shown this many minutes before each projected nap.
-        </span>
-        <input
+        <span className={styles.label}>Putdown lead time</span>
+        <span className={styles.hint}>Heads-up shown this long before each projected nap.</span>
+        <DurationInput
           id={ids.putdown}
-          type="number"
-          min="0"
           className={styles.input}
           value={value.putdownLeadMinutes}
-          onChange={updateNumber("putdownLeadMinutes")}
+          onChange={updateDuration("putdownLeadMinutes")}
+          min={0}
         />
       </label>
     </section>
