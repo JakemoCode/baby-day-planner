@@ -12,7 +12,9 @@ import { startNewDay } from "@/repositories/startNewDay";
 import { db } from "@/lib/firebase/client";
 import { LoadingState } from "@/components/shared/LoadingState";
 import { FAB } from "@/components/shared/FAB";
+import { FABTypePicker } from "@/components/shared/FABTypePicker";
 import { EventEditDrawer } from "@/components/shared/EventEditDrawer";
+import { buildCreateTemplate, type CreatableType } from "@/components/shared/createEventTemplate";
 import { CurrentWakeWindowStatus } from "@/components/Dashboard/CurrentWakeWindowStatus";
 import { EndOfDayCard } from "@/components/Dashboard/EndOfDayCard";
 import { NapActionButton } from "@/components/Dashboard/NapActionButton";
@@ -27,7 +29,7 @@ const CHILD_ID = process.env.NEXT_PUBLIC_DEFAULT_CHILD_ID ?? "aden";
 
 type DrawerState =
   | { open: false }
-  | { open: true; mode: "create-extra" }
+  | { open: true; mode: "create"; template: Event }
   | { open: true; mode: "edit"; event: Event };
 
 export default function DashboardPage() {
@@ -37,6 +39,7 @@ export default function DashboardPage() {
   const { events: actuals, createOptimistic } = useEvents(CHILD_ID, day?.id ?? "");
   const { templates } = useTemplates(CHILD_ID);
   const [drawer, setDrawer] = useState<DrawerState>({ open: false });
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   const template = useMemo<OwnershipTemplate | undefined>(() => {
     if (!day?.ownershipTemplateId) return undefined;
@@ -161,17 +164,35 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      <FAB
-        label="Add extra event"
-        onClick={() => setDrawer({ open: true, mode: "create-extra" })}
+      <FAB label="Add an event" onClick={() => setPickerOpen(true)} />
+
+      <FABTypePicker
+        open={pickerOpen}
+        onSelect={(type: CreatableType) => {
+          setPickerOpen(false);
+          const template = buildCreateTemplate({
+            type,
+            dayId: day.id,
+            actuals,
+            settings,
+            nowHHMM: formatNowAsHHMM(),
+          });
+          setDrawer({ open: true, mode: "create", template });
+        }}
+        onCancel={() => setPickerOpen(false)}
       />
 
       <EventEditDrawer
-        key={drawer.open && drawer.mode === "edit" ? drawer.event.id : "new"}
+        key={
+          drawer.open && drawer.mode === "edit"
+            ? drawer.event.id
+            : drawer.open && drawer.mode === "create"
+              ? drawer.template.id
+              : "closed"
+        }
         open={drawer.open}
-        event={drawer.open && drawer.mode === "edit" ? drawer.event : null}
-        mode={drawer.open && drawer.mode === "edit" ? "edit" : "create-extra"}
-        dayId={day.id}
+        event={drawer.open ? (drawer.mode === "edit" ? drawer.event : drawer.template) : null}
+        mode={drawer.open && drawer.mode === "edit" ? "edit" : "create"}
         onSave={async (event) => {
           await createOptimistic(event);
           setDrawer({ open: false });

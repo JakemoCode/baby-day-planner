@@ -201,16 +201,19 @@ describe("EventEditDrawer", () => {
     expect(onDelete).toHaveBeenCalledTimes(1);
   });
 
-  it("create-extra mode renders extra form with empty defaults", () => {
+  it("create mode renders the seeded template's form fields", () => {
+    const template: Event = baseEvent({
+      id: "extra-new",
+      eventKey: "extra_new",
+      type: "extra",
+      label: "",
+      startTime: "12:00",
+      source: "manual",
+      status: "completed",
+    });
+    delete (template as Partial<Event>).amountOz;
     renderWithAuth(
-      <EventEditDrawer
-        open
-        event={null}
-        mode="create-extra"
-        dayId="day-1"
-        onSave={() => {}}
-        onCancel={() => {}}
-      />,
+      <EventEditDrawer open event={template} mode="create" onSave={() => {}} onCancel={() => {}} />,
     );
     expect(screen.getByLabelText(/label/i)).toBeVisible();
     expect(screen.getByLabelText(/start time/i)).toBeVisible();

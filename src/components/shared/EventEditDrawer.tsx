@@ -6,14 +6,13 @@ import { ConfirmDialog } from "./ConfirmDialog";
 import { OwnerPicker } from "./OwnerPicker";
 import styles from "./EventEditDrawer.module.css";
 
-export type EventEditDrawerMode = "edit" | "create-extra";
+export type EventEditDrawerMode = "edit" | "create";
 
 export type EventEditDrawerProps = {
   open: boolean;
-  event: Event | null;
   mode: EventEditDrawerMode;
-  /** Required when mode === "create-extra" so the new event has a parent day. */
-  dayId?: string;
+  /** The event being edited (mode="edit") or the seeded template to create (mode="create"). */
+  event: Event | null;
   onSave: (event: Event) => void | Promise<void>;
   onCancel: () => void;
   onDelete?: (event: Event) => void | Promise<void>;
@@ -67,7 +66,7 @@ function formToEvent(form: FormState, source: Event, type: EventType): Event {
   return next;
 }
 
-const TITLE_BY_TYPE: Record<EventType, string> = {
+const EDIT_TITLE_BY_TYPE: Record<EventType, string> = {
   wake: "Edit wake",
   wake_window: "Edit wake window",
   putdown: "Edit putdown",
@@ -79,38 +78,30 @@ const TITLE_BY_TYPE: Record<EventType, string> = {
   extra: "Edit event",
 };
 
-function createExtraTemplate(dayId: string): Event {
-  return {
-    id: `extra-${Date.now()}`,
-    dayId,
-    eventKey: `extra_${Date.now()}`,
-    type: "extra",
-    label: "",
-    startTime: "12:00",
-    source: "manual",
-    status: "completed",
-  };
-}
+const CREATE_TITLE_BY_TYPE: Partial<Record<EventType, string>> = {
+  bottle: "Add bottle",
+  nap: "Add nap",
+  pump: "Add pump",
+  extra: "Add event",
+};
 
 export function EventEditDrawer({
   open,
-  event,
   mode,
-  dayId,
+  event,
   onSave,
   onCancel,
   onDelete,
 }: EventEditDrawerProps) {
-  const sourceEvent = mode === "create-extra" ? createExtraTemplate(dayId ?? "") : (event as Event);
-
+  const sourceEvent = event;
   const [form, setForm] = useState<FormState>(() => eventToForm(sourceEvent));
   const [confirmOpen, setConfirmOpen] = useState(false);
   const titleId = useId();
 
   // Form state is derived from the source event on first render only.
   // To force a fresh form when the event changes, parents should pass
-  // `<EventEditDrawer key={event?.id ?? "new"} … />` so React remounts
-  // the component (cleaner than syncing state inside an effect).
+  // `<EventEditDrawer key={...} … />` so React remounts the component
+  // (cleaner than syncing state inside an effect).
 
   useEffect(() => {
     if (!open) return;
@@ -122,14 +113,15 @@ export function EventEditDrawer({
   }, [open, onCancel]);
 
   if (!open) return null;
-  if (mode === "edit" && !event) return null;
+  if (!sourceEvent) return null;
 
   const type = sourceEvent.type;
-  const title = mode === "create-extra" ? "Add event" : TITLE_BY_TYPE[type];
+  const title =
+    mode === "create" ? (CREATE_TITLE_BY_TYPE[type] ?? "Add event") : EDIT_TITLE_BY_TYPE[type];
   const canDelete =
     mode === "edit" &&
     onDelete !== undefined &&
-    (event?.source === "actual" || event?.source === "manual");
+    (sourceEvent.source === "actual" || sourceEvent.source === "manual");
 
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) =>
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -248,7 +240,7 @@ export function EventEditDrawer({
         onCancel={() => setConfirmOpen(false)}
         onConfirm={() => {
           setConfirmOpen(false);
-          if (event && onDelete) void onDelete(event);
+          if (sourceEvent && onDelete) void onDelete(sourceEvent);
         }}
       />
     </div>
