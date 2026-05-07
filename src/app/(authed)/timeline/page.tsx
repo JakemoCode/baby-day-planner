@@ -92,6 +92,7 @@ export default function TimelinePage() {
       <TimelineList
         events={projected}
         nowMinutes={nowMinutes}
+        scrollToNowOnMount
         onEventTap={(event) => setDrawer({ open: true, mode: "edit", event })}
       />
 

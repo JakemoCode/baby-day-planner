@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import type { Event } from "@/domain";
 import { formatTimeForDisplay, parseTime } from "@/domain";
 import { CurrentTimeIndicator } from "@/components/shared/CurrentTimeIndicator";
@@ -12,30 +12,46 @@ export type TimelineListProps = {
   events: Event[];
   nowMinutes?: number;
   onEventTap?: (event: Event) => void;
+  /**
+   * One-shot scroll on mount to bring the current time (or the event in
+   * progress) into view. Off by default; the Timeline page opts in.
+   */
+  scrollToNowOnMount?: boolean;
 };
 
 const PX_PER_MIN = 2;
 const VIEWPORT_PADDING_MIN = 30;
 const MIN_BLOCK_HEIGHT = 32;
+/** Vertical space inside a block reserved for label + range row. */
+const BLOCK_HEADER_PX = 44;
+/** Vertical step between stacked chips inside a block. */
+const CHIP_STEP_PX = 28;
+/** Padding above the current time when auto-scrolling so context is visible. */
+const SCROLL_TOP_PADDING_PX = 80;
 const DEFAULT_VIEWPORT = { start: 7 * 60, end: 21 * 60 };
-/** Events whose start times fall within this many minutes of each other are
- *  considered "the same slot" and stacked vertically instead of overlapping. */
-const STACK_TOLERANCE_MIN = 5;
-/** Vertical offset applied per stack position (≈ a PointMarker's height). */
-const STACK_OFFSET_PX = 32;
 
 type BlockEvent = Event & { endTime: string };
 const isDurationEvent = (e: Event): e is BlockEvent =>
   (e.type === "nap" || e.type === "wake_window" || e.type === "extra") && e.endTime !== undefined;
 
-export function TimelineList({ events, nowMinutes, onEventTap }: TimelineListProps) {
-  const { sorted, originMinutes, heightPx, stackOffsetById } = useMemo(() => {
+type Position = { topPx: number; heightPx: number; embeddedIn?: string };
+
+export function TimelineList({
+  events,
+  nowMinutes,
+  onEventTap,
+  scrollToNowOnMount = false,
+}: TimelineListProps) {
+  const rootRef = useRef<HTMLDivElement>(null);
+  const hasScrolledRef = useRef(false);
+
+  const { sorted, originMinutes, heightPx, positionById } = useMemo(() => {
     if (events.length === 0) {
       return {
         sorted: [] as Event[],
         originMinutes: 0,
         heightPx: 0,
-        stackOffsetById: new Map<string, number>(),
+        positionById: new Map<string, Position>(),
       };
     }
 
@@ -43,41 +59,91 @@ export function TimelineList({ events, nowMinutes, onEventTap }: TimelineListPro
       (a, b) => parseTime(a.startTime) - parseTime(b.startTime),
     );
 
-    // Bucket events that start within STACK_TOLERANCE_MIN of one another and
-    // assign each a vertical "lane" so they don't render on top of each other.
-    const offsets = new Map<string, number>();
-    let bucketAnchor = -Infinity;
-    let bucketIndex = 0;
-    for (const e of sortedEvents) {
-      const min = parseTime(e.startTime);
-      if (min - bucketAnchor <= STACK_TOLERANCE_MIN) {
-        bucketIndex += 1;
-      } else {
-        bucketAnchor = min;
-        bucketIndex = 0;
-      }
-      offsets.set(e.id, bucketIndex * STACK_OFFSET_PX);
-    }
-
     const startTimes = sortedEvents.map((e) => parseTime(e.startTime));
     const endTimes = sortedEvents.map((e) =>
       e.endTime ? parseTime(e.endTime) : parseTime(e.startTime),
     );
     const minMin = Math.min(...startTimes, DEFAULT_VIEWPORT.start);
     const maxMin = Math.max(...endTimes, DEFAULT_VIEWPORT.end);
-
     const origin = Math.max(0, minMin - VIEWPORT_PADDING_MIN);
-    const end = maxMin + VIEWPORT_PADDING_MIN;
-    const baseHeight = (end - origin) * PX_PER_MIN;
-    const maxStackOffset = Math.max(0, ...offsets.values());
+
+    // Time axis stays absolute. Each block sits at its natural y. Point
+    // markers contained by a block become "chips" stacked inside that block,
+    // not separate rows on the timeline. Free-standing point markers render
+    // normally at their time-anchored y.
+    const blocks = sortedEvents.filter(isDurationEvent);
+    const positions = new Map<string, Position>();
+    const chipCountByBlock = new Map<string, number>();
+
+    for (const e of sortedEvents) {
+      const startMin = parseTime(e.startTime);
+      const naturalTop = (startMin - origin) * PX_PER_MIN;
+
+      if (isDurationEvent(e)) {
+        const blockHeight = Math.max(
+          MIN_BLOCK_HEIGHT,
+          (parseTime(e.endTime) - startMin) * PX_PER_MIN,
+        );
+        positions.set(e.id, { topPx: naturalTop, heightPx: blockHeight });
+        continue;
+      }
+
+      // Point marker — does it fall inside any block's time range?
+      const container = blocks.find((b) => {
+        const bs = parseTime(b.startTime);
+        const be = parseTime(b.endTime);
+        return bs <= startMin && startMin < be;
+      });
+
+      if (container) {
+        const chipIndex = chipCountByBlock.get(container.id) ?? 0;
+        chipCountByBlock.set(container.id, chipIndex + 1);
+        const containerPos = positions.get(container.id);
+        const containerTop = containerPos?.topPx ?? naturalTop;
+        positions.set(e.id, {
+          topPx: containerTop + BLOCK_HEADER_PX + chipIndex * CHIP_STEP_PX,
+          heightPx: CHIP_STEP_PX,
+          embeddedIn: container.id,
+        });
+      } else {
+        positions.set(e.id, { topPx: naturalTop, heightPx: CHIP_STEP_PX });
+      }
+    }
+
+    const baseEnd = (maxMin + VIEWPORT_PADDING_MIN - origin) * PX_PER_MIN;
 
     return {
       sorted: sortedEvents,
       originMinutes: origin,
-      heightPx: baseHeight + maxStackOffset,
-      stackOffsetById: offsets,
+      heightPx: baseEnd,
+      positionById: positions,
     };
   }, [events]);
+
+  // One-shot scroll to the event in progress (or the now-line) the first
+  // time we have the data needed to compute it. Subsequent re-renders are
+  // gated by hasScrolledRef so the page doesn't keep snapping.
+  useEffect(() => {
+    if (hasScrolledRef.current) return;
+    if (!scrollToNowOnMount || nowMinutes === undefined || sorted.length === 0) return;
+    const root = rootRef.current;
+    if (!root) return;
+
+    const inProgress = sorted.find((e) => {
+      const start = parseTime(e.startTime);
+      const end = e.endTime ? parseTime(e.endTime) : start;
+      return start <= nowMinutes && nowMinutes < end;
+    });
+
+    const targetTopWithinList = inProgress
+      ? (positionById.get(inProgress.id)?.topPx ?? 0)
+      : (nowMinutes - originMinutes) * PX_PER_MIN;
+
+    const rootTopOnPage = root.getBoundingClientRect().top + window.scrollY;
+    const scrollTo = Math.max(0, rootTopOnPage + targetTopWithinList - SCROLL_TOP_PADDING_PX);
+    window.scrollTo({ top: scrollTo, behavior: "auto" });
+    hasScrolledRef.current = true;
+  }, [scrollToNowOnMount, nowMinutes, sorted, originMinutes, positionById]);
 
   if (events.length === 0) {
     return (
@@ -87,33 +153,37 @@ export function TimelineList({ events, nowMinutes, onEventTap }: TimelineListPro
     );
   }
 
+  // Render blocks first, then markers, so embedded chips paint on top of
+  // their containing block (browsers paint later siblings above earlier ones
+  // when z-indexes are equal; markerCompact also has z-index: 2 as a belt).
+  const blocks = sorted.filter(isDurationEvent);
+  const markers = sorted.filter((e) => !isDurationEvent(e));
+
   return (
-    <div className={styles.list} style={{ height: `${heightPx}px` }}>
-      {sorted.map((event) => {
-        const startMin = parseTime(event.startTime);
-        const baseTopPx = (startMin - originMinutes) * PX_PER_MIN;
-        const topPx = baseTopPx + (stackOffsetById.get(event.id) ?? 0);
+    <div ref={rootRef} className={styles.list} style={{ height: `${heightPx}px` }}>
+      {blocks.map((event) => {
+        const pos = positionById.get(event.id);
         const tap = onEventTap ? () => onEventTap(event) : undefined;
+        return (
+          <DurationBlock
+            key={event.id}
+            event={event}
+            topPx={pos?.topPx ?? 0}
+            heightPx={pos?.heightPx ?? MIN_BLOCK_HEIGHT}
+            {...(tap ? { onClick: tap } : {})}
+          />
+        );
+      })}
 
-        if (isDurationEvent(event)) {
-          const endMin = parseTime(event.endTime);
-          const blockHeight = Math.max(MIN_BLOCK_HEIGHT, (endMin - startMin) * PX_PER_MIN);
-          return (
-            <DurationBlock
-              key={event.id}
-              event={event}
-              topPx={topPx}
-              heightPx={blockHeight}
-              {...(tap ? { onClick: tap } : {})}
-            />
-          );
-        }
-
+      {markers.map((event) => {
+        const pos = positionById.get(event.id);
+        const tap = onEventTap ? () => onEventTap(event) : undefined;
         return (
           <PointMarker
             key={event.id}
             event={event}
-            topPx={topPx}
+            topPx={pos?.topPx ?? 0}
+            compact={!!pos?.embeddedIn}
             {...(tap ? { onClick: tap } : {})}
           />
         );
