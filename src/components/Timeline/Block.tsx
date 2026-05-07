@@ -86,8 +86,21 @@ export function Block({
           <span className={styles.markerLine} data-edge="bottom" aria-hidden="true" />
         </>
       )}
-      <span className={styles.label}>{blockLabel(event)}</span>
-      {range && (
+      <span className={styles.label}>
+        {blockLabel(event)}
+        {/* Putdown blocks are ~30px tall — owner inline with the label
+         * keeps them single-row legible against the diagonal stripes.
+         * Other blocks render owner in the range row below. */}
+        {event.type === "putdown" && event.owner && (
+          <span className={styles.owner} data-owner={event.owner}>
+            · {event.owner}
+          </span>
+        )}
+      </span>
+      {/* Range row is dropped for putdown blocks (too tall for ~30px height,
+       * and the time is already conveyed by the block's geometry — last
+       * 15min of its parent wake window). */}
+      {range && event.type !== "putdown" && (
         <span className={styles.range}>
           {range}
           {event.owner && (

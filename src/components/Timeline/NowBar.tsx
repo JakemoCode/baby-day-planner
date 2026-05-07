@@ -1,6 +1,6 @@
 "use client";
 
-import { formatTimeShort } from "@/domain";
+import { formatTimeForDisplay } from "@/domain";
 import styles from "./NowBar.module.css";
 
 export type NowBarProps = {
@@ -17,7 +17,7 @@ export type NowBarProps = {
 function formatNow(nowMinutes: number): string {
   const h = Math.floor(nowMinutes / 60);
   const m = nowMinutes % 60;
-  return formatTimeShort(`${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`);
+  return formatTimeForDisplay(`${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`);
 }
 
 /**
@@ -34,12 +34,14 @@ export function NowBar({ topPx, axisWidthPx, rightPx = 0, nowMinutes }: NowBarPr
         className={styles.line}
         style={{ left: `${axisWidthPx}px`, right: `${rightPx}px`, top: `${topPx}px` }}
       />
+      {/* Pill auto-sizes to fit "11:01 AM" (full format per Jake). It's
+       * allowed to extend a few px past the axis lane on the right because
+       * its y-band is exactly the now-line — no event content lives there. */}
       <div
         data-testid="now-pill"
         className={styles.pill}
         style={{
           left: 0,
-          width: `${axisWidthPx}px`,
           top: `${topPx - 9}px`,
         }}
       >

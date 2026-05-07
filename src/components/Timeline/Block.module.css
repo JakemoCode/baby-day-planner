@@ -54,14 +54,17 @@
 }
 
 .block[data-type="putdown"][data-color-mode="type"] {
-  /* Two adjacent warm cream tones for low-contrast diagonal stripes that
-   * read as a "transition" without competing with the label text on top. */
+  /* Diagonal stripes: surface-raised (matches wake's fill so the putdown
+   * reads as "still wake" visually) alternated with --color-border for
+   * just enough contrast that the stripe pattern is visible against the
+   * underlying wake window. The single-row label layout below keeps text
+   * legibility intact even on the textured fill. */
   background: repeating-linear-gradient(
     45deg,
-    var(--color-bg) 0,
-    var(--color-bg) 5px,
-    var(--color-surface-raised) 5px,
-    var(--color-surface-raised) 10px
+    var(--color-surface-raised) 0,
+    var(--color-surface-raised) 6px,
+    var(--color-border) 6px,
+    var(--color-border) 11px
   );
   border-color: var(--color-border-strong);
 }
