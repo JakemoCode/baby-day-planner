@@ -127,7 +127,15 @@ export default function TimelinePage() {
         mode={drawer.open && drawer.mode === "edit" ? "edit" : "create"}
         onSave={async (event) => {
           if (drawer.open && drawer.mode === "edit") {
-            await updateOptimistic(event.id, event);
+            // Projected events are synthesized by the engine and have no
+            // Firestore doc — the first edit needs to CREATE the override,
+            // not update a non-existent record. Give it a fresh id so we
+            // don't write under the synthetic "proj-…" key.
+            if (drawer.event.source === "projected") {
+              await createOptimistic({ ...event, id: `manual-${Date.now()}` });
+            } else {
+              await updateOptimistic(event.id, event);
+            }
           } else {
             await createOptimistic(event);
           }
@@ -135,6 +143,12 @@ export default function TimelinePage() {
         }}
         onCancel={() => setDrawer({ open: false })}
         onDelete={async (event) => {
+          // Same caveat — can't delete a projected event since it doesn't
+          // exist in Firestore. Just close the drawer.
+          if (drawer.open && drawer.mode === "edit" && drawer.event.source === "projected") {
+            setDrawer({ open: false });
+            return;
+          }
           await deleteOptimistic(event.id);
           setDrawer({ open: false });
         }}
