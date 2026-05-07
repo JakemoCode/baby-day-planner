@@ -49,13 +49,18 @@ function validateForm(
   if (type === "nap" && endTime && existingEvents) {
     const start = parseTime(startTime);
     const end = parseTime(endTime);
+    // Only flag overlap against *recorded* naps (status actual/completed).
+    // A projected nap that overlaps will get recomputed by the engine when
+    // this manual nap saves — projected naps haven't happened yet, so
+    // they're fair game to displace. Same for owner-only annotations
+    // (status="overridden"): those carry stale projection times.
     const overlap = existingEvents.find((e) => {
       if (e.id === editingId) return false;
       if (e.type !== "nap") return false;
       if (!e.endTime) return false;
+      if (e.status !== "actual" && e.status !== "completed") return false;
       const a = parseTime(e.startTime);
       const b = parseTime(e.endTime);
-      // overlap iff a < end && start < b
       return a < end && start < b;
     });
     if (overlap) {
