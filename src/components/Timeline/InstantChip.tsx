@@ -52,8 +52,17 @@ export function InstantChip({ event, colorMode, onClick }: InstantChipProps) {
         : { role: "presentation" as const })}
     >
       <span className={styles.dot} aria-hidden="true" />
-      <span className={styles.label}>{label}</span>
-      <span className={styles.time}>{time}</span>
+      <span className={styles.body}>
+        <span className={styles.topRow}>
+          <span className={styles.label}>{label}</span>
+          <span className={styles.time}>{time}</span>
+        </span>
+        {event.owner && (
+          <span className={styles.ownerName} data-owner={event.owner}>
+            {event.owner}
+          </span>
+        )}
+      </span>
     </Tag>
   );
 }

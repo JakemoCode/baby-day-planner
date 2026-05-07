@@ -17,7 +17,10 @@ const evt = (type: Event["type"], eventKey: string, start = "07:00"): Event =>
   });
 
 describe("applyTemplate", () => {
-  it("assigns nap and wake-window owners by index", () => {
+  it("assigns nap owners by index, and wake-windows inherit from the same nap index", () => {
+    // Wake Window N is the period leading into Nap N — same parent on duty,
+    // so wake_window_N owner = nap_N owner. Legacy wakeWindowOwners is
+    // ignored when napOwners[i] is set.
     const events = [
       evt("wake_window", "wake_window_1"),
       evt("nap", "nap_1"),
@@ -27,8 +30,20 @@ describe("applyTemplate", () => {
     const result = applyTemplate(events, saturdayTemplate);
     expect(result.find((e) => e.eventKey === "nap_1")?.owner).toBe("Kelly");
     expect(result.find((e) => e.eventKey === "nap_2")?.owner).toBe("Jake");
-    expect(result.find((e) => e.eventKey === "wake_window_1")?.owner).toBe("Jake");
-    expect(result.find((e) => e.eventKey === "wake_window_2")?.owner).toBe("Kelly");
+    expect(result.find((e) => e.eventKey === "wake_window_1")?.owner).toBe("Kelly");
+    expect(result.find((e) => e.eventKey === "wake_window_2")?.owner).toBe("Jake");
+  });
+
+  it("falls back to wakeWindowOwners when napOwners[i] is missing", () => {
+    const partialTemplate: OwnershipTemplate = {
+      id: "partial",
+      label: "Partial",
+      napOwners: [], // empty
+      wakeWindowOwners: ["Daycare", "Daycare"],
+    };
+    const events = [evt("wake_window", "wake_window_1")];
+    const result = applyTemplate(events, partialTemplate);
+    expect(result[0]?.owner).toBe("Daycare");
   });
 
   it("does not overwrite existing owner overrides", () => {

@@ -54,11 +54,10 @@
 }
 
 .block[data-type="putdown"][data-color-mode="type"] {
-  /* Diagonal stripes: surface-raised (matches wake's fill so the putdown
-   * reads as "still wake" visually) alternated with --color-border for
-   * just enough contrast that the stripe pattern is visible against the
-   * underlying wake window. The single-row label layout below keeps text
-   * legibility intact even on the textured fill. */
+  /* Low-contrast diagonal stripes — surface-raised matches wake's fill
+   * so putdown reads as "still wake, but transitioning." --color-border
+   * provides just enough contrast for the stripe pattern to be visible
+   * without competing with the single-row label text on top. */
   background: repeating-linear-gradient(
     45deg,
     var(--color-surface-raised) 0,

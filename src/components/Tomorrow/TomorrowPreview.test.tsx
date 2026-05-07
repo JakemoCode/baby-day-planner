@@ -62,10 +62,11 @@ describe("TomorrowPreview", () => {
       .getAllByTestId("timeline-block")
       .filter((el) => el.dataset.type === "nap");
     expect(napBlocks[0]?.dataset.owner).toBe("Kelly");
+    // Wake Window N inherits Nap N's owner now (see applyTemplate test).
     const wwBlocks = screen
       .getAllByTestId("timeline-block")
       .filter((el) => el.dataset.type === "wake_window");
-    expect(wwBlocks[0]?.dataset.owner).toBe("Jake");
+    expect(wwBlocks[0]?.dataset.owner).toBe("Kelly");
   });
 
   it("includes a Bottle chip in the preview when bottle1Time is provided", () => {

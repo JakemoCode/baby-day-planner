@@ -1,19 +1,19 @@
 /*
- * Pill chip rendered inside an InstantCluster. Type-mode encodes type via
- * the dot color; owner-mode swaps the dot color to the owner color.
- * Background and border stay neutral (chips are visually anchored by the
- * surrounding cluster, not by their fill).
+ * Pill chip with two-row layout when owner is set:
+ *   [dot] [ Bottle 1   7:00a ]
+ *         [ Jake             ]
+ * Dot color = owner color (sage default if no owner).
+ * Border color = owner color (default border if no owner).
  */
 
 .chip {
   display: inline-flex;
-  /* Baseline-align so the label and time text sit on the same baseline;
-   * the dot uses align-self: center to stay vertically centered against
-   * the row's optical center (mid-x-height of the text). */
-  align-items: baseline;
-  gap: 4px;
+  /* Top-align so the dot sits with the label row, not centered against
+   * a tall two-row chip. */
+  align-items: flex-start;
+  gap: 6px;
   padding: 3px 8px;
-  border-radius: 999px;
+  border-radius: 12px;
   background: var(--color-surface-raised);
   border: 1px solid var(--color-border);
   font: inherit;
@@ -40,55 +40,55 @@
 }
 
 .dot {
-  width: 7px;
-  height: 7px;
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
   flex-shrink: 0;
-  background: var(--color-muted);
-  /* Override the baseline alignment of the parent so the dot sits at the
-   * optical center of the text row (mid-x-height) instead of at the text
-   * baseline (which would put it visually too low). */
-  align-self: center;
-  /* Nudge down 1px to match the visual midpoint of the cap-height of
-   * label/time — pure baseline center sits a hair too high vs. the
-   * x-height that the eye actually anchors on. */
-  transform: translateY(1px);
-}
-
-/* === Type-mode dot colors (default) ====================== */
-
-.chip[data-color-mode="type"][data-type="bottle"] .dot {
-  background: var(--color-warning);
-}
-.chip[data-color-mode="type"][data-type="pump"] .dot {
-  background: var(--color-muted);
-}
-.chip[data-color-mode="type"][data-type="dream_feed"] .dot {
-  background: var(--color-muted);
-}
-.chip[data-color-mode="type"][data-type="bedtime"] .dot {
-  background: var(--color-fg);
-}
-.chip[data-color-mode="type"][data-type="extra"] .dot {
+  /* Default: sage when no owner. Owner color overrides via data-owner. */
   background: var(--color-accent);
-}
-.chip[data-color-mode="type"][data-type="wake"] .dot {
-  background: var(--color-accent);
+  /* Nudge down 2px so the dot lines up with the label row's optical
+   * mid-x-height instead of sitting at the very top of the chip. */
+  margin-top: 3px;
 }
 
-/* === Owner-mode dot colors ============================== */
+/* === Owner dot color (applies in BOTH color modes per Jake) ======= */
 
-.chip[data-color-mode="owner"][data-owner="Jake"] .dot {
+.chip[data-owner="Jake"] .dot {
   background: var(--color-owner-jake);
 }
-.chip[data-color-mode="owner"][data-owner="Kelly"] .dot {
+.chip[data-owner="Kelly"] .dot {
   background: var(--color-owner-kelly);
 }
-.chip[data-color-mode="owner"][data-owner="Daycare"] .dot {
+.chip[data-owner="Daycare"] .dot {
   background: var(--color-owner-daycare);
 }
 
-/* === Content ============================================ */
+/* === Owner border (applies in both color modes) ================== */
+
+.chip[data-owner="Jake"] {
+  border-color: var(--color-owner-jake);
+}
+.chip[data-owner="Kelly"] {
+  border-color: var(--color-owner-kelly);
+}
+.chip[data-owner="Daycare"] {
+  border-color: var(--color-owner-daycare);
+}
+
+/* === Content layout ================================================ */
+
+.body {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.topRow {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+}
 
 .label {
   font-size: 12px;
@@ -102,4 +102,20 @@
   color: var(--color-muted);
   white-space: nowrap;
   line-height: 1;
+}
+
+.ownerName {
+  font-size: 10px;
+  font-weight: var(--weight-medium);
+  line-height: 1;
+}
+
+.ownerName[data-owner="Jake"] {
+  color: var(--color-owner-jake);
+}
+.ownerName[data-owner="Kelly"] {
+  color: var(--color-owner-kelly);
+}
+.ownerName[data-owner="Daycare"] {
+  color: var(--color-owner-daycare);
 }

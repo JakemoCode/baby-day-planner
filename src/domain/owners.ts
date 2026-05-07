@@ -26,8 +26,12 @@ export function applyTemplate(events: Event[], template: OwnershipTemplate): Eve
       return o ? { ...e, owner: o } : e;
     }
     if (e.type === "wake_window") {
+      // Wake Window N inherits its owner from Nap N — the parent watching
+      // during the wake window is the same parent putting baby down for
+      // the upcoming nap. Falls back to the legacy wakeWindowOwners array
+      // only if napOwners is empty for this index (back-compat).
       const i = wwIndex(e.eventKey);
-      const o = i >= 0 ? template.wakeWindowOwners[i] : undefined;
+      const o = i >= 0 ? (template.napOwners[i] ?? template.wakeWindowOwners[i]) : undefined;
       return o ? { ...e, owner: o } : e;
     }
     if (e.type === "putdown") {
