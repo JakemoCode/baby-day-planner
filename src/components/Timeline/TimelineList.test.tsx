@@ -134,4 +134,54 @@ describe("TimelineList", () => {
     // Equal time deltas → equal pixel deltas (no stacking) confirms no offset crept in.
     expect(top2 - top1).toBe(top3 - top2);
   });
+
+  it("pushes a later event past a same-time stack instead of into it", () => {
+    // Mirrors the screenshot Jake shared: a stacked cluster at 1:00 PM
+    // (Bottle + Pump) followed by an event at 1:20 PM. The 1:20 event must
+    // render BELOW the bottom of the stacked cluster, not at its naive
+    // time-anchored position which would land inside it.
+    const pump: Event = {
+      id: "p1",
+      dayId: "d1",
+      eventKey: "pump_13",
+      type: "pump",
+      label: "Pump",
+      startTime: "13:00",
+      source: "projected",
+      status: "projected",
+    };
+    renderWithAuth(<TimelineList events={[bottle(3, "13:00"), pump, nap(3, "13:20", "14:05")]} />);
+    const tops = screen
+      .getAllByTestId(/point-marker|duration-block/)
+      .map((el) => ({
+        type: el.getAttribute("data-event-type"),
+        top: parseFloat((el as HTMLElement).style.top),
+      }))
+      .sort((a, b) => a.top - b.top);
+    // Strictly increasing — frontier guarantees no two events share the same y
+    // even when the third event's natural time-anchor would put it inside
+    // the rendered area of the prior cluster.
+    expect(tops[1]!.top).toBeGreaterThan(tops[0]!.top);
+    expect(tops[2]!.top).toBeGreaterThan(tops[1]!.top);
+  });
+
+  it("scrolls to the in-progress event when scrollToNowOnMount is true", () => {
+    const scrollSpy = vi.spyOn(window, "scrollTo").mockImplementation(() => {});
+    renderWithAuth(
+      <TimelineList
+        events={[bottle(1, "07:00"), nap(1, "09:00", "10:00")]}
+        nowMinutes={9 * 60 + 30}
+        scrollToNowOnMount
+      />,
+    );
+    expect(scrollSpy).toHaveBeenCalledTimes(1);
+    scrollSpy.mockRestore();
+  });
+
+  it("does not scroll when scrollToNowOnMount is false", () => {
+    const scrollSpy = vi.spyOn(window, "scrollTo").mockImplementation(() => {});
+    renderWithAuth(<TimelineList events={[bottle(1, "07:00")]} nowMinutes={8 * 60} />);
+    expect(scrollSpy).not.toHaveBeenCalled();
+    scrollSpy.mockRestore();
+  });
 });
