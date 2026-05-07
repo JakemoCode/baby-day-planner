@@ -54,14 +54,14 @@
 }
 
 .block[data-type="putdown"][data-color-mode="type"] {
-  /* Diagonal stripes between two warm tones — reads as "transition" without
-   * stomping on the underlying wake window's text. */
+  /* Two adjacent warm cream tones for low-contrast diagonal stripes that
+   * read as a "transition" without competing with the label text on top. */
   background: repeating-linear-gradient(
     45deg,
-    var(--color-surface-raised) 0,
+    var(--color-bg) 0,
+    var(--color-bg) 5px,
     var(--color-surface-raised) 5px,
-    var(--color-accent-soft) 5px,
-    var(--color-accent-soft) 10px
+    var(--color-surface-raised) 10px
   );
   border-color: var(--color-border-strong);
 }

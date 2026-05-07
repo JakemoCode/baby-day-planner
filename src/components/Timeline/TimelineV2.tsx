@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef } from "react";
 import type { Event } from "@/domain";
-import { formatTimeForDisplay, parseTime, TIMELINE_DEFAULTS } from "@/domain";
+import { parseTime, TIMELINE_DEFAULTS } from "@/domain";
 import { Block } from "./Block";
 import { InstantCluster } from "./InstantCluster";
 import { NowBar } from "./NowBar";
@@ -25,9 +25,11 @@ export type TimelineV2Props = {
   colorMode?: "type" | "owner";
 };
 
-// Layout constants (TIMELINE_V2_PLAN.md §7).
-const AXIS_W = 50;
-const GUTTER_W = 110;
+// Layout constants. Axis tightened to fit the short "10p" / "1:05p" form;
+// gutter widened so chips like "Bottle 1 1:05p" fit on one row without
+// overflowing the right edge.
+const AXIS_W = 36;
+const GUTTER_W = 124;
 const BLOCK_LEFT_INSET = AXIS_W + 4;
 const BLOCK_RIGHT_INSET = GUTTER_W;
 const PUTDOWN_RIGHT_EXTRA = 30; // putdown stops short of the right edge
@@ -38,10 +40,12 @@ const DEFAULT_VIEWPORT = { start: 7 * 60, end: 21 * 60 };
 const SCROLL_TOP_PADDING_PX = 80;
 
 function formatHourLabel(hour24: number): string {
+  // Compact "10A" / "1P" form to match the design spec; full "AM/PM" doesn't
+  // fit comfortably in the tightened 36px axis lane.
   const h = ((hour24 % 24) + 24) % 24;
-  const period = h < 12 ? "AM" : "PM";
+  const period = h < 12 ? "A" : "P";
   const display = h % 12 === 0 ? 12 : h % 12;
-  return `${display} ${period}`;
+  return `${display}${period}`;
 }
 
 /**
@@ -222,5 +226,3 @@ function zOrder(e: Event): number {
   if (e.type === "extra") return 3;
   return 1;
 }
-
-export { formatTimeForDisplay };

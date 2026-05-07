@@ -44,3 +44,19 @@ export function formatTimeForDisplay(time: string): string {
   const h12 = h24 % 12 === 0 ? 12 : h24 % 12;
   return `${h12}:${String(m).padStart(2, "0")} ${period}`;
 }
+
+/**
+ * Compact form for tight spaces (timeline axis, instant chips, now pill):
+ *   "10:00" → "10a"
+ *   "13:05" → "1:05p"
+ *   "00:00" → "12a"
+ * Drops the colon-zero on whole hours so axis ticks read calmer.
+ */
+export function formatTimeShort(time: string): string {
+  const totalMinutes = parseTime(time) % (24 * 60);
+  const h24 = Math.floor(totalMinutes / 60);
+  const m = totalMinutes % 60;
+  const period = h24 >= 12 ? "p" : "a";
+  const h12 = h24 % 12 === 0 ? 12 : h24 % 12;
+  return m === 0 ? `${h12}${period}` : `${h12}:${String(m).padStart(2, "0")}${period}`;
+}

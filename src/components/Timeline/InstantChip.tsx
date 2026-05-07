@@ -1,7 +1,7 @@
 "use client";
 
 import type { Event } from "@/domain";
-import { formatTimeForDisplay } from "@/domain";
+import { formatTimeShort } from "@/domain";
 import styles from "./InstantChip.module.css";
 
 export type InstantChipProps = {
@@ -11,22 +11,20 @@ export type InstantChipProps = {
 };
 
 /**
- * Routine event types collapse to their type name in chip form (the time +
- * dot color carry the rest of the signal). User-defined `extra` events use
- * the supplied label so things like "Pediatrician" or "Friend visit" stay
- * informative. event.label is the fallback for anything not covered here.
+ * Chip label rules:
+ *   - bottle / nap-numbered types keep their event.label ("Bottle 1") so
+ *     the per-event ordinal stays visible — Jake explicitly wants this.
+ *   - dream_feed visually collapses to "Pump" (§3 mapping).
+ *   - other routine types (pump / bedtime / wake) collapse to a short form.
+ *   - user-defined `extra` events use event.label.
  */
-const TYPE_NAMES: Partial<Record<Event["type"], string>> = {
-  bottle: "Bottle",
-  pump: "Pump",
-  dream_feed: "Pump", // visually identical per §3
-  bedtime: "Bed",
-  wake: "Wake",
-};
-
 function chipText(event: Event): string {
-  if (event.type === "extra") return event.label;
-  return TYPE_NAMES[event.type] ?? event.label;
+  if (event.type === "dream_feed") return "Pump";
+  if (event.type === "bedtime") return "Bed";
+  if (event.type === "wake") return "Wake";
+  if (event.type === "pump") return event.label.startsWith("Pump") ? event.label : "Pump";
+  // bottle / extra / fallback: keep the label as-is
+  return event.label;
 }
 
 /**
@@ -37,7 +35,7 @@ function chipText(event: Event): string {
 export function InstantChip({ event, colorMode, onClick }: InstantChipProps) {
   const interactive = !!onClick;
   const Tag = interactive ? "button" : "span";
-  const time = formatTimeForDisplay(event.startTime);
+  const time = formatTimeShort(event.startTime);
   const label = chipText(event);
   const a11y = `${event.label} at ${time}${event.owner ? ` ${event.owner}` : ""}`;
 

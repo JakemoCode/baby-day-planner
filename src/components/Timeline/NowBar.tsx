@@ -1,6 +1,6 @@
 "use client";
 
-import { formatTimeForDisplay } from "@/domain";
+import { formatTimeShort } from "@/domain";
 import styles from "./NowBar.module.css";
 
 export type NowBarProps = {
@@ -17,7 +17,7 @@ export type NowBarProps = {
 function formatNow(nowMinutes: number): string {
   const h = Math.floor(nowMinutes / 60);
   const m = nowMinutes % 60;
-  return formatTimeForDisplay(`${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`);
+  return formatTimeShort(`${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`);
 }
 
 /**
@@ -39,7 +39,7 @@ export function NowBar({ topPx, axisWidthPx, rightPx = 0, nowMinutes }: NowBarPr
         className={styles.pill}
         style={{
           left: 0,
-          width: `${axisWidthPx - 2}px`,
+          width: `${axisWidthPx}px`,
           top: `${topPx - 9}px`,
         }}
       >

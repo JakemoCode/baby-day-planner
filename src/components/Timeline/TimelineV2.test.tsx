@@ -104,7 +104,7 @@ describe("<TimelineV2 />", () => {
     render(<TimelineV2 events={[wake1, bottle]} onEventTap={onEventTap} />);
     await userEvent.click(screen.getByRole("button", { name: /Wake Window 1/ }));
     expect(onEventTap).toHaveBeenCalledWith(wake1);
-    await userEvent.click(screen.getByRole("button", { name: /Bottle 1 at 7:30 AM/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Bottle 1 at 7:30a/ }));
     expect(onEventTap).toHaveBeenCalledWith(bottle);
   });
 

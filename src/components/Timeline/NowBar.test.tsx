@@ -9,23 +9,22 @@ describe("<NowBar />", () => {
     expect(line).toHaveStyle({ left: "50px", right: "6px", top: "200px" });
   });
 
-  it("constrains the pill to the axis lane width", () => {
-    render(<NowBar topPx={200} axisWidthPx={50} nowMinutes={9 * 60 + 3} />);
+  it("uses the full axis lane width for the pill so the label fits", () => {
+    render(<NowBar topPx={200} axisWidthPx={36} nowMinutes={9 * 60 + 3} />);
     const pill = screen.getByTestId("now-pill");
-    // Width should be axisWidthPx - 2 = 48px so it stops short of the line.
-    expect(pill).toHaveStyle({ width: "48px", left: "0px" });
+    expect(pill).toHaveStyle({ width: "36px", left: "0px" });
   });
 
-  it("formats the time label", () => {
-    render(<NowBar topPx={0} axisWidthPx={50} nowMinutes={13 * 60 + 5} />);
-    expect(screen.getByTestId("now-pill")).toHaveTextContent(/1:05 PM/);
+  it("formats the time label in short form", () => {
+    render(<NowBar topPx={0} axisWidthPx={36} nowMinutes={13 * 60 + 5} />);
+    expect(screen.getByTestId("now-pill")).toHaveTextContent(/1:05p/);
   });
 
   it("does NOT extend the pill into the block lane (anti-requirement)", () => {
-    render(<NowBar topPx={0} axisWidthPx={50} nowMinutes={9 * 60} />);
+    render(<NowBar topPx={0} axisWidthPx={36} nowMinutes={9 * 60} />);
     const pill = screen.getByTestId("now-pill");
     const widthValue = (pill as HTMLElement).style.width;
     const leftValue = (pill as HTMLElement).style.left;
-    expect(parseInt(leftValue, 10) + parseInt(widthValue, 10)).toBeLessThanOrEqual(50);
+    expect(parseInt(leftValue, 10) + parseInt(widthValue, 10)).toBeLessThanOrEqual(36);
   });
 });

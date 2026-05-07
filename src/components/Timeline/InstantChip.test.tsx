@@ -30,10 +30,12 @@ const pump: Event = makeEvent({
 });
 
 describe("<InstantChip />", () => {
-  it("renders the type-derived label and the time", () => {
+  it("renders the per-event label (numbered for bottles) and the short time", () => {
     render(<InstantChip event={bottle} colorMode="type" />);
-    expect(screen.getByText("Bottle")).toBeVisible();
-    expect(screen.getByText(/7:00 AM/)).toBeVisible();
+    // Jake wants "Bottle 1" preserved on chips (per-event ordinal).
+    expect(screen.getByText("Bottle 1")).toBeVisible();
+    // Short time form per design ("7a" / "10:30a" / "1:05p").
+    expect(screen.getByText("7a")).toBeVisible();
   });
 
   it("collapses dream_feed to the same visible label as pump", () => {
@@ -58,7 +60,7 @@ describe("<InstantChip />", () => {
   it("calls onClick when tapped", async () => {
     const onClick = vi.fn();
     render(<InstantChip event={bottle} colorMode="type" onClick={onClick} />);
-    await userEvent.click(screen.getByRole("button", { name: /Bottle 1 at 7:00 AM/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Bottle 1 at 7a/ }));
     expect(onClick).toHaveBeenCalled();
   });
 });
@@ -110,7 +112,7 @@ describe("<InstantCluster />", () => {
         onEventTap={onEventTap}
       />,
     );
-    await userEvent.click(screen.getByRole("button", { name: /Pump at 7:00 AM/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Pump at 7a/ }));
     expect(onEventTap).toHaveBeenCalledWith(pump);
   });
 });

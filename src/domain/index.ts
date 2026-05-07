@@ -3,6 +3,7 @@ export {
   parseTime,
   formatTime,
   formatTimeForDisplay,
+  formatTimeShort,
   addMinutes,
   diffMinutes,
   clampTime,
