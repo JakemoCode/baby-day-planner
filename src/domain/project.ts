@@ -21,6 +21,10 @@ export function projectDay(input: ProjectInput): Event[] {
   // 2. Apply nap actuals + short-nap adjustment
   events = applyNapActuals(events, actuals, settings);
 
+  // 2b. Merge user-edited wake_window overrides BEFORE bedtime so a manual
+  //     wake_window with an endTime past bedtime gets clipped correctly.
+  events = applyWakeWindowOverrides(events, actuals);
+
   // 3. Substitute bedtime for late naps (or honor a user override from actuals)
   events = applyBedtime(events, settings, actuals);
 
@@ -43,11 +47,7 @@ export function projectDay(input: ProjectInput): Event[] {
   // 9. Pumps + extras
   events = mergePumpsAndExtras(events, actuals, settings, day);
 
-  // 10. Merge any user-edited wake_window overrides by eventKey so manual
-  //     owner / time tweaks survive into the final projection.
-  events = applyWakeWindowOverrides(events, actuals);
-
-  // 11. Apply ownership template (last, so it sees putdown + final nap shape).
+  // 10. Apply ownership template (last, so it sees putdown + final nap shape).
   //     applyTemplate skips events whose owner is already set, so manual
   //     overrides win over template defaults.
   if (template) events = applyTemplate(events, template);

@@ -68,6 +68,25 @@ describe("applyBedtime", () => {
     expect(result.find((e) => e.type === "wake_window" && e.startTime >= "18:30")).toBeUndefined();
   });
 
+  it("clips a wake_window that crosses a manual bedtime override", () => {
+    const proj = projectNapChain(sampleDay, sampleSettings);
+    // Manual bedtime at 18:30 — WW4 (16:30 → 19:00) crosses it and must be
+    // clipped at 18:30 so it doesn't render past Bedtime on the timeline.
+    const manualBedtime = {
+      id: "manual-bedtime-1",
+      dayId: sampleDay.id,
+      eventKey: "bedtime",
+      type: "bedtime" as const,
+      label: "Bedtime",
+      startTime: "18:30",
+      source: "manual" as const,
+      status: "completed" as const,
+    };
+    const result = applyBedtime(proj, sampleSettings, [manualBedtime]);
+    const ww4 = result.find((e) => e.eventKey === "wake_window_4");
+    expect(ww4).toMatchObject({ startTime: "16:30", endTime: "18:30" });
+  });
+
   it("removes wake_window events that start at or after the bedtime nap's start time", () => {
     // Set threshold early enough that nap_3 becomes bedtime (nap_3 starts at 15:30)
     // nap_3 napToReplace.startTime = "15:30"; WW4 starts at cursor after nap_3 = 16:30

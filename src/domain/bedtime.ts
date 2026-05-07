@@ -10,11 +10,17 @@ export function applyBedtime(events: Event[], settings: Settings, actuals: Event
   );
   if (userBedtime) {
     const bedMins = parseTime(userBedtime.startTime);
-    const trimmed = events.filter((e) => {
-      if (e.type === "bedtime") return false; // drop any projected bedtime
-      if (e.type === "nap" && parseTime(e.startTime) >= bedMins) return false;
-      if (e.type === "wake_window" && parseTime(e.startTime) >= bedMins) return false;
-      return true;
+    const trimmed = events.flatMap((e): Event[] => {
+      if (e.type === "bedtime") return []; // drop any projected bedtime
+      if (e.type === "nap" && parseTime(e.startTime) >= bedMins) return [];
+      if (e.type === "wake_window") {
+        if (parseTime(e.startTime) >= bedMins) return [];
+        // Wake window crosses bedtime — clip its end so it doesn't render past it.
+        if (e.endTime && parseTime(e.endTime) > bedMins) {
+          return [{ ...e, endTime: userBedtime.startTime }];
+        }
+      }
+      return [e];
     });
     return [...trimmed, userBedtime].sort(
       (a, b) => parseTime(a.startTime) - parseTime(b.startTime),
