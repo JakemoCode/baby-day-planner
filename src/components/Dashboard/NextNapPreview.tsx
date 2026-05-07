@@ -1,9 +1,11 @@
 import type { Event } from "@/domain";
-import { formatTimeForDisplay } from "@/domain";
+import { diffMinutes, formatTimeForDisplay } from "@/domain";
 import styles from "./PreviewCard.module.css";
 
 export type NextNapPreviewProps = {
   nap: Event | undefined;
+  /** Most recent logged nap, shown as subtext when present. */
+  lastNap?: Event;
 };
 
 /**
@@ -22,12 +24,25 @@ function formatNapRange(start: string, end: string | undefined): string {
   return `${startStr} – ${endStr}`;
 }
 
-export function NextNapPreview({ nap }: NextNapPreviewProps) {
+function formatDuration(minutes: number): string {
+  if (minutes < 60) return `${minutes}m`;
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  return m === 0 ? `${h}h` : `${h}h ${m}m`;
+}
+
+function formatLast(n: Event): string {
+  if (!n.endTime) return `Last: started ${formatTimeForDisplay(n.startTime)} · in progress`;
+  return `Last: ${formatNapRange(n.startTime, n.endTime)} · ${formatDuration(diffMinutes(n.endTime, n.startTime))}`;
+}
+
+export function NextNapPreview({ nap, lastNap }: NextNapPreviewProps) {
   if (!nap) {
     return (
       <article className={styles.card} aria-label="Next nap">
         <p className={styles.heading}>Next nap</p>
         <p className={styles.empty}>No more naps today</p>
+        {lastNap && <p className={styles.meta}>{formatLast(lastNap)}</p>}
       </article>
     );
   }
@@ -40,6 +55,7 @@ export function NextNapPreview({ nap }: NextNapPreviewProps) {
       <p className={styles.heading}>Next nap</p>
       <p className={styles.primary}>{range}</p>
       <p className={styles.subtitle}>{subtitle}</p>
+      {lastNap && <p className={styles.meta}>{formatLast(lastNap)}</p>}
     </article>
   );
 }

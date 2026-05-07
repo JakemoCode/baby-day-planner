@@ -53,4 +53,32 @@ describe("NextBottlePreview", () => {
     renderWithAuth(<NextBottlePreview bottle={bottle({ amountOz: 5.5 })} />);
     expect(screen.getByText(/5.5 oz Bottle 2/)).toBeVisible();
   });
+
+  it("shows last-bottle subtext when lastBottle is provided", () => {
+    const last = bottle({
+      id: "b1",
+      eventKey: "bottle_1",
+      label: "Bottle 1",
+      startTime: "13:45",
+      amountOz: 5,
+      source: "actual",
+      status: "actual",
+    });
+    renderWithAuth(<NextBottlePreview bottle={bottle()} lastBottle={last} />);
+    expect(screen.getByText("Last: 1:45 PM · 5 oz")).toBeVisible();
+  });
+
+  it("shows last-bottle subtext even with empty next state", () => {
+    const last = bottle({
+      id: "b1",
+      eventKey: "bottle_1",
+      startTime: "18:30",
+      amountOz: 5.5,
+      source: "actual",
+      status: "actual",
+    });
+    renderWithAuth(<NextBottlePreview bottle={undefined} lastBottle={last} />);
+    expect(screen.getByText(/no more bottles today/i)).toBeVisible();
+    expect(screen.getByText("Last: 6:30 PM · 5.5 oz")).toBeVisible();
+  });
 });
