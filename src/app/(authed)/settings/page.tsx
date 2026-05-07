@@ -13,6 +13,7 @@ import { WakeWindowsEditor } from "@/components/Settings/WakeWindowsEditor";
 import { PumpTimesEditor } from "@/components/Settings/PumpTimesEditor";
 import { BottleRulesEditor } from "@/components/Settings/BottleRulesEditor";
 import { TimelineDisplayEditor } from "@/components/Settings/TimelineDisplayEditor";
+import { CookDinnerEditor } from "@/components/Settings/CookDinnerEditor";
 import { SettingsAccount } from "@/components/Settings/SettingsAccount";
 import styles from "./page.module.css";
 
@@ -73,6 +74,11 @@ export default function SettingsPage() {
       <PumpTimesEditor
         value={value.pumpTimes}
         onChange={(next) => persist({ ...value, pumpTimes: next })}
+      />
+
+      <CookDinnerEditor
+        value={value.cookDinner ?? { enabled: false, time: "17:00" }}
+        onChange={(next) => persist({ ...value, cookDinner: next })}
       />
 
       <TimelineDisplayEditor

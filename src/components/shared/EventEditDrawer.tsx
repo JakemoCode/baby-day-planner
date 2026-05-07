@@ -2,7 +2,7 @@
 
 import { useEffect, useId, useState } from "react";
 import type { Event, EventType, Owner } from "@/domain";
-import { formatTimeForDisplay, parseTime } from "@/domain";
+import { formatTime, formatTimeForDisplay, parseTime } from "@/domain";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { OwnerPicker } from "./OwnerPicker";
 import styles from "./EventEditDrawer.module.css";
@@ -27,26 +27,26 @@ export type EventEditDrawerProps = {
 };
 
 /**
- * Validate the form and return a user-facing error string, or null if OK.
- * Two checks:
- *   1. endTime must be strictly after startTime (zero-length and inverted
- *      ranges aren't useful; the dashboard 5-min guard handles the
- *      end-too-soon scenario before it gets here).
- *   2. For naps, the new range must not overlap any other nap on the day.
+ * Field-level validation errors. Returned as a partial map of field →
+ * message so the drawer can render the message inline as helper text on
+ * the offending input rather than at the bottom of the form.
  */
+type FormErrors = { startTime?: string; endTime?: string };
+
 function validateForm(
   type: EventType,
   startTime: string,
   endTime: string,
   editingId: string | undefined,
   existingEvents: Event[] | undefined,
-): string | null {
+): FormErrors {
+  const errors: FormErrors = {};
   if (endTime && startTime) {
     if (parseTime(endTime) <= parseTime(startTime)) {
-      return "End time must be after start time.";
+      errors.endTime = "Must be after start time.";
     }
   }
-  if (type === "nap" && endTime && existingEvents) {
+  if (!errors.endTime && type === "nap" && endTime && existingEvents) {
     const start = parseTime(startTime);
     const end = parseTime(endTime);
     // Only flag overlap against RECORDED naps. Projected and unrecorded
@@ -63,11 +63,13 @@ function validateForm(
     if (overlap) {
       const startStr = formatTimeForDisplay(overlap.startTime);
       const endStr = overlap.endTime ? formatTimeForDisplay(overlap.endTime) : "";
-      return `This overlaps ${overlap.label} (${startStr} – ${endStr}).`;
+      errors.endTime = `Overlaps ${overlap.label} (${startStr} – ${endStr}).`;
     }
   }
-  return null;
+  return errors;
 }
+
+const hasErrors = (e: FormErrors) => !!(e.startTime || e.endTime);
 
 type FormState = {
   startTime: string;
@@ -194,13 +196,27 @@ export function EventEditDrawer({
   const showStartTime = type !== "wake_window";
   const showEndTime = type === "nap" || type === "extra";
 
-  const validationError = validateForm(
-    type,
-    form.startTime,
-    form.endTime,
-    sourceEvent?.id,
-    existingEvents,
-  );
+  const errors = validateForm(type, form.startTime, form.endTime, sourceEvent?.id, existingEvents);
+
+  // When the user changes startTime on a duration block, slide endTime
+  // forward to preserve the existing duration (or default to 60 min if
+  // we don't have an existing duration to learn from). Saves the user
+  // from re-entering the end time every time they tweak the start.
+  const NAP_DEFAULT_MINUTES = 60;
+  const handleStartTimeChange = (nextStart: string) => {
+    if (!showEndTime || !nextStart) {
+      set("startTime", nextStart);
+      return;
+    }
+    const startMin = parseTime(nextStart);
+    let durMin = NAP_DEFAULT_MINUTES;
+    if (form.startTime && form.endTime) {
+      const prevDur = parseTime(form.endTime) - parseTime(form.startTime);
+      if (prevDur > 0) durMin = prevDur;
+    }
+    const nextEnd = formatTime(startMin + durMin);
+    setForm((prev) => ({ ...prev, startTime: nextStart, endTime: nextEnd }));
+  };
   const showAmount = type === "bottle" || type === "dream_feed";
   const showOwner =
     type === "nap" ||
@@ -251,9 +267,15 @@ export function EventEditDrawer({
               type="time"
               className={styles.input}
               value={form.startTime}
-              onChange={(e) => set("startTime", e.target.value)}
+              onChange={(e) => handleStartTimeChange(e.target.value)}
               required
+              {...(errors.startTime ? { "aria-invalid": true } : {})}
             />
+            {errors.startTime && (
+              <span className={styles.fieldError} role="alert">
+                {errors.startTime}
+              </span>
+            )}
           </label>
         )}
 
@@ -265,7 +287,13 @@ export function EventEditDrawer({
               className={styles.input}
               value={form.endTime}
               onChange={(e) => set("endTime", e.target.value)}
+              {...(errors.endTime ? { "aria-invalid": true } : {})}
             />
+            {errors.endTime && (
+              <span className={styles.fieldError} role="alert">
+                {errors.endTime}
+              </span>
+            )}
           </label>
         )}
 
@@ -299,9 +327,9 @@ export function EventEditDrawer({
           <button
             type="button"
             className={styles.save}
-            disabled={validationError !== null}
+            disabled={hasErrors(errors)}
             onClick={() => {
-              if (validationError !== null) return;
+              if (hasErrors(errors)) return;
               const next = formToEvent(form, sourceEvent, type);
               void onSave(next);
             }}
@@ -309,12 +337,6 @@ export function EventEditDrawer({
             Save
           </button>
         </div>
-
-        {validationError !== null && (
-          <p className={styles.error} role="alert">
-            {validationError}
-          </p>
-        )}
       </div>
 
       <ConfirmDialog

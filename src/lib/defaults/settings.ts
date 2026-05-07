@@ -36,5 +36,6 @@ export function defaultSettings(childId: string): Settings {
     },
     pumpTimes: ["10:30", "14:30"],
     minBottleIntervalMinutes: 20,
+    cookDinner: { enabled: false, time: "17:00" },
   };
 }

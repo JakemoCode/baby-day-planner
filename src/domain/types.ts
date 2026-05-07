@@ -146,6 +146,12 @@ export type Settings = {
   timelineColorMode?: "type" | "owner"; // default "type"
   timelinePxPerHour?: number; // default 120, valid range 70-220
   timelineDimPast?: boolean; // default true
+  /**
+   * Recurring "Cook Dinner" reminder. When enabled, the engine emits a
+   * projected extra event each day at the configured time. Optional so
+   * legacy Settings docs stay valid (treated as disabled when absent).
+   */
+  cookDinner?: { enabled: boolean; time: string };
 };
 
 /** Defaults for the optional Timeline v2 display fields. */

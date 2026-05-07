@@ -14,12 +14,27 @@ export function projectBottleChain(actuals: Event[], settings: Settings, day: Da
 
   const out: Event[] = [...bottleActuals];
 
+  // Anchor:
+  //   - cursor time/amount comes from the LATEST-by-time actual (where the
+  //     next interval cascades from).
+  //   - eventKey index comes from the MAX existing key index across all
+  //     bottle actuals (so we never generate a duplicate `bottle_N` if a
+  //     stray manual override carries a higher index than the latest-by-
+  //     time bottle — exactly the bug Jake hit: a bottle_4 manual at noon
+  //     plus a bottle_3 actual in the afternoon caused two bottle_4 docs).
   const anchor = bottleActuals[bottleActuals.length - 1]!;
-  const anchorIdx = parseInt(anchor.eventKey.replace("bottle_", ""), 10);
   let cursorTime = anchor.startTime;
   let cursorAmount = anchor.amountOz;
 
-  let n = anchorIdx + 1;
+  let maxKeyIdx = 0;
+  for (const a of bottleActuals) {
+    const m = /bottle_(\d+)/.exec(a.eventKey);
+    if (m && m[1]) {
+      const idx = parseInt(m[1], 10);
+      if (Number.isFinite(idx) && idx > maxKeyIdx) maxKeyIdx = idx;
+    }
+  }
+  let n = maxKeyIdx + 1;
   while (true) {
     const interval = intervalForAmount(
       settings.bottleRules,
