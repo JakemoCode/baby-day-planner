@@ -91,17 +91,13 @@ function eventToForm(event: Event | null): FormState {
 }
 
 function formToEvent(form: FormState, source: Event, type: EventType): Event {
-  // When editing a previously-projected event, decide whether the edit is a
-  // *recording* (user changed times → mark as completed) or just an
-  // *annotation* (owner/label only → keep as overridden so the dashboard
-  // counter doesn't treat it as a real recording). Naps without an
-  // explicit endTime change are also treated as annotations by default —
-  // dashboard "Start Nap" / "End Nap" remain the canonical recording path.
-  const startTimeChanged = source.startTime !== form.startTime;
-  const endTimeChanged = (source.endTime ?? "") !== form.endTime;
-  const isRecording = startTimeChanged || endTimeChanged;
-  const nextStatus =
-    source.status === "projected" ? (isRecording ? "completed" : "overridden") : source.status;
+  // Saving the drawer for a previously-projected event always counts as a
+  // recording — opening the drawer + tapping Save = "I'm committing this
+  // event as actually happening (or planned to happen at this time)."
+  // Owner-only edits without time changes belong on /day-templates
+  // (which updates the template, not events). status -> "completed" so
+  // the dashboard ordinal counter recognizes the recording.
+  const nextStatus = source.status === "projected" ? "completed" : source.status;
 
   const next: Event = {
     ...source,
