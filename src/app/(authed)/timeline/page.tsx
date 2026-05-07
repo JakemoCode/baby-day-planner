@@ -126,6 +126,7 @@ export default function TimelinePage() {
               ? drawer.template.id
               : "closed"
         }
+        existingEvents={projected}
         open={drawer.open}
         event={drawer.open ? (drawer.mode === "edit" ? drawer.event : drawer.template) : null}
         mode={drawer.open && drawer.mode === "edit" ? "edit" : "create"}

@@ -2,6 +2,7 @@
 
 import { useEffect, useId, useState } from "react";
 import type { Event, EventType, Owner } from "@/domain";
+import { parseTime } from "@/domain";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { OwnerPicker } from "./OwnerPicker";
 import styles from "./EventEditDrawer.module.css";
@@ -16,7 +17,53 @@ export type EventEditDrawerProps = {
   onSave: (event: Event) => void | Promise<void>;
   onCancel: () => void;
   onDelete?: (event: Event) => void | Promise<void>;
+  /**
+   * Other events in the day, used to validate against time-overlap conflicts
+   * (e.g. a new Nap 2 inserted inside an existing Nap 3). Excludes the
+   * event being edited via id match. Optional — when omitted, only the
+   * basic end>start check runs.
+   */
+  existingEvents?: Event[];
 };
+
+/**
+ * Validate the form and return a user-facing error string, or null if OK.
+ * Two checks:
+ *   1. endTime must be strictly after startTime (zero-length and inverted
+ *      ranges aren't useful; the dashboard 5-min guard handles the
+ *      end-too-soon scenario before it gets here).
+ *   2. For naps, the new range must not overlap any other nap on the day.
+ */
+function validateForm(
+  type: EventType,
+  startTime: string,
+  endTime: string,
+  editingId: string | undefined,
+  existingEvents: Event[] | undefined,
+): string | null {
+  if (endTime && startTime) {
+    if (parseTime(endTime) <= parseTime(startTime)) {
+      return "End time must be after start time.";
+    }
+  }
+  if (type === "nap" && endTime && existingEvents) {
+    const start = parseTime(startTime);
+    const end = parseTime(endTime);
+    const overlap = existingEvents.find((e) => {
+      if (e.id === editingId) return false;
+      if (e.type !== "nap") return false;
+      if (!e.endTime) return false;
+      const a = parseTime(e.startTime);
+      const b = parseTime(e.endTime);
+      // overlap iff a < end && start < b
+      return a < end && start < b;
+    });
+    if (overlap) {
+      return `This overlaps "${overlap.label}" (${overlap.startTime}–${overlap.endTime}).`;
+    }
+  }
+  return null;
+}
 
 type FormState = {
   startTime: string;
@@ -92,6 +139,7 @@ export function EventEditDrawer({
   onSave,
   onCancel,
   onDelete,
+  existingEvents,
 }: EventEditDrawerProps) {
   const sourceEvent = event;
   const [form, setForm] = useState<FormState>(() => eventToForm(sourceEvent));
@@ -128,6 +176,14 @@ export function EventEditDrawer({
 
   const showStartTime = type !== "wake_window";
   const showEndTime = type === "nap" || type === "extra";
+
+  const validationError = validateForm(
+    type,
+    form.startTime,
+    form.endTime,
+    sourceEvent?.id,
+    existingEvents,
+  );
   const showAmount = type === "bottle" || type === "dream_feed";
   const showOwner =
     type === "nap" || type === "wake_window" || type === "bottle" || type === "extra";
@@ -221,7 +277,9 @@ export function EventEditDrawer({
           <button
             type="button"
             className={styles.save}
+            disabled={validationError !== null}
             onClick={() => {
+              if (validationError !== null) return;
               const next = formToEvent(form, sourceEvent, type);
               void onSave(next);
             }}
@@ -229,6 +287,12 @@ export function EventEditDrawer({
             Save
           </button>
         </div>
+
+        {validationError !== null && (
+          <p className={styles.error} role="alert">
+            {validationError}
+          </p>
+        )}
       </div>
 
       <ConfirmDialog

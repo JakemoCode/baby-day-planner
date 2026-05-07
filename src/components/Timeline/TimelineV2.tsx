@@ -224,10 +224,13 @@ export function TimelineV2({
 
 /**
  * Z-order via render order (later siblings paint over earlier).
- * Wake/nap < putdown < custom. (Handoff §Z-Order.)
+ * Wake < nap < putdown < custom. Naps win against wake_windows so a
+ * tiny / 0-minute nap (clamped to a 24px min-height for tappability)
+ * still shows above an adjacent wake_window starting at the same y.
  */
 function zOrder(e: Event): number {
-  if (e.type === "putdown") return 2;
-  if (e.type === "extra") return 3;
-  return 1;
+  if (e.type === "extra") return 4;
+  if (e.type === "putdown") return 3;
+  if (e.type === "nap") return 2;
+  return 1; // wake_window and everything else
 }

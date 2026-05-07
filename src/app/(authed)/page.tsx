@@ -118,13 +118,15 @@ export default function DashboardPage() {
   const cww = currentWakeWindow(projected, nowMinutes);
   const inProgressNap = actuals.find((e) => e.type === "nap" && !e.endTime);
   const bottle1Pending = !actuals.some((e) => e.type === "bottle");
-  // "Next" ordinals must reflect what's been *recorded* (Daycare pressed
-  // Start) — not what's been *edited* (owner change on /timeline). Manual
-  // edits inflate countByType because they live as manual-source docs in
-  // Firestore. Filter to source: "actual" so the ordinals match reality.
-  const nextBottleNumber =
-    actuals.filter((e) => e.type === "bottle" && e.source === "actual").length + 1;
-  const nextNapNumber = actuals.filter((e) => e.type === "nap" && e.source === "actual").length + 1;
+  // "Next" ordinals reflect what's been *recorded* — not what's been
+  // *edited* (owner change via /timeline). The drawer serialises edits
+  // with status: "overridden"; explicit recordings (Start/End Nap, Start
+  // Bottle Now, FAB-create) carry "actual" or "completed". Filtering by
+  // status is more robust than source — End Nap creates a doc with
+  // source="actual" but End-recordings via FAB carry source="manual".
+  const isRecorded = (e: Event) => e.status === "actual" || e.status === "completed";
+  const nextBottleNumber = actuals.filter((e) => e.type === "bottle" && isRecorded(e)).length + 1;
+  const nextNapNumber = actuals.filter((e) => e.type === "nap" && isRecorded(e)).length + 1;
   const lastBottleTime = lastTimeForType(actuals, "bottle");
   const lastBottle = lastEventOfType(actuals, "bottle");
   const lastNap = lastEventOfType(actuals, "nap");
@@ -240,6 +242,7 @@ export default function DashboardPage() {
               ? drawer.template.id
               : "closed"
         }
+        existingEvents={projected}
         open={drawer.open}
         event={drawer.open ? (drawer.mode === "edit" ? drawer.event : drawer.template) : null}
         mode={drawer.open && drawer.mode === "edit" ? "edit" : "create"}

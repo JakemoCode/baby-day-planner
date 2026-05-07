@@ -1,8 +1,10 @@
 "use client";
 
 import type { Event } from "@/domain";
-import { formatTime, makeEvent } from "@/domain";
+import { formatTime, makeEvent, parseTime } from "@/domain";
 import styles from "./ActionButton.module.css";
+
+const SHORT_NAP_CONFIRM_MINUTES = 5;
 
 export type NapActionButtonProps = {
   inProgressNap: Event | undefined;
@@ -27,6 +29,20 @@ export function NapActionButton({
   const handleClick = () => {
     const time = formatTime(currentLocalMinutes());
     if (inProgressNap) {
+      // Guard: if the user is ending a nap less than 5 minutes after
+      // starting it, that's almost certainly an accidental double-tap.
+      // Confirm before recording — a 0-min nap is invisible on the
+      // timeline (well, clamped to 24px now, but the data is still wrong)
+      // and the user would have to manually edit the duration to fix.
+      const startMin = parseTime(inProgressNap.startTime);
+      const endMin = currentLocalMinutes();
+      const elapsed = endMin - startMin;
+      if (elapsed >= 0 && elapsed < SHORT_NAP_CONFIRM_MINUTES) {
+        const ok = window.confirm(
+          `That's only ${elapsed} minute${elapsed === 1 ? "" : "s"} since you started this nap. End it anyway?`,
+        );
+        if (!ok) return;
+      }
       void onEnd(inProgressNap, time);
     } else {
       const nap: Event = makeEvent({
