@@ -251,15 +251,15 @@ describe("TimelineList", () => {
   });
 
   it("stacks consecutive free-standing markers so they don't overlap", () => {
-    // Two free-standing markers very close in time (Pump and Dream Feed both
-    // after bedtime). Must not render at the same y.
+    // Two free-standing markers very close in time but NOT both on the hour
+    // (the on-the-hour case is handled by the compound-row collapse instead).
     const pump: Event = {
       id: "p1",
       dayId: "d1",
       eventKey: "pump_21",
       type: "pump",
       label: "Pump",
-      startTime: "21:00",
+      startTime: "21:05",
       source: "projected",
       status: "projected",
     };
@@ -269,7 +269,7 @@ describe("TimelineList", () => {
       eventKey: "dream_feed",
       type: "dream_feed",
       label: "Dream Feed",
-      startTime: "21:00",
+      startTime: "21:05",
       source: "projected",
       status: "projected",
     };
@@ -320,6 +320,67 @@ describe("TimelineList", () => {
     renderWithAuth(<TimelineList events={[bottle(1, "12:30"), bottle(2, "14:30")]} />);
     expect(screen.getByText("1 PM")).toBeVisible();
     expect(screen.getByText("2 PM")).toBeVisible();
+  });
+
+  it("renders putdown events as duration blocks (engine emits endTime)", () => {
+    const putdown: Event = {
+      id: "pd1",
+      dayId: "d1",
+      eventKey: "nap_1_putdown",
+      type: "putdown",
+      label: "Start putting down for Nap 1",
+      startTime: "08:10",
+      endTime: "08:25",
+      source: "projected",
+      status: "projected",
+    };
+    renderWithAuth(<TimelineList events={[putdown]} />);
+    expect(screen.getByTestId("duration-block")).toBeVisible();
+    expect(screen.queryByTestId("point-marker")).toBeNull();
+  });
+
+  it("collapses 2-3 free-standing on-the-hour markers into a compound row", () => {
+    const pump: Event = {
+      id: "p1",
+      dayId: "d1",
+      eventKey: "pump_21",
+      type: "pump",
+      label: "Pump",
+      startTime: "21:00",
+      source: "projected",
+      status: "projected",
+    };
+    const dream: Event = {
+      id: "df1",
+      dayId: "d1",
+      eventKey: "dream_feed",
+      type: "dream_feed",
+      label: "Dream Feed",
+      startTime: "21:00",
+      source: "projected",
+      status: "projected",
+    };
+    renderWithAuth(<TimelineList events={[pump, dream]} />);
+    const row = screen.getByTestId("compound-hour-row");
+    expect(row).toBeVisible();
+    expect(row.textContent).toContain("Pump · Dream Feed");
+    expect(screen.queryByTestId("point-marker")).toBeNull();
+  });
+
+  it("falls back to individual markers when 4+ events share an hour", () => {
+    const make = (n: number): Event => ({
+      id: `e${n}`,
+      dayId: "d1",
+      eventKey: `pump_${n}`,
+      type: "pump",
+      label: `Pump ${n}`,
+      startTime: "21:00",
+      source: "projected",
+      status: "projected",
+    });
+    renderWithAuth(<TimelineList events={[make(1), make(2), make(3), make(4)]} />);
+    expect(screen.queryByTestId("compound-hour-row")).toBeNull();
+    expect(screen.getAllByTestId("point-marker")).toHaveLength(4);
   });
 
   it("scrolls to the in-progress event when scrollToNowOnMount is true", () => {

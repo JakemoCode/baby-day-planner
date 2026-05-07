@@ -23,6 +23,7 @@ export function addPutdownEvents(events: Event[], settings: Settings): Event[] {
       type: "putdown",
       label: `Start putting down for ${e.label}`,
       startTime: addMinutes(e.startTime, -lead),
+      endTime: e.startTime,
       ...(e.owner !== undefined ? { owner: e.owner } : {}),
       source: "projected",
       status: "projected",

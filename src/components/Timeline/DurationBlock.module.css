@@ -46,6 +46,28 @@
   border-color: var(--color-warning);
 }
 
+/*
+ * Putdown blocks span ≈ putdownLeadMinutes (typically 15min ≈ 30px) — too
+ * short for the standard label + range stack. Pack the single label into a
+ * one-row layout, drop the range, and use a softer tint so it reads as a
+ * "transition" between wake window and nap rather than its own card.
+ */
+.block[data-event-type="putdown"] {
+  background: var(--color-bg);
+  border-style: dashed;
+  border-color: var(--color-border-strong);
+  padding: 2px var(--space-3);
+  flex-direction: row;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.block[data-event-type="putdown"] .label {
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+  color: var(--color-fg-soft);
+}
+
 /* Owner tints for naps */
 .block[data-event-type="nap"][data-owner="Jake"] {
   background: var(--color-owner-jake-tint);

@@ -37,7 +37,8 @@ const DEFAULT_VIEWPORT = { start: 7 * 60, end: 21 * 60 };
 
 type BlockEvent = Event & { endTime: string };
 const isDurationEvent = (e: Event): e is BlockEvent =>
-  (e.type === "nap" || e.type === "wake_window" || e.type === "extra") && e.endTime !== undefined;
+  (e.type === "nap" || e.type === "wake_window" || e.type === "extra" || e.type === "putdown") &&
+  e.endTime !== undefined;
 
 type Position = { topPx: number; heightPx: number; embeddedIn?: string };
 
@@ -57,13 +58,14 @@ export function TimelineList({
   const rootRef = useRef<HTMLDivElement>(null);
   const hasScrolledRef = useRef(false);
 
-  const { sorted, originMinutes, heightPx, positionById } = useMemo(() => {
+  const { sorted, originMinutes, heightPx, positionById, compoundRows } = useMemo(() => {
     if (events.length === 0) {
       return {
         sorted: [] as Event[],
         originMinutes: 0,
         heightPx: 0,
         positionById: new Map<string, Position>(),
+        compoundRows: [] as { hour: number; events: Event[]; topPx: number }[],
       };
     }
 
@@ -91,12 +93,42 @@ export function TimelineList({
     // not separate rows on the timeline. Free-standing point markers render
     // normally at their time-anchored y.
     const blocks = sortedEvents.filter(isDurationEvent);
+
+    // Group free-standing markers that fall *exactly on the hour* — when
+    // there are 2 or 3 such siblings the hour tick already announces the
+    // time, so the page stays calm by collapsing them into a single row.
+    // 4+ at the same hour falls back to individual rendering (a small list
+    // of chips reads more like a real burst than a calm cluster).
+    const onHourFreeGroups = new Map<number, Event[]>();
+    for (const e of sortedEvents) {
+      if (isDurationEvent(e)) continue;
+      const startMin = parseTime(e.startTime);
+      if (startMin % 60 !== 0) continue;
+      const insideBlock = blocks.some((b) => {
+        const bs = parseTime(b.startTime);
+        const be = parseTime(b.endTime);
+        return bs <= startMin && startMin < be;
+      });
+      if (insideBlock) continue;
+      const hour = startMin / 60;
+      const list = onHourFreeGroups.get(hour) ?? [];
+      list.push(e);
+      onHourFreeGroups.set(hour, list);
+    }
+    const groupedIds = new Set<string>();
+    for (const [, evts] of onHourFreeGroups) {
+      if (evts.length >= 2 && evts.length <= 3) {
+        evts.forEach((e) => groupedIds.add(e.id));
+      }
+    }
+
     const positions = new Map<string, Position>();
     const chipCountByBlock = new Map<string, number>();
     const chipFrontierByBlock = new Map<string, number>();
     let lastFreeMarkerBottom = -Infinity;
 
     for (const e of sortedEvents) {
+      if (groupedIds.has(e.id)) continue; // rendered as part of a compound row
       const startMin = parseTime(e.startTime);
       const naturalTop = (startMin - origin) * PX_PER_MIN;
 
@@ -155,10 +187,24 @@ export function TimelineList({
       }
     }
 
+    const compoundRows: { hour: number; events: Event[]; topPx: number }[] = [];
+    for (const [hour, evts] of onHourFreeGroups) {
+      if (evts.length >= 2 && evts.length <= 3) {
+        compoundRows.push({
+          hour,
+          events: evts,
+          // Sit just below the hour tick line so the row obviously belongs
+          // to the hour rather than floating between two ticks.
+          topPx: (hour * 60 - origin) * PX_PER_MIN + 4,
+        });
+      }
+    }
+
     const baseEnd = (maxMin + VIEWPORT_PADDING_MIN - origin) * PX_PER_MIN;
     const maxBottom = Math.max(
       baseEnd,
       ...Array.from(positions.values()).map((p) => p.topPx + p.heightPx),
+      ...compoundRows.map((r) => r.topPx + CHIP_STEP_PX),
     );
 
     return {
@@ -166,6 +212,7 @@ export function TimelineList({
       originMinutes: origin,
       heightPx: maxBottom,
       positionById: positions,
+      compoundRows,
     };
   }, [events]);
 
@@ -206,7 +253,8 @@ export function TimelineList({
   // their containing block (browsers paint later siblings above earlier ones
   // when z-indexes are equal; markerCompact also has z-index: 2 as a belt).
   const blocks = sorted.filter(isDurationEvent);
-  const markers = sorted.filter((e) => !isDurationEvent(e));
+  const groupedIdSet = new Set(compoundRows.flatMap((r) => r.events.map((e) => e.id)));
+  const markers = sorted.filter((e) => !isDurationEvent(e) && !groupedIdSet.has(e.id));
 
   // Hour ticks: from the first whole hour at/after origin, up through the
   // last whole hour visible. Each gets a hairline + a left-gutter label.
@@ -270,6 +318,20 @@ export function TimelineList({
           />
         );
       })}
+
+      {compoundRows.map((row) => (
+        <div
+          key={`hour-row-${row.hour}`}
+          className={styles.compoundRow}
+          style={{ top: `${row.topPx}px` }}
+          data-testid="compound-hour-row"
+        >
+          <span className={styles.compoundDot} aria-hidden="true" />
+          <span className={styles.compoundLabels}>
+            {row.events.map((e) => e.label).join(" · ")}
+          </span>
+        </div>
+      ))}
 
       {nowMinutes !== undefined && (
         <CurrentTimeIndicator
