@@ -68,6 +68,32 @@ describe("applyBedtime", () => {
     expect(result.find((e) => e.type === "wake_window" && e.startTime >= "18:30")).toBeUndefined();
   });
 
+  it("drops a nap that crosses a manual bedtime override", () => {
+    const proj = projectNapChain(sampleDay, sampleSettings);
+    // A nap that crosses bedtime should be removed entirely — bedtime wins.
+    const napCrossing = proj.find(
+      (e) =>
+        e.type === "nap" &&
+        e.endTime !== undefined &&
+        e.startTime < "18:30" &&
+        e.endTime > "18:30",
+    );
+    if (napCrossing) {
+      const manualBedtime = {
+        id: "manual-bedtime-cross",
+        dayId: sampleDay.id,
+        eventKey: "bedtime",
+        type: "bedtime" as const,
+        label: "Bedtime",
+        startTime: "18:30",
+        source: "manual" as const,
+        status: "completed" as const,
+      };
+      const result = applyBedtime(proj, sampleSettings, [manualBedtime]);
+      expect(result.find((e) => e.id === napCrossing.id)).toBeUndefined();
+    }
+  });
+
   it("clips a wake_window that crosses a manual bedtime override", () => {
     const proj = projectNapChain(sampleDay, sampleSettings);
     // Manual bedtime at 18:30 — WW4 (16:30 → 19:00) crosses it and must be

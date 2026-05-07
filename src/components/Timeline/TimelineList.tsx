@@ -137,10 +137,12 @@ export function TimelineList({
       const naturalTop = (startMin - origin) * PX_PER_MIN;
 
       if (isDurationEvent(e)) {
-        const blockHeight = Math.max(
-          MIN_BLOCK_HEIGHT,
-          (parseTime(e.endTime) - startMin) * PX_PER_MIN,
-        );
+        const naturalHeight = (parseTime(e.endTime) - startMin) * PX_PER_MIN;
+        // Putdown blocks have their own compact row layout and short
+        // duration (≈ putdownLeadMinutes); MIN_BLOCK_HEIGHT would push
+        // them past their endTime and collide with the next nap.
+        const blockHeight =
+          e.type === "putdown" ? naturalHeight : Math.max(MIN_BLOCK_HEIGHT, naturalHeight);
         positions.set(e.id, { topPx: naturalTop, heightPx: blockHeight });
         continue;
       }
