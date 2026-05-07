@@ -2,7 +2,7 @@
 
 import { useEffect, useId, useState } from "react";
 import type { Event, EventType, Owner } from "@/domain";
-import { parseTime } from "@/domain";
+import { formatTimeForDisplay, parseTime } from "@/domain";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { OwnerPicker } from "./OwnerPicker";
 import styles from "./EventEditDrawer.module.css";
@@ -59,7 +59,9 @@ function validateForm(
       return a < end && start < b;
     });
     if (overlap) {
-      return `This overlaps "${overlap.label}" (${overlap.startTime}–${overlap.endTime}).`;
+      const startStr = formatTimeForDisplay(overlap.startTime);
+      const endStr = overlap.endTime ? formatTimeForDisplay(overlap.endTime) : "";
+      return `This overlaps ${overlap.label} (${startStr} – ${endStr}).`;
     }
   }
   return null;

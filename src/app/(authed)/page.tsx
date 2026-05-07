@@ -118,20 +118,17 @@ export default function DashboardPage() {
   const cww = currentWakeWindow(projected, nowMinutes);
   const inProgressNap = actuals.find((e) => e.type === "nap" && !e.endTime);
   const bottle1Pending = !actuals.some((e) => e.type === "bottle");
-  // "Next" ordinals = number of unique nap/bottle slots that have a
-  // user-created doc, plus one. We dedupe by eventKey so the Start/End
-  // pair (which produces two docs with the same eventKey via
-  // createOptimistic) doesn't double-count. We exclude pure projections
-  // (those never appear in actuals anyway, but the filter is safe).
-  // Owner-only annotations save with status "overridden" — the drawer
-  // now distinguishes those from time-recording edits, but legacy data
-  // may have either, so we accept any non-projected nap doc as "this
-  // slot has been touched, the next available is N+1".
+  // "Next" ordinals = unique nap/bottle slots that have been *recorded*,
+  // plus one. Only status "actual" (Start Nap in progress) or "completed"
+  // (End Nap pressed, FAB-create, or drawer time-edit) count. Owner-only
+  // drawer edits save with status "overridden" — those are annotations,
+  // not recordings, and must NOT inflate the ordinal. Dedupe by eventKey
+  // so the Start+End pair (two docs, same key) doesn't double-count.
   const uniqueRecordedKeys = (type: Event["type"]) => {
     const seen = new Set<string>();
     for (const e of actuals) {
       if (e.type !== type) continue;
-      if (e.status === "projected") continue;
+      if (e.status !== "actual" && e.status !== "completed") continue;
       seen.add(e.eventKey);
     }
     return seen.size;
