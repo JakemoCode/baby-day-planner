@@ -22,6 +22,18 @@ function formatRange(start: string, end: string): string {
   return `${startStr} – ${endStr}`;
 }
 
+/**
+ * Putdown blocks are short (≈ putdownLeadMinutes) and don't have room for
+ * the engine's verbose "Start putting down for X" label, so trim down to
+ * the same abbreviation we use for putdown chips.
+ */
+function blockLabel(event: Event): string {
+  if (event.type === "putdown") {
+    return event.label.replace(/^Start putting down for /, "Putdown · ");
+  }
+  return event.label;
+}
+
 export function DurationBlock({ event, topPx, heightPx, onClick }: DurationBlockProps) {
   const interactive = !!onClick;
   const Tag = interactive ? "button" : "div";
@@ -42,16 +54,11 @@ export function DurationBlock({ event, topPx, heightPx, onClick }: DurationBlock
         ? { type: "button" as const, onClick, "aria-label": accessibleName }
         : { role: "presentation" as const })}
     >
-      <span className={styles.label}>{event.label}</span>
-      <div className={styles.range}>
-        <span>{range}</span>
+      <span className={styles.label}>
+        {blockLabel(event)}
         {event.owner && <span className={styles.owner}>· {event.owner}</span>}
-        {event.status === "overridden" && (
-          <span className={styles.editMark} aria-label="edited">
-            ✎
-          </span>
-        )}
-      </div>
+      </span>
+      <span className={styles.range}>{range}</span>
     </Tag>
   );
 }

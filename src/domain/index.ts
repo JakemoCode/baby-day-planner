@@ -18,5 +18,6 @@ export { suppressBottlesAfterBedtime } from "./bottleSuppress";
 export { addDreamFeed } from "./dreamFeed";
 export { mergePumpsAndExtras } from "./extras";
 export { applyTemplate, flipTemplate, copyToOtherDay } from "./owners";
+export { applyWakeWindowOverrides } from "./wakeWindowOverrides";
 export { projectDay } from "./project";
 export { nextEvent, nextBottle, nextNap, currentWakeWindow, projectedBedtime } from "./selectors";

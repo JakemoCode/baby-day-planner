@@ -11,6 +11,8 @@ export type TomorrowPreviewProps = {
   extras?: Event[];
   /** Optional Bottle 1 time to seed the chain projection. */
   bottle1Time?: string;
+  /** Tap a projected event in the preview (e.g., to assign an owner). */
+  onEventTap?: (event: Event) => void;
 };
 
 export function TomorrowPreview({
@@ -19,6 +21,7 @@ export function TomorrowPreview({
   template,
   extras = [],
   bottle1Time,
+  onEventTap,
 }: TomorrowPreviewProps) {
   const events = useMemo(() => {
     if (!day.wakeTime) return [];
@@ -52,5 +55,5 @@ export function TomorrowPreview({
     );
   }
 
-  return <TimelineList events={events} />;
+  return <TimelineList events={events} {...(onEventTap ? { onEventTap } : {})} />;
 }

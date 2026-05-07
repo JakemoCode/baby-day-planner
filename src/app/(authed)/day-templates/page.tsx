@@ -10,6 +10,7 @@ import { db } from "@/lib/firebase/client";
 import { LoadingState } from "@/components/shared/LoadingState";
 import { TimelineList } from "@/components/Timeline/TimelineList";
 import { TemplateOwnerPicker } from "@/components/DayTemplates/TemplateOwnerPicker";
+import { ASSIGNABLE_TYPES, setOwnerInTemplate } from "@/components/DayTemplates/setOwnerInTemplate";
 import styles from "./page.module.css";
 
 const CHILD_ID = process.env.NEXT_PUBLIC_DEFAULT_CHILD_ID ?? "aden";
@@ -33,44 +34,6 @@ const DEFAULT_SUN: OwnershipTemplate = {
 };
 
 type DayKey = "saturday" | "sunday";
-
-const ASSIGNABLE_TYPES: ReadonlyArray<Event["type"]> = ["nap", "wake_window", "bottle"];
-
-function indexFromKey(eventKey: string, prefix: string): number {
-  const m = new RegExp(`^${prefix}_(\\d+)`).exec(eventKey);
-  return m ? Number(m[1]) - 1 : -1;
-}
-
-function setOwnerInTemplate(
-  template: OwnershipTemplate,
-  event: Event,
-  owner: Owner,
-): OwnershipTemplate {
-  const next = { ...template };
-  if (event.type === "nap") {
-    const i = indexFromKey(event.eventKey, "nap");
-    if (i < 0) return template;
-    const arr = [...template.napOwners];
-    while (arr.length <= i) arr.push("Jake");
-    arr[i] = owner;
-    next.napOwners = arr;
-  } else if (event.type === "wake_window") {
-    const i = indexFromKey(event.eventKey, "wake_window");
-    if (i < 0) return template;
-    const arr = [...template.wakeWindowOwners];
-    while (arr.length <= i) arr.push("Kelly");
-    arr[i] = owner;
-    next.wakeWindowOwners = arr;
-  } else if (event.type === "bottle") {
-    const i = indexFromKey(event.eventKey, "bottle");
-    if (i < 0) return template;
-    const arr = [...(template.bottleOwners ?? [])];
-    while (arr.length <= i) arr.push("Jake");
-    arr[i] = owner;
-    next.bottleOwners = arr;
-  }
-  return next;
-}
 
 export default function DayTemplatesPage() {
   const { settings, loading: settingsLoading } = useSettings(CHILD_ID);

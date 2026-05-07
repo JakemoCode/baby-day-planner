@@ -4,30 +4,34 @@ import { mergePumpsAndExtras } from "./extras";
 import { sampleSettings, sampleDay } from "./__fixtures__/sample";
 
 describe("mergePumpsAndExtras", () => {
-  it("emits pump events from settings.pumpTimes when no actuals exist", () => {
+  it("anchors the first pump to day.wakeTime; remaining come from settings.pumpTimes", () => {
     const result = mergePumpsAndExtras([], [], sampleSettings, sampleDay);
     const pumps = result.filter((e) => e.type === "pump");
-    expect(pumps.map((p) => p.startTime)).toEqual(["10:30", "14:30"]);
+    // sampleDay.wakeTime = "07:00"; sampleSettings.pumpTimes = ["10:30", "14:30"]
+    // First scheduled pump (10:30) is replaced with wakeTime (07:00).
+    expect(pumps.map((p) => p.startTime)).toEqual(["07:00", "14:30"]);
     expect(pumps[0]).toMatchObject({ source: "projected", label: "Pump" });
   });
 
-  it("prefers actual pump events over projected ones when times overlap", () => {
+  it("prefers actual pump events over projected ones when eventKey matches", () => {
+    // The first projected pump now keys on wakeTime, so an actual matching
+    // pump_07:00 should replace it.
     const actuals: Event[] = [
       {
         id: "actual-pump-1",
         dayId: sampleDay.id,
-        eventKey: "pump_10:30",
+        eventKey: "pump_07:00",
         type: "pump",
         label: "Pump",
-        startTime: "10:45",
+        startTime: "07:15",
         source: "actual",
         status: "actual",
       },
     ];
     const result = mergePumpsAndExtras([], actuals, sampleSettings, sampleDay);
     const pumps = result.filter((e) => e.type === "pump");
-    expect(pumps.map((p) => p.startTime)).toEqual(["10:45", "14:30"]);
-    expect(pumps.find((p) => p.startTime === "10:45")?.source).toBe("actual");
+    expect(pumps.map((p) => p.startTime)).toEqual(["07:15", "14:30"]);
+    expect(pumps.find((p) => p.startTime === "07:15")?.source).toBe("actual");
   });
 
   it("includes extra events with source 'manual'", () => {
@@ -52,10 +56,10 @@ describe("mergePumpsAndExtras", () => {
       {
         id: "exist-pump",
         dayId: sampleDay.id,
-        eventKey: "pump_10:30",
+        eventKey: "pump_07:00",
         type: "pump",
         label: "Pump",
-        startTime: "10:30",
+        startTime: "07:00",
         source: "projected",
         status: "projected",
       },

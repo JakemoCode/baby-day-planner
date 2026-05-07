@@ -37,11 +37,13 @@ describe("addPutdownEvents", () => {
       type: "putdown",
       label: "Start putting down for Nap 1",
       startTime: "08:45",
+      endTime: "09:00",
       owner: "Jake",
       source: "projected",
     });
     expect(putdowns[1]).toMatchObject({
       startTime: "12:00",
+      endTime: "12:15",
       label: "Start putting down for Nap 2",
     });
   });
@@ -55,6 +57,7 @@ describe("addPutdownEvents", () => {
       type: "putdown",
       label: "Start putting down for Bedtime",
       startTime: "18:45",
+      endTime: "19:00",
       source: "projected",
     });
   });

@@ -18,7 +18,7 @@
  */
 .hourTick {
   position: absolute;
-  left: 0;
+  left: 64px; /* start past the hour-label gutter so the line never crosses text */
   right: var(--space-3);
   height: 1px;
   background: var(--color-border);
@@ -36,6 +36,40 @@
   color: var(--color-muted);
   text-align: right;
   padding-right: var(--space-2);
+  background: var(--color-bg); /* mask any line that bleeds under the label */
   pointer-events: none;
-  z-index: 0;
+  z-index: 1;
+}
+
+/*
+ * A "compound row" collapses 2-3 free-standing markers that all start on the
+ * same exact hour into a single line: one dot, comma-separated labels. The
+ * adjacent hour tick announces the time, so we don't repeat it per event.
+ */
+.compoundRow {
+  position: absolute;
+  left: 76px;
+  right: var(--space-3);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 2px var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--color-fg);
+  z-index: 1;
+}
+
+.compoundDot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: transparent;
+  border: 2px solid var(--color-muted);
+}
+
+.compoundLabels {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }

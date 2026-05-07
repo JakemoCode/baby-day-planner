@@ -1,7 +1,36 @@
 import type { Event, Settings } from "./types";
 import { parseTime } from "./time";
 
-export function applyBedtime(events: Event[], settings: Settings): Event[] {
+export function applyBedtime(events: Event[], settings: Settings, actuals: Event[] = []): Event[] {
+  // Honor a user-supplied (manual / actual) bedtime first — it represents an
+  // explicit override of the projected schedule. Trim naps and wake windows
+  // that fall at/after the override time and use that bedtime as canonical.
+  const userBedtime = actuals.find(
+    (e) => e.type === "bedtime" && (e.source === "manual" || e.source === "actual"),
+  );
+  if (userBedtime) {
+    const bedMins = parseTime(userBedtime.startTime);
+    const trimmed = events.flatMap((e): Event[] => {
+      if (e.type === "bedtime") return []; // drop any projected bedtime
+      if (e.type === "nap") {
+        if (parseTime(e.startTime) >= bedMins) return [];
+        // Nap crosses bedtime — drop it. Bedtime overrides the projected nap;
+        // a 5-min sliver of nap before sleep isn't useful to surface.
+        if (e.endTime && parseTime(e.endTime) > bedMins) return [];
+      }
+      if (e.type === "wake_window") {
+        if (parseTime(e.startTime) >= bedMins) return [];
+        if (e.endTime && parseTime(e.endTime) > bedMins) {
+          return [{ ...e, endTime: userBedtime.startTime }];
+        }
+      }
+      return [e];
+    });
+    return [...trimmed, userBedtime].sort(
+      (a, b) => parseTime(a.startTime) - parseTime(b.startTime),
+    );
+  }
+
   const bedtimeMins = parseTime(settings.bedtimeThreshold);
   const naps = events.filter((e) => e.type === "nap");
   const replaceIdx = naps.findIndex((n) => parseTime(n.startTime) >= bedtimeMins);
