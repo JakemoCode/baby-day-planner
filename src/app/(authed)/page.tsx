@@ -2,7 +2,15 @@
 
 import { useMemo, useState } from "react";
 import type { Event, OwnershipTemplate } from "@/domain";
-import { currentWakeWindow, nextBottle, nextEvent, nextNap, parseTime, projectDay } from "@/domain";
+import {
+  currentWakeWindow,
+  nextBottle,
+  nextEvent,
+  nextNap,
+  parseTime,
+  projectDay,
+  projectedBedtime,
+} from "@/domain";
 import { useDay } from "@/hooks/useDay";
 import { useEvents } from "@/hooks/useEvents";
 import { useSettings } from "@/hooks/useSettings";
@@ -115,6 +123,10 @@ export default function DashboardPage() {
   const lastBottleTime = lastTimeForType(actuals, "bottle");
   const lastBottle = lastEventOfType(actuals, "bottle");
   const lastNap = lastEventOfType(actuals, "nap");
+  const upcomingDreamFeed = projected.find(
+    (e) => e.type === "dream_feed" && parseTime(e.startTime) >= nowMinutes,
+  );
+  const bedtime = projectedBedtime(projected);
 
   const handleLogBottle = async (bottle: Event) => {
     await createOptimistic(bottle);
@@ -145,8 +157,13 @@ export default function DashboardPage() {
         bottle={nb}
         bottle1Pending={bottle1Pending}
         {...(lastBottle ? { lastBottle } : {})}
+        {...(upcomingDreamFeed ? { dreamFeed: upcomingDreamFeed } : {})}
       />
-      <NextNapPreview nap={nn} {...(lastNap ? { lastNap } : {})} />
+      <NextNapPreview
+        nap={nn}
+        {...(lastNap ? { lastNap } : {})}
+        {...(bedtime ? { bedtime } : {})}
+      />
       <CurrentWakeWindowStatus wakeWindow={cww} />
 
       <div className={styles.actions}>

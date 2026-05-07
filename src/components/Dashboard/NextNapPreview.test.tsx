@@ -34,6 +34,12 @@ describe("NextNapPreview", () => {
     expect(screen.getByText(/no more naps today|nothing scheduled/i)).toBeVisible();
   });
 
+  it("shows bedtime in place of empty state when bedtime is provided", () => {
+    renderWithAuth(<NextNapPreview nap={undefined} bedtime="19:00" />);
+    expect(screen.getByText("Bedtime at 7:00 PM")).toBeVisible();
+    expect(screen.queryByText(/no more naps today/i)).toBeNull();
+  });
+
   it("only shows start time when endTime is missing (in-progress)", () => {
     const { endTime: _omit, ...inProgress } = nap();
     renderWithAuth(<NextNapPreview nap={inProgress} />);
