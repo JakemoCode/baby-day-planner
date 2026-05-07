@@ -114,6 +114,32 @@ describe("applyBedtime", () => {
     expect(ww4).toMatchObject({ startTime: "16:30", endTime: "18:30" });
   });
 
+  it("emits bedtime with kind 'instant' so Timeline v2 renders it as a chip", () => {
+    // Phase 2 contract: bedtime is no longer a block in Timeline v2; it
+    // lives in the right gutter as an instant chip. The engine must emit
+    // kind: 'instant' on every bedtime path (projected substitution + manual
+    // override).
+    const proj = projectNapChain(sampleDay, sampleSettings);
+    const projected = applyBedtime(proj, sampleSettings).find((e) => e.type === "bedtime");
+    expect(projected?.kind).toBe("instant");
+    expect(projected?.endTime).toBeUndefined();
+
+    const manual = applyBedtime(proj, sampleSettings, [
+      {
+        id: "manual-bedtime-x",
+        dayId: sampleDay.id,
+        eventKey: "bedtime",
+        type: "bedtime" as const,
+        kind: "instant" as const,
+        label: "Bedtime",
+        startTime: "18:30",
+        source: "manual" as const,
+        status: "completed" as const,
+      },
+    ]).find((e) => e.type === "bedtime");
+    expect(manual?.kind).toBe("instant");
+  });
+
   it("removes wake_window events that start at or after the bedtime nap's start time", () => {
     // Set threshold early enough that nap_3 becomes bedtime (nap_3 starts at 15:30)
     // nap_3 napToReplace.startTime = "15:30"; WW4 starts at cursor after nap_3 = 16:30
