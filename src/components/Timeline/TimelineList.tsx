@@ -22,12 +22,6 @@ export type TimelineListProps = {
 const PX_PER_MIN = 2;
 const VIEWPORT_PADDING_MIN = 30;
 const MIN_BLOCK_HEIGHT = 32;
-/**
- * Vertical space inside a block reserved for the header before a chip can
- * overlap it. Sized to clear BOTH the bold label row AND the range subtitle
- * row (text-sm + text-xs at line-height 1.2 + 4px top padding ≈ 38px).
- */
-const BLOCK_HEADER_PX = 42;
 /** Vertical step between stacked chips inside a block. */
 const CHIP_STEP_PX = 28;
 /** Breathing room below a duration block before a free-standing event below it. */
@@ -155,20 +149,13 @@ export function TimelineList({
       });
 
       if (container) {
-        // Time-anchored chip: place at its actual time position, but with two
-        // floors AND a ceiling to keep the layout readable —
-        //   1. Floor against the block's header (label + range row).
-        //   2. Floor against the previous chip in this block (dense clusters stack).
-        //   3. Ceiling at the block's bottom so the chip can't overflow into
-        //      the next block when an event sits near the container's end.
-        const containerPos = positions.get(container.id);
-        const containerTop = containerPos?.topPx ?? naturalTop;
-        const containerBottom = containerTop + (containerPos?.heightPx ?? 0);
-        const headerFloor = containerTop + BLOCK_HEADER_PX;
+        // Time-anchored chip: place at its actual time position. Chips live
+        // on the right half (see PointMarker.module.css), so they never
+        // collide with the block's left-side title — no ceiling or header
+        // floor needed. The only floor is the previous chip in this block,
+        // so dense clusters stack instead of stamping on each other.
         const prevChipBottom = chipFrontierByBlock.get(container.id) ?? -Infinity;
-        const ceiling = containerBottom - CHIP_STEP_PX;
-        const flooredTop = Math.max(naturalTop, headerFloor, prevChipBottom);
-        const topPx = Math.min(flooredTop, Math.max(headerFloor, ceiling));
+        const topPx = Math.max(naturalTop, prevChipBottom);
         chipFrontierByBlock.set(container.id, topPx + CHIP_STEP_PX);
         chipCountByBlock.set(container.id, (chipCountByBlock.get(container.id) ?? 0) + 1);
         positions.set(e.id, {
