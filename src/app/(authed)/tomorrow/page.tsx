@@ -2,10 +2,11 @@
 
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
-import type { Day, Event, OwnershipTemplate } from "@/domain";
+import type { Day, Event, Owner, OwnershipTemplate } from "@/domain";
 import { useSettings } from "@/hooks/useSettings";
 import { useTemplates } from "@/hooks/useTemplates";
 import { startNewDay } from "@/repositories/startNewDay";
+import { saveTemplate } from "@/repositories/templates";
 import { db } from "@/lib/firebase/client";
 import { LoadingState } from "@/components/shared/LoadingState";
 import { EventEditDrawer } from "@/components/shared/EventEditDrawer";
@@ -13,6 +14,8 @@ import { buildCreateTemplate } from "@/components/shared/createEventTemplate";
 import { TomorrowForm, type TomorrowFormState } from "@/components/Tomorrow/TomorrowForm";
 import { TomorrowPreview } from "@/components/Tomorrow/TomorrowPreview";
 import { PromoteTomorrowButton } from "@/components/Tomorrow/PromoteTomorrowButton";
+import { TemplateOwnerPicker } from "@/components/DayTemplates/TemplateOwnerPicker";
+import { ASSIGNABLE_TYPES, setOwnerInTemplate } from "@/components/DayTemplates/setOwnerInTemplate";
 import styles from "./page.module.css";
 
 const CHILD_ID = process.env.NEXT_PUBLIC_DEFAULT_CHILD_ID ?? "aden";
@@ -38,6 +41,10 @@ export default function TomorrowPage() {
     extras: [],
   });
   const [drawer, setDrawer] = useState<DrawerState>({ open: false });
+  const [pickedEvent, setPickedEvent] = useState<Event | null>(null);
+  // Local override of the selected template so owner edits in the preview
+  // reflect immediately without waiting for the listener round-trip.
+  const [templateOverride, setTemplateOverride] = useState<OwnershipTemplate | null>(null);
 
   const tomorrowDay = useMemo<Day>(() => {
     const day: Day = {
@@ -54,8 +61,9 @@ export default function TomorrowPage() {
 
   const selectedTemplate = useMemo<OwnershipTemplate | undefined>(() => {
     if (!form.templateId) return undefined;
+    if (templateOverride && templateOverride.id === form.templateId) return templateOverride;
     return templates.find((t) => t.id === form.templateId);
-  }, [form.templateId, templates]);
+  }, [form.templateId, templates, templateOverride]);
 
   if (settingsLoading || !settings) {
     return (
@@ -110,10 +118,32 @@ export default function TomorrowPage() {
           {...(selectedTemplate ? { template: selectedTemplate } : {})}
           extras={form.extras}
           {...(form.bottle1Time ? { bottle1Time: form.bottle1Time } : {})}
+          onEventTap={(event) => {
+            if (event.type === "extra") {
+              setDrawer({ open: true, mode: "edit", event });
+              return;
+            }
+            if (!ASSIGNABLE_TYPES.includes(event.type)) return;
+            if (!selectedTemplate) return; // need a template to write owners into
+            setPickedEvent(event);
+          }}
         />
       </section>
 
       <PromoteTomorrowButton onPromote={handlePromote} disabled={!form.wakeTime} />
+
+      {pickedEvent && selectedTemplate && (
+        <TemplateOwnerPicker
+          event={pickedEvent}
+          onSelect={(owner: Owner) => {
+            const next = setOwnerInTemplate(selectedTemplate, pickedEvent, owner);
+            setTemplateOverride(next);
+            setPickedEvent(null);
+            void saveTemplate(db, CHILD_ID, next);
+          }}
+          onCancel={() => setPickedEvent(null)}
+        />
+      )}
 
       <EventEditDrawer
         key={

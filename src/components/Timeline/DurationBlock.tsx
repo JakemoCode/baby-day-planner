@@ -57,11 +57,6 @@ export function DurationBlock({ event, topPx, heightPx, onClick }: DurationBlock
       <span className={styles.label}>
         {blockLabel(event)}
         {event.owner && <span className={styles.owner}>· {event.owner}</span>}
-        {event.status === "overridden" && (
-          <span className={styles.editMark} aria-label="edited">
-            ✎
-          </span>
-        )}
       </span>
       <span className={styles.range}>{range}</span>
     </Tag>

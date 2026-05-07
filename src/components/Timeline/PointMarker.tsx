@@ -70,11 +70,6 @@ export function PointMarker({ event, topPx, onClick, compact = false }: PointMar
         <span className={styles.dot} aria-hidden="true" />
         <span className={styles.label}>{visibleLabel}</span>
         {!compact && subtitle && <span className={styles.subtitle}>· {subtitle}</span>}
-        {event.status === "overridden" && (
-          <span className={styles.editMark} aria-label="edited">
-            ✎
-          </span>
-        )}
       </span>
       {compact && showTime && <span className={styles.compactTime}>{time}</span>}
     </Tag>

@@ -24,10 +24,11 @@ const VIEWPORT_PADDING_MIN = 30;
 const MIN_BLOCK_HEIGHT = 32;
 /**
  * Vertical space inside a block reserved for the title row before a chip can
- * overlap it. Just enough to clear the bold label (the small range row below
- * is allowed to be covered by chips — the hour ticks already announce time).
+ * overlap it. Sized to clear the bold label with a small buffer (the small
+ * range row below is allowed to be covered by chips — the hour ticks already
+ * announce time).
  */
-const BLOCK_HEADER_PX = 24;
+const BLOCK_HEADER_PX = 30;
 /** Vertical step between stacked chips inside a block. */
 const CHIP_STEP_PX = 28;
 /** Breathing room below a duration block before a free-standing event below it. */
