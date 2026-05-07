@@ -42,4 +42,41 @@ describe("NextEventCard", () => {
     renderWithAuth(<NextEventCard event={undefined} nowMinutes={500} />);
     expect(screen.getByText(/nothing scheduled/i)).toBeVisible();
   });
+
+  it("appends target time to putdown label when targetEvent is provided", () => {
+    const target: Event = {
+      id: "n2",
+      dayId: "day-1",
+      eventKey: "nap_2",
+      type: "nap",
+      label: "Nap 2",
+      startTime: "09:45",
+      source: "projected",
+      status: "projected",
+    };
+    renderWithAuth(<NextEventCard event={ev({})} nowMinutes={9 * 60 + 18} targetEvent={target} />);
+    expect(screen.getByText("Start putting down for Nap 2 at 9:45 AM")).toBeVisible();
+  });
+
+  it("ignores targetEvent for non-putdown events", () => {
+    const target: Event = {
+      id: "n2",
+      dayId: "day-1",
+      eventKey: "nap_2",
+      type: "nap",
+      label: "Nap 2",
+      startTime: "09:45",
+      source: "projected",
+      status: "projected",
+    };
+    renderWithAuth(
+      <NextEventCard
+        event={ev({ type: "bottle", label: "Bottle 2", eventKey: "bottle_2" })}
+        nowMinutes={9 * 60 + 18}
+        targetEvent={target}
+      />,
+    );
+    expect(screen.getByText("Bottle 2")).toBeVisible();
+    expect(screen.queryByText(/at 9:45 AM/)).toBeNull();
+  });
 });
