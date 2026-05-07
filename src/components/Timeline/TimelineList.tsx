@@ -156,14 +156,19 @@ export function TimelineList({
 
       if (container) {
         // Time-anchored chip: place at its actual time position, but with two
-        // floors to keep the layout readable —
-        //   1. Below the block's header (label + range row).
-        //   2. Below the previous chip in this block (so dense clusters stack).
+        // floors AND a ceiling to keep the layout readable —
+        //   1. Floor against the block's header (label + range row).
+        //   2. Floor against the previous chip in this block (dense clusters stack).
+        //   3. Ceiling at the block's bottom so the chip can't overflow into
+        //      the next block when an event sits near the container's end.
         const containerPos = positions.get(container.id);
         const containerTop = containerPos?.topPx ?? naturalTop;
+        const containerBottom = containerTop + (containerPos?.heightPx ?? 0);
         const headerFloor = containerTop + BLOCK_HEADER_PX;
         const prevChipBottom = chipFrontierByBlock.get(container.id) ?? -Infinity;
-        const topPx = Math.max(naturalTop, headerFloor, prevChipBottom);
+        const ceiling = containerBottom - CHIP_STEP_PX;
+        const flooredTop = Math.max(naturalTop, headerFloor, prevChipBottom);
+        const topPx = Math.min(flooredTop, Math.max(headerFloor, ceiling));
         chipFrontierByBlock.set(container.id, topPx + CHIP_STEP_PX);
         chipCountByBlock.set(container.id, (chipCountByBlock.get(container.id) ?? 0) + 1);
         positions.set(e.id, {
