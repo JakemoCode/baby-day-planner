@@ -580,18 +580,18 @@ cascade itself (the previous bottle's start + interval).
 If the user manually logs a bottle at 03:00, it persists and seeds the
 next cascade. No suppression based on time of day.
 
-### R5.10 First bottle of the day is NOT auto-anchored to wake time
+### R5.10 First bottle of the day is NOT recorded automatically
 
-V2 had ambiguous handling here. V3 explicit: the first bottle of the
-day is created when the user taps **Start Bottle Now** (or via FAB).
-No projected bottle exists before the first recording. Subsequent
-bottles cascade from that anchor per R5.1.
+The first bottle of the day is *recorded* only when the user taps
+**Start Bottle Now** (or via FAB). The engine never auto-creates a
+recorded bottle at wake time. Until that first tap, any first-bottle
+event in the timeline is a **projected placeholder** per R5.11 — its
+time is a forecast, not a measurement.
 
-- **Why**: the first feed timing varies; tying it to wake time
-  produced a false projection that confused users.
-- **Edge case it prevents**: dashboard showing "Bottle 1 at 7:30 AM"
-  before the user has actually fed the baby, then renumbering happening
-  when the real first bottle is logged at 8:15.
+- **Why**: tying a recorded first bottle to wake time produced false
+  history that confused users.
+- **Edge case it prevents**: dashboard counting "Bottle 1" as logged
+  before the user has actually fed the baby.
 
 ### R5.11 Expected bottles per day drives placeholder projection
 
@@ -599,13 +599,25 @@ bottles cascade from that anchor per R5.1.
 hard default — set per child's stage) is the **expected lower limit**
 of daily intake. The engine projects bottle placeholders up to this
 count so the timeline shows expected feeding cadence even before any
-bottle has been recorded. Reality routinely exceeds this number;
-additional bottles are added via FAB or via the cascade once one is
-recorded. There is no upper bound (R5.8).
+bottle has been recorded.
+
+**Anchoring with no recorded bottles**: the first placeholder lands at
+`Day.wakeTime + settings.bottleChain.bufferAfterWakeMinutes` (default
+10). Subsequent placeholders cascade at `defaultBottleIntervalMinutes`
+intervals up to `bottlesPerDay` total. The buffer is what avoids the
+"first bottle exactly at wake time" false-history problem from R5.10
+while still rendering an actionable forecast from minute one.
+
+**Anchoring after the first recorded bottle**: cascade resumes from
+the *latest* recorded bottle's startTime per R5.1. Earlier placeholder
+projections from before that recording are dropped.
+
+There is no upper bound (R5.8); reality routinely exceeds
+`bottlesPerDay` and additional bottles are added via FAB or via the
+cascade once recordings start.
 
 - **Why**: Jake wants the timeline to show the day's expected cadence
-  at a glance, without an auto-anchor at wake time (R5.10) and without
-  prescribing a ceiling that's wrong for newborns.
+  at a glance, without prescribing a ceiling that's wrong for newborns.
 - **Edge case it prevents**: empty bottle row first thing in the
   morning, leaving the user no visual sense of when the next feeds
   should land.
@@ -1560,11 +1572,12 @@ Existing fields:
 
 V3 additions:
 - `defaultWakeTime`: "07:00" (drives bedtime endTime — R7.1)
-- `bottleChain`: { bottlesPerDay: number } — expected lower limit of
-  daily intake; drives placeholder projection (R5.11). No upper bound
-  and no fixed `latestProjectedStart`; both are derived from the
-  cascade (R5.8). Configurable per child; no hard default (set in
-  first-run flow).
+- `bottleChain`: { bottlesPerDay: number;
+  bufferAfterWakeMinutes: number } — expected lower limit of daily
+  intake plus the wake-to-first-placeholder buffer (default 10) that
+  anchors the placeholder projection per R5.11. No upper bound and no
+  fixed `latestProjectedStart`; both are derived from the cascade
+  (R5.8). Configurable per child.
 - `pumpOwnerSlot`: "parent2" (drives pump owner default — R12.8)
 - `dailyRecurring`: [] (replaces `cookDinner` — R11)
 - `owners`: { parent1: {displayName, color}, parent2: {...},
