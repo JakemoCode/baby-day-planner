@@ -12,6 +12,7 @@
  */
 
 import type { Rule } from "../evaluator";
+import { RULES as BEDTIME_RULES } from "./bedtime";
 import { RULES as NAP_RULES } from "./naps";
 
-export const ALL_RULES: Rule[] = [...NAP_RULES];
+export const ALL_RULES: Rule[] = [...NAP_RULES, ...BEDTIME_RULES];
