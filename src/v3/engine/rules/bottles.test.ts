@@ -5,12 +5,20 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { aContext, aDay, aRecordedBottle, aSettings } from "../../__tests__/factories";
+import {
+  aContext,
+  aDay,
+  aRecordedBottle,
+  aRecordedNap,
+  aSettings,
+} from "../../__tests__/factories";
 import type { Rule } from "../evaluator";
 import { projectDay } from "../projectDay";
+import { RULES as NAP_RULES } from "./naps";
 import { RULES as BOTTLE_RULES } from "./bottles";
 
 const ALL: Rule[] = [...BOTTLE_RULES];
+const ALL_WITH_NAPS: Rule[] = [...NAP_RULES, ...BOTTLE_RULES];
 
 describe("R5.11 — placeholder projection when no bottle has been recorded", () => {
   it("projects bottlesPerDay placeholders, anchored at wake + buffer, spaced by interval", () => {
@@ -193,5 +201,151 @@ describe("R5.1 — cascade resumes from the latest recorded bottle", () => {
     const projections = bottles.slice(1);
     expect(projections.every((b) => b.lifecycle.state === "projected")).toBe(true);
     expect(projections.every((b) => b.kind === "instant")).toBe(true);
+  });
+});
+
+describe("R5.6 — convergence regression with various nowMinutes", () => {
+  it.each([0, 5 * 60, 10 * 60, 15 * 60, 20 * 60])("converges with nowMinutes=%i", (now) => {
+    const recordedBottle = aRecordedBottle({
+      id: "rec_b1",
+      eventKey: "bottle_1",
+      start: 8 * 60 + 15,
+    });
+    const recordedNap = aRecordedNap({
+      id: "rec_n1",
+      eventKey: "nap_recorded_616",
+      start: 10 * 60 + 16,
+      end: 12 * 60 + 14,
+    });
+
+    const ctx = aContext({
+      day: aDay({ wakeTime: 5 * 60 }),
+      settings: aSettings({
+        bottleChain: { bottlesPerDay: 4, bufferAfterWakeMinutes: 10 },
+        defaultBottleIntervalMinutes: 180,
+        wakeWindowsMinutes: [120, 135, 135, 150],
+      }),
+      actuals: [recordedBottle, recordedNap],
+      nowMinutes: now,
+    });
+
+    expect(() =>
+      projectDay(
+        {
+          day: ctx.day,
+          settings: ctx.settings,
+          actuals: ctx.actuals,
+          nowMinutes: ctx.nowMinutes,
+        },
+        { rules: ALL_WITH_NAPS },
+      ),
+    ).not.toThrow();
+  });
+});
+
+describe("R5.6 — convergence regression (mirrors property-test failure)", () => {
+  it("converges with recorded bottle at 8:15 + recorded nap 10:16-12:14 + early wake", () => {
+    // Reproduces a property-test convergence failure where bottle_2 from
+    // the cascade lands inside a recorded nap and R5.6 must terminate.
+    const recordedBottle = aRecordedBottle({
+      id: "rec_b1",
+      eventKey: "bottle_1",
+      start: 8 * 60 + 15, // 495
+    });
+    const recordedNap = aRecordedNap({
+      id: "rec_n1",
+      eventKey: "nap_recorded_616",
+      start: 10 * 60 + 16, // 616
+      end: 12 * 60 + 14, // 734
+    });
+
+    const ctx = aContext({
+      day: aDay({ wakeTime: 5 * 60 }),
+      settings: aSettings({
+        bottleChain: { bottlesPerDay: 4, bufferAfterWakeMinutes: 10 },
+        defaultBottleIntervalMinutes: 180,
+        wakeWindowsMinutes: [120, 135, 135, 150],
+      }),
+      actuals: [recordedBottle, recordedNap],
+      nowMinutes: 12 * 60,
+    });
+
+    expect(() =>
+      projectDay(
+        {
+          day: ctx.day,
+          settings: ctx.settings,
+          actuals: ctx.actuals,
+          nowMinutes: ctx.nowMinutes,
+        },
+        { rules: ALL_WITH_NAPS },
+      ),
+    ).not.toThrow();
+  });
+});
+
+describe("R5.6 — projected bottle inside a nap moves to the closer edge", () => {
+  it("placeholder bottle landing in nap_1 moves to nap_1.startTime when that's nearer the predicted interval", () => {
+    // Setup:
+    //   wake 7:00, buffer 10, interval 180, bottlesPerDay 4, now 8:00
+    //   recorded nap_1 from 9:30-11:00 (covers default placeholder slot 10:10)
+    //
+    // R5.11 places placeholders at 7:10, 10:10, 13:10, 16:10.
+    // bottle_2 at 10:10 is inside [9:30, 11:00].
+    //   predicted (prev 7:10 + 180) = 10:10
+    //   nap_1.start = 9:30, distance |10:10 - 9:30| = 40
+    //   nap_1.end   = 11:00, distance |11:00 - 10:10| = 50
+    //   → move to 9:30 (closer).
+    // 9:30 is in the future relative to nowMinutes=8:00, so no past-edge fallback.
+    const recordedNap1 = aRecordedNap({
+      id: "actual_nap_1",
+      eventKey: "nap_1",
+      start: 9 * 60 + 30,
+      end: 11 * 60,
+    });
+
+    const ctx = aContext({
+      day: aDay({ wakeTime: 7 * 60 }),
+      settings: aSettings({
+        bottleChain: { bottlesPerDay: 4, bufferAfterWakeMinutes: 10 },
+        defaultBottleIntervalMinutes: 180,
+        wakeWindowsMinutes: [120, 90, 90, 90],
+      }),
+      actuals: [recordedNap1],
+      nowMinutes: 8 * 60,
+    });
+
+    const out = projectDay(
+      {
+        day: ctx.day,
+        settings: ctx.settings,
+        actuals: ctx.actuals,
+        nowMinutes: ctx.nowMinutes,
+      },
+      { rules: ALL_WITH_NAPS },
+    );
+
+    const bottles = out
+      .filter((e) => e.type === "bottle")
+      .sort((a, b) => a.startTime - b.startTime);
+
+    // bottle_2 (10:10) lands inside recorded nap_1 → moves to 9:30 (closer to predicted 10:10).
+    // R3.1 also projects nap_2 at [12:30, 13:30] (cascade from nap_1.end 11:00 + ww_2 90min).
+    // bottle_3 (13:10) lands inside that projected nap → moves to 12:30 (closer to predicted 12:30 from new bottle_2 9:30 + 180).
+    expect(bottles.map((b) => b.startTime)).toEqual([
+      7 * 60 + 10, // 7:10 (unchanged)
+      9 * 60 + 30, // 9:30 (moved from 10:10 → nap_1.start)
+      12 * 60 + 30, // 12:30 (moved from 13:10 → projected nap_2.start)
+      16 * 60 + 10, // 16:10 (unchanged; no nap there)
+    ]);
+
+    // No bottle's startTime falls strictly inside any nap.
+    const naps = out.filter((e) => e.type === "nap" && e.endTime !== undefined);
+    for (const b of bottles) {
+      for (const nap of naps) {
+        const inside = b.startTime > nap.startTime && b.startTime < nap.endTime!;
+        expect(inside).toBe(false);
+      }
+    }
   });
 });

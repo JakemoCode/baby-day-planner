@@ -146,6 +146,110 @@ function cascadeFromLatest(ctx: Context, existing: Event[]): Event[] {
 }
 
 /**
+ * R5.6 — Move a projected bottle that lands inside a nap to the nap edge
+ * that's closer to the predicted interval.
+ *
+ * Predictive lens (§0): the engine forecasts the *likely* next feed time.
+ * Bottles "before nap" vs "after nap" are both plausible; pick the edge
+ * closer to the cadence the cascade was already predicting.
+ *
+ * For each projected bottle whose startTime is strictly inside a nap's
+ * (start, end), compute:
+ *   predicted = prevBottle.startTime + defaultBottleIntervalMinutes
+ * Move to whichever of (nap.startTime, nap.endTime) has smaller
+ * |edge - predicted|. If the closer edge is in the past (< nowMinutes),
+ * use the far edge instead.
+ *
+ * Recorded mid-nap bottles are never moved (the §0 reality-wins guard
+ * would throw — but we also gate by lifecycle.state === "projected" to
+ * make intent explicit).
+ *
+ * Iterates to fixed point (R5.7) via the evaluator: moving a bottle out
+ * of nap_2 might land it inside nap_3, triggering another match.
+ */
+const RuleMoveProjectedBottleOutOfNap: Rule = {
+  id: "R5.6",
+  description:
+    "Move projected bottles inside naps to whichever edge is closer to the predicted interval",
+  // R3.1 (nap chain projection) is NOT listed here even though we need
+  // its output: declaring it would force every bottle test to include
+  // the nap rules, but R5.6 reads naps from events at evaluation time —
+  // if R3.1 hasn't run, there are no naps and R5.6 simply doesn't fire.
+  // The evaluator's fixed-point loop ensures R5.6 picks up naps once
+  // R3.1 emits them on a subsequent pass.
+  dependsOn: ["R5.1", "R5.11"],
+  matches: (events) => findFirstOverlap(events) !== null,
+  produces: (events, ctx) => {
+    const overlap = findFirstOverlap(events);
+    if (!overlap) return events;
+    const { bottle, region } = overlap;
+    // Snap to the merged-interval boundary of transitively-overlapping
+    // naps containing the bottle. A bottle landing on the edge of one
+    // nap that's inside an adjacent overlapping nap creates a cycle if
+    // we look only at directly-containing naps; merging the connected
+    // component breaks the cycle.
+    const predicted = predictedNextStart(events, bottle, ctx);
+    const distBefore = Math.abs(predicted - region.start);
+    const distAfter = Math.abs(predicted - region.end);
+    let chosen = distBefore <= distAfter ? region.start : region.end;
+    if (chosen < ctx.nowMinutes) chosen = chosen === region.start ? region.end : region.start;
+    return events.map((e) => (e.id === bottle.id ? { ...e, startTime: chosen } : e));
+  },
+};
+
+type Region = { start: number; end: number };
+type Overlap = { bottle: Event; region: Region };
+
+/**
+ * Merge nap intervals that touch or overlap into a single connected
+ * region. Returns regions sorted by start; each region's [start, end]
+ * is the union boundary the bottle should clear.
+ */
+function mergedNapRegions(events: Event[]): Region[] {
+  const intervals: Region[] = events
+    .filter((e) => e.type === "nap" && e.endTime !== undefined)
+    .map((e) => ({ start: e.startTime, end: e.endTime! }))
+    .sort((a, b) => a.start - b.start);
+  const merged: Region[] = [];
+  for (const iv of intervals) {
+    const last = merged[merged.length - 1];
+    if (last && iv.start <= last.end) {
+      last.end = Math.max(last.end, iv.end);
+    } else {
+      merged.push({ ...iv });
+    }
+  }
+  return merged;
+}
+
+function findFirstOverlap(events: Event[]): Overlap | null {
+  const regions = mergedNapRegions(events);
+  for (const e of events) {
+    if (e.type !== "bottle") continue;
+    if (e.lifecycle.state !== "projected") continue;
+    const region = regions.find((r) => e.startTime > r.start && e.startTime < r.end);
+    if (region) return { bottle: e, region };
+  }
+  return null;
+}
+
+function predictedNextStart(
+  events: Event[],
+  bottle: Event,
+  ctx: { settings: { defaultBottleIntervalMinutes: number } },
+): number {
+  // The "previous" bottle is the chronologically-closest bottle whose
+  // startTime is < this bottle's CURRENT startTime. If none exists,
+  // there's no cadence to honor — fall back to current startTime so the
+  // edge with smallest |edge - currentStart| is chosen.
+  const earlier = events
+    .filter((e) => e.type === "bottle" && e.id !== bottle.id && e.startTime < bottle.startTime)
+    .sort((a, b) => b.startTime - a.startTime)[0];
+  if (!earlier) return bottle.startTime;
+  return earlier.startTime + ctx.settings.defaultBottleIntervalMinutes;
+}
+
+/**
  * R5.4 — Bottles are renumbered chronologically for display.
  *
  * After cascade and overlap resolution, the engine sorts bottles by
@@ -189,5 +293,6 @@ const RuleRenumberBottlesChronologically: Rule = {
 export const RULES: Rule[] = [
   RuleProjectBottlePlaceholders,
   RuleCascadeFromLatestRecorded,
+  RuleMoveProjectedBottleOutOfNap,
   RuleRenumberBottlesChronologically,
 ];
