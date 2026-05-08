@@ -75,23 +75,26 @@ const nextId = (): string => {
 
 /**
  * A recorded nap (start/end, completed lifecycle). End is always after start
- * within a sensible duration window.
+ * within a sensible duration window. The eventKey targets one of the four
+ * default nap-chain slots (nap_1..nap_4) so cascade-anchoring scenarios
+ * actually exercise R3.3/R3.5/R3.6 in property runs.
  */
 export const arbRecordedNap: fc.Arbitrary<Event> = fc
   .record({
+    slot: fc.integer({ min: 1, max: 4 }),
     start: fc.integer({ min: 6 * 60, max: 18 * 60 }),
     durationMinutes: fc.integer({ min: 10, max: 180 }),
   })
-  .map(({ start, durationMinutes }) => {
+  .map(({ slot, start, durationMinutes }) => {
     const event: Event = {
       id: nextId(),
       dayId: "day_test",
-      eventKey: `nap_recorded_${start}`,
+      eventKey: `nap_${slot}`,
       type: "nap",
       kind: "block",
       startTime: start,
       endTime: start + durationMinutes,
-      label: "Nap",
+      label: `Nap ${slot}`,
       hasPutdown: false,
       lifecycle: { state: "completed", committedAt: start },
     };
@@ -123,7 +126,23 @@ export const arbActuals: fc.Arbitrary<Event[]> = fc.array(
 
 export const arbDay: fc.Arbitrary<Day> = arbDayTime.map((wakeTime) => aDay({ wakeTime }));
 
-export const arbSettings: fc.Arbitrary<Settings> = fc.constant(aSettings());
+/**
+ * Settings vary enough to exercise different cadence shapes. Held within
+ * realistic ranges so the cascade still produces sensible scenarios.
+ */
+export const arbSettings: fc.Arbitrary<Settings> = fc
+  .record({
+    bottlesPerDay: fc.integer({ min: 2, max: 8 }),
+    bedtimeThresholdHour: fc.integer({ min: 18, max: 21 }),
+    bottleIntervalMinutes: fc.constantFrom(150, 180, 210),
+  })
+  .map(({ bottlesPerDay, bedtimeThresholdHour, bottleIntervalMinutes }) =>
+    aSettings({
+      bottleChain: { bottlesPerDay, bufferAfterWakeMinutes: 10 },
+      bedtimeThreshold: bedtimeThresholdHour * 60,
+      defaultBottleIntervalMinutes: bottleIntervalMinutes,
+    }),
+  );
 
 export const arbProjectInput: fc.Arbitrary<ProjectInput> = fc
   .record({

@@ -146,10 +146,12 @@ function checkRealityWins(ruleId: string, before: Event[], after: Event[]): void
 }
 
 /**
- * Recorded events have authoritative time, owner, and payload. Display fields
- * (label, hasPutdown) MAY be re-derived by rules.
+ * Recorded events have authoritative type, time, owner, and payload.
+ * Display fields (label, hasPutdown) MAY be re-derived by rules. eventKey
+ * is also mutable (R5.4 chronological renumber rewrites recorded bottle keys).
  */
 function recordedFieldsMatch(a: Event, b: Event): boolean {
+  if (a.type !== b.type) return false;
   if (a.startTime !== b.startTime) return false;
   if (a.endTime !== b.endTime) return false;
   if (a.amountOz !== b.amountOz) return false;
@@ -168,10 +170,10 @@ function sameOwner(a: Event["owner"], b: Event["owner"]): boolean {
 
 function sameLifecycle(a: Lifecycle, b: Lifecycle): boolean {
   if (a.state !== b.state) return false;
-  if (a.state === "started" && b.state === "started") {
-    return a.committedAt === b.committedAt;
-  }
-  if (a.state === "completed" && b.state === "completed") {
+  if (
+    (a.state === "started" && b.state === "started") ||
+    (a.state === "completed" && b.state === "completed")
+  ) {
     return a.committedAt === b.committedAt;
   }
   return true;

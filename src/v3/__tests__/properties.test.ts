@@ -60,3 +60,24 @@ describe("Output ordering", () => {
     );
   });
 });
+
+describe("R5.6 — projected bottles are never inside any nap region", () => {
+  it("no PROJECTED bottle's startTime falls strictly inside any nap interval", () => {
+    fc.assert(
+      fc.property(arbProjectInput, (input) => {
+        const out = projectDay(input);
+        const naps = out.filter((e) => e.type === "nap" && e.endTime !== undefined);
+        const projectedBottles = out.filter(
+          (e) => e.type === "bottle" && e.lifecycle.state === "projected",
+        );
+        for (const bottle of projectedBottles) {
+          for (const nap of naps) {
+            const inside = bottle.startTime > nap.startTime && bottle.startTime < nap.endTime!;
+            expect(inside).toBe(false);
+          }
+        }
+      }),
+      { numRuns: NUM_RUNS },
+    );
+  });
+});

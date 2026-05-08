@@ -14,6 +14,7 @@
 
 import type { Event } from "../../schemas";
 import type { Rule } from "../evaluator";
+import { isProjected } from "../helpers";
 
 const RuleSetHasPutdown: Rule = {
   id: "R6.1",
@@ -30,7 +31,7 @@ const RuleSetHasPutdown: Rule = {
 
 function deriveHasPutdown(e: Event, nowMinutes: number): boolean {
   if (e.type !== "nap" && e.type !== "bedtime") return false;
-  if (e.lifecycle.state !== "projected") return false;
+  if (!isProjected(e)) return false;
   return e.startTime > nowMinutes;
 }
 

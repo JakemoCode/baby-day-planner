@@ -85,6 +85,46 @@ describe("R8.1 — disabled dream feed emits nothing", () => {
   });
 });
 
+describe("R8.3 — clamped dream feed never lands before its bedtime", () => {
+  it("when bedtime + offset > latest, dream feed is suppressed (no causality inversion)", () => {
+    // Manual bedtime at 23:00 (e.g. travel night), offset 90 → would-be 24:30.
+    // latestTime is 21:00 from defaults. min(24:30, 21:00) = 21:00, which is
+    // BEFORE bedtime → invalid. The rule must suppress emission.
+    const ctx = aContext({
+      day: aDay({ wakeTime: 7 * 60 }),
+      settings: aSettings({
+        wakeWindowsMinutes: [120, 135, 135, 150],
+        bedtimeThreshold: 19 * 60,
+        dreamFeedEnabled: true,
+        dreamFeedStart: 20 * 60 + 30,
+        dreamFeedEnd: 21 * 60,
+        dreamFeedOffsetAfterBedtimeMinutes: 90,
+      }),
+      actuals: [
+        aProjectedBedtime({
+          id: "manual_late_bedtime",
+          start: 23 * 60,
+          end: 30 * 60,
+          owner: PARENT1,
+          lifecycle: { state: "completed", committedAt: 23 * 60 },
+        }),
+      ],
+    });
+
+    const out = projectDay(
+      {
+        day: ctx.day,
+        settings: ctx.settings,
+        actuals: ctx.actuals,
+        nowMinutes: ctx.nowMinutes,
+      },
+      { rules: ALL },
+    );
+
+    expect(out.find((e) => e.type === "dream_feed")).toBeUndefined();
+  });
+});
+
 describe("R8.2 — no bedtime → no dream feed", () => {
   it("emits nothing when no bedtime is in events", () => {
     // wake_windows array is empty, so no cascade and no threshold trigger.

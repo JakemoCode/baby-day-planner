@@ -206,6 +206,20 @@ describe("evaluate — reality-wins guard", () => {
     );
   });
 
+  it("throws if a rule mutates a recorded event's type", () => {
+    const recorded = aRecordedNap({ start: 13 * 60, end: 14 * 60 });
+    const naughty: Rule = {
+      id: "R.naughty.type",
+      description: "tries to retype a recorded nap as bedtime",
+      matches: () => true,
+      produces: (events) =>
+        events.map((e: Event) => (e.id === recorded.id ? { ...e, type: "bedtime" } : e)),
+    };
+    expect(() => evaluate([naughty], aContext({ actuals: [recorded] }))).toThrow(
+      /mutated recorded event/,
+    );
+  });
+
   it("allows display-only mutations on recorded events (label, hasPutdown)", () => {
     const recorded = aRecordedNap({
       start: 13 * 60,

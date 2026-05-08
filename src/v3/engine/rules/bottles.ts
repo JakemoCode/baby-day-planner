@@ -4,8 +4,38 @@
  * Source: docs/v3/REQUIREMENTS.md §5.
  */
 
-import { isRecorded, type Context, type Event } from "../../schemas";
+import type { Context, Event } from "../../schemas";
 import type { Rule } from "../evaluator";
+import { hasType, isProjected, isRecordedEvent, projectedEvent } from "../helpers";
+
+// ---------------------------------------------------------------------------
+// Bottle helpers
+// ---------------------------------------------------------------------------
+
+const isBottle = hasType("bottle");
+
+function buildProjectedBottle(ctx: Context, n: number, startTime: number): Event {
+  // ID is keyed to startTime, NOT slot number. Slot number changes when
+  // R5.4 renumbers chronologically, so a slot-keyed id would be unstable
+  // across passes — the same projection could end up with two different
+  // ids on consecutive evaluator passes, which would defeat the
+  // fixed-point check and risk convergence loops. startTime is what the
+  // event IS; the eventKey/label are how we display it.
+  return projectedEvent({
+    ctx,
+    id: `proj_bottle_t${startTime}`,
+    eventKey: `bottle_${n}`,
+    type: "bottle",
+    kind: "instant",
+    startTime,
+    label: `Bottle ${n}`,
+    amountOz: ctx.settings.defaultBottleAmountOz,
+  });
+}
+
+// ---------------------------------------------------------------------------
+// R5.11 — Project bottle placeholders
+// ---------------------------------------------------------------------------
 
 /**
  * R5.11 — Project bottle placeholders up to settings.bottleChain.bottlesPerDay.
@@ -28,17 +58,9 @@ const RuleProjectBottlePlaceholders: Rule = {
     "Project bottle placeholders up to bottlesPerDay, anchored at wake + buffer when no recordings yet",
   matches: (events, ctx) => {
     if (ctx.day.wakeTime === undefined) return false;
-    const bottlesProjected = events.some(
-      (e) => e.type === "bottle" && e.lifecycle.state === "projected",
-    );
-    const bottlesRecorded = events.some(
-      (e) =>
-        e.type === "bottle" &&
-        (e.lifecycle.state === "started" || e.lifecycle.state === "completed"),
-    );
     // Fire only when no bottles of any kind exist yet — placeholders
     // need a clean slate. Once recordings land, R5.1 owns the cascade.
-    return !bottlesProjected && !bottlesRecorded;
+    return !events.some(isBottle);
   },
   produces: (events, ctx) => projectPlaceholders(ctx, events),
 };
@@ -49,27 +71,19 @@ function projectPlaceholders(ctx: Context, existing: Event[]): Event[] {
 
   const { bottlesPerDay, bufferAfterWakeMinutes } = ctx.settings.bottleChain;
   const interval = ctx.settings.defaultBottleIntervalMinutes;
+  const firstStart = wakeTime + bufferAfterWakeMinutes;
 
   const placeholders: Event[] = [];
   for (let i = 0; i < bottlesPerDay; i++) {
-    const start = wakeTime + bufferAfterWakeMinutes + i * interval;
-    const n = i + 1;
-    placeholders.push({
-      id: `proj_bottle_${n}`,
-      dayId: ctx.day.id,
-      eventKey: `bottle_${n}`,
-      type: "bottle",
-      kind: "instant",
-      startTime: start,
-      label: `Bottle ${n}`,
-      hasPutdown: false,
-      lifecycle: { state: "projected" },
-      amountOz: ctx.settings.defaultBottleAmountOz,
-    });
+    placeholders.push(buildProjectedBottle(ctx, i + 1, firstStart + i * interval));
   }
 
   return [...existing, ...placeholders];
 }
+
+// ---------------------------------------------------------------------------
+// R5.1 — Cascade from the latest recorded bottle
+// ---------------------------------------------------------------------------
 
 /**
  * R5.1 — Once at least one bottle has been recorded, the cascade resumes
@@ -86,29 +100,26 @@ const RuleCascadeFromLatestRecorded: Rule = {
   id: "R5.1",
   description: "Cascade additional projected bottles from the latest recorded bottle",
   matches: (events, ctx) => {
-    const bottles = events.filter((e) => e.type === "bottle");
-    const hasRecorded = bottles.some((b) => isRecorded(b.lifecycle));
-    if (!hasRecorded) return false;
+    const bottles = events.filter(isBottle);
+    if (!bottles.some(isRecordedEvent)) return false;
     return bottles.length < ctx.settings.bottleChain.bottlesPerDay;
   },
   produces: (events, ctx) => cascadeFromLatest(ctx, events),
 };
 
 function cascadeFromLatest(ctx: Context, existing: Event[]): Event[] {
-  const bottles = existing.filter((e) => e.type === "bottle");
-  const hasRecorded = bottles.some((b) => isRecorded(b.lifecycle));
-  if (!hasRecorded) return existing;
+  const bottles = existing.filter(isBottle);
+  if (!bottles.some(isRecordedEvent)) return existing;
+
+  const target = ctx.settings.bottleChain.bottlesPerDay;
+  const needed = target - bottles.length;
+  if (needed <= 0) return existing;
 
   // Cascade from the latest bottle of ANY kind. The chain may already
   // include projections downstream of a recorded anchor; we extend from
   // the tip, not from the recorded anchor itself, so we don't re-emit
   // at the same times on subsequent evaluator passes.
   const latest = bottles.reduce((max, b) => (b.startTime > max.startTime ? b : max));
-
-  const target = ctx.settings.bottleChain.bottlesPerDay;
-  const interval = ctx.settings.defaultBottleIntervalMinutes;
-  const needed = target - bottles.length;
-  if (needed <= 0) return existing;
 
   // Find the highest existing eventKey index so new keys don't collide
   // (R5.3 — index from MAX, not latest-by-time).
@@ -118,6 +129,7 @@ function cascadeFromLatest(ctx: Context, existing: Event[]): Event[] {
     return Math.max(m, parseInt(match[1]!, 10));
   }, 0);
 
+  const interval = ctx.settings.defaultBottleIntervalMinutes;
   // R5.8: cascade stops when the next projected start would land at or
   // after tomorrow's defaultWakeTime. After that point, the bottle
   // belongs to tomorrow, not today.
@@ -127,23 +139,15 @@ function cascadeFromLatest(ctx: Context, existing: Event[]): Event[] {
   for (let i = 1; i <= needed; i++) {
     const start = latest.startTime + i * interval;
     if (start >= tomorrowWake) break; // R5.8
-    const n = maxIndex + i;
-    projections.push({
-      id: `proj_bottle_${n}`,
-      dayId: ctx.day.id,
-      eventKey: `bottle_${n}`,
-      type: "bottle",
-      kind: "instant",
-      startTime: start,
-      label: `Bottle ${n}`,
-      hasPutdown: false,
-      lifecycle: { state: "projected" },
-      amountOz: ctx.settings.defaultBottleAmountOz,
-    });
+    projections.push(buildProjectedBottle(ctx, maxIndex + i, start));
   }
 
   return [...existing, ...projections];
 }
+
+// ---------------------------------------------------------------------------
+// R5.6 — Move projected bottles out of naps
+// ---------------------------------------------------------------------------
 
 /**
  * R5.6 — Move a projected bottle that lands inside a nap to the nap edge
@@ -224,11 +228,11 @@ function mergedNapRegions(events: Event[]): Region[] {
 
 function findFirstOverlap(events: Event[]): Overlap | null {
   const regions = mergedNapRegions(events);
-  for (const e of events) {
-    if (e.type !== "bottle") continue;
-    if (e.lifecycle.state !== "projected") continue;
-    const region = regions.find((r) => e.startTime > r.start && e.startTime < r.end);
-    if (region) return { bottle: e, region };
+  if (regions.length === 0) return null;
+  for (const event of events) {
+    if (!isBottle(event) || !isProjected(event)) continue;
+    const region = regions.find((r) => event.startTime > r.start && event.startTime < r.end);
+    if (region) return { bottle: event, region };
   }
   return null;
 }
@@ -243,11 +247,15 @@ function predictedNextStart(
   // there's no cadence to honor — fall back to current startTime so the
   // edge with smallest |edge - currentStart| is chosen.
   const earlier = events
-    .filter((e) => e.type === "bottle" && e.id !== bottle.id && e.startTime < bottle.startTime)
+    .filter((e) => isBottle(e) && e.id !== bottle.id && e.startTime < bottle.startTime)
     .sort((a, b) => b.startTime - a.startTime)[0];
   if (!earlier) return bottle.startTime;
   return earlier.startTime + ctx.settings.defaultBottleIntervalMinutes;
 }
+
+// ---------------------------------------------------------------------------
+// R5.4 — Renumber bottles chronologically
+// ---------------------------------------------------------------------------
 
 /**
  * R5.4 — Bottles are renumbered chronologically for display.
@@ -267,21 +275,17 @@ const RuleRenumberBottlesChronologically: Rule = {
   description: "Renumber bottle eventKey/label chronologically for display",
   dependsOn: ["R5.1", "R5.11"],
   matches: (events) => {
-    const bottles = events
-      .filter((e) => e.type === "bottle")
-      .sort((a, b) => a.startTime - b.startTime);
-    return bottles.some((b, i) => b.eventKey !== `bottle_${i + 1}`);
+    const ordered = bottlesByStartTime(events);
+    return ordered.some((b, i) => b.eventKey !== `bottle_${i + 1}`);
   },
   produces: (events) => {
-    const ordered = [...events].filter((e) => e.type === "bottle");
-    ordered.sort((a, b) => a.startTime - b.startTime);
     const renamed = new Map<string, { eventKey: string; label: string }>();
-    ordered.forEach((b, i) => {
+    bottlesByStartTime(events).forEach((b, i) => {
       const n = i + 1;
       renamed.set(b.id, { eventKey: `bottle_${n}`, label: `Bottle ${n}` });
     });
     return events.map((e) => {
-      if (e.type !== "bottle") return e;
+      if (!isBottle(e)) return e;
       const next = renamed.get(e.id);
       if (!next) return e;
       if (e.eventKey === next.eventKey && e.label === next.label) return e;
@@ -289,6 +293,10 @@ const RuleRenumberBottlesChronologically: Rule = {
     });
   },
 };
+
+function bottlesByStartTime(events: Event[]): Event[] {
+  return events.filter(isBottle).sort((a, b) => a.startTime - b.startTime);
+}
 
 export const RULES: Rule[] = [
   RuleProjectBottlePlaceholders,

@@ -153,16 +153,24 @@ describe("R3.4 / R3.5 — wake window endTime tracks the next nap's start", () =
   });
 });
 
-describe("R3.8 — short-nap adjustment ONLY applies if previous nap was recorded", () => {
-  it("an overridden nap_1 (owner-only annotation) does NOT trigger adjustment", () => {
-    // The lifecycle is `overridden` — owner edit on a still-future projection.
-    // Even if its apparent duration is short, R3.8 says the cascade ignores
-    // it for short-nap-adjustment purposes. ww_2 length stays at default 90.
-    const annotatedNap1 = aRecordedNap({
+describe("R3.3 / R3.8 — overridden nap doesn't anchor cascade times", () => {
+  it("with an overridden nap_1 at a NON-natural time, cascade computes WW endpoints from defaults", () => {
+    // Overridden = "user assigned an owner before the nap happened." Per R3.3,
+    // these annotations carry the owner forward but DON'T pin times. The
+    // cascade should compute ww_1 / ww_2 endpoints purely from
+    // wakeWindowsMinutes, ignoring the overridden's stored startTime / endTime.
+    //
+    // Settings: WW [120, 90], napLen 60, wake 7:00.
+    // Natural cascade:
+    //   ww_1 7:00-9:00, nap_1 9:00-10:00, ww_2 10:00-11:30, nap_2 11:30-12:30.
+    // The overridden nap_1 sits at 9:30-9:50 (NOT at the natural 9:00-10:00).
+    // Despite that, ww_1 must still end at 9:00 and ww_2 must still start
+    // at 10:00.
+    const overriddenNap1 = aRecordedNap({
       id: "annotated_nap_1",
       eventKey: "nap_1",
-      start: 9 * 60,
-      end: 9 * 60 + 20,
+      start: 9 * 60 + 30,
+      end: 9 * 60 + 50,
       lifecycle: { state: "overridden", annotatedAt: 8 * 60 },
     });
 
@@ -174,7 +182,7 @@ describe("R3.8 — short-nap adjustment ONLY applies if previous nap was recorde
         shortNapThresholdMinutes: 35,
         shortNapAdjustmentMinutes: 10,
       }),
-      actuals: [annotatedNap1],
+      actuals: [overriddenNap1],
     });
 
     const out = projectDay(
@@ -187,13 +195,22 @@ describe("R3.8 — short-nap adjustment ONLY applies if previous nap was recorde
       { rules: NAP_RULES },
     );
 
+    const ww1 = out.find((e) => e.eventKey === "wake_window_1");
+    expect(ww1?.startTime).toBe(7 * 60);
+    expect(ww1?.endTime).toBe(9 * 60); // natural — NOT 9:30
+
     const ww2 = out.find((e) => e.eventKey === "wake_window_2");
-    expect(ww2).toBeDefined();
-    // ww_2 starts where nap_1 was annotated to end (we treat the
-    // overridden nap's startTime as a hint to anchor cascade), and runs the
-    // FULL default 90 — no short-nap shortening.
-    const ww2Length = ww2!.endTime! - ww2!.startTime;
-    expect(ww2Length).toBe(90);
+    expect(ww2?.startTime).toBe(10 * 60); // natural — NOT 9:50
+    expect(ww2?.endTime).toBe(11 * 60 + 30);
+
+    // The overridden event itself is preserved in events (carries owner forward).
+    const napOne = out.find((e) => e.id === overriddenNap1.id);
+    expect(napOne).toBeDefined();
+    expect(napOne!.lifecycle.state).toBe("overridden");
+
+    // R3.8: overridden's apparent 20-min duration does NOT trigger
+    // short-nap-adjust on ww_2. Length still 90.
+    expect(ww2!.endTime! - ww2!.startTime).toBe(90);
   });
 });
 

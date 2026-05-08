@@ -9,6 +9,10 @@
 
 import type { Event } from "../../schemas";
 import type { Rule } from "../evaluator";
+import { hasType, isProjected, projectedEvent } from "../helpers";
+
+const isNap = hasType("nap");
+const isBedtime = hasType("bedtime");
 
 /**
  * R7.6 / R7.5 — `bedtimeThreshold` triggers cascade replacement: the first
@@ -26,20 +30,15 @@ const RuleThresholdBedtime: Rule = {
     "Replace the first projected nap whose interval reaches bedtimeThreshold with a projected bedtime",
   dependsOn: ["R3.1"],
   matches: (events, ctx) => {
-    if (events.some((e) => e.type === "bedtime")) return false;
-    return events.some(
-      (e) =>
-        e.type === "nap" &&
-        e.lifecycle.state === "projected" &&
-        napReachesThreshold(e, ctx.settings.bedtimeThreshold),
-    );
+    if (events.some(isBedtime)) return false;
+    return findFirstProjectedNapReachingThreshold(events, ctx.settings.bedtimeThreshold) !== null;
   },
   produces: (events, ctx) => {
     const trigger = findFirstProjectedNapReachingThreshold(events, ctx.settings.bedtimeThreshold);
     if (!trigger) return events;
-    const bedtime: Event = {
+    const bedtime = projectedEvent({
+      ctx,
       id: "proj_bedtime",
-      dayId: ctx.day.id,
       eventKey: "bedtime",
       type: "bedtime",
       kind: "block",
@@ -48,9 +47,7 @@ const RuleThresholdBedtime: Rule = {
       // (24*60 minutes ahead in cross-day notation).
       endTime: ctx.settings.defaultWakeTime + 24 * 60,
       label: "Bedtime",
-      hasPutdown: false,
-      lifecycle: { state: "projected" },
-    };
+    });
     return events.filter((e) => e.id !== trigger.id).concat(bedtime);
   },
 };
@@ -67,14 +64,10 @@ function napReachesThreshold(nap: Event, threshold: number): boolean {
   return false;
 }
 
-function findFirstProjectedNapReachingThreshold(
-  events: Event[],
-  threshold: number,
-): Event | undefined {
-  let best: Event | undefined;
+function findFirstProjectedNapReachingThreshold(events: Event[], threshold: number): Event | null {
+  let best: Event | null = null;
   for (const e of events) {
-    if (e.type !== "nap") continue;
-    if (e.lifecycle.state !== "projected") continue;
+    if (!isNap(e) || !isProjected(e)) continue;
     if (!napReachesThreshold(e, threshold)) continue;
     if (!best || e.startTime < best.startTime) best = e;
   }
@@ -96,24 +89,18 @@ const RuleDropProjectedNapsAfterBedtime: Rule = {
   description: "Drop projected naps starting at/after a bedtime event (recorded naps stand)",
   dependsOn: ["R7.6"],
   matches: (events) => {
-    const bedtime = events.find((e) => e.type === "bedtime");
+    const bedtime = events.find(isBedtime);
     if (!bedtime) return false;
-    return events.some(
-      (e) =>
-        e.type === "nap" && e.lifecycle.state === "projected" && e.startTime >= bedtime.startTime,
-    );
+    return events.some((e) => isProjectedNapAfter(e, bedtime.startTime));
   },
   produces: (events) => {
-    const bedtime = events.find((e) => e.type === "bedtime")!;
-    return events.filter(
-      (e) =>
-        !(
-          e.type === "nap" &&
-          e.lifecycle.state === "projected" &&
-          e.startTime >= bedtime.startTime
-        ),
-    );
+    const bedtime = events.find(isBedtime)!;
+    return events.filter((e) => !isProjectedNapAfter(e, bedtime.startTime));
   },
 };
+
+function isProjectedNapAfter(event: Event, threshold: number): boolean {
+  return isNap(event) && isProjected(event) && event.startTime >= threshold;
+}
 
 export const RULES: Rule[] = [RuleThresholdBedtime, RuleDropProjectedNapsAfterBedtime];
