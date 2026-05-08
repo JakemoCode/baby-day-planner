@@ -7,7 +7,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { aContext, aDay, aSettings } from "../../__tests__/factories";
+import { aContext, aDay, aRecordedNap, aSettings } from "../../__tests__/factories";
 import { projectDay } from "../projectDay";
 import { RULES as NAP_RULES } from "./naps";
 
@@ -80,5 +80,48 @@ describe("R3.1 — projected nap chain from wakeWindowsMinutes", () => {
         lifecycle: "projected",
       },
     ]);
+  });
+});
+
+describe("R3.3 — recorded naps coexist with projected cascade", () => {
+  it("with a recorded nap_2 at the projected time, output is ww_1, nap_1 (proj), ww_2 (proj), nap_2 (recorded)", () => {
+    const recordedNap2 = aRecordedNap({
+      id: "actual_nap_2",
+      eventKey: "nap_2",
+      start: 11 * 60 + 30,
+      end: 12 * 60 + 30,
+    });
+
+    const ctx = aContext({
+      day: aDay({ wakeTime: 7 * 60 }),
+      settings: aSettings({
+        wakeWindowsMinutes: [120, 90],
+        defaultNapLengthMinutes: 60,
+      }),
+      actuals: [recordedNap2],
+    });
+
+    const out = projectDay(
+      {
+        day: ctx.day,
+        settings: ctx.settings,
+        actuals: ctx.actuals,
+        nowMinutes: ctx.nowMinutes,
+      },
+      { rules: NAP_RULES },
+    );
+
+    // Exactly 4 events: ww_1, nap_1, ww_2, nap_2 (no duplicate nap_2).
+    expect(out.map((e) => e.eventKey)).toEqual([
+      "wake_window_1",
+      "nap_1",
+      "wake_window_2",
+      "nap_2",
+    ]);
+
+    // The recorded nap_2 must be the one in the output (preserved per §0).
+    const napTwo = out.find((e) => e.eventKey === "nap_2");
+    expect(napTwo?.id).toBe(recordedNap2.id);
+    expect(napTwo?.lifecycle.state).toBe("completed");
   });
 });

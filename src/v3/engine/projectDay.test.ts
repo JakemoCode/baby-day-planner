@@ -4,16 +4,19 @@ import type { Rule } from "./evaluator";
 import { projectDay } from "./projectDay";
 
 describe("projectDay", () => {
-  it("with the empty default rule set, returns actuals sorted by startTime", () => {
+  it("with an empty rule set, returns actuals sorted by startTime", () => {
     const ctx = aContext({
       actuals: [aRecordedNap({ start: 13 * 60, end: 14 * 60 }), aRecordedBottle({ start: 9 * 60 })],
     });
-    const out = projectDay({
-      day: ctx.day,
-      settings: ctx.settings,
-      actuals: ctx.actuals,
-      nowMinutes: ctx.nowMinutes,
-    });
+    const out = projectDay(
+      {
+        day: ctx.day,
+        settings: ctx.settings,
+        actuals: ctx.actuals,
+        nowMinutes: ctx.nowMinutes,
+      },
+      { rules: [] },
+    );
     expect(out.map((e) => e.startTime)).toEqual([9 * 60, 13 * 60]);
   });
 
