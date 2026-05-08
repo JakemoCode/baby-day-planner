@@ -12,8 +12,6 @@
  */
 
 import type { Rule } from "../evaluator";
+import { RULES as NAP_RULES } from "./naps";
 
-// Domain rule files — populated as Phase 1 builds them out.
-// Empty for now; the evaluator handles an empty rule set as identity.
-
-export const ALL_RULES: Rule[] = [];
+export const ALL_RULES: Rule[] = [...NAP_RULES];
