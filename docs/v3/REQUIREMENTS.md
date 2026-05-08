@@ -18,6 +18,7 @@
 
 ## Table of Contents
 
+- [§0 Engine Philosophy — Predictive, Not Prescriptive](#0-engine-philosophy--predictive-not-prescriptive)
 - [§1 Event Data Model](#1-event-data-model)
 - [§2 Event Lifecycle & Status](#2-event-lifecycle--status)
 - [§3 Naps](#3-naps)
@@ -38,6 +39,48 @@
 - [§18 Dashboard](#18-dashboard)
 - [§19 Settings](#19-settings)
 - [§20 Persistence (Firestore)](#20-persistence-firestore)
+- [§21 Daycare Dropoff & Pickup](#21-daycare-dropoff--pickup)
+- [§22 Membership Management](#22-membership-management)
+
+---
+
+## §0 Engine Philosophy — Predictive, Not Prescriptive
+
+The engine's job is to **predict and plan**, not to enforce. Given a
+set of recorded events (actuals), configuration (templates, settings,
+owners), and the current time, it produces a forecast of the rest of
+the day.
+
+**Reality wins.** When user-recorded reality conflicts with the
+forecast, the engine reshapes the forecast around what actually
+happened, never the reverse. Saving an actual event re-runs the
+cascade; the day is re-predicted, not validated against the old
+prediction.
+
+**Validations exist only at two boundaries:**
+1. **Data integrity** — values that are physically impossible or
+   would corrupt persistence (negative durations, missing required
+   fields, malformed times). These reject saves with field-level
+   errors.
+2. **Interface hygiene** — confirm dialogs that protect against
+   button-mash duplicates and "did you really mean this?" cases. These
+   *delay* a save with a single confirm; they never block.
+
+The engine never refuses to record an event because it conflicts with
+its own projection. A recorded mid-nap bottle, a recorded nap during
+"bedtime," a recorded wake window stretching past a bedtime threshold
+— all are accepted; the engine adjusts everything downstream.
+
+**Probability framing.** Settings like `bedtimeThreshold` express
+"after this time, the most likely interpretation of a sleep event is
+that it's bedtime." They don't impose; they shape the prediction and
+sometimes prompt the user to confirm an interpretation. See R7.6 and
+R7.6.1.
+
+Every rule in this document should be readable through this lens. If a
+rule reads as "the engine refuses X," check whether it's data
+integrity, interface hygiene, or actually prescriptive. The third case
+is a bug in the requirements.
 
 ---
 
@@ -317,25 +360,44 @@ Unrecorded annotations have no real duration to learn from.
 - **Edge case it prevents**: phantom adjustment cascading off a stale
   projected duration.
 
-### R3.9 Naps that overlap RECORDED naps are blocked at the drawer
+### R3.9 Naps overlapping another nap prompt to merge (interface hygiene)
 
-Drawer validation rejects a save if the new (start, end) range overlaps
-any other nap with `recorded === true`. Projected and `recorded: false`
-naps don't block — they get recalculated by the engine.
+If a nap save would create a nap whose range overlaps another
+**recorded** nap, the drawer prompts: *"This overlaps Nap N. Merge
+into one nap?"* — Merge / Keep Separate / Cancel. Merge produces a
+single nap spanning the union of both ranges (`min(start)` →
+`max(end)`), preserving the lower nap ordinal and discarding the
+higher one. Keep Separate persists both as-is.
 
-- **Why**: prevents user from accidentally double-booking actual naps
-  while letting them displace projections.
-- **Edge case it prevents**: blocking "I'm recording Nap 2 at 1pm" just
-  because projected Nap 3 also lives at 1pm.
+Overlap with **projected** naps doesn't prompt — saving the new nap
+re-runs the cascade and the projection adjusts.
 
-### R3.10 Nap cannot have `endTime <= startTime`
+- **Why** (predictive lens): two genuinely-recorded simultaneous naps
+  are nearly always one nap that the user logged in two pieces (Start,
+  forgot to End, started again). The engine doesn't refuse the save —
+  it offers the most likely interpretation.
+- **Edge case it prevents**: timeline showing Nap 2 (14:00–14:45) and
+  Nap 3 (14:30–15:30) as separate when they're really one nap.
+
+### R3.10 Nap cannot have `endTime <= startTime` (data integrity)
 
 Drawer validation blocks save with a field-level error message.
 
-- **Why**: zero-length and inverted ranges aren't useful. The dashboard
-  5-min confirm guard handles "ended too soon" before this check.
-- **Edge case it prevents**: persisting nap_3 with start=10:00, end=9:30
-  which the renderer can't draw.
+- **Why**: zero-length and inverted ranges are physically impossible
+  data — this is the data-integrity boundary from §0, not a
+  prescriptive rule.
+- **Edge case it prevents**: persisting nap_3 with start=10:00,
+  end=9:30 which the renderer can't draw.
+
+### R3.10.1 Naps validate against a "realistic" duration range
+
+Drawer validation surfaces a *warning* (not a block) if a nap's
+duration falls outside `[settings.napDurationMin, napDurationMax]`
+(defaults: 5 min – 240 min). The user can confirm and save anyway.
+
+- **Why** (interface hygiene from §0): catches typos like a 20-hour
+  nap from picking the wrong AM/PM, without prescribing what a "real"
+  nap looks like for any given child.
 
 ### R3.11 Naps under 24px tall are clamped UP for tappability
 
@@ -459,15 +521,26 @@ their original eventKey. Lookups by `id` stay intact.
 - **Why**: changing eventKey in Firestore would break references and
   audit history.
 
-### R5.6 Bottle inside a nap moves to the nearer nap edge
+### R5.6 Projected bottles move to whichever nap edge is closer to the predicted interval
 
-If a projected bottle's startTime is strictly between a nap's start
-and end, move the bottle to the closer edge. If the closer edge is in
-the past (`< nowMinutes`), move to the far edge instead.
+If a **projected** bottle's startTime falls strictly between a nap's
+start and end, the engine moves the bottle to whichever nap edge —
+before-nap-start or after-nap-end — lands closer to the previous
+bottle's start time + the predicted bottle interval at that point in
+the day. If the closer edge is in the past (`< nowMinutes`), move to
+the far edge instead.
 
-- **Why**: "no bottles in the middle of naps" — Jake's gospel rule.
-- **Edge case it prevents**: parent attempts to bottle-feed a sleeping
-  baby because the projection said so.
+**Recorded bottles are never moved.** A user-logged mid-nap bottle is
+genuine data (rare, but real — dream feed mid-stretch, parent woke
+the baby on purpose). The cascade picks back up from the recorded
+bottle's actual time per R5.1.
+
+- **Why** (predictive lens): the engine forecasts the *likely* next
+  feed time. Bottles "before nap" vs "after nap" are both plausible;
+  pick the one closer to the cadence the cascade was already
+  predicting.
+- **Edge case it prevents**: projection telling a parent to feed a
+  sleeping baby — but only when no actual feed happened in there.
 
 ### R5.7 Bottle overlap resolution iterates to a fixed point
 
@@ -479,35 +552,33 @@ adjustments occur in a pass, bounded by `MAX_PASSES = 8`.
 - **Edge case it prevents**: Bottle 4 moved out of Nap 2 lands inside
   Nap 3.
 
-### R5.8 Bottle chain suppression is governed by an explicit cap, not bedtime
+### R5.8 Bottle chain has no hard upper count or time cutoff
 
-V2 hard-suppressed projected bottles past `bedtimeThreshold`. V3 uses
-an explicit setting:
+V2 hard-suppressed projected bottles past `bedtimeThreshold` AND
+implicitly capped daily emission. V3 removes both. Babies — especially
+newborns — are unpredictable and may feed 8–12+ times/day, including
+overnight. The engine projects bottles via cascade (R5.1) until either:
 
-```ts
-Settings.bottleChain = {
-  // Maximum number of bottles to project per day. Default 6 for an
-  // older infant; set higher for newborns who eat 8+ times/day.
-  maxBottlesPerDay: number;
-  // Latest projected start time. Default bedtime-equivalent for
-  // sleep-through-the-night kids; later (or 24:00) for kids who
-  // genuinely feed multiple times overnight.
-  latestProjectedStart: TimeMin;
-};
-```
+- The next projected start would land at/after the next day's
+  `defaultWakeTime` (then it's tomorrow's bottle, not today's).
+- The user has logged enough bottles that no further projections are
+  needed for the day's expected cadence (see R5.11 for the lower
+  bound that drives placeholder projection).
 
-- **Why**: Aden currently sleeps through ~80% of nights but
-  occasionally feeds at 2–4 AM. Hard-coding "no bottles past 19:00"
-  makes the engine wrong for those nights, AND wrong for younger
-  infants who eat 8+ times/day.
-- **Edge case it prevents**: dream feed projecting at 21:30 then NO
-  more bottles because suppression cuts in. With overnight enabled,
-  cascade continues to project at intervals through the night.
+There is no `maxBottlesPerDay` setting. There is no `latestProjectedStart`
+setting either — the latest projected start is **derived** from the
+cascade itself (the previous bottle's start + interval).
 
-### R5.9 Recorded bottles past the suppression cap are always kept
+- **Why**: prescribing an upper bound makes the engine wrong for
+  newborns and for irregular nights.
+- **Edge case it prevents**: a parent of a 6-week-old hitting an
+  artificial 6-bottle cap and the timeline going blank for the rest of
+  the day.
 
-If the user manually logs a bottle at 03:00, it persists regardless of
-`latestProjectedStart`.
+### R5.9 Recorded bottles are always kept regardless of cadence
+
+If the user manually logs a bottle at 03:00, it persists and seeds the
+next cascade. No suppression based on time of day.
 
 ### R5.10 First bottle of the day is NOT auto-anchored to wake time
 
@@ -522,11 +593,22 @@ bottles cascade from that anchor per R5.1.
   before the user has actually fed the baby, then renumbering happening
   when the real first bottle is logged at 8:15.
 
-### R5.12 Bottle chain has a hard upper bound to prevent infinite emission
+### R5.11 Expected bottles per day drives placeholder projection
 
-Even with overnight enabled, projection stops at
-`Settings.bottleChain.maxBottlesPerDay` per day (default 6, configurable).
-This is a safety cap, not a usage cap.
+`Settings.bottleChain.bottlesPerDay` (whole number; configurable, no
+hard default — set per child's stage) is the **expected lower limit**
+of daily intake. The engine projects bottle placeholders up to this
+count so the timeline shows expected feeding cadence even before any
+bottle has been recorded. Reality routinely exceeds this number;
+additional bottles are added via FAB or via the cascade once one is
+recorded. There is no upper bound (R5.8).
+
+- **Why**: Jake wants the timeline to show the day's expected cadence
+  at a glance, without an auto-anchor at wake time (R5.10) and without
+  prescribing a ceiling that's wrong for newborns.
+- **Edge case it prevents**: empty bottle row first thing in the
+  morning, leaving the user no visual sense of when the next feeds
+  should land.
 
 ### R5.13 Recorded bottles within `minBottleIntervalMinutes` of the previous trigger a confirm
 
@@ -538,67 +620,60 @@ dialog before recording. Default applies if the setting is missing.
 
 ---
 
-## §6 Putdown
+## §6 Putdown — Pure Prediction Layer
 
-### R6.1 Every nap and bedtime emits a putdown event
+### R6.1 Putdown is purely predictive — never recorded, never persisted
 
-Putdown duration = `settings.putdownLeadMinutes` (default 15).
-Putdown ends exactly at the nap or bedtime's start time.
+Putdown is a **render-only reminder** that appears in the timeline
+preceding any projected nap or bedtime. It says: "to get the baby down
+at the predicted start time, begin winding down `~settings.putdownLeadMinutes`
+(default 15) before."
 
-- **Why**: putdown is the visual "transition zone" (last 15 min of the
-  preceding wake window).
-- **Edge case it prevents**: wake window ending abruptly at nap start
-  with no transition cue.
+Putdown is **not an event**. There is no Firestore document, no
+"Start Putdown" / "End Putdown" action, no lifecycle, no owner field
+on a putdown record. The engine derives putdown shapes at render time
+from the upcoming nap/bedtime; persisting nothing.
 
-### R6.2 Putdown emits regardless of nap source
+- **Why** (predictive lens): putdown is a forecast about the parent's
+  behavior, not the baby's. It carries no observation; nothing to
+  record.
+- **Edge case it prevents**: V2's bug where editing nap owner caused
+  the putdown record to disappear because it was a sibling Firestore
+  doc. With no doc, nothing can drop out of sync.
 
-Recorded, manual, projected — all naps get a putdown. Even owner-only
-annotated naps get a putdown.
+### R6.2 Putdown is derived from the next-upcoming projected nap or bedtime
 
-- **Why**: an owner edit shouldn't erase the visual transition cue.
-- **Edge case it prevents**: putdown vanishing when user assigns an
-  owner via /timeline drawer (the bug Jake hit).
+For each projected (`recorded: false`) nap or bedtime whose start is
+in the future relative to `nowMinutes`, the renderer emits a virtual
+putdown ending at the parent's start time, lasting
+`settings.putdownLeadMinutes`.
 
-### R6.3 Putdown inherits owner from its parent (nap or bedtime)
+Recorded naps/bedtime get no putdown (the moment has passed; the
+reminder is no longer useful).
 
-`nap_N_putdown` gets `napOwners[N-1]`. `bedtime_putdown` gets
-`bedtimeOwner ?? lastNapOwner`.
+### R6.3 Putdown inherits its visual owner-tint from its parent
 
-- **Why**: same caregiver does the putdown as the nap/bedtime itself.
+Render-only — purely a styling concern. Putdown stripe color matches
+the parent nap/bedtime's owner (or unowned default).
 
-### R6.4 Putdown blocks render with single-row layout (no range row)
+### R6.4 Putdown renders as a single-row block
 
-Putdown labels are `"Putdown · {time}"` (compact short-time). Owner
-appended inline. Range row is dropped.
+Label format: `"Putdown · {time}"` (compact short-time, e.g.
+`"Putdown · 1:45p"`). Owner stripe only; no range row.
 
-- **Why**: putdown blocks are ~30px tall (15 min × 2px/min); two-row
-  text doesn't fit.
-- **Edge case it prevents**: range row clipping or overlapping the
-  next nap's title.
+### R6.5 Putdown render uses low-contrast warm-tone stripes
 
-### R6.5 Putdown skips MIN_BLOCK_HEIGHT clamp
-
-Putdown blocks render at their natural height (no 24px floor).
-
-- **Why**: the clamp would push 30px putdowns to 24px, and they'd
-  overlap the following nap.
-- **Edge case it prevents**: 2px overlap with next nap from min-height
-  padding.
+Stripe pattern alternates `--color-surface-raised` and `--color-border`
+(both warm cream-ish) so the label text reads cleanly on top.
 
 ### R6.6 Putdown renders ABOVE the parent wake window (z-order)
 
 Z-order rank: `wake_window=1 < nap=2 = bedtime=2 < putdown=3 < extra=4`.
 
-Same-zOrder events render in DOM order; layout ensures putdowns paint
-last among their siblings.
+### R6.7 Putdown is suppressed if `nowMinutes` is past the would-be putdown start
 
-### R6.7 Putdown stripes use low-contrast warm tones
-
-Stripe pattern alternates `--color-surface-raised` and `--color-border`
-(both warm cream-ish) so the label text reads cleanly on top.
-
-- **Why**: high-contrast stripes (e.g. cream + sage) compete with text.
-- **Edge case it prevents**: putdown label illegible against busy stripes.
+If "now" has already passed the putdown's lead-time window, don't
+render it — the reminder window has elapsed.
 
 ---
 
@@ -631,75 +706,105 @@ ignored.
 Users tap a time, not a range. Engine fills `endTime` so the block
 extends through the night.
 
-### R7.4 Naps starting at or after bedtime are dropped
+### R7.4 Projected naps starting at or after a bedtime event are not projected
 
-Any nap with `startTime >= bedtime.startTime` is removed from the event
-list.
+When the engine has emitted a bedtime event (whether via threshold
+R7.6 or manual record R7.7), it stops projecting further naps for the
+day. Already-recorded naps after that time are kept as-is — see §0,
+reality wins.
 
-### R7.5 Naps that cross bedtime are dropped entirely (not clipped)
+### R7.5 Projected naps crossing a bedtime are stopped at the bedtime start
 
-If a nap's `startTime < bedtime` but `endTime > bedtime`, drop the
-whole nap. Don't show a 5-minute sliver before sleep.
+A *projected* nap whose start would be < bedtime but whose end would
+extend past bedtime is replaced by bedtime (the cascade was about to
+predict a bedtime-shaped event anyway). A *recorded* nap crossing a
+bedtime is kept — that's the user telling the engine "Aden actually
+napped past the bedtime threshold tonight."
 
-### R7.6 `bedtimeThreshold` is a trigger: the first nap that would start at/after it becomes bedtime
+### R7.6 `bedtimeThreshold` describes the time after which any sleep is *most likely* bedtime
 
-In plain English: as the engine projects the day forward, it checks
-each nap's start time. **The first nap whose start time is at or
-after `settings.bedtimeThreshold` is replaced by bedtime.** That
-nap's start time becomes bedtime's start time. The preceding wake
-window keeps its natural length — nothing is clipped or shortened.
+`settings.bedtimeThreshold` (default `"19:00"`) is a probability
+shaping device: after this clock time, when the baby goes down, he is
+**almost certainly** going to stay down for the night, regardless of
+the parent's intent.
+
+The engine uses it in two ways:
+
+1. **Cascade replacement** — when projecting the day, the first nap
+   whose start time would land at or after the threshold is replaced
+   by bedtime. The bedtime event takes that nap's start time. The
+   preceding wake window keeps its natural length; nothing is clipped.
+2. **Convert prompt** (R7.6.1) — when the user starts a recorded nap
+   close enough to the threshold that it might really be bedtime, the
+   UI asks.
+
+The threshold does NOT clip wake windows. It does NOT prevent the user
+from recording a normal nap after that time (Aden could still wake up
+after a standard nap length — slim, not zero). It only shapes the
+*default prediction* and the *convert prompt*.
+
+- **Why** (predictive lens): "almost certainly bedtime" is not "must
+  be bedtime." The threshold expresses likelihood; the engine acts on
+  the likelihood without imposing.
+
+### R7.6.1 Recorded sleep starting within `defaultNapLengthMinutes` of `bedtimeThreshold` prompts to convert to bedtime
+
+When the user records a sleep event whose start time is within
+`settings.defaultNapLengthMinutes` of `bedtimeThreshold` (i.e. a
+nap-length window ending at the threshold), the UI prompts:
+*"Start bedtime instead of Nap N?"* — Bedtime / Nap / Cancel.
+
+Picking Bedtime converts the event's `kind` to `"block"` with
+`eventKey: "bedtime"`. Picking Nap saves it as a nap; if the recorded
+nap later runs past the threshold, it stays a nap (the user
+explicitly chose).
 
 Concretely:
-- Settings: `bedtimeThreshold = 19:00`.
-- Cascade produces nap 4 starting at 19:30 (after a longer-than-usual
-  WW4).
-- Engine: nap 4 is replaced by bedtime; bedtime starts at 19:30.
-- WW4 stays at its natural 16:30–19:30 length. **No clipping.**
+- Settings: `bedtimeThreshold = 19:00`,
+  `defaultNapLengthMinutes = 60`.
+- User taps Start Nap at 18:15. Window is `[18:00, 19:00]`. 18:15 is
+  inside → prompt fires.
+- User taps Start Nap at 17:30. Outside window → no prompt; saved as
+  nap.
 
-If `bedtimeThreshold = 19:00` but the cascade only reaches nap 3 at
-17:00 with no nap 4, no bedtime is triggered (the day's nap chain
-ended before crossing the threshold).
+- **Why** (predictive lens): a sleep event in the danger zone is most
+  likely bedtime, but we ask rather than assume.
 
-- **Why**: the baby's actual wake-window rhythm determines when
-  bedtime is *possible*. The threshold says "stop projecting more
-  naps after this point and call it bedtime instead," not "force the
-  last wake window to end at exactly this clock time."
-- **Edge case it prevents**: WW4 artificially truncated from
-  1h30 to 30 min just to fit a `19:00` bedtime when the cascade
-  naturally puts nap 4 at 19:30.
+### R7.7 Manual bedtime is the user's authoritative declaration of bedtime time
 
-### R7.7 Manual bedtime IS a hard wall — it clips wake windows that cross it
+If the user explicitly records a bedtime (via drawer or the
+End-of-day flow), `bedtime.startTime = recorded value`. Subsequent
+projection treats this as the bedtime anchor for the cascade-stop
+behavior in R7.4 / R7.5.
 
-Threshold-driven bedtime (R7.6) preserves WW length. **Manual
-bedtime** (user explicitly recorded a bedtime time via drawer or End
-of day) is different: it's the user saying "we're going to bed AT this
-exact time." Wake windows that cross a manual bedtime ARE clipped to
-end at the bedtime start; naps starting at/after a manual bedtime are
-dropped (R7.4); naps that cross a manual bedtime are dropped (R7.5).
+A manual bedtime does NOT retroactively clip already-recorded wake
+windows or drop already-recorded naps (those are reality — see §0).
+It DOES stop *projection* of further naps and clamp the *projected*
+wake window leading up to it. If a recorded WW already extends past
+the manual bedtime, the timeline shows both — the user can see the
+overlap.
 
-- **Why**: manual = user intent. The user is authoritative.
-- **Edge case it prevents**: ignoring the user's "bedtime is at 18:30
-  tonight (we're going to a wedding)" because the natural cascade
-  said 19:30.
+- **Why** (predictive lens): user input is highest-confidence data
+  but doesn't rewrite history.
+- **Edge case it prevents**: V2's "manual bedtime erases recorded
+  data" behavior — the user moves bedtime earlier and a recorded nap
+  silently disappears from history.
 
-### R7.8 Wake windows starting at or after a manual bedtime are dropped
+### R7.8 Removed (folded into R7.7)
 
-`ww.startTime >= manualBedtime.startTime` → remove. Threshold-driven
-bedtime never produces this case (R7.6: WW preserves natural length;
-the next nap is replaced, not the WW).
+Wake-window handling around manual bedtime is part of R7.7. No
+separate "drop ww that starts after manual bedtime" rule — the
+projection naturally won't emit one, and a recorded one stands.
 
-### R7.9 Wake window leading into a manual-bedtime-dropped nap stretches to bedtime
+### R7.9 Removed (no stretching; reality wins)
 
-If a manual bedtime drops `nap_N` (R7.5), the preceding `ww_N.endTime`
-stretches to `bedtime.startTime` so the timeline doesn't render an
-orphan bedtime putdown.
-
-(Threshold-driven bedtime: WW already ends at the natural nap start,
-which IS the bedtime start, so no stretch is needed.)
+The "stretch WW into the dropped nap" hack from V2 doesn't apply when
+recorded data isn't being dropped.
 
 ### R7.10 Bedtime threshold default = `"19:00"` (settings)
 
-User can edit. Affects ONLY threshold-driven bedtime triggering.
+User-configurable. Affects threshold-replacement (R7.6) and the
+convert prompt (R7.6.1).
 
 ### R7.11 Threshold-driven bedtime takes the substituted nap's `startTime`
 
@@ -1132,25 +1237,33 @@ transaction as creating the new one.
 
 Engine returns empty events. Dashboard shows the "Start New Day" prompt.
 
-### R14.4 "Start New Day" action sets `wakeTime` to the current local time
+### R14.4 The new day begins when bedtime ends
 
-When invoked, the new Day record's `wakeTime = now()`. User can edit
-later via the Day-detail / Settings flow.
+V3 treats bedtime/overnight as a duration event with a definite end:
+the user taps **End Bedtime** (alias: "Wake Up" / "Start Day") on the
+prior day's bedtime block. That tap closes yesterday's bedtime
+(`endTime = now()`) and creates today's Day record with
+`wakeTime = now()`. The two are the same action, expressed from
+yesterday's frame of reference.
 
-### R14.4.1 The "Start New Day" UI surface is contextual, not always-shown
+- **Why**: between bedtime start and bedtime end, the engine assumes
+  the baby is asleep. Modeling overnight as a single duration removes
+  the ambiguous "post-bedtime, pre-tomorrow" gap.
+- **Edge case it prevents**: bottles, naps, or other events being
+  projected into the overnight window before the user has actually
+  started the new day.
 
-V2 hardcoded a Start-New-Day button on the dashboard whenever the
-active day was missing `wakeTime`. V3 makes this a contextual action
-that only appears when it's the genuinely-correct next step
-(end-of-yesterday, no active day yet, after midnight, etc.). When the
-day is in motion, that screen real estate is used for live status.
+### R14.4.1 No standalone "Start New Day" button
 
-The UX of WHEN to show the action is open in V3 — likely surfaces:
-- End-of-day card on dashboard ("Tomorrow's plan?")
-- A persistent header action only when no active day exists
-- Settings or /tomorrow page
+The dashboard does NOT carry a dedicated Start-New-Day surface. Day
+creation is a side-effect of ending bedtime (R14.4). This frees the
+dashboard space previously occupied by Start-New-Day for live status
+or other contextual actions; specific reuse is open and decided after
+the V3 engine rebuild ships.
 
-Tracked as a V3 design decision; not finalized.
+The only fallback path: if no active day exists AND no prior bedtime
+is open (cold start, fresh install, archived yesterday with no
+bedtime), the dashboard offers a one-tap "Start Day" affordance.
 
 ### R14.5 Each Day owns its own events collection
 
@@ -1447,12 +1560,19 @@ Existing fields:
 
 V3 additions:
 - `defaultWakeTime`: "07:00" (drives bedtime endTime — R7.1)
-- `bottleChain`: { maxBottlesPerDay: 6, latestProjectedStart: "20:00" }
-  (overnight bottles configurable — R5.8)
+- `bottleChain`: { bottlesPerDay: number } — expected lower limit of
+  daily intake; drives placeholder projection (R5.11). No upper bound
+  and no fixed `latestProjectedStart`; both are derived from the
+  cascade (R5.8). Configurable per child; no hard default (set in
+  first-run flow).
 - `pumpOwnerSlot`: "parent2" (drives pump owner default — R12.8)
 - `dailyRecurring`: [] (replaces `cookDinner` — R11)
 - `owners`: { parent1: {displayName, color}, parent2: {...},
    other: [...] } (configurable owner slots — R1.7)
+- `daycare`: { enabled, dropoffTime, pickupTime, ownerId } (R21).
+  `ownerId` references an `owners.other[]` entry. Default disabled;
+  when first enabled, prompt user to confirm/create the daycare
+  owner entry.
 
 V3 removed:
 - `cookDinner` (subsumed by `dailyRecurring`; migrated on read)
@@ -1498,6 +1618,244 @@ Days are top-level under children. Events are nested under their day.
 
 Multi-child path-prefix already exists; multi-child UI is out of scope
 for V3 (see OUT_OF_SCOPE).
+
+---
+
+## §21 Daycare Dropoff & Pickup
+
+### R21.1 Two new instant event types: `daycare_dropoff`, `daycare_pickup`
+
+Both are `kind: "instant"` events with full lifecycle support
+(projected → completed). They render as instant chips on the timeline.
+
+- **Why** (predictive lens): a custodial handoff is a fact about
+  *when* care transferred. Modeling it as an event lets the engine
+  predict who owns events between the two moments.
+
+### R21.2 Daycare events are projected from settings each day, when enabled AND today is a daycare day
+
+```ts
+Settings.daycare = {
+  enabled: boolean;            // master toggle for the feature
+  dropoffTime: TimeMin;        // default time to project (e.g. 8:30)
+  pickupTime: TimeMin;         // default time to project (e.g. 17:30)
+  ownerId: string;             // points to a Settings.owners.other[id]
+                               //   entry whose displayName is the
+                               //   custodial provider's name
+                               //   (default user-set: "Daycare").
+  weekdays: WeekdayFlags;      // which days of the week to project
+                               //   { mon, tue, wed, thu, fri, sat, sun: bool }
+                               //   default: { mon..fri: true, sat..sun: false }
+};
+```
+
+The engine projects `daycare_dropoff` and `daycare_pickup` only when
+ALL of the following are true:
+1. `Settings.daycare.enabled === true`
+2. `Settings.daycare.weekdays[today]` is true
+3. `Day.suppressedDaycareDay !== true` (R21.5)
+
+Both events default-own to `daycare.ownerId` (a parent doing drop-off
+can edit to their parent slot if they want).
+
+### R21.3 Projected naps and bottles whose start falls between dropoff and pickup auto-assign Daycare
+
+For any *projected* `nap` or `bottle` event whose `startTime` is at or
+after the day's `daycare_dropoff.startTime` and strictly before the
+day's `daycare_pickup.startTime`, the engine assigns
+`owner = daycare.ownerId` (slot id pointing into `other[]`) — UNLESS
+the template explicitly assigns a different owner for that index, OR
+the user has manually overridden the owner.
+
+Recorded events are not retroactively reassigned (§0 reality wins).
+The owner inferred at recording time stays. This rule shapes
+*projection only*.
+
+Precedence (highest to lowest, per R12 owner inheritance):
+1. User manual edit (drawer assignment)
+2. Template explicit assignment for that index
+3. **Daycare window auto-assign (R21.3)**
+4. Default owner-resolution rules (R12)
+
+- **Why** (predictive lens): the most likely caregiver during daycare
+  hours is daycare. The engine predicts; user can override.
+- **Edge case it prevents**: every nap during daycare hours rendering
+  as unowned because the template wasn't set up for daycare days.
+
+### R21.4 Dashboard CTA reflects daycare events when next-projected
+
+When the next projected event is `daycare_dropoff`, the dashboard
+shows two actions:
+- **Primary**: "Daycare Dropoff" — transitions the event
+  `projected → completed`.
+- **Secondary**: "No daycare today" — sets
+  `Day.suppressedDaycareDay = true` (R21.5), removing both daycare
+  events from today and clearing R21.3 auto-assigns. After the tap,
+  the dashboard immediately advances to the next now-projected event.
+
+When the next projected event is `daycare_pickup`, the dashboard
+button label is "Daycare Pickup" (single primary action; no
+"No daycare today" secondary because by definition the day already
+included drop-off).
+
+- **Why**: consistency with the "Start Nap N" / "Start Bottle Now"
+  pattern. The "No daycare today" surface puts the suppression
+  one-tap away on exactly the day it matters (kid woke up sick,
+  parent decides at 7am to keep them home).
+- **Edge case it prevents**: parent has to navigate to settings or
+  the day-detail page to suppress daycare when they realize the kid
+  is staying home, while the dashboard insists "Daycare Dropoff next".
+
+### R21.5 Per-day daycare suppression
+
+A day can opt out via `Day.suppressedDaycareDay: boolean`. Suppressed
+days project no daycare events and don't trigger R21.3 owner
+auto-assign. Suppression entry points:
+- Dashboard "No daycare today" secondary action when daycare_dropoff
+  is the next projected event (R21.4).
+- Day-detail / start-of-day flow toggle ("Aden home today?").
+- Day-templates picker (when planning ahead for a known holiday).
+
+Suppression can be undone (toggle back to false). Already-recorded
+daycare events on that day are not deleted by suppression — only
+*projected* daycare events are removed (§0 reality wins).
+
+- **Why**: kid sick, parent home for the day, snow day, holiday.
+- **Edge case it prevents**: phantom daycare-owned naps on a day
+  the parent is actually doing them at home.
+
+### R21.6 Dropoff after pickup is invalid configuration (data integrity)
+
+Settings validation: `daycare.dropoffTime < daycare.pickupTime` (after
+both being normalized into the same day). Inverted ranges block save
+on the settings form.
+
+- **Why**: this is the §0 data-integrity boundary, not prescriptive —
+  an inverted window has no defined semantics.
+
+### R21.7 Recorded daycare events override projected times
+
+If the user records a daycare_dropoff at 8:42 (manual time edit),
+R21.3's window for that day uses the recorded time (8:42) as the
+window start, not the projected 8:30. Same for pickup. Reality wins
+(§0); the auto-assign window tracks the actual handoff.
+
+---
+
+## §22 Membership Management
+
+> Replaces V2's hardcoded allowlist (`src/lib/auth/allowlist.ts` +
+> `firestore.rules`) with a settings-managed list of co-parent emails.
+> This is the "lightweight sharing" feature; full role-based sharing
+> stays out-of-scope (`OUT_OF_SCOPE.md` §2).
+
+### R22.1 Allowlist lives in Firestore at `config/allowlist`
+
+```ts
+type AllowlistDoc = {
+  emails: string[];           // lowercase, deduped
+  updatedAt: Timestamp;
+  updatedBy: string;          // email of the member who last edited
+};
+```
+
+The doc is a top-level singleton at `/config/allowlist`. Initial
+seed: `["jake136@yahoo.com", "kellyrbarber@gmail.com"]`. Once V3
+ships, the hardcoded `ALLOWLISTED_EMAILS` constant is deleted.
+
+### R22.2 All members have equal full-access permissions
+
+There is no role gradient. Every email in the allowlist gets the same
+read/write access as every other email. View-only and tiered roles
+are explicitly out-of-scope (`OUT_OF_SCOPE.md` §2 — confirmed-out).
+
+### R22.3 Firestore rules check membership via `get()` lookup
+
+```js
+function isAllowlisted() {
+  return request.auth != null
+    && request.auth.token.email in
+       get(/databases/$(database)/documents/config/allowlist).data.emails;
+}
+```
+
+The `config/allowlist` doc itself is readable by any authenticated
+user (so the client can subscribe). It's writable only by current
+members.
+
+### R22.4 Settings page exposes a "Members" section
+
+UI rules:
+- Lists current member emails with their join date (if known) and a
+  remove button next to each.
+- "Add member" input: validates email format. On save, lowercases and
+  dedupes.
+- Adding an email persists to `config/allowlist.emails` and stamps
+  `updatedBy = currentUser.email`.
+
+### R22.5 Removing members has guards
+
+- A member can remove anyone, including themselves, EXCEPT: the last
+  remaining member cannot be removed (the operation would orphan the
+  data and lock everyone out).
+- Removing yourself triggers a confirm: "You'll be signed out and
+  lose access. Continue?" On confirm: remove email, sign out, redirect
+  to sign-in (where the now-non-allowlisted email will be rejected).
+- Removing another member triggers a softer confirm: "Remove
+  `email@example.com`? They'll lose access immediately."
+
+### R22.6 Adding an email does NOT send an invitation
+
+The user being added must already have a Google account matching that
+email and must sign in via Google to gain access. There is no email,
+SMS, or in-app notification to the new user — communication is the
+adding member's responsibility (out-of-band).
+
+- **Why**: invitation flows are the heavy version covered by
+  OUT_OF_SCOPE §2. R22 stays light.
+- **Edge case it prevents**: misspelled emails sitting in the
+  allowlist forever — the worst that happens is dead-string rows.
+
+### R22.7 Email comparison is case-insensitive
+
+All writes lowercase the email; the rule check uses the exact stored
+form against `request.auth.token.email` (which is always lowercase
+for Google-issued tokens).
+
+### R22.8 The client `isAllowlisted()` subscribes to the doc
+
+```ts
+// src/lib/auth/allowlist.ts (V3 — replaces hardcoded constant)
+export function useAllowlist(): { emails: string[]; loading: boolean } {
+  // onSnapshot to /config/allowlist; cached in a context provider
+}
+```
+
+The auth flow blocks on the first allowlist read; subsequent updates
+propagate live (so a removed user gets bounced within seconds without
+a refresh).
+
+### R22.9 First-time setup seeds the allowlist if missing
+
+If the V3 build runs against a Firestore where `/config/allowlist`
+doesn't exist:
+1. The very first authenticated request reads `null` → auth treats
+   nobody as allowlisted (closed-by-default).
+2. A one-time CLI/seed script (`pnpm seed:allowlist`) writes the doc
+   with the founding member set.
+3. Documented in `README.md` setup steps.
+
+This avoids a chicken-and-egg deploy where the rules require the doc
+but the doc can't be written because the rules require the doc.
+
+### R22.10 Membership changes log to an activity collection (optional, behind flag)
+
+Each add/remove can optionally write a row to `/config/allowlist_log`
+with `{ action, target, actor, at }`. Defaults off; useful for audit
+if the founding members want it.
+
+(Mark as `OPEN`: ship this in V3 or punt to V4? Recommend punting —
+trivial to add later, no audit demand right now.)
 
 ---
 
@@ -1600,3 +1958,95 @@ Refinements to Review 1:
   `Settings.pumpOwnerSlot` (no change needed — already in R12.8).
 - **OUT_OF_SCOPE §3**: marked `moved-in` ✓ (per-day suppression now
   R11.6).
+
+### Review 3 (Jake, 2026-05-08)
+
+- **§5 / R5.11** (new): `Settings.bottleChain.bottlesPerDay` (whole
+  number, configurable per child) projects bottle placeholders for
+  the expected lower limit of daily intake. Reality routinely exceeds
+  this; additional bottles come from FAB or the cascade.
+- **§5 / R5.8 + R5.9**: removed `maxBottlesPerDay` and removed the
+  fixed `latestProjectedStart`. Babies (especially newborns) are
+  unpredictable and may feed 8–12+ times/day. No upper count cap; no
+  fixed time cutoff. Cascade projects until the next start would land
+  in tomorrow.
+- **§14 / R14.4 + R14.4.1**: the dedicated "Start New Day" action is
+  removed. Bedtime is a duration event running from "Begin Bedtime"
+  → "End Bedtime" (a.k.a. Wake Up / Start Day); the engine assumes
+  the baby is asleep across that span. Tapping End Bedtime closes
+  yesterday's bedtime AND creates today's Day record. The freed
+  dashboard space is open and decided after the V3 engine rebuild.
+- **§19.3**: `bottleChain` simplified to `{ bottlesPerDay }`.
+
+### Review 4 (Jake, 2026-05-08)
+
+Predict-don't-prescribe pass. Added new §0 Engine Philosophy as the
+canonical lens; rewrote rules that imposed engine constraints on user
+recordings.
+
+- **§0** (new): Engine Philosophy. Engine predicts; reality wins.
+  Validations only at data-integrity and interface-hygiene boundaries.
+- **§3 / R3.9**: nap–nap overlap → "merge into one nap?" prompt
+  (interface hygiene), not a save-block. Overlap with projected naps
+  doesn't prompt at all (cascade re-projects).
+- **§3 / R3.10.1** (new): nap duration outside `[5, 240]` min → soft
+  warning, user can save anyway.
+- **§5 / R5.6**: bottle inside a nap moves to whichever edge is
+  closer to the predicted interval (was: nearer edge unconditionally).
+  Recorded mid-nap bottles are accepted (rare but real).
+- **§6 — Putdown rewritten as pure prediction**. No Firestore doc, no
+  lifecycle, no record/edit. Render-only reminder derived from the
+  next-upcoming projected nap/bedtime. Eliminates V2's "edit owner
+  drops the putdown record" class of bug entirely.
+- **§7 / R7.4 + R7.5**: bedtime "drops" naps only in the
+  *projection*. Recorded naps after a bedtime are kept as-is.
+- **§7 / R7.6**: rewrote bedtimeThreshold doc to reflect probability
+  framing — "after this time, sleep is *most likely* bedtime." Acts
+  via cascade-replacement and a convert prompt; does not impose.
+- **§7 / R7.6.1** (new): if user records sleep starting within
+  `defaultNapLengthMinutes` of `bedtimeThreshold`, prompt
+  Bedtime/Nap/Cancel.
+- **§7 / R7.7**: manual bedtime is "authoritative declaration," not
+  a hard wall. Stops further projection and clamps projected WW;
+  doesn't rewrite recorded events.
+- **§7 / R7.8 + R7.9**: removed (folded into R7.7; no retroactive
+  clipping or stretching).
+- **§5 / R5.13**: kept (interface hygiene — guards against
+  button-mash duplicates, not engine prescription).
+
+### Review 5 (Jake, 2026-05-08) — Daycare dropoff/pickup
+
+- **§21** (new): two new instant event types `daycare_dropoff` /
+  `daycare_pickup`. Configurable defaults in
+  `Settings.daycare.{enabled, dropoffTime, pickupTime, ownerId}`.
+  `ownerId` references an `owners.other[]` entry.
+- **R21.3**: projected naps/bottles inside the daycare window
+  auto-assign daycare as owner. Precedence: manual edit > template
+  > daycare auto-assign > default. Recorded events stand (§0).
+- **R21.4**: dashboard CTA reflects daycare events when next-projected.
+- **R21.5**: per-day suppression via `Day.suppressedDaycareDay`
+  ("Aden home today").
+- **R21.7**: recorded dropoff/pickup times shift the auto-assign
+  window (reality wins).
+- **§19.3 Settings**: added `daycare` config block.
+- **R21.2**: added `weekdays: WeekdayFlags` to daycare settings —
+  Mon/Tue/.../Sun checkboxes; default Mon–Fri true. Engine only
+  projects daycare events when today's weekday flag is true (in
+  addition to `enabled` and not-suppressed).
+- **R21.4**: when `daycare_dropoff` is next-projected, dashboard
+  shows a secondary "No daycare today" action that toggles
+  `Day.suppressedDaycareDay = true` and advances to the next event.
+  One-tap suppression for "kid woke up sick, staying home today."
+
+### Review 6 (Jake, 2026-05-08) — Settings-managed allowlist
+
+- **§22** (new): Membership Management. Allowlist moves from
+  hardcoded `src/lib/auth/allowlist.ts` + `firestore.rules` to a
+  Firestore doc at `/config/allowlist`. Settings page exposes a
+  "Members" section; current members can add/remove emails. All
+  members are full-access equals (tiered roles stay out-of-scope per
+  OUT_OF_SCOPE §2). No invitation flow — out-of-band communication.
+- **OUT_OF_SCOPE §2**: clarified — full role-based sharing
+  (view-only, tiered, invitation tokens) stays `confirmed-out`.
+- **OUT_OF_SCOPE §2.5** (new): settings-managed allowlist
+  `moved-in`, lands in §22.

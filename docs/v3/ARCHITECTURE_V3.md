@@ -78,7 +78,7 @@ type Event = {
   eventKey: string;               // semantic slot: "nap_2", "bedtime"
 
   // What kind of event
-  type: EventType;                // 'nap' | 'wake_window' | ... (same as V2)
+  type: EventType;
   kind: EventKind;                // 'block' | 'instant' (derived from type+endTime)
 
   // Time
@@ -90,7 +90,17 @@ type Event = {
   owner?: Owner;
   amountOz?: number;              // bottle / dream_feed only
 
-  // Lifecycle (replaces V2's source + status + recorded triplet)
+  // Putdown — render-only reminder. true ⇒ renderer prepends a
+  // virtual putdown block. Set by rules; never persisted (the parent
+  // event itself is what's persisted). See R6.1.
+  hasPutdown: boolean;
+
+  // Lifecycle (replaces V2's source + status + recorded triplet).
+  // Always present for type-uniformity; for wake_window it's
+  // synthetically `{state: 'projected'}` (wake windows are always
+  // derived from nap interval rules, never recorded directly).
+  // Putdown has no Event doc at all (render-only — R6.1), so this
+  // field doesn't apply there.
   lifecycle: Lifecycle;
 };
 
@@ -101,6 +111,30 @@ type Lifecycle =
   | { state: 'overridden'; annotatedAt: TimeMin };  // owner-only annotation
 
 type EventKind = 'block' | 'instant';
+
+// Hard list — exhaustive switch checks should be possible everywhere.
+// Add a new event type? Update this union and the compiler tells you
+// every site to handle it.
+type EventType =
+  | 'nap'              // block; lifecycle applies
+  | 'wake_window'      // block; ALWAYS derived from nap interval rules
+                       //   (synthesized between consecutive naps, between
+                       //   day-start and nap_1, and between last_nap and
+                       //   bedtime). Never user-recorded directly.
+                       //   `lifecycle` is always `{state: 'projected'}`.
+  | 'bottle'           // instant; lifecycle applies
+  | 'bedtime'          // block; lifecycle applies
+  | 'dream_feed'       // instant; lifecycle applies
+  | 'pump'             // instant; lifecycle applies
+  | 'extra'            // block or instant; lifecycle applies (custom user events)
+  | 'daily_recurring'  // block or instant; lifecycle applies (R11 — replaces V2's `cook_dinner`)
+  | 'daycare_dropoff'  // instant; lifecycle applies (R21)
+  | 'daycare_pickup';  // instant; lifecycle applies (R21)
+
+// V2 had `'putdown'` and `'wake'`. V3 removes both:
+// - `putdown` is render-only (R6.1); see `Event.hasPutdown` flag.
+// - `wake` was redundant with `Day.wakeTime`; the wake moment is
+//   derived from the Day record (R14.4), not stored as an Event.
 
 // V3 owner system: configurable slots, not hard-coded names. See R1.7.
 type OwnerSlot = 'parent1' | 'parent2';
@@ -129,6 +163,47 @@ type TimeMin = number; // 0..1440+ (cross-day)
 - Old docs are progressively rewritten as users edit them. After ~6
   weeks of use, the V2 fallback can be dropped.
 
+### 1.1.5 Auth / membership
+
+V3 replaces the hardcoded allowlist with a Firestore-managed
+membership doc (R22).
+
+```ts
+// Firestore: /config/allowlist (singleton)
+type AllowlistDoc = {
+  emails: string[];           // lowercase, deduped, full-access only
+  updatedAt: Timestamp;
+  updatedBy: string;          // email of last editor
+};
+```
+
+Rules:
+```js
+function isAllowlisted() {
+  return request.auth != null
+    && request.auth.token.email in
+       get(/databases/$(database)/documents/config/allowlist).data.emails;
+}
+match /config/allowlist {
+  // Any signed-in user can read (so the client can subscribe and
+  // gate the auth flow).
+  allow read: if request.auth != null;
+  // Only current members can write — prevents arbitrary signup.
+  allow write: if isAllowlisted();
+}
+```
+
+Client:
+- `useAllowlist()` — `onSnapshot` subscription cached in an auth
+  context provider. Auth flow blocks on first read; subsequent
+  changes propagate live.
+- The legacy `src/lib/auth/allowlist.ts` constant is deleted at the
+  V3 cutover (Phase 4).
+
+Bootstrap: a seed script (`pnpm seed:allowlist`) writes the doc with
+the founding members on a fresh Firestore. Documented in README. No
+migration of existing data is needed since V2 isn't deployed.
+
 ### 1.2 Day shape
 
 Adds:
@@ -153,10 +228,15 @@ OwnershipTemplate = {
 V3 additions on top of V2:
 ```ts
 Settings.defaultWakeTime: TimeMin;            // R7.1 — drives bedtime endTime
+Settings.bedtimeThreshold: TimeMin;           // R7.6 — probability shaper
+Settings.defaultNapLengthMinutes: number;     // R7.6.1 — drives convert-prompt window
 Settings.bottleChain: {
-  maxBottlesPerDay: number;                   // R5.8/R5.12
-  latestProjectedStart: TimeMin;
+  bottlesPerDay: number;                      // R5.11 — expected lower limit
+  // No upper bound and no fixed latest-projected-start; both are
+  // derived from the cascade itself (see R5.8).
 };
+Settings.napDurationMin: number;              // R3.10.1 — soft warning floor
+Settings.napDurationMax: number;              // R3.10.1 — soft warning ceiling
 Settings.pumpOwnerSlot: OwnerSlot;            // R12.8 — pump default owner
 Settings.dailyRecurring: Array<{              // R11 — replaces cookDinner
   id: string;
@@ -171,7 +251,19 @@ Settings.owners: {                            // R1.7 — configurable owner slo
   parent2: { displayName: string; color: ColorToken };
   other: Array<{ id: string; displayName: string; color: ColorToken }>;
 };
+Settings.daycare: {                           // R21 — daycare dropoff/pickup
+  enabled: boolean;
+  dropoffTime: TimeMin;
+  pickupTime: TimeMin;
+  ownerId: string;                            // refs Settings.owners.other[].id
+  weekdays: {                                 // R21.2 — which days project daycare
+    mon: boolean; tue: boolean; wed: boolean;
+    thu: boolean; fri: boolean; sat: boolean; sun: boolean;
+  };
+};
 ```
+
+`Day.suppressedDaycareDay: boolean` is the per-day opt-out (R21.5).
 
 V2 `Settings.cookDinner` migrated to a single `dailyRecurring` entry
 on read; the field is dropped going forward.
@@ -179,6 +271,37 @@ on read; the field is dropped going forward.
 ---
 
 ## §2 The Rules Engine
+
+### 2.0 Reality-wins axiom (encodes REQUIREMENTS §0)
+
+Before any rule fires, `ctx.actuals` enters the events array unchanged.
+Rules MAY add projected events, MAY transform projected events, MAY
+remove projected events. Rules MAY NOT mutate or remove any event
+whose `lifecycle.state ∈ {'started', 'completed'}` ("recorded
+events"). Owner edits via the drawer transition projected → completed
+*before* evaluation; the rules see the result, never operate on a
+state transition.
+
+Implementation:
+- Each rule's `produces` runs through a guard helper:
+  ```ts
+  function safeProduces(rule: Rule, events: Event[], ctx: Context): Event[] {
+    const recordedBefore = events.filter(isRecorded);
+    const next = rule.produces(events, ctx);
+    const recordedAfter = next.filter(isRecorded);
+    if (!sameSet(recordedBefore, recordedAfter)) {
+      throw new EvaluationError(
+        rule.id,
+        `rule violated reality-wins axiom: recorded event added/removed/mutated`,
+        next
+      );
+    }
+    return next;
+  }
+  ```
+- This is the engine-level expression of the §0 philosophy in
+  REQUIREMENTS. If any rule tries to drop or rewrite a recorded
+  event, the engine throws loudly with the rule id.
 
 ### 2.1 Rule shape
 
@@ -285,23 +408,71 @@ const RuleClampWWToNap: Rule = {
   },
 };
 
-// R7.4: drop naps starting at/after bedtime
-const RuleDropNapsAtBedtime: Rule = {
+// R7.4: stop projecting naps at/after bedtime (recorded naps are kept)
+const RuleStopProjectingNapsAtBedtime: Rule = {
   id: 'R7.4',
-  description: 'Naps starting at/after bedtime are removed',
+  description: 'Projected naps starting at/after bedtime are removed; recorded naps stand (§0 reality-wins)',
   dependsOn: ['R3.5'],   // need cascade times before checking
   matches: (events) => {
     const bedtime = events.find(e => e.type === 'bedtime');
     if (!bedtime) return false;
     return events.some(e =>
-      e.type === 'nap' && e.startTime >= bedtime.startTime
+      e.type === 'nap' &&
+      e.lifecycle.state === 'projected' &&
+      e.startTime >= bedtime.startTime
     );
   },
   produces: (events) => {
     const bedtime = events.find(e => e.type === 'bedtime')!;
     return events.filter(e =>
-      !(e.type === 'nap' && e.startTime >= bedtime.startTime)
+      !(e.type === 'nap' &&
+        e.lifecycle.state === 'projected' &&
+        e.startTime >= bedtime.startTime)
     );
+  },
+};
+```
+
+```ts
+// R21.3: projected naps/bottles inside daycare window auto-assign daycare
+const RuleAssignDaycareWindowOwner: Rule = {
+  id: 'R21.3',
+  description: 'Projected naps and bottles inside [dropoff, pickup) inherit daycare owner',
+  dependsOn: ['R3.5', 'R5.1'],   // need final cascade times
+  matches: (events, ctx) => {
+    if (!ctx.settings.daycare.enabled) return false;
+    if (!isDaycareWeekday(ctx)) return false;   // R21.2 weekday gate
+    if (ctx.day.suppressedDaycareDay) return false;
+    const dropoff = events.find(e => e.type === 'daycare_dropoff');
+    const pickup  = events.find(e => e.type === 'daycare_pickup');
+    if (!dropoff || !pickup) return false;
+    return events.some(e =>
+      (e.type === 'nap' || e.type === 'bottle') &&
+      e.lifecycle.state === 'projected' &&
+      !e.owner &&                      // template/manual didn't already set
+      e.startTime >= dropoff.startTime &&
+      e.startTime <  pickup.startTime
+    );
+  },
+  produces: (events, ctx) => {
+    const dropoff = events.find(e => e.type === 'daycare_dropoff')!;
+    const pickup  = events.find(e => e.type === 'daycare_pickup')!;
+    const daycareOwner: OwnerRef = {
+      slot: 'other',
+      otherId: ctx.settings.daycare.ownerId,
+    };
+    return events.map(e => {
+      if (
+        (e.type === 'nap' || e.type === 'bottle') &&
+        e.lifecycle.state === 'projected' &&
+        !e.owner &&
+        e.startTime >= dropoff.startTime &&
+        e.startTime <  pickup.startTime
+      ) {
+        return { ...e, owner: daycareOwner };
+      }
+      return e;
+    });
   },
 };
 ```
@@ -320,7 +491,8 @@ code: ~1500 lines including helpers, vs. V2's ~2000 across 12 files.
 - `dreamFeed.ts` (R8.x)
 - `pumps.ts` (R9.x)
 - `extras.ts` (R10.x)
-- `cookDinner.ts` (R11.x)
+- `cookDinner.ts` (R11.x) — naming TBD; rename to `dailyRecurring.ts`
+- `daycare.ts` (R21.x)
 - `owners.ts` (R12.x)
 
 Each file exports `const RULES: Rule[]`. The top-level engine
@@ -386,21 +558,27 @@ on cycles, surfacing the issue at startup, not in production.
                     └────┬───────────┘
                          │
        ┌─────────────────┼──────────────────┐
-       │ Start Nap       │ Drawer save:      │ Drawer save:
-       │ Start Bottle    │ time-edit         │ owner-only edit
+       │ Start Nap       │ Start Bottle Now  │ Drawer save:
+       │ (block events   │ FAB-create        │ owner-only edit
+       │ only)           │ Drawer time-edit  │
        ▼                 ▼                   ▼
   ┌────────┐         ┌───────────┐      ┌─────────────┐
   │started │         │ completed │      │ overridden  │
   └───┬────┘         └─────▲─────┘      └──────┬──────┘
       │ End Nap            │                   │
-      │ (or End Bottle)    │ Subsequent        │ Subsequent
-      └────────────────────┘ time-edit         │ time-edit
-                                               │
+      │ (block events      │ Subsequent        │ Subsequent
+      │ only)              │ time-edit         │ time-edit
+      └────────────────────┘                   │
                                                ▼
                                          (transitions to completed)
 ```
 
 **Invariants enforced**:
+- The `started` state applies ONLY to block-kind events (`nap`,
+  `bedtime`, and any `extra` / `daily_recurring` configured with a
+  duration). Instant events (`bottle`, `dream_feed`, `pump`, instant
+  extras) record start + any payload in one tap and transition
+  `projected → completed` directly. There is no "End Bottle".
 - Once `completed`, never returns to `projected`.
 - Once `started`, only progresses to `completed`.
 - `overridden` is reachable only from `projected` (drawer edit of
@@ -491,17 +669,43 @@ import fc from 'fast-check';
 const arbActual = fc.record({...}); // generates valid Event docs
 const arbDay = fc.record({...});
 
-test.prop([fc.array(arbActual), arbDay, settingsArb])('R5.6: bottles never inside naps', (actuals, day, settings) => {
-  const events = projectDay({ day, settings, actuals });
-  for (const bottle of events.filter(e => e.type === 'bottle')) {
-    for (const nap of events.filter(e => e.type === 'nap')) {
-      const inside =
-        bottle.startTime > nap.startTime &&
-        bottle.startTime < (nap.endTime ?? Infinity);
-      expect(inside).toBe(false);
+test.prop([fc.array(arbActual), arbDay, settingsArb])(
+  'R5.6: PROJECTED bottles are never inside PROJECTED naps',
+  (actuals, day, settings) => {
+    const events = projectDay({ day, settings, actuals });
+    const projectedBottles = events.filter(
+      e => e.type === 'bottle' && e.lifecycle.state === 'projected'
+    );
+    const projectedNaps = events.filter(
+      e => e.type === 'nap' && e.lifecycle.state === 'projected'
+    );
+    for (const bottle of projectedBottles) {
+      for (const nap of projectedNaps) {
+        const inside =
+          bottle.startTime > nap.startTime &&
+          bottle.startTime < (nap.endTime ?? Infinity);
+        expect(inside).toBe(false);
+      }
     }
   }
-});
+);
+
+// Companion property: §0 reality-wins. Recorded events pass through
+// unchanged regardless of overlap with projected or other recorded
+// events.
+test.prop([fc.array(arbActual), arbDay, settingsArb])(
+  '§0: recorded events in actuals appear unchanged in output',
+  (actuals, day, settings) => {
+    const events = projectDay({ day, settings, actuals });
+    for (const actual of actuals.filter(isRecorded)) {
+      const out = events.find(e => e.id === actual.id);
+      expect(out).toBeDefined();
+      expect(out!.startTime).toBe(actual.startTime);
+      expect(out!.endTime).toBe(actual.endTime);
+      expect(out!.lifecycle).toEqual(actual.lifecycle);
+    }
+  }
+);
 ```
 
 Run with `numRuns: 1000+` per property in CI. Each property checks an
@@ -537,13 +741,34 @@ correctness, component tests for accessibility and layout.
 ### 6.4 V2 vs V3 differential tests (Phase 2 only)
 
 ```ts
-test.prop([validProjectInputArb])('V3 output equals V2 output', (input) => {
-  expect(projectDayV3(input)).toEqual(projectDayV2(input));
-});
+test.prop([validProjectInputArb])(
+  'V3 output equals V2 output (within philosophy carve-out)',
+  (input) => {
+    expect(projectDayV3(input)).toEqual(projectDayV2(input));
+  }
+);
 ```
 
 Run with `numRuns: 5000+`. This is the real safety net during the
 strangler migration. Drops after Phase 4 cleanup.
+
+**Philosophy carve-out — expected divergences.** REQUIREMENTS §0
+intentionally changes behavior at a few boundaries; differential
+testing exempts inputs that exercise them. The arbitrary
+`validProjectInputArb` filters these out (`.filter(input => !exercisesDivergence(input))`):
+
+| Divergence | V2 behavior | V3 behavior (§0) |
+|---|---|---|
+| Recorded nap crossing bedtime | dropped | kept (R7.5) |
+| Recorded nap after manual bedtime | dropped | kept (R7.7) |
+| Recorded WW crossing manual bedtime | clipped | kept full (R7.7) |
+| Recorded bottle inside a recorded nap | moved to nap edge | kept (R5.6) |
+| Bottle chain count past V2's implicit cap | suppressed | continues until tomorrow (R5.8) |
+| Putdown event in Firestore | persisted | render-only, never persisted (R6.1) |
+
+A separate suite asserts each divergence directly (V2 produces shape
+A, V3 produces shape B). That suite ships with the philosophy
+documentation and survives Phase 4 cleanup as a regression guard.
 
 ---
 
@@ -569,58 +794,105 @@ strangler migration. Drops after Phase 4 cleanup.
 
 ---
 
-## §8 Open Questions for Jake
+## §8 Open Questions — Resolved
 
-### [OPEN] Q1: Rules engine implementation — hand-roll vs. small lib?
+All questions answered Jake 2026-05-08. Decisions below are locked
+unless explicitly re-opened.
 
-**Recommendation**: hand-roll. ~200 lines, no dependencies, exactly
-fits our shape. We control the failure modes.
+### Q1: Rules engine implementation — RESOLVED → hand-roll
 
-**Alternative**: pull in `nools` or similar. Saves writing the
-evaluator at the cost of working around its assumptions.
+~200 lines, no dependencies, exactly fits our shape. We control the
+failure modes.
 
-### [OPEN] Q2: V3 engine in same repo or extracted to a package?
+### Q2: V3 engine in same repo or extracted to a package — RESOLVED → same repo, separate folder
 
-**Recommendation**: same repo. Future "share with Kelly's friend's app"
-might want extraction, but YAGNI for now.
+Lives at `src/v3/` for the duration of the strangler migration. Easy
+cut-over: when V2 is deleted in Phase 4, V3 stays at `src/v3/` (or
+moves to `src/domain/`, naming TBD at cut-over).
 
-### [OPEN] Q3: Lifecycle field — required on new V3 docs from day 1?
+### Q3: Lifecycle field on V3 docs from day 1 — RESOLVED → yes
 
-**Recommendation**: yes. Read-side migration handles legacy V2 docs;
-write-side requires the new shape.
+No V2 production data exists (app not deployed). Local Firestore
+emulator can be wiped freely. Read-side `migrateEventV2toV3` becomes
+a documented helper rather than a daily fallback; can be deleted
+once Phase 1 is past dev iteration.
 
-### [OPEN] Q4: Time as integer minutes vs. string "HH:MM"?
+### Q4: Time as integer minutes vs. string — RESOLVED → integer minutes
 
-**Recommendation**: integer minutes internally, formatted at UI
-boundary. Saves `parseTime`/`formatTime` calls scattered across rules.
+Internal representation is `TimeMin` (integer minutes since midnight,
+24+ for cross-day). UI boundary always formats to `"HH:MM"` (12-hour
+AM/PM in user-facing surfaces, per project_decisions). No V2 data
+risk — Firestore emulator gets reset locally; nothing deployed.
 
-**Trade-off**: Firestore docs will store integers, breaking V2 read
-compatibility unless we coerce. Easy to do in the converter.
+### Q5: fast-check for property tests — RESOLVED → yes
 
-### [OPEN] Q5: Adopt fast-check for property testing?
+### Q6: Wave 9 timing — RESOLVED → strict end-of-Phase-5
 
-**Recommendation**: yes. It's the de facto TS property-testing lib,
-maintained, fast, plays nice with vitest.
+No PWA work intermixed with the engine rewrite.
 
-### [OPEN] Q6: Wave 9 timing — strict end-of-Phase-5 or interspersed?
+### Q7: Should V3 introduce a "scenario" concept? — RESOLVED (with caveat)
 
-**Recommendation**: strict. Mixing in PWA work mid-rewrite is the
-shortest path to a stuck branch.
+**Decision: NOT in V3 scope.**
 
-### [OPEN] Q7: Should V3 introduce a "scenario" concept (templates that mutate during the day)?
+#### Why this question existed and why it dissolves
 
-V2 templates are static. Some real-world cases (Jake takes Daycare
-naps; weekends are different) might benefit from runtime template
-selection.
+V2 templates are *manually-selected* day blueprints. The user picks
+"Weekday" or "Weekend" or "Daycare Day" when starting a new day.
+"Scenarios" was the idea of making selection automatic and/or
+mid-day mutable based on context: day-of-week, calendar date, a
+runtime "switch templates now" action.
 
-**Recommendation**: NOT in V3 scope. Add to OUT_OF_SCOPE.
+Concrete imagined uses:
+- **Auto-pick by weekday**: M–F → "Weekday template"; Sat/Sun →
+  "Weekend template". User never has to choose.
+- **Mid-day switch**: kid was at daycare until pickup, then home
+  with grandma — switch to "evening at grandma's" template at
+  16:30.
+- **Holiday/calendar override**: Christmas → "Holiday" template;
+  travel days → "Travel" template.
 
-### [OPEN] Q8: Per-day suppression of recurring projections (cook dinner)?
+The first case (weekday auto-pick) is partially solved already by:
+- `Settings.daycare.weekdays` (R21.2) — daycare events project only
+  on configured days
+- `Day.suppressedDaycareDay` (R21.5) — manual same-day opt-out
 
-V2 has no way to "skip dinner today." V3 could add `Day.suppressedKeys:
-string[]`.
+The second case (mid-day switch) is solved by manual template
+selection at start-of-day plus drawer edits during the day.
 
-**Recommendation**: ship in V3. Tiny addition; user-visible win.
+The third case (calendar overrides) is real but rare; solving it
+adds a calendar dependency and a UI to manage exceptions — heavy
+machinery for a few days a year.
+
+**The remaining value of scenarios is small enough that V3 doesn't
+need them.** Templates remain static; the user picks one when
+starting the day; daycare config covers the most common
+"is-it-a-daycare-day" question.
+
+If a real pattern emerges in usage (e.g., "I keep forgetting to
+flip from Weekday to Weekend on Saturdays"), revisit in V4 with a
+narrower question: "auto-pick template by weekday?" That question
+is far cheaper than building a general scenario system.
+
+**Action**: add to `OUT_OF_SCOPE.md` with rationale.
+
+### Q8: Per-day suppression of recurring projections — RESOLVED
+
+Ratified Review 1 (2026-05-08). Now `Day.suppressedRecurringIds:
+string[]` per R11.6.
+
+### Q9: `nowMinutes` reconciliation in stale tabs — RESOLVED → once-per-minute + on focus
+
+`useNowMinutes` hook re-runs `projectDay` on a 60-second tick while
+the tab is visible, plus immediately on `visibilitychange` when the
+tab regains focus. Memoized within the same minute to avoid
+redundant evaluation.
+
+### Q10: Is the `overridden` lifecycle state still needed — RESOLVED → keep (option A)
+
+Keeps the engine state machine cohesive: a user-assigned owner on a
+not-yet-started event is a real distinction the dashboard ordinal
+logic needs (`recorded ⇒ count toward "next nap N+1"`; `overridden ⇒
+doesn't count`). Costs nothing.
 
 ---
 
@@ -675,6 +947,73 @@ state.
 - **[OPEN] Q4 (time as integer minutes)**: still recommend; unchanged.
 - **OUT_OF_SCOPE §3 (per-day suppression)**: ratified MOVED IN; now
   R11.6 in REQUIREMENTS.
+
+### Review 2 (Jake, 2026-05-08) — synced with REQUIREMENTS Reviews 3 & 4
+
+- **§1.1 Event**: added `hasPutdown: boolean` flag (putdown is
+  render-only — see R6.1). Lifecycle field comment now lists which
+  event types it applies to (excludes wake_window, putdown).
+- **§1.4 Settings**: replaced `bottleChain.{maxBottlesPerDay,
+  latestProjectedStart}` with just `bottleChain.bottlesPerDay`
+  (Review 3, R5.8/R5.11). Added `bedtimeThreshold`,
+  `defaultNapLengthMinutes`, `napDurationMin`, `napDurationMax`.
+- **§2.0** (new): Reality-wins axiom. Encodes REQUIREMENTS §0 as
+  an engine-level invariant. `safeProduces` guard wraps every rule;
+  any rule that mutates a recorded event throws.
+- **§2.3 R7.4 sample**: rewritten to filter only *projected* naps
+  (Review 4, R7.4). Recorded naps after bedtime are kept.
+- **§6.1 property test sample**: tightened to "*projected* bottles
+  never inside *projected* naps" (Review 4, R5.6). Companion property
+  asserts §0 — recorded events appear unchanged in output.
+- **§6.4 V2-vs-V3 differential**: added philosophy carve-out table
+  documenting expected divergences; differential arbitrary filters
+  these out; separate divergence-assert suite ships as a permanent
+  regression guard.
+- **Q8**: marked RESOLVED (per-day suppression already ratified).
+- **Q9** (new): nowMinutes reconciliation in stale tabs.
+- **Q10** (new): is the `overridden` lifecycle state still needed?
+
+### Review 5 (Jake, 2026-05-08) — Settings-managed allowlist
+
+- **§1.1.5** (new): allowlist moves from hardcoded constant +
+  Firestore rules to a single `/config/allowlist` doc. Rules use
+  `get()` membership check. Client subscribes via `useAllowlist()`.
+- Seed script for founding-member bootstrap; no data migration
+  (V2 not deployed).
+- OUT_OF_SCOPE §2.5 moved-in; §2 (role-based sharing) confirmed-out.
+- REQUIREMENTS §22 carries the user-visible rules (Settings UI,
+  guards, etc.).
+
+### Review 4 (Jake, 2026-05-08) — All open questions answered
+
+- **Q1** hand-roll rules engine ✓
+- **Q2** same repo, separate folder (`src/v3/`) for cut-over ✓
+- **Q3** lifecycle on V3 docs day 1 (no V2 data exists) ✓
+- **Q4** integer minutes internally, formatted at UI boundary ✓
+- **Q5** fast-check ✓
+- **Q6** strict Wave 9 timing ✓
+- **Q7** scenarios NOT in V3 scope; daycare weekdays + manual
+  template selection covers common cases. Revisit narrow question
+  "auto-pick template by weekday?" only if needed in V4. Adds to
+  OUT_OF_SCOPE.
+- **Q9** `nowMinutes`: 60s tick while visible + on `visibilitychange` ✓
+- **Q10** keep `overridden` state — option A ✓
+
+§8 is now fully resolved. Phase 1 is unblocked once Jake sweeps
+remaining `proposed-out` items in OUT_OF_SCOPE.md.
+
+### Review 3 (Jake, 2026-05-08) — Daycare config
+
+- **§1.1 EventType**: added `daycare_dropoff`, `daycare_pickup`
+  (instants).
+- **§1.4 Settings**: added `daycare: { enabled, dropoffTime,
+  pickupTime, ownerId, weekdays }` — last is a per-weekday flag
+  record so "Tue/Thu only" config works.
+- **§1.4 Day**: `suppressedDaycareDay: boolean` for per-day opt-out.
+- **§2.3 Sample rule**: added `RuleAssignDaycareWindowOwner` (R21.3)
+  — projected naps/bottles inside the daycare window auto-assign
+  daycare owner. Gates on enabled + weekday + not-suppressed.
+- **§2.4 Rules organization**: added `daycare.ts`.
 
 ---
 
