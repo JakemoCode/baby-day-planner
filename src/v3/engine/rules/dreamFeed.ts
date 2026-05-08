@@ -32,10 +32,7 @@ const RuleProjectDreamFeed: Rule = {
   },
 };
 
-function buildDreamFeed(
-  bedtime: Event,
-  ctx: { day: { id: string }; settings: Settings },
-): Event {
+function buildDreamFeed(bedtime: Event, ctx: { day: { id: string }; settings: Settings }): Event {
   const offset = ctx.settings.dreamFeedOffsetAfterBedtimeMinutes;
   const earliest = ctx.settings.dreamFeedStart;
   const latest = ctx.settings.dreamFeedEnd;
