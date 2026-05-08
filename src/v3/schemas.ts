@@ -199,6 +199,13 @@ export type DaycareConfig = {
 export type BottleChainConfig = {
   /** Expected lower limit of daily intake (R5.11). Drives placeholder projection. */
   bottlesPerDay: number;
+  /**
+   * Minutes between Day.wakeTime and the first placeholder bottle when
+   * no bottle has been recorded yet (R5.11). Default 10. Avoids the
+   * "first bottle exactly at wake time" false history (R5.10) while
+   * still rendering an actionable forecast from minute one.
+   */
+  bufferAfterWakeMinutes: number;
 };
 
 export type BottleAmountRule = { minWeeks: number; amountOz: number };
