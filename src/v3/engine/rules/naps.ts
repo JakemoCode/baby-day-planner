@@ -44,8 +44,14 @@ function projectBaseNapChain(ctx: Context, existing: Event[]): Event[] {
   for (let i = 0; i < wws.length; i++) {
     const wwMinutes = wws[i]!;
     const wwStart = cursor;
-    const wwEnd = wwStart + wwMinutes;
     const n = i + 1;
+    const napKey = `nap_${n}`;
+    const recorded = existingByKey.get(napKey);
+
+    // R3.4/R3.5: WW endTime tracks the next nap's start. When a recorded
+    // nap is present, the WW stretches or shrinks to meet it. Otherwise
+    // the projected nap starts at the natural cascade tick (wwStart + wwMinutes).
+    const wwEnd = recorded ? recorded.startTime : wwStart + wwMinutes;
 
     projected.push({
       id: `proj_wake_window_${n}`,
@@ -60,18 +66,15 @@ function projectBaseNapChain(ctx: Context, existing: Event[]): Event[] {
       lifecycle: { state: "projected" },
     });
 
-    const napKey = `nap_${n}`;
-    const recorded = existingByKey.get(napKey);
     if (!recorded) {
-      const napStart = wwEnd;
-      const napEnd = napStart + napLen;
+      const napEnd = wwEnd + napLen;
       projected.push({
         id: `proj_nap_${n}`,
         dayId: ctx.day.id,
         eventKey: napKey,
         type: "nap",
         kind: "block",
-        startTime: napStart,
+        startTime: wwEnd,
         endTime: napEnd,
         label: `Nap ${n}`,
         hasPutdown: false,

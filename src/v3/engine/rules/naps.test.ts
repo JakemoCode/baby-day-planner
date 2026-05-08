@@ -83,6 +83,76 @@ describe("R3.1 — projected nap chain from wakeWindowsMinutes", () => {
   });
 });
 
+describe("R3.4 / R3.5 — wake window endTime tracks the next nap's start", () => {
+  it("with a recorded nap_2 LATER than projected, ww_2 stretches to the recorded start", () => {
+    // Projected cascade (no actuals) would put nap_2 at 11:30.
+    // The recorded nap_2 actually started at 13:00 — ww_2 must stretch.
+    const recordedNap2 = aRecordedNap({
+      id: "actual_nap_2",
+      eventKey: "nap_2",
+      start: 13 * 60,
+      end: 14 * 60,
+    });
+
+    const ctx = aContext({
+      day: aDay({ wakeTime: 7 * 60 }),
+      settings: aSettings({
+        wakeWindowsMinutes: [120, 90],
+        defaultNapLengthMinutes: 60,
+      }),
+      actuals: [recordedNap2],
+    });
+
+    const out = projectDay(
+      {
+        day: ctx.day,
+        settings: ctx.settings,
+        actuals: ctx.actuals,
+        nowMinutes: ctx.nowMinutes,
+      },
+      { rules: NAP_RULES },
+    );
+
+    const ww2 = out.find((e) => e.eventKey === "wake_window_2");
+    expect(ww2?.startTime).toBe(10 * 60);
+    expect(ww2?.endTime).toBe(13 * 60);
+  });
+
+  it("with a recorded nap_2 EARLIER than projected, ww_2 shrinks to the recorded start", () => {
+    // Projected cascade (no actuals) would put nap_2 at 11:30.
+    // The baby actually went down at 10:30 — ww_2 must shrink to that.
+    const recordedNap2 = aRecordedNap({
+      id: "actual_nap_2_early",
+      eventKey: "nap_2",
+      start: 10 * 60 + 30,
+      end: 11 * 60 + 30,
+    });
+
+    const ctx = aContext({
+      day: aDay({ wakeTime: 7 * 60 }),
+      settings: aSettings({
+        wakeWindowsMinutes: [120, 90],
+        defaultNapLengthMinutes: 60,
+      }),
+      actuals: [recordedNap2],
+    });
+
+    const out = projectDay(
+      {
+        day: ctx.day,
+        settings: ctx.settings,
+        actuals: ctx.actuals,
+        nowMinutes: ctx.nowMinutes,
+      },
+      { rules: NAP_RULES },
+    );
+
+    const ww2 = out.find((e) => e.eventKey === "wake_window_2");
+    expect(ww2?.startTime).toBe(10 * 60);
+    expect(ww2?.endTime).toBe(10 * 60 + 30);
+  });
+});
+
 describe("R3.3 — recorded naps coexist with projected cascade", () => {
   it("with a recorded nap_2 at the projected time, output is ww_1, nap_1 (proj), ww_2 (proj), nap_2 (recorded)", () => {
     const recordedNap2 = aRecordedNap({
