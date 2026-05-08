@@ -1,18 +1,38 @@
 #!/usr/bin/env sh
 
-# Run emulator-backed integration tests before pushing.
+# Pre-push gate. Runs the same checks CI runs (in the same order) plus
+# the integration tests. Fail fast and fail loud — every minute spent
+# debugging a CI failure here is a minute saved on the remote runner.
 #
-# If a Firestore emulator is already running on :8080 (e.g. you've got
-# `firebase emulators:start` open in another terminal for local dev),
-# we reuse it. Otherwise we boot a fresh one via `firebase emulators:exec`.
+# Order mirrors .github/workflows/ci.yml verify job: typecheck → lint →
+# format:check → unit tests. Integration tests run last (CI skips them
+# because they need a Firestore emulator). `pnpm build` is intentionally
+# NOT run here — it's slow and depends on env vars CI provides; let CI
+# own that step.
 #
-# Requires Java JRE for the boot path. To skip in an emergency:
-# `git push --no-verify`.
+# Each step runs only if the previous passed (set -e).
+#
+# To skip in an emergency: `git push --no-verify`. Don't make a habit of it.
 
+set -e
+
+echo "→ Typecheck"
+pnpm typecheck
+
+echo "→ Lint"
+pnpm lint
+
+echo "→ Format check"
+pnpm format:check
+
+echo "→ Unit tests"
+pnpm test
+
+echo "→ Integration tests"
 if nc -z localhost 8080 2>/dev/null; then
-  echo "→ Reusing existing Firestore emulator on :8080"
-  exec pnpm exec vitest run src/repositories tests/integration
+  echo "  (reusing existing Firestore emulator on :8080)"
+  pnpm exec vitest run src/repositories tests/integration
 else
-  echo "→ Starting Firestore emulator + running integration tests"
-  exec pnpm test:integration
+  echo "  (starting Firestore emulator)"
+  pnpm test:integration
 fi
