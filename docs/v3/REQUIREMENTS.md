@@ -28,7 +28,7 @@
 - [§8 Dream Feed](#8-dream-feed)
 - [§9 Pumps](#9-pumps)
 - [§10 Custom Events (Extras)](#10-custom-events-extras)
-- [§11 Cook Dinner](#11-cook-dinner)
+- [§11 Daily Recurring Events](#11-daily-recurring-events)
 - [§12 Owner Inheritance](#12-owner-inheritance)
 - [§13 Day Templates](#13-day-templates)
 - [§14 Day Lifecycle](#14-day-lifecycle)
@@ -111,14 +111,52 @@ Internal `30:00` displays as `"6:00 AM"` when shown to users.
 - **Edge case it prevents**: showing "30:00" or "6:00 AM next day" in
   chip labels — visually broken.
 
-### R1.7 Owners are an enum: `"Jake" | "Kelly" | "Daycare"`
+### R1.7 Owners are configurable, not hard-coded — three slots
 
-Three owners only. Set in code; users don't add new owners.
+V3 generalizes V2's hard-coded `Jake | Kelly | Daycare`. The schema
+defines three semantic slots:
 
-- **Why**: simplifies template arrays, color tokens, and inheritance
-  rules. V3 adds a fourth owner via code change + token addition.
-- **Edge case it prevents**: drift between OwnershipTemplate, color
-  palette, and assignment UI when an owner is partially added.
+```ts
+type OwnerSlot = 'parent1' | 'parent2' | 'other';
+
+type OwnerConfig = {
+  parent1: { displayName: string; color: ColorToken };
+  parent2: { displayName: string; color: ColorToken };
+  // Multiple "other" entries supported (Daycare, in-laws, babysitter, etc.)
+  other: Array<{ id: string; displayName: string; color: ColorToken }>;
+};
+```
+
+Stored under `Settings.owners` (or a sibling doc). Defaults:
+`parent1.displayName = "Parent 1"`, `parent2.displayName = "Parent 2"`,
+`other = [{ id: 'caregiver1', displayName: "Caregiver" }]`. First-run
+setup screen lets the user fill in real names.
+
+An `Owner` reference on an Event is `{ slot: OwnerSlot; otherId?: string }`
+(or just a string id under the hood). The display layer resolves to a
+name + color via the config.
+
+- **Why**: the app is currently built for Jake + Kelly; if anyone else
+  wants to use it, the codebase shouldn't bake in our names. Slot-based
+  with display config = portable.
+- **Edge case it prevents**: every reference to "Jake" / "Kelly" /
+  "Daycare" in code, copy, and color tokens having to be hand-changed
+  for a fork. Slots stay constant; display strings come from config.
+
+### R1.7.1 "Other" supports multiple named entries
+
+Daycare, in-laws, babysitter, sister, friend — each is a distinct
+"other" entry with its own id and displayName. Templates and event
+docs reference the id; UI looks up the name.
+
+- **Edge case it prevents**: collapsing all non-parent caregivers into
+  a single "Other" with no way to distinguish "Daycare nap" from
+  "In-laws nap."
+
+### R1.7.2 Owner config is per-child / per-account
+
+A single Settings doc owns the slot config; multi-child support
+(out of scope for V3 — see OUT_OF_SCOPE §1) would expand this.
 
 ### R1.8 An event with `recorded: true` has a permanent commitment
 
@@ -318,15 +356,24 @@ range row.
 
 ## §4 Wake Windows
 
-### R4.1 Wake window N owner inherits from Nap N owner
+### R4.1 Wake window owner is set by template OR manual edit; no auto-inheritance
 
-Same parent on duty during WW2 puts baby down for Nap 2. Settings has a
-legacy `wakeWindowOwners` array used only as fallback when
-`napOwners[i]` is absent.
+V3 reverses V2's "WW N inherits from Nap N" convention. Wake windows
+get an owner ONLY when:
+1. A template specifies `wakeWindowOwners[N-1]`, OR
+2. The user explicitly assigns one via the drawer or
+   /day-templates picker.
 
-- **Why**: removes redundant per-WW owner setting; UX simplification.
-- **Edge case it prevents**: WW2 owner (Kelly) and Nap 2 owner (Jake)
-  diverging due to two separate setters.
+If neither, the wake window has no owner (renders without an owner
+stripe).
+
+- **Why**: V2's auto-inheritance was a Jake-Kelly-life-pattern
+  convention, not a universal truth. (E.g., Daycare runs Nap 2 but a
+  parent supervised the wake window leading up to drop-off.) Encoding
+  it in the engine made the data lose information.
+- **Edge case it prevents**: WW2 silently labeled with Daycare's color
+  because Nap 2 happened at Daycare, even though a parent was on duty
+  during WW2.
 
 ### R4.2 Manual wake_window override carries metadata, NOT time
 
@@ -425,30 +472,56 @@ adjustments occur in a pass, bounded by `MAX_PASSES = 8`.
 - **Edge case it prevents**: Bottle 4 moved out of Nap 2 lands inside
   Nap 3.
 
-### R5.8 Projected bottles are suppressed past `settings.bedtimeThreshold`
+### R5.8 Bottle chain suppression is governed by an explicit cap, not bedtime
 
-Bottles with `source: "projected"` AND `startTime >= bedtimeThreshold`
-are dropped. Recorded bottles past bedtime are kept (rare but defensive).
+V2 hard-suppressed projected bottles past `bedtimeThreshold`. V3 uses
+an explicit setting:
 
-- **Why**: nobody bottle-feeds at midnight.
-- **Edge case it prevents**: timeline showing 6 projected bottles after
-  bedtime when chain's interval is short.
+```ts
+Settings.bottleChain = {
+  // Maximum number of bottles to project per day. Default 6 for an
+  // older infant; set higher for newborns who eat 8+ times/day.
+  maxBottlesPerDay: number;
+  // Latest projected start time. Default bedtime-equivalent for
+  // sleep-through-the-night kids; later (or 24:00) for kids who
+  // genuinely feed multiple times overnight.
+  latestProjectedStart: TimeMin;
+};
+```
 
-### R5.9 Bottle chain has hard stop at 23:00
+- **Why**: Aden currently sleeps through ~80% of nights but
+  occasionally feeds at 2–4 AM. Hard-coding "no bottles past 19:00"
+  makes the engine wrong for those nights, AND wrong for younger
+  infants who eat 8+ times/day.
+- **Edge case it prevents**: dream feed projecting at 21:30 then NO
+  more bottles because suppression cuts in. With overnight enabled,
+  cascade continues to project at intervals through the night.
 
-Projection stops emitting at startTime >= 23:00 even if interval would
-allow more.
+### R5.9 Recorded bottles past the suppression cap are always kept
 
-- **Why**: safety cap to avoid infinite chains in edge data.
+If the user manually logs a bottle at 03:00, it persists regardless of
+`latestProjectedStart`.
 
-### R5.10 First bottle of the day anchors to `day.wakeTime`
+### R5.10 First bottle of the day is NOT auto-anchored to wake time
 
-In `mergePumpsAndExtras`, when populating bottles from `settings.pumpTimes`
-for projection, the FIRST entry is replaced with `day.wakeTime`. Wait
-— actually this is for pumps, not bottles. **Confirmed: this rule
-applies to PUMPS only**, not bottles. See §9.
+V2 had ambiguous handling here. V3 explicit: the first bottle of the
+day is created when the user taps **Start Bottle Now** (or via FAB).
+No projected bottle exists before the first recording. Subsequent
+bottles cascade from that anchor per R5.1.
 
-### R5.11 Recorded bottles within `minBottleIntervalMinutes` of the previous trigger a confirm
+- **Why**: the first feed timing varies; tying it to wake time
+  produced a false projection that confused users.
+- **Edge case it prevents**: dashboard showing "Bottle 1 at 7:30 AM"
+  before the user has actually fed the baby, then renumbering happening
+  when the real first bottle is logged at 8:15.
+
+### R5.12 Bottle chain has a hard upper bound to prevent infinite emission
+
+Even with overnight enabled, projection stops at
+`Settings.bottleChain.maxBottlesPerDay` per day (default 6, configurable).
+This is a safety cap, not a usage cap.
+
+### R5.13 Recorded bottles within `minBottleIntervalMinutes` of the previous trigger a confirm
 
 When user taps "Start Bottle Now" and the last bottle was logged less
 than `minBottleIntervalMinutes` (default 20) ago, show a confirm
@@ -524,13 +597,21 @@ Stripe pattern alternates `--color-surface-raised` and `--color-border`
 
 ## §7 Bedtime
 
-### R7.1 Bedtime is a `kind: "block"` event with a default `endTime` of `"30:00"`
+### R7.1 Bedtime is a `kind: "block"` event whose endTime defaults to `settings.defaultWakeTime` (next day)
 
-Bedtime extends visually through the night until the next morning's
-"Start New Day" creates a fresh Day record.
+V3 introduces `Settings.defaultWakeTime: TimeMin`. Bedtime's default
+`endTime` = `defaultWakeTime + 24*60` minutes (i.e. tomorrow morning's
+expected wake). For Aden's typical 7 AM wake, bedtime extends to
+`31*60 = "31:00"`.
 
-- **Why**: the night IS part of the day's display. Treating it as an
-  instant chip lost the visual continuity.
+Manual bedtime + manual wake-time-tomorrow can override individually.
+
+- **Why**: V2 hardcoded `"30:00"` (= 6 AM next day) which was a
+  reasonable default but not parameterized. Tying it to
+  `defaultWakeTime` makes the engine self-consistent and respects the
+  parents' actual rhythm.
+- **Edge case it prevents**: family with 8 AM wake schedule getting
+  the bedtime block end 2 hours before their actual morning wake.
 
 ### R7.2 Manual bedtime override replaces the projected bedtime
 
@@ -553,13 +634,25 @@ list.
 If a nap's `startTime < bedtime` but `endTime > bedtime`, drop the
 whole nap. Don't show a 5-minute sliver before sleep.
 
-### R7.6 Wake windows that cross bedtime are CLIPPED to bedtime
+### R7.6 Bedtime starts at the END of the preceding wake window — don't shorten the WW for bedtime
 
-Unlike naps, wake windows clip rather than drop: `ww.endTime =
-min(ww.endTime, bedtime.startTime)`.
+V2 had `bedtimeThreshold` clip the preceding WW to fit. V3 reverses
+this: the WW preceding bedtime ends at its NATURAL cascade time, and
+bedtime starts there. The WW is not shortened just because bedtime
+"should" be at a configured threshold.
 
-- **Why**: the baby IS awake leading up to bedtime; the wake window
-  meaningfully exists.
+The `bedtimeThreshold` setting becomes a **trigger**, not a cap: if
+the cascade reaches a state where the next nap would start at/after
+bedtimeThreshold, that nap is replaced by bedtime starting at the
+WW's natural end.
+
+- **Why**: the baby's actual wake window is what determines when
+  bedtime can start. Forcing bedtime to a fixed clock time (and
+  clipping the wake window to fit) creates impossible schedules — the
+  baby has 30 minutes of wake time after a short nap, then "must" go
+  to bed.
+- **Edge case it prevents**: WW4 truncated from 1:30 to 0:45 because
+  the engine wanted bedtime at exactly 19:00.
 
 ### R7.7 Wake windows starting at or after bedtime are dropped
 
@@ -593,6 +686,19 @@ Same fill family as nap (both = "baby asleep"), with stroke
 ---
 
 ## §8 Dream Feed
+
+### R8.0 Dream feed coexists with overnight bottles
+
+Dream feed is one specific projected event between bedtime and
+tomorrow's wake. It does NOT suppress other bottles in that window.
+If `Settings.bottleChain.latestProjectedStart` extends overnight AND
+the bottle interval would emit additional bottles between dream feed
+and morning wake, those bottles project normally.
+
+- **Why**: real-world overlap. A baby may have dream feed at 22:00
+  AND a 03:00 bottle the same night. The engine projects both.
+- **Edge case it prevents**: dream feed silently swallowing all other
+  overnight bottle slots.
 
 ### R8.1 Dream feed only emits if `settings.dreamFeed.enabled === true`
 
@@ -634,10 +740,20 @@ Even though styling matches pump, the label is distinct.
 Dream feed is part of the drawer's `showOwner` set so users can pick a
 caregiver.
 
-### R8.8 Dream feed has NO automatic owner inheritance
+### R8.8 Dream feed owner defaults to the OPPOSITE of the bedtime owner
 
-Unlike bedtime, dream feed doesn't inherit from `lastNapOwner`. Users
-must set explicitly. (V3 may revisit if Kelly always handles it.)
+If bedtime owner is `parent1`, dream feed owner defaults to `parent2`,
+and vice versa. If bedtime owner is `other` (e.g. babysitter sleepover
+— rare), dream feed has no default owner; user assigns manually.
+
+- **Why**: the bedtime parent has just gone to sleep; the other parent
+  is still up and naturally handles the dream feed.
+- **Edge case it prevents**: same person doing back-to-back bedtime +
+  dream feed defaults that nobody actually does in practice.
+
+### R8.9 Dream feed owner is editable via drawer
+
+Manual override always wins over the opposite-of-bedtime default.
 
 ---
 
@@ -681,9 +797,17 @@ No duration. Standard chip render.
 
 Chip / block label = `event.label`, not a type-derived string.
 
-### R10.3 Extras are user-created via FAB on /timeline
+### R10.3 Extras can be created from any page; they always live on `/timeline`
 
-FAB picker offers "Custom event" → drawer opens for entry.
+The FAB is available on any authed page (dashboard, /timeline,
+/tomorrow, /day-templates, /history). Tapping the FAB → type picker
+→ drawer. The created event is associated with the active day and
+appears on `/timeline`.
+
+- **Why**: users should be able to log "Pediatrician at 11" from
+  wherever they happen to be in the app.
+- **Edge case it prevents**: forcing the user to navigate to /timeline
+  before logging a one-off event.
 
 ### R10.4 Custom blocks (with endTime) anchor RIGHT in the center lane
 
@@ -702,113 +826,240 @@ boundary like wake/nap do.)
 
 ---
 
-## §11 Cook Dinner
+## §11 Daily Recurring Events
 
-### R11.1 Cook dinner is a recurring projected extra-instant
+V3 generalizes V2's Cook Dinner into a list of user-defined recurring
+events. Each entry has a label, time, optional default owner, and
+optional duration.
 
-When `settings.cookDinner.enabled === true`, the engine emits a
-projected event with `eventKey: "cook_dinner"` at
-`settings.cookDinner.time` each day.
+### R11.1 Settings holds a list of recurring event templates
 
-### R11.2 If the user already created a `cook_dinner` extra for the day, no duplicate
+```ts
+Settings.dailyRecurring: Array<{
+  id: string;                    // stable internal id
+  label: string;                 // "Cook Dinner", "Daycare Dropoff", "Pediatrician"
+  time: TimeMin;                 // start time
+  durationMinutes?: number;      // present → block; absent → instant
+  defaultOwnerSlot?: OwnerSlot;  // "parent1" / "parent2" / "other:caregiver1"
+  enabled: boolean;
+}>;
+```
 
-Engine checks for existing eventKey before emitting.
+### R11.2 Each enabled entry emits one projected event per day
 
-### R11.3 Cook dinner default = `{ enabled: false, time: "17:00" }`
+The engine emits one event per enabled recurring template, with
+`eventKey = "recurring:{id}"`. If duration is set, kind = "block";
+otherwise kind = "instant".
 
-User must opt in via Settings.
+### R11.3 Recurring events follow the standard "extra" rules
 
-### R11.4 Cook dinner is owner-assignable
+Same drawer behavior, same chip/block rendering, same overlap and
+validation rules as user-created extras.
 
-Renders as an instant chip; user can edit owner via drawer.
+### R11.4 Multiple recurring events of any combination are supported
 
-### R11.5 V3 OPEN: per-day delete/suppress for projected cook dinner
+Examples a user might configure:
+- "Cook Dinner" — instant at 17:00
+- "Daycare Dropoff" — instant at 08:30, owner = parent1
+- "Daycare Pickup" — instant at 17:30, owner = parent2
+- "Bath" — block 18:30–18:45, no default owner
+- "Pediatrician (Tuesdays)" — *out of scope for V3* — see §31 in
+  OUT_OF_SCOPE for "weekly recurring" as a v4+ candidate
 
-V2 doesn't support "skip dinner today" without disabling globally. V3
-should add a Day-level suppression list. Tracked in `OUT_OF_SCOPE.md`
-as a "punt or include" decision.
+### R11.5 If a manual extra exists with eventKey `recurring:{id}` for the day, no duplicate projection
+
+The engine checks for an existing matching key before emitting.
+
+### R11.6 Per-day suppression: `Day.suppressedRecurringIds: string[]`
+
+If the recurring template's id is in the active day's suppression list,
+no projected event emits for that day. The user "skip today" button
+adds the id; toggle off removes it.
+
+- **Why**: family is out of town tonight, no need to cook dinner
+  → tap "skip" on today's chip → dinner doesn't appear today,
+  reappears tomorrow.
+
+### R11.7 Defaults: empty list
+
+V3 ships with `Settings.dailyRecurring = []`. Users opt in by adding
+entries via Settings. Migration: any V2 doc with
+`settings.cookDinner.enabled = true` is converted to a single
+`dailyRecurring` entry on read.
 
 ---
 
 ## §12 Owner Inheritance
 
-### R12.1 Manual / actual events keep their owner state forever
+V3's owner-resolution model is **explicit, not heuristic**. An event
+gets an owner from one of:
+1. **Manual user assignment** (drawer, /day-templates picker, or
+   dashboard button creating a recording) — wins always.
+2. **Template** — when the day has an `ownershipTemplateId` and the
+   template specifies an owner for this event's slot.
+3. **Default rule** — for two specific cases (putdown, dream feed).
+4. **No owner** (renders without an owner stripe / dot tint).
 
-`applyTemplate` skips events with `source ∈ {actual, manual}`. The
-template only stamps owners on projected/template-source events.
+### R12.1 Manual / recorded events keep their owner forever
 
-- **Why**: user explicitly chose this owner; template defaults must not
-  override.
-- **Edge case it prevents**: clearing owner on a manual nap and having
-  the template re-stamp it on every projection.
+If an event has `source ∈ {actual, manual}` AND a non-empty owner
+field, no template override applies.
 
-### R12.2 Projected naps inherit `template.napOwners[N-1]`
+If the user explicitly cleared owner (the field is omitted), the
+template still does NOT re-stamp — clearing is treated as a deliberate
+choice. (See R12.7.)
 
-Index 0 = Nap 1, etc.
+- **Why**: user intent always wins.
+- **Edge case it prevents**: template silently overwriting a cleared
+  owner on every render.
 
-### R12.3 Projected wake windows inherit from the matching nap
+### R12.2 Projected naps inherit owner from the day's template, indexed by nap number
 
-`wake_window_N` gets `template.napOwners[N-1]`. Falls back to
-`template.wakeWindowOwners[N-1]` only if `napOwners[N-1]` is absent
-(legacy back-compat).
+In English: when today is configured to use a particular template
+(e.g. "Saturday template"), and that template specifies who's on duty
+for nap 1, nap 2, etc., the projected nap docs render with those
+owners. If no template is set, projected naps have NO default owner —
+they render unassigned until the user explicitly picks one.
 
-### R12.4 Projected putdowns inherit from their parent
+Schema:
+```ts
+OwnershipTemplate.napOwners: OwnerRef[];  // index 0 = nap 1
+```
 
-`nap_N_putdown` → `napOwners[N-1]`. `bedtime_putdown` → `bedtimeOwner
-?? lastNapOwner`.
+### R12.3 Projected wake windows inherit owner ONLY from the template, NOT from naps
 
-### R12.5 Projected bedtime inherits from `template.bedtimeOwner ?? lastNapOwner`
+V3 reverses V2. Wake windows do not auto-inherit from same-index naps.
+A template can specify `wakeWindowOwners[N-1]`; if absent, the wake
+window has no owner.
 
-Single owner field, not an array.
+V3 does NOT keep V2's `napOwners[i]` fallback for wake windows.
 
-### R12.6 Projected bottles inherit from `template.bottleOwners[N-1]`
+- **Why**: see R4.1.
+- **Edge case it prevents**: WW2 owner silently changing because Nap 2
+  was reassigned to Daycare.
 
-Optional field; missing = no owner inherited.
+### R12.4 Projected putdowns inherit from their parent event's owner
 
-### R12.7 Owner can be cleared explicitly (set to `undefined`)
+`nap_N_putdown` resolves to nap_N's owner (regardless of whether nap_N
+got that owner from manual assignment, template, or anywhere else).
+`bedtime_putdown` resolves to bedtime's owner.
 
-Drawer's owner picker has a "no owner" option. Saved doc has the field
-omitted (per `exactOptionalPropertyTypes`).
+- **Why**: the person putting baby down is, by definition, the same
+  person attached to the parent event. This is a structural
+  relationship, not a template lookup.
+- **Edge case it prevents**: putdown chip rendering with a different
+  owner color than its nap.
 
-- **Edge case it prevents**: template re-stamping owner on every
-  projection because `undefined` looks like "owner not yet set."
+### R12.5 Projected bedtime inherits from `template.bedtimeOwner` if set
 
-### R12.8 No template inheritance for: pump, dream_feed, wake, extra
+Templates have an explicit `bedtimeOwner` field. No fallback to
+"last nap owner" — V3 makes this explicit. If the template doesn't
+specify, bedtime has no default owner.
 
-Pumps and extras require explicit per-event owner assignment. Wake is
-auto-filtered out of display. Dream feed ties to the user's bedtime
-ritual (often Kelly), but isn't templated.
+### R12.6 Projected bottles inherit owner from the template's bottle list, by index
+
+In English: when a template is set and it includes a list of bottle
+owners (e.g. "Bottle 1 = parent1, Bottle 2 = parent2"), each
+projected bottle N gets the owner at index N-1. If the template lacks
+a bottle owner list, projected bottles have no default owner.
+
+Schema:
+```ts
+OwnershipTemplate.bottleOwners?: OwnerRef[];  // index 0 = bottle 1
+```
+
+### R12.7 Owner can be cleared explicitly (drawer "no owner" → field omitted)
+
+When the user picks "no owner," the saved doc has the `owner` field
+absent (not set to `undefined`). This is the explicit "clear" signal.
+
+- **Edge case it prevents**: template treating empty-but-present
+  owner field as a defaulting opportunity.
+
+### R12.8 Pump owner defaults to a specific configured slot; dream feed defaults to opposite of bedtime
+
+- **Pumps**: every pump's default owner is `Settings.pumpOwnerSlot`.
+  V3 default = `parent2` (per Jake: pumping is Kelly's domain in his
+  setup; configurable for other families).
+- **Dream feed**: see R8.8 — opposite of bedtime owner.
+
+These two are the ONLY events with rule-derived (vs. template-derived)
+default owners.
+
+### R12.9 No template inheritance for: wake events, extras (manual), dailyRecurring (uses its own default)
+
+- Wake instant events are filtered out when they coincide with WW1
+  (R16.8); no owner needed.
+- User-created extras carry whatever owner the user picked (or none).
+- Recurring events use their per-template `defaultOwnerSlot`.
 
 ---
 
 ## §13 Day Templates
 
-### R13.1 Templates are stored separately from days
+### R13.1 Templates are user-named and unbounded in count
 
-`OwnershipTemplate` docs in Firestore. A `Day` references one via
-`day.ownershipTemplateId`.
+Each template has a `displayName` (e.g. "Weekday Daycare", "Weekend
+Saturday", "Sick day", "Grandparents visiting"). No hard cap on how
+many templates a user can save; V3 ships with two seeds (Saturday,
+Sunday) but the UI lets the user create / rename / delete freely.
 
-### R13.2 Saturday and Sunday have separate default templates
+```ts
+OwnershipTemplate = {
+  id: string;                // stable
+  displayName: string;       // user-editable
+  napOwners: OwnerRef[];
+  wakeWindowOwners: OwnerRef[];
+  bottleOwners?: OwnerRef[];
+  bedtimeOwner?: OwnerRef;
+};
+```
 
-V2 ships with Saturday + Sunday seeds that flip Jake/Kelly so each
-parent gets predictable shifts.
+### R13.2 A Day references at most one template via `day.ownershipTemplateId`
 
-### R13.3 `flipTemplate` swaps Jake ↔ Kelly, leaves Daycare alone
+Mid-day swaps are out of scope (see OUT_OF_SCOPE §10).
 
-Used for "alternating day" patterns.
+### R13.3 Templates can be cloned and edited as a starting point
 
-### R13.4 `setOwnerInTemplate` only handles types in `ASSIGNABLE_TYPES`
+UI offers "Duplicate this template" so users can create variations
+without retyping every owner.
 
-V2 set: `{nap, wake_window, bottle, bedtime}`. Putdowns inherit from
-their parents; pumps and dream_feed are not assigned via this path.
+### R13.4 `flipTemplate` swaps `parent1 ↔ parent2`, leaves `other` slots alone
 
-### R13.5 The /day-templates page projects against a synthetic day
+Used for "alternating weekend" patterns. Now generalized for the
+configurable owner system (R1.7).
 
-Hardcoded day + wake time + a seed bottle to drive the engine. Day is
-never saved.
+### R13.5 Templates can be assigned for a future day via /tomorrow
 
-- **Why**: lets the user assign owners against a representative day
-  shape without touching real data.
+The /tomorrow page lets the user pick which template the next-day
+projection should use. Persists as `day.ownershipTemplateId` on the
+new Day record when "Start New Day" runs (or, if the new Day already
+exists in `planned` status, updates that doc).
+
+### R13.6 Assignable event types via /day-templates picker: `{nap, wake_window, bottle, bedtime, dailyRecurring}`
+
+The picker UI surfaces the owner-pick interaction for each of these.
+Pumps and dream feed don't use the picker (R12.8 handles them via
+explicit Settings).
+
+### R13.7 The /day-templates page projects against a synthetic day
+
+Hardcoded day + wake time + a seed bottle to drive the engine so the
+user sees a representative shape. Synthetic day is never saved.
+
+### R13.8 Optional: "Copy from yesterday" or "Alternate from yesterday" shortcuts
+
+When creating a new template (or assigning one to tomorrow), the UI
+should offer:
+- **Copy from yesterday**: same template the active/previous day used.
+- **Alternate from yesterday**: yesterday's template flipped via
+  `flipTemplate`.
+
+This addresses the natural "we did Saturday today, want Sunday-pattern
+tomorrow" rhythm without forcing the user to manually pick.
+
+- **Why**: real-world weekends often alternate; baking shortcuts in
+  saves clicks.
 
 ---
 
@@ -829,9 +1080,25 @@ transaction as creating the new one.
 
 Engine returns empty events. Dashboard shows the "Start New Day" prompt.
 
-### R14.4 "Start New Day" sets `wakeTime` to the current local time
+### R14.4 "Start New Day" action sets `wakeTime` to the current local time
 
-User can edit later via Settings.
+When invoked, the new Day record's `wakeTime = now()`. User can edit
+later via the Day-detail / Settings flow.
+
+### R14.4.1 The "Start New Day" UI surface is contextual, not always-shown
+
+V2 hardcoded a Start-New-Day button on the dashboard whenever the
+active day was missing `wakeTime`. V3 makes this a contextual action
+that only appears when it's the genuinely-correct next step
+(end-of-yesterday, no active day yet, after midnight, etc.). When the
+day is in motion, that screen real estate is used for live status.
+
+The UX of WHEN to show the action is open in V3 — likely surfaces:
+- End-of-day card on dashboard ("Tomorrow's plan?")
+- A persistent header action only when no active day exists
+- Settings or /tomorrow page
+
+Tracked as a V3 design decision; not finalized.
 
 ### R14.5 Each Day owns its own events collection
 
@@ -888,6 +1155,12 @@ End of day. Used for bottle overlap "is closer edge in past" check.
 ---
 
 ## §16 Timeline Display
+
+> **V3 scope note**: V3 does NOT redesign the Timeline UI. The rules
+> below document the V2 timeline's current behavior so the V3 engine
+> output stays compatible with the existing renderer. After V3 stabilizes,
+> incidental cleanups in the timeline component (component organization,
+> token cleanup) may happen, but no visual redesign is planned.
 
 ### R16.1 Three lanes: axis (left, hour labels), block lane (center), gutter (right, chips)
 
@@ -1003,15 +1276,19 @@ end field. Save button disables while any error is present.
 - **Why**: a bottom-of-form error is harder to associate with the
   offending input.
 
-### R17.3 Editing `startTime` auto-fills `endTime` to preserve duration
+### R17.3 Editing `startTime` auto-fills `endTime` to preserve duration; show a helper hint
 
 When user changes `startTime` on a duration-having event:
 - If `form.startTime` and `form.endTime` are both set, preserve the
   duration: `nextEnd = nextStart + (oldEnd - oldStart)`.
-- Otherwise default to `nextStart + 60 min`.
+- Otherwise default to `nextStart + (settings.defaultNapLengthMinutes for naps; 60 min for extras)`.
+
+A small helper text under the End time field reads (e.g.) "Auto-adjusts
+when start time changes — edit to override" so the auto-fill is
+discoverable.
 
 - **Why**: saves re-entering both fields when the user is just shifting
-  the event in time.
+  the event in time. Helper text demystifies the magic.
 
 ### R17.4 Saving a drawer-edited projected event counts as a recording
 
@@ -1038,6 +1315,18 @@ Times in error messages are `"1:11 PM – 1:56 PM"`, never raw 24h.
 ### R17.8 Delete button only shows for `actual`/`manual` source events
 
 Projected events can't be deleted (they're not in Firestore).
+
+### R17.9 Buttons use terse labels; no descriptive sub-labels or subtitles
+
+Drawer / dashboard / FAB buttons render a single short label
+("Save", "Cancel", "Delete", "Start Bottle", "Start Nap N"). No
+secondary text under buttons explaining what they do. The label IS
+the explanation.
+
+- **Why**: V2 occasionally bundled subtext ("Tap to record a bottle
+  now") that proved redundant. Users learn the buttons quickly.
+- **Edge case it prevents**: stale subtext in non-English contexts or
+  drift between subtext and behavior over time.
 
 ---
 
@@ -1085,12 +1374,14 @@ whether multi-child is in scope (probably not, per OUT_OF_SCOPE).
 The Settings page renders against defaults if no doc exists; first save
 creates the doc.
 
-### R19.3 Default values (from `src/lib/defaults/settings.ts`)
+### R19.3 Default values (V3 schema; some are renamed/added vs V2)
+
+Existing fields:
 - `defaultBottleAmountOz`: 5
 - `defaultBottleIntervalMinutes`: 180
 - `defaultNapLengthMinutes`: 60
 - `putdownLeadMinutes`: 15
-- `bedtimeThreshold`: "19:00"
+- `bedtimeThreshold`: "19:00" (now a *trigger*, not a clip — see R7.6)
 - `shortNapThresholdMinutes`: 35
 - `shortNapAdjustmentMinutes`: 10
 - `wakeWindowsMinutes`: [120, 135, 135, 150]
@@ -1098,10 +1389,21 @@ creates the doc.
 - `dreamFeed`: enabled, 20:30–21:00, +90min after bedtime
 - `pumpTimes`: ["10:30", "14:30"]
 - `minBottleIntervalMinutes`: 20
-- `cookDinner`: { enabled: false, time: "17:00" }
 - `timelineColorMode`: "type"
 - `timelinePxPerHour`: 120
 - `timelineDimPast`: true
+
+V3 additions:
+- `defaultWakeTime`: "07:00" (drives bedtime endTime — R7.1)
+- `bottleChain`: { maxBottlesPerDay: 6, latestProjectedStart: "20:00" }
+  (overnight bottles configurable — R5.8)
+- `pumpOwnerSlot`: "parent2" (drives pump owner default — R12.8)
+- `dailyRecurring`: [] (replaces `cookDinner` — R11)
+- `owners`: { parent1: {displayName, color}, parent2: {...},
+   other: [...] } (configurable owner slots — R1.7)
+
+V3 removed:
+- `cookDinner` (subsumed by `dailyRecurring`; migrated on read)
 
 ### R19.4 Duration inputs use `H:MM` format, persist as minutes
 
@@ -1178,3 +1480,44 @@ V3 reads V2 Firestore docs without migration. New writes use V3 schema.
 - Strategy plan: `docs/V3_REWRITE_PLAN.md`.
 - Edge cases derived from rules: `docs/v3/EDGE_CASES.md`.
 - Architecture proposal: `docs/v3/ARCHITECTURE_V3.md`.
+
+---
+
+## Review Log
+
+### Review 1 (Jake, 2026-05-08)
+
+Applied changes:
+- **§1.7**: Owner type made extensible (parent1 / parent2 / other[]
+  with display config). Multi-name "other" support.
+- **§4.1**: Wake-window owner inheritance from same-index nap REMOVED.
+  WW owners now come from template or manual only.
+- **§5.8**: Hard 19:00 suppression replaced with explicit
+  `bottleChain.{maxBottlesPerDay, latestProjectedStart}` settings to
+  support overnight bottles when configured.
+- **§5.10**: First bottle of day no longer auto-anchored to wake
+  time; requires manual Start.
+- **§7.1**: Bedtime endTime sources from `settings.defaultWakeTime`
+  (next morning) rather than hardcoded "30:00".
+- **§7.6**: Bedtime starts at preceding WW's natural end; WW is NOT
+  shortened to fit a bedtime threshold. `bedtimeThreshold` is now a
+  trigger, not a clip.
+- **§8.0** (new): Dream feed coexists with overnight bottles; doesn't
+  suppress them.
+- **§8.8**: Dream feed owner defaults to OPPOSITE of bedtime owner.
+- **§10.3**: FAB usable on any page; events live on /timeline.
+- **§11**: "Cook Dinner" generalized to "Daily Recurring Events" —
+  multiple, named, with optional duration / owner / per-day suppression.
+- **§12.2/3/5/6**: Rewrote in plain English. Wake windows no longer
+  inherit from naps. Bedtime no longer falls back to lastNapOwner.
+- **§12.8**: Pump owner from `Settings.pumpOwnerSlot`. Dream feed =
+  opposite of bedtime owner.
+- **§13**: Templates user-named, unbounded count; copy/flip from
+  yesterday shortcuts; assignable types include `dailyRecurring`.
+- **§14.4.1** (new): "Start New Day" UI surface is contextual, not
+  always shown.
+- **§16**: Note added — V3 does NOT redesign Timeline UI; rules just
+  document V2 behavior so V3 engine output stays compatible.
+- **§17.3**: Helper hint text on auto-fill of endTime.
+- **§17.9** (new): Buttons use terse labels; no descriptive subtitles.
+- **§19.3**: Settings defaults updated for new fields.

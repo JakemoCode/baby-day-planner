@@ -101,7 +101,13 @@ type Lifecycle =
   | { state: 'overridden'; annotatedAt: TimeMin };  // owner-only annotation
 
 type EventKind = 'block' | 'instant';
-type Owner = 'Jake' | 'Kelly' | 'Daycare';
+
+// V3 owner system: configurable slots, not hard-coded names. See R1.7.
+type OwnerSlot = 'parent1' | 'parent2';
+type OwnerRef =
+  | { slot: OwnerSlot }
+  | { slot: 'other'; otherId: string };
+
 type TimeMin = number; // 0..1440+ (cross-day)
 ```
 
@@ -125,22 +131,50 @@ type TimeMin = number; // 0..1440+ (cross-day)
 
 ### 1.2 Day shape
 
-Unchanged from V2. Optional `cookDinnerSuppressed: string[]` field
-added for per-day skip of recurring projections (see [OUT_OF_SCOPE
-§3](./OUT_OF_SCOPE.md)).
+Adds:
+- `suppressedRecurringIds: string[]` — per-day skip of recurring
+  projections (see R11.6).
 
 ### 1.3 OwnershipTemplate shape
 
-Unchanged from V2 except:
-- `wakeWindowOwners` deprecated (use `napOwners` for inheritance).
-  Field stays in the schema for back-compat read; new templates don't
-  populate it.
-- `bottleOwners` formalized (was V2 optional).
+```ts
+OwnershipTemplate = {
+  id: string;
+  displayName: string;            // user-named (R13.1)
+  napOwners: OwnerRef[];
+  wakeWindowOwners: OwnerRef[];   // template-only; no fallback to nap (R12.3)
+  bottleOwners?: OwnerRef[];
+  bedtimeOwner?: OwnerRef;        // no lastNapOwner fallback (R12.5)
+};
+```
 
 ### 1.4 Settings shape
 
-Unchanged from V2. The optional Timeline display fields (R19.3) become
-required on new docs but legacy fallback continues to be coerced.
+V3 additions on top of V2:
+```ts
+Settings.defaultWakeTime: TimeMin;            // R7.1 — drives bedtime endTime
+Settings.bottleChain: {
+  maxBottlesPerDay: number;                   // R5.8/R5.12
+  latestProjectedStart: TimeMin;
+};
+Settings.pumpOwnerSlot: OwnerSlot;            // R12.8 — pump default owner
+Settings.dailyRecurring: Array<{              // R11 — replaces cookDinner
+  id: string;
+  label: string;
+  time: TimeMin;
+  durationMinutes?: number;
+  defaultOwnerSlot?: OwnerSlot;
+  enabled: boolean;
+}>;
+Settings.owners: {                            // R1.7 — configurable owner slots
+  parent1: { displayName: string; color: ColorToken };
+  parent2: { displayName: string; color: ColorToken };
+  other: Array<{ id: string; displayName: string; color: ColorToken }>;
+};
+```
+
+V2 `Settings.cookDinner` migrated to a single `dailyRecurring` entry
+on read; the field is dropped going forward.
 
 ---
 
@@ -619,6 +653,28 @@ Working sessions of ~2-4 focused hours, nights/weekends:
 nights/weekends. Less if life cooperates; more if it doesn't. The
 strangler pattern means there's no "broken at week 4" intermediate
 state.
+
+---
+
+## §10.5 Review Log
+
+### Review 1 (Jake, 2026-05-08) — synced with REQUIREMENTS revisions
+
+- **§1.1 Event/Lifecycle**: `Owner` replaced with `OwnerRef` (slot
+  + optional otherId) for configurable owner slots.
+- **§1.2 Day**: `cookDinnerSuppressed` renamed to
+  `suppressedRecurringIds` (generalizes beyond cook dinner).
+- **§1.3 OwnershipTemplate**: `displayName` field added; comments
+  clarify wakeWindowOwners is template-only (no nap fallback in V3),
+  bedtimeOwner has no lastNapOwner fallback.
+- **§1.4 Settings**: added `defaultWakeTime`, `bottleChain`,
+  `pumpOwnerSlot`, `dailyRecurring`, `owners`. V2 `cookDinner`
+  migrated.
+- **[OPEN] Q1 (rules engine impl)**: still recommend hand-roll;
+  unchanged.
+- **[OPEN] Q4 (time as integer minutes)**: still recommend; unchanged.
+- **OUT_OF_SCOPE §3 (per-day suppression)**: ratified MOVED IN; now
+  R11.6 in REQUIREMENTS.
 
 ---
 

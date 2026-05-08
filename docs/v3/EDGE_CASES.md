@@ -137,12 +137,19 @@
 - **Rule(s)**: R16.8
 - **Source**: rule-derived
 
-### EC-N17: Wake window inherits owner from paired nap
-- **Given**: template.napOwners=[Kelly, Jake]
+### EC-N17: Wake window owner is template-driven, NOT nap-derived (revised)
+- **Given**: template.napOwners=[Kelly, Jake]; template.wakeWindowOwners=[parent2, parent1]
 - **When**: applyTemplate runs on projected WW2
-- **Then**: WW2.owner = Jake (matches nap_2)
+- **Then**: WW2.owner = parent1 (from wakeWindowOwners[1], NOT nap_2's owner)
+- **Rule(s)**: R4.1, R12.3 (revised in Jake review 1)
+- **Source**: rule-derived (V3)
+
+### EC-N17b: Wake window with no template owner has no owner
+- **Given**: no template; projected WW2
+- **When**: applyTemplate runs
+- **Then**: WW2.owner is unset (renders without owner stripe)
 - **Rule(s)**: R4.1, R12.3
-- **Source**: 43efdb3 (2026-05-07)
+- **Source**: rule-derived
 
 ### EC-N18: Wake window override carries metadata only, not time
 - **Given**: manual ww_2 override stored from days ago with stale time
@@ -211,26 +218,33 @@
 - **Rule(s)**: R5.7
 - **Source**: 9893f60 (2026-05-07)
 
-### EC-B8: Projected bottle past bedtime is suppressed
-- **Given**: bedtimeThreshold=19:00; projected bottle at 19:30
-- **When**: suppressBottlesAfterBedtime runs
+### EC-B8: Projected bottle past `bottleChain.latestProjectedStart` is suppressed
+- **Given**: bottleChain.latestProjectedStart=19:00; projected bottle at 19:30
+- **When**: cascade runs
 - **Then**: bottle removed from event list
-- **Rule(s)**: R5.8
-- **Source**: rule-derived
+- **Rule(s)**: R5.8 (revised)
+- **Source**: rule-derived (V3)
 
-### EC-B9: Recorded bottle past bedtime is preserved
-- **Given**: bedtimeThreshold=19:00; recorded bottle at 19:15 (rare but real)
-- **When**: suppressBottlesAfterBedtime runs
+### EC-B9: Recorded bottle past suppression cap is preserved
+- **Given**: bottleChain.latestProjectedStart=19:00; recorded bottle at 03:00 (overnight feed)
+- **When**: cascade runs
 - **Then**: bottle stays in event list
-- **Rule(s)**: R5.8
-- **Source**: rule-derived
+- **Rule(s)**: R5.9 (revised)
+- **Source**: rule-derived (V3)
 
-### EC-B10: Bottle chain stops at 23:00
-- **Given**: cascade would emit bottle at 23:30
-- **When**: projectBottleChain runs
-- **Then**: chain breaks before 23:30; no bottle emitted
-- **Rule(s)**: R5.9
-- **Source**: rule-derived
+### EC-B10: Overnight bottles project when `latestProjectedStart` extends past midnight
+- **Given**: bottleChain={maxBottlesPerDay: 8, latestProjectedStart: "30:00"}; last recorded bottle at 22:00 with 4-hour interval
+- **When**: cascade runs
+- **Then**: projected bottles at 02:00 and 06:00 included in event list
+- **Rule(s)**: R5.8
+- **Source**: rule-derived (V3)
+
+### EC-B10b: Bottle count cap stops emission even before time cap
+- **Given**: maxBottlesPerDay=4; user has logged 4 bottles; cascade would emit a 5th
+- **When**: cascade runs
+- **Then**: chain breaks; no 5th bottle emitted
+- **Rule(s)**: R5.12
+- **Source**: rule-derived (V3)
 
 ### EC-B11: Narrowest bottle rule wins
 - **Given**: rules `[{0–5.5: 150}, {5.6+: 180}, {0–6: 165}]`; bottle amount=5.5oz
@@ -285,12 +299,12 @@
 - **Rule(s)**: R7.1, R1.3
 - **Source**: 2956795 (2026-05-07)
 
-### EC-BD2: Projected bedtime gets default endTime "30:00"
-- **Given**: applyBedtime substitutes nap_4 (19:00) with bedtime
+### EC-BD2: Projected bedtime endTime = settings.defaultWakeTime + 24h
+- **Given**: settings.defaultWakeTime="07:00"; applyBedtime substitutes nap_4 with bedtime
 - **When**: bedtime emitted
-- **Then**: bedtime.endTime = "30:00"
-- **Rule(s)**: R7.1
-- **Source**: 2956795 (2026-05-07)
+- **Then**: bedtime.endTime = "31:00" (7 AM next day)
+- **Rule(s)**: R7.1 (revised)
+- **Source**: rule-derived (V3)
 
 ### EC-BD3: Manual bedtime override replaces projection
 - **Given**: actuals contain bedtime (manual) at 18:30; settings.bedtimeThreshold=19:00
@@ -299,12 +313,12 @@
 - **Rule(s)**: R7.2
 - **Source**: 7313ca9 (2026-05-06)
 
-### EC-BD4: Manual bedtime without endTime gets "30:00" backfilled
-- **Given**: user creates manual bedtime at 18:30 with no endTime
+### EC-BD4: Manual bedtime without endTime backfilled from defaultWakeTime
+- **Given**: settings.defaultWakeTime="07:00"; user creates manual bedtime at 18:30 with no endTime
 - **When**: applyBedtime processes
-- **Then**: result has bedtime.endTime = "30:00"
-- **Rule(s)**: R7.3
-- **Source**: 2956795 (2026-05-07)
+- **Then**: result has bedtime.endTime = "31:00"
+- **Rule(s)**: R7.3, R7.1
+- **Source**: rule-derived (V3)
 
 ### EC-BD5: Nap starting at bedtime is dropped
 - **Given**: bedtime=19:00; projected nap at 19:00
@@ -320,12 +334,19 @@
 - **Rule(s)**: R7.5
 - **Source**: 6ba1689 (2026-05-06)
 
-### EC-BD7: WW crossing bedtime is clipped
-- **Given**: manual bedtime=18:30; WW3 at 16:30–19:00
+### EC-BD7: Bedtime starts at preceding WW's natural end (revised; V2 behavior reversed)
+- **Given**: cascade puts WW3 at 16:30–19:00 (its natural end); bedtimeThreshold=19:00 triggers bedtime
 - **When**: applyBedtime runs
-- **Then**: WW3.endTime = 18:30
+- **Then**: WW3.endTime stays 19:00; bedtime.startTime = 19:00 (WW's natural end). WW is NOT shortened to fit a fixed bedtime time.
+- **Rule(s)**: R7.6 (revised)
+- **Source**: rule-derived (V3)
+
+### EC-BD7b: Bedtime threshold acts as a trigger when WW's natural end exceeds it
+- **Given**: cascade puts WW4 at 16:30–20:30 (natural); bedtimeThreshold=19:00
+- **When**: applyBedtime runs
+- **Then**: bedtime triggered at the next nap's projected start; WW4's natural end is preserved (not artificially clipped to 19:00)
 - **Rule(s)**: R7.6
-- **Source**: a13307a (2026-05-06)
+- **Source**: rule-derived (V3)
 
 ### EC-BD8: WW starting at/after bedtime is dropped
 - **Given**: bedtime=18:30; WW4 at 19:00–20:00
@@ -597,28 +618,56 @@
 
 ---
 
-## Cook Dinner
+## Daily Recurring Events
 
-### EC-CD1: Cook dinner disabled => no projection
-- **Given**: settings.cookDinner.enabled=false
-- **When**: mergePumpsAndExtras runs
-- **Then**: no cook_dinner event emitted
-- **Rule(s)**: R11.1, R11.3
-- **Source**: 9893f60 (2026-05-07)
+### EC-DR1: No recurring entries => no projection
+- **Given**: settings.dailyRecurring=[]
+- **When**: cascade runs
+- **Then**: no recurring events emitted
+- **Rule(s)**: R11.1, R11.7
+- **Source**: rule-derived (V3)
 
-### EC-CD2: Cook dinner enabled => projected at configured time
-- **Given**: settings.cookDinner = { enabled: true, time: "17:00" }
-- **When**: mergePumpsAndExtras runs
-- **Then**: projected extra-instant emitted with eventKey "cook_dinner", startTime "17:00"
-- **Rule(s)**: R11.1
-- **Source**: 9893f60 (2026-05-07)
-
-### EC-CD3: Existing manual cook_dinner skips projected emission
-- **Given**: settings.cookDinner enabled; actuals contain extra with eventKey "cook_dinner"
-- **When**: mergePumpsAndExtras runs
-- **Then**: only the manual one in output (no duplicate)
+### EC-DR2: Enabled instant entry projects as chip
+- **Given**: dailyRecurring=[{id:"cook", label:"Cook Dinner", time:"17:00", enabled:true}]
+- **When**: cascade runs
+- **Then**: projected extra-instant emitted with eventKey "recurring:cook", startTime "17:00", kind "instant"
 - **Rule(s)**: R11.2
-- **Source**: 9893f60 (2026-05-07)
+- **Source**: rule-derived (V3)
+
+### EC-DR3: Enabled block entry (with duration) projects as block
+- **Given**: dailyRecurring=[{id:"bath", label:"Bath", time:"18:30", durationMinutes:15, enabled:true}]
+- **When**: cascade runs
+- **Then**: projected extra emitted with kind "block", endTime "18:45"
+- **Rule(s)**: R11.2
+- **Source**: rule-derived (V3)
+
+### EC-DR4: Multiple entries all project independently
+- **Given**: dailyRecurring=[{cook,17:00,enabled}, {bath,18:30,enabled}, {pediatrician,11:00,disabled}]
+- **When**: cascade runs
+- **Then**: 2 events projected (cook + bath); pediatrician omitted
+- **Rule(s)**: R11.4
+- **Source**: rule-derived (V3)
+
+### EC-DR5: Existing manual extra with same key suppresses projection
+- **Given**: dailyRecurring includes cook (id="cook"); actuals contain extra with eventKey "recurring:cook"
+- **When**: cascade runs
+- **Then**: manual one wins; no duplicate
+- **Rule(s)**: R11.5
+- **Source**: rule-derived (V3)
+
+### EC-DR6: Per-day suppression skips a single day's projection
+- **Given**: dailyRecurring includes cook (id="cook"); day.suppressedRecurringIds=["cook"]
+- **When**: cascade runs
+- **Then**: cook NOT emitted today; emitted normally tomorrow
+- **Rule(s)**: R11.6
+- **Source**: rule-derived (V3)
+
+### EC-DR7: V2 cookDinner migrates to dailyRecurring on read
+- **Given**: legacy V2 settings doc has cookDinner={enabled:true, time:"17:00"}
+- **When**: settings converter runs on read
+- **Then**: result has dailyRecurring=[{id:"cook_dinner_legacy", label:"Cook Dinner", time:"17:00", enabled:true}]; cookDinner field is dropped
+- **Rule(s)**: R11.7
+- **Source**: rule-derived (V3)
 
 ---
 
@@ -638,19 +687,19 @@
 - **Rule(s)**: R12.2
 - **Source**: rule-derived
 
-### EC-OW3: Wake window inherits from same-index nap
-- **Given**: napOwners=[Jake, Kelly]; ww_2 projected with no owner
-- **When**: applyTemplate runs
-- **Then**: ww_2.owner = Kelly (matches nap_2)
-- **Rule(s)**: R12.3
-- **Source**: 43efdb3 (2026-05-07)
+### EC-OW3: Wake window owner from template's wakeWindowOwners only (revised)
+- **Given**: template.napOwners=[parent1, parent2]; template.wakeWindowOwners=[parent2, parent1]
+- **When**: applyTemplate runs on projected ww_2
+- **Then**: ww_2.owner = parent1 (from wakeWindowOwners[1], NOT nap_2's owner)
+- **Rule(s)**: R12.3 (revised)
+- **Source**: rule-derived (V3)
 
-### EC-OW4: WW falls back to wakeWindowOwners if napOwners absent
-- **Given**: napOwners=[]; wakeWindowOwners=[Daycare]
-- **When**: applyTemplate runs on ww_1
-- **Then**: ww_1.owner = Daycare
+### EC-OW4: WW with no template owner stays unset
+- **Given**: template.wakeWindowOwners=[parent2]; projected ww_2 (index 1, out of array)
+- **When**: applyTemplate runs
+- **Then**: ww_2.owner is unset
 - **Rule(s)**: R12.3
-- **Source**: rule-derived
+- **Source**: rule-derived (V3)
 
 ### EC-OW5: Putdown for nap_N inherits napOwners[N-1]
 - **Given**: napOwners=[Jake, Kelly]
@@ -659,33 +708,54 @@
 - **Rule(s)**: R12.4
 - **Source**: rule-derived
 
-### EC-OW6: bedtime_putdown inherits bedtimeOwner ?? lastNapOwner
-- **Given**: napOwners=[Jake, Kelly]; bedtimeOwner unset
+### EC-OW6: bedtime_putdown inherits bedtime's owner (no lastNapOwner fallback in V3)
+- **Given**: bedtime.owner=parent1 (from template or manual)
 - **When**: applyTemplate runs on bedtime_putdown
-- **Then**: bedtime_putdown.owner = Kelly
-- **Rule(s)**: R6.3, R12.4
-- **Source**: 700092a (2026-05-07)
+- **Then**: bedtime_putdown.owner = parent1
+- **Rule(s)**: R6.3, R12.4 (revised)
+- **Source**: rule-derived (V3)
+
+### EC-OW6b: bedtime with no template owner has no owner
+- **Given**: template.bedtimeOwner unset; no manual override
+- **When**: applyTemplate runs on bedtime
+- **Then**: bedtime.owner unset (no fallback)
+- **Rule(s)**: R12.5 (revised)
+- **Source**: rule-derived (V3)
 
 ### EC-OW7: Manual bottle keeps owner
-- **Given**: actual bottle_2 with owner=Daycare; template.bottleOwners=[Jake, Jake]
+- **Given**: actual bottle_2 with owner=other:caregiver1; template.bottleOwners=[parent1, parent1]
 - **When**: applyTemplate runs
-- **Then**: bottle_2.owner = Daycare (preserved)
+- **Then**: bottle_2.owner = other:caregiver1 (preserved)
 - **Rule(s)**: R12.1, R12.6
 - **Source**: rule-derived
 
-### EC-OW8: Pump owner not template-driven
-- **Given**: template has no pump owner field
-- **When**: applyTemplate runs on a pump
-- **Then**: pump.owner stays undefined
-- **Rule(s)**: R12.8
-- **Source**: rule-derived
+### EC-OW8: Pump owner from Settings.pumpOwnerSlot
+- **Given**: settings.pumpOwnerSlot=parent2; projected pump
+- **When**: applyTemplate runs
+- **Then**: pump.owner = parent2 (always, unless manually overridden)
+- **Rule(s)**: R12.8 (revised)
+- **Source**: rule-derived (V3)
 
-### EC-OW9: Dream feed owner not template-driven
-- **Given**: template has no dream_feed owner field
-- **When**: applyTemplate runs on a projected dream_feed
-- **Then**: dream_feed.owner stays undefined
-- **Rule(s)**: R12.8
-- **Source**: rule-derived
+### EC-OW9: Dream feed owner = opposite of bedtime owner
+- **Given**: bedtime.owner=parent1; projected dream_feed with no manual override
+- **When**: applyTemplate runs
+- **Then**: dream_feed.owner = parent2
+- **Rule(s)**: R8.8, R12.8 (revised)
+- **Source**: rule-derived (V3)
+
+### EC-OW9b: Dream feed owner with bedtime owner=other has no default
+- **Given**: bedtime.owner=other:caregiver1
+- **When**: applyTemplate runs on dream_feed
+- **Then**: dream_feed.owner unset (no opposite-of mapping for "other")
+- **Rule(s)**: R8.8
+- **Source**: rule-derived (V3)
+
+### EC-OW10: Manual dream feed owner wins over opposite-of-bedtime
+- **Given**: bedtime.owner=parent1; manual dream_feed with owner=other:caregiver1
+- **When**: applyTemplate runs
+- **Then**: dream_feed.owner = other:caregiver1 (manual wins)
+- **Rule(s)**: R8.9, R12.1
+- **Source**: rule-derived (V3)
 
 ---
 
@@ -1164,3 +1234,28 @@ referenced from `REQUIREMENTS.md`.
 - Locked decisions: `~/.claude/projects/.../memory/project_decisions.md`.
 - Rules they enforce: `docs/v3/REQUIREMENTS.md`.
 - Architecture they will be tested against: `docs/v3/ARCHITECTURE_V3.md`.
+
+---
+
+## Review Log
+
+### Review 1 (Jake, 2026-05-08) — Synced with REQUIREMENTS.md changes
+
+- **EC-N17**: revised — wake window owner from template only
+  (no nap inheritance).
+- **EC-B8/B9/B10**: revised — overnight bottles supported via
+  `bottleChain.{maxBottlesPerDay, latestProjectedStart}`.
+- **EC-BD2/BD4**: revised — bedtime endTime from
+  `settings.defaultWakeTime + 24h`.
+- **EC-BD7**: revised — bedtime starts at WW's natural end; WW NOT
+  shortened to fit a fixed bedtime time. EC-BD7b added.
+- **EC-CD1–CD3 → EC-DR1–DR7**: replaced — Cook Dinner generalized to
+  Daily Recurring Events with multiple entries, optional duration,
+  per-day suppression, V2 migration on read.
+- **EC-OW3/OW4**: revised — wake window owner template-driven, no
+  fallback to nap owner.
+- **EC-OW6/OW6b**: revised — bedtime + bedtime_putdown owner
+  template-driven only; no lastNapOwner fallback.
+- **EC-OW8**: revised — pump owner from `Settings.pumpOwnerSlot`.
+- **EC-OW9/OW9b/OW10**: revised — dream feed owner = opposite of
+  bedtime owner; explicit "other" handling; manual override wins.
