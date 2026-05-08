@@ -1,0 +1,84 @@
+/**
+ * R3.x — Nap rules.
+ *
+ * Tests-first per CLAUDE.md TDD protocol. Each rule's failing test lands
+ * before the implementation; new behavior gets a new failing test before
+ * any code change.
+ */
+
+import { describe, expect, it } from "vitest";
+import { aContext, aDay, aSettings } from "../../__tests__/factories";
+import { projectDay } from "../projectDay";
+import { RULES as NAP_RULES } from "./naps";
+
+describe("R3.1 — projected nap chain from wakeWindowsMinutes", () => {
+  it("with [120, 90] WWs, wake at 7:00, projects ww_1, nap_1, ww_2, nap_2", () => {
+    const ctx = aContext({
+      day: aDay({ wakeTime: 7 * 60 }),
+      settings: aSettings({
+        wakeWindowsMinutes: [120, 90],
+        defaultNapLengthMinutes: 60,
+      }),
+      actuals: [],
+    });
+
+    const out = projectDay(
+      {
+        day: ctx.day,
+        settings: ctx.settings,
+        actuals: ctx.actuals,
+        nowMinutes: ctx.nowMinutes,
+      },
+      { rules: NAP_RULES },
+    );
+
+    // Expected cascade:
+    //   ww_1 : 7:00 → 9:00   (120 min)
+    //   nap_1: 9:00 → 10:00  (60 min)
+    //   ww_2 : 10:00 → 11:30 (90 min)
+    //   nap_2: 11:30 → 12:30 (60 min)
+    const summary = out.map((e) => ({
+      eventKey: e.eventKey,
+      type: e.type,
+      kind: e.kind,
+      startTime: e.startTime,
+      endTime: e.endTime,
+      lifecycle: e.lifecycle.state,
+    }));
+
+    expect(summary).toEqual([
+      {
+        eventKey: "wake_window_1",
+        type: "wake_window",
+        kind: "block",
+        startTime: 7 * 60,
+        endTime: 9 * 60,
+        lifecycle: "projected",
+      },
+      {
+        eventKey: "nap_1",
+        type: "nap",
+        kind: "block",
+        startTime: 9 * 60,
+        endTime: 10 * 60,
+        lifecycle: "projected",
+      },
+      {
+        eventKey: "wake_window_2",
+        type: "wake_window",
+        kind: "block",
+        startTime: 10 * 60,
+        endTime: 11 * 60 + 30,
+        lifecycle: "projected",
+      },
+      {
+        eventKey: "nap_2",
+        type: "nap",
+        kind: "block",
+        startTime: 11 * 60 + 30,
+        endTime: 12 * 60 + 30,
+        lifecycle: "projected",
+      },
+    ]);
+  });
+});
