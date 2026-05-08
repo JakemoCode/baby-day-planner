@@ -42,7 +42,16 @@ function projectBaseNapChain(ctx: Context, existing: Event[]): Event[] {
   let cursor = wakeTime;
 
   for (let i = 0; i < wws.length; i++) {
-    const wwMinutes = wws[i]!;
+    const baseWw = wws[i]!;
+    // R3.7/R3.8: if the previous nap is recorded and shorter than the
+    // shortNapThresholdMinutes, shorten THIS wake window by
+    // shortNapAdjustmentMinutes. Only applies for i >= 1 (there's a
+    // previous nap to compare). Unrecorded annotations don't trigger it.
+    const prevRecordedShort = i > 0 && isShortRecordedNap(existingByKey.get(`nap_${i}`), ctx);
+    const wwMinutes = prevRecordedShort
+      ? Math.max(0, baseWw - ctx.settings.shortNapAdjustmentMinutes)
+      : baseWw;
+
     const wwStart = cursor;
     const n = i + 1;
     const napKey = `nap_${n}`;
@@ -51,7 +60,10 @@ function projectBaseNapChain(ctx: Context, existing: Event[]): Event[] {
     // R3.4/R3.5: WW endTime tracks the next nap's start. When a recorded
     // nap is present, the WW stretches or shrinks to meet it. Otherwise
     // the projected nap starts at the natural cascade tick (wwStart + wwMinutes).
-    const wwEnd = recorded ? recorded.startTime : wwStart + wwMinutes;
+    // R3.6: if the recorded nap's start is BEFORE wwStart (user-edited
+    // inversion), clamp wwEnd to wwStart so the WW renders zero-length
+    // rather than negative.
+    const wwEnd = recorded ? Math.max(wwStart, recorded.startTime) : wwStart + wwMinutes;
 
     projected.push({
       id: `proj_wake_window_${n}`,
@@ -93,6 +105,18 @@ function projectBaseNapChain(ctx: Context, existing: Event[]): Event[] {
   // and anything else). The reality-wins guard in the evaluator enforces
   // this; we simply concat.
   return [...existing, ...projected];
+}
+
+/**
+ * R3.8: only RECORDED naps drive the short-nap adjustment. Unrecorded
+ * annotations (overridden, projected) carry intent, not measurement.
+ */
+function isShortRecordedNap(nap: Event | undefined, ctx: Context): boolean {
+  if (!nap) return false;
+  if (nap.lifecycle.state !== "completed") return false;
+  if (nap.endTime === undefined) return false;
+  const duration = nap.endTime - nap.startTime;
+  return duration < ctx.settings.shortNapThresholdMinutes;
 }
 
 export const RULES: Rule[] = [RuleProjectNapChain];
