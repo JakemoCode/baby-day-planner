@@ -86,6 +86,14 @@ export function aProjectedBedtime(overrides: EventOverrides = {}): Event {
   return eventBase("bedtime", "block", "bedtime", { start: 19 * 60, end: 30 * 60, ...overrides });
 }
 
+export function aRecordedBedtime(overrides: EventOverrides = {}): Event {
+  const start = overrides.start ?? overrides.startTime ?? 19 * 60;
+  return aProjectedBedtime({
+    ...overrides,
+    lifecycle: overrides.lifecycle ?? { state: "completed", committedAt: start },
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Owners
 // ---------------------------------------------------------------------------
