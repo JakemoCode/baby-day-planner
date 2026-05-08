@@ -6,6 +6,10 @@
 
 import type { Context, Event } from "../../schemas";
 import type { Rule } from "../evaluator";
+import { hasType, isRecordedEvent, projectedEvent } from "../helpers";
+
+const isNap = hasType("nap");
+const isWakeWindow = hasType("wake_window");
 
 /**
  * R3.1 — Project the day's base nap chain from settings.wakeWindowsMinutes.
@@ -17,8 +21,7 @@ import type { Rule } from "../evaluator";
 const RuleProjectNapChain: Rule = {
   id: "R3.1",
   description: "Project the day's base nap chain from settings.wakeWindowsMinutes",
-  matches: (events, ctx) =>
-    ctx.day.wakeTime !== undefined && !events.some((e) => e.type === "wake_window"),
+  matches: (events, ctx) => ctx.day.wakeTime !== undefined && !events.some(isWakeWindow),
   produces: (events, ctx) => projectBaseNapChain(ctx, events),
 };
 
@@ -35,7 +38,7 @@ function projectBaseNapChain(ctx: Context, existing: Event[]): Event[] {
   // never the case yet.
   const existingByKey = new Map<string, Event>();
   for (const e of existing) {
-    if (e.type === "nap") existingByKey.set(e.eventKey, e);
+    if (isNap(e)) existingByKey.set(e.eventKey, e);
   }
 
   const projected: Event[] = [];
@@ -55,7 +58,12 @@ function projectBaseNapChain(ctx: Context, existing: Event[]): Event[] {
     const wwStart = cursor;
     const n = i + 1;
     const napKey = `nap_${n}`;
-    const recorded = existingByKey.get(napKey);
+    const existingNap = existingByKey.get(napKey);
+    // R3.3: recorded actuals (started/completed) pin times; the cascade
+    // anchors to them. Overridden / projected naps don't pin — they let
+    // the cascade compute times. The cascade still skips emitting a
+    // duplicate projected nap when ANY existing nap occupies the slot.
+    const anchor = existingNap && isRecordedEvent(existingNap) ? existingNap : undefined;
 
     // R3.4/R3.5: WW endTime tracks the next nap's start. When a recorded
     // nap is present, the WW stretches or shrinks to meet it. Otherwise
@@ -63,41 +71,46 @@ function projectBaseNapChain(ctx: Context, existing: Event[]): Event[] {
     // R3.6: if the recorded nap's start is BEFORE wwStart (user-edited
     // inversion), clamp wwEnd to wwStart so the WW renders zero-length
     // rather than negative.
-    const wwEnd = recorded ? Math.max(wwStart, recorded.startTime) : wwStart + wwMinutes;
+    const wwEnd = anchor ? Math.max(wwStart, anchor.startTime) : wwStart + wwMinutes;
 
-    projected.push({
-      id: `proj_wake_window_${n}`,
-      dayId: ctx.day.id,
-      eventKey: `wake_window_${n}`,
-      type: "wake_window",
-      kind: "block",
-      startTime: wwStart,
-      endTime: wwEnd,
-      label: `Wake window ${n}`,
-      hasPutdown: false,
-      lifecycle: { state: "projected" },
-    });
-
-    if (!recorded) {
-      const napEnd = wwEnd + napLen;
-      projected.push({
-        id: `proj_nap_${n}`,
-        dayId: ctx.day.id,
-        eventKey: napKey,
-        type: "nap",
+    projected.push(
+      projectedEvent({
+        ctx,
+        id: `proj_wake_window_${n}`,
+        eventKey: `wake_window_${n}`,
+        type: "wake_window",
         kind: "block",
-        startTime: wwEnd,
-        endTime: napEnd,
-        label: `Nap ${n}`,
-        hasPutdown: false,
-        lifecycle: { state: "projected" },
-      });
+        startTime: wwStart,
+        endTime: wwEnd,
+        label: `Wake window ${n}`,
+      }),
+    );
+
+    if (!existingNap) {
+      // No nap occupies this slot — emit a fresh projected one.
+      const napEnd = wwEnd + napLen;
+      projected.push(
+        projectedEvent({
+          ctx,
+          id: `proj_nap_${n}`,
+          eventKey: napKey,
+          type: "nap",
+          kind: "block",
+          startTime: wwEnd,
+          endTime: napEnd,
+          label: `Nap ${n}`,
+        }),
+      );
       cursor = napEnd;
+    } else if (anchor) {
+      // Recorded actual: cascade continues from its end (or, if started
+      // but not ended, from start + default duration).
+      cursor = anchor.endTime ?? anchor.startTime + napLen;
     } else {
-      // Cascade continues from the recorded nap's end (or fall through to
-      // the next default-length tick if endTime is missing — e.g. started
-      // but not ended).
-      cursor = recorded.endTime ?? recorded.startTime + napLen;
+      // Existing nap is overridden / projected — slot is occupied so we
+      // don't emit a duplicate, but per R3.3 the cascade computes natural
+      // times. Cursor advances by the natural projection.
+      cursor = wwEnd + napLen;
     }
   }
 

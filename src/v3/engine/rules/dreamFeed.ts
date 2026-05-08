@@ -12,48 +12,66 @@
  *       is `other`, dream feed has no default owner.
  */
 
-import type { Event, OwnerRef, Settings } from "../../schemas";
+import type { Context, Event, OwnerRef } from "../../schemas";
 import type { Rule } from "../evaluator";
+import { hasType, projectedEvent } from "../helpers";
+
+const isBedtime = hasType("bedtime");
+const isDreamFeed = hasType("dream_feed");
 
 const RuleProjectDreamFeed: Rule = {
-  id: "R8",
+  id: "R8.1",
   description: "Project a dream_feed instant after bedtime when enabled",
   dependsOn: ["R7.6"],
   matches: (events, ctx) => {
     if (!ctx.settings.dreamFeedEnabled) return false;
-    if (events.some((e) => e.type === "dream_feed")) return false;
-    return events.some((e) => e.type === "bedtime");
+    if (events.some(isDreamFeed)) return false;
+    if (!events.some(isBedtime)) return false;
+    const bedtime = events.find(isBedtime)!;
+    return dreamFeedTime(bedtime, ctx) !== null;
   },
   produces: (events, ctx) => {
-    const bedtime = events.find((e) => e.type === "bedtime");
+    const bedtime = events.find(isBedtime);
     if (!bedtime) return events;
-    const dreamFeed = buildDreamFeed(bedtime, ctx);
-    return [...events, dreamFeed];
+    const time = dreamFeedTime(bedtime, ctx);
+    if (time === null) return events;
+    return [...events, buildDreamFeed(bedtime, ctx, time)];
   },
 };
 
-function buildDreamFeed(bedtime: Event, ctx: { day: { id: string }; settings: Settings }): Event {
-  const offset = ctx.settings.dreamFeedOffsetAfterBedtimeMinutes;
-  const earliest = ctx.settings.dreamFeedStart;
-  const latest = ctx.settings.dreamFeedEnd;
-  const earliestAllowed = Math.max(bedtime.startTime + offset, earliest);
-  const start = Math.min(earliestAllowed, latest);
+/**
+ * R8.3: time = clamp(max(bedtime + offset, earliest), earliest, latest).
+ *
+ * Returns null when the clamped result would land at or before bedtime —
+ * a causality inversion (bedtime far enough in the day that
+ * `bedtime + offset > latest` pulls the dream feed earlier than bedtime).
+ * Suppressing in that case is the predictive-lens choice: don't render a
+ * "feed" event before the baby has even gone down.
+ */
+function dreamFeedTime(bedtime: Event, ctx: Context): number | null {
+  const { dreamFeedOffsetAfterBedtimeMinutes, dreamFeedStart, dreamFeedEnd } = ctx.settings;
+  const earliestAllowed = Math.max(
+    bedtime.startTime + dreamFeedOffsetAfterBedtimeMinutes,
+    dreamFeedStart,
+  );
+  const startTime = Math.min(earliestAllowed, dreamFeedEnd);
+  if (startTime <= bedtime.startTime) return null;
+  return startTime;
+}
 
-  const event: Event = {
+function buildDreamFeed(bedtime: Event, ctx: Context, startTime: number): Event {
+  const owner = oppositeOf(bedtime.owner);
+  return projectedEvent({
+    ctx,
     id: "proj_dream_feed",
-    dayId: ctx.day.id,
     eventKey: "dream_feed",
     type: "dream_feed",
     kind: "instant",
-    startTime: start,
+    startTime,
     label: "Dream Feed",
-    hasPutdown: false,
-    lifecycle: { state: "projected" },
     amountOz: ctx.settings.defaultBottleAmountOz,
-  };
-  const oppositeOwner = oppositeOf(bedtime.owner);
-  if (oppositeOwner) event.owner = oppositeOwner;
-  return event;
+    ...(owner !== undefined ? { owner } : {}),
+  });
 }
 
 /**
