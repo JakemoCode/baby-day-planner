@@ -22,7 +22,10 @@ const isDreamFeed = hasType("dream_feed");
 const RuleProjectDreamFeed: Rule = {
   id: "R8.1",
   description: "Project a dream_feed instant after bedtime when enabled",
-  dependsOn: ["R7.6"],
+  // R7.6 emits the bedtime; R12.5 stamps the template-driven bedtime
+  // owner. R8.8 (opposite-of-bedtime owner) must observe both before
+  // computing the dream feed default.
+  dependsOn: ["R7.6", "R12.5"],
   matches: (events, ctx) => {
     if (!ctx.settings.dreamFeedEnabled) return false;
     if (events.some(isDreamFeed)) return false;

@@ -17,6 +17,7 @@ import { RULES as BOTTLE_RULES } from "./bottles";
 import { RULES as DR_RULES } from "./dailyRecurring";
 import { RULES as DREAM_RULES } from "./dreamFeed";
 import { RULES as NAP_RULES } from "./naps";
+import { RULES as OWNER_RULES } from "./owners";
 import { RULES as PUMP_RULES } from "./pumps";
 import { RULES as PUTDOWN_RULES } from "./putdown";
 
@@ -24,6 +25,7 @@ export const ALL_RULES: Rule[] = [
   ...NAP_RULES,
   ...BEDTIME_RULES,
   ...BOTTLE_RULES,
+  ...OWNER_RULES,
   ...DREAM_RULES,
   ...PUMP_RULES,
   ...DR_RULES,
