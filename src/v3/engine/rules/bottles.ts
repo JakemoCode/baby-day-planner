@@ -96,10 +96,14 @@ const RuleCascadeFromLatestRecorded: Rule = {
 
 function cascadeFromLatest(ctx: Context, existing: Event[]): Event[] {
   const bottles = existing.filter((e) => e.type === "bottle");
-  const recorded = bottles.filter((b) => isRecorded(b.lifecycle));
-  if (recorded.length === 0) return existing;
+  const hasRecorded = bottles.some((b) => isRecorded(b.lifecycle));
+  if (!hasRecorded) return existing;
 
-  const latest = recorded.reduce((max, b) => (b.startTime > max.startTime ? b : max));
+  // Cascade from the latest bottle of ANY kind. The chain may already
+  // include projections downstream of a recorded anchor; we extend from
+  // the tip, not from the recorded anchor itself, so we don't re-emit
+  // at the same times on subsequent evaluator passes.
+  const latest = bottles.reduce((max, b) => (b.startTime > max.startTime ? b : max));
 
   const target = ctx.settings.bottleChain.bottlesPerDay;
   const interval = ctx.settings.defaultBottleIntervalMinutes;
@@ -114,9 +118,15 @@ function cascadeFromLatest(ctx: Context, existing: Event[]): Event[] {
     return Math.max(m, parseInt(match[1]!, 10));
   }, 0);
 
+  // R5.8: cascade stops when the next projected start would land at or
+  // after tomorrow's defaultWakeTime. After that point, the bottle
+  // belongs to tomorrow, not today.
+  const tomorrowWake = ctx.settings.defaultWakeTime + 24 * 60;
+
   const projections: Event[] = [];
   for (let i = 1; i <= needed; i++) {
     const start = latest.startTime + i * interval;
+    if (start >= tomorrowWake) break; // R5.8
     const n = maxIndex + i;
     projections.push({
       id: `proj_bottle_${n}`,
@@ -135,4 +145,49 @@ function cascadeFromLatest(ctx: Context, existing: Event[]): Event[] {
   return [...existing, ...projections];
 }
 
-export const RULES: Rule[] = [RuleProjectBottlePlaceholders, RuleCascadeFromLatestRecorded];
+/**
+ * R5.4 — Bottles are renumbered chronologically for display.
+ *
+ * After cascade and overlap resolution, the engine sorts bottles by
+ * startTime and rewrites eventKey/label as `bottle_1`, `bottle_2`, etc.
+ * This ensures the timeline shows bottles in monotonic order regardless
+ * of how the user inserted them.
+ *
+ * R5.5: this is engine-side only. Firestore docs keep their original
+ * eventKey (the persistence layer reads `id` for lookups, never
+ * eventKey). The reality-wins guard allows this rewrite because eventKey
+ * and label are display fields, not authoritative recorded fields.
+ */
+const RuleRenumberBottlesChronologically: Rule = {
+  id: "R5.4",
+  description: "Renumber bottle eventKey/label chronologically for display",
+  dependsOn: ["R5.1", "R5.11"],
+  matches: (events) => {
+    const bottles = events
+      .filter((e) => e.type === "bottle")
+      .sort((a, b) => a.startTime - b.startTime);
+    return bottles.some((b, i) => b.eventKey !== `bottle_${i + 1}`);
+  },
+  produces: (events) => {
+    const ordered = [...events].filter((e) => e.type === "bottle");
+    ordered.sort((a, b) => a.startTime - b.startTime);
+    const renamed = new Map<string, { eventKey: string; label: string }>();
+    ordered.forEach((b, i) => {
+      const n = i + 1;
+      renamed.set(b.id, { eventKey: `bottle_${n}`, label: `Bottle ${n}` });
+    });
+    return events.map((e) => {
+      if (e.type !== "bottle") return e;
+      const next = renamed.get(e.id);
+      if (!next) return e;
+      if (e.eventKey === next.eventKey && e.label === next.label) return e;
+      return { ...e, eventKey: next.eventKey, label: next.label };
+    });
+  },
+};
+
+export const RULES: Rule[] = [
+  RuleProjectBottlePlaceholders,
+  RuleCascadeFromLatestRecorded,
+  RuleRenumberBottlesChronologically,
+];
