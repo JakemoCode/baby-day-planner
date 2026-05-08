@@ -12,7 +12,7 @@
  *       is `other`, dream feed has no default owner.
  */
 
-import type { Event, OwnerRef } from "../../schemas";
+import type { Event, OwnerRef, Settings } from "../../schemas";
 import type { Rule } from "../evaluator";
 
 const RuleProjectDreamFeed: Rule = {
@@ -34,7 +34,7 @@ const RuleProjectDreamFeed: Rule = {
 
 function buildDreamFeed(
   bedtime: Event,
-  ctx: { day: { id: string }; settings: import("../../schemas").Settings },
+  ctx: { day: { id: string }; settings: Settings },
 ): Event {
   const offset = ctx.settings.dreamFeedOffsetAfterBedtimeMinutes;
   const earliest = ctx.settings.dreamFeedStart;
