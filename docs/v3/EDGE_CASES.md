@@ -334,18 +334,32 @@
 - **Rule(s)**: R7.5
 - **Source**: 6ba1689 (2026-05-06)
 
-### EC-BD7: Bedtime starts at preceding WW's natural end (revised; V2 behavior reversed)
-- **Given**: cascade puts WW3 at 16:30–19:00 (its natural end); bedtimeThreshold=19:00 triggers bedtime
-- **When**: applyBedtime runs
-- **Then**: WW3.endTime stays 19:00; bedtime.startTime = 19:00 (WW's natural end). WW is NOT shortened to fit a fixed bedtime time.
-- **Rule(s)**: R7.6 (revised)
+### EC-BD7: Threshold-driven bedtime — first nap at/after threshold becomes bedtime
+- **Given**: cascade produces nap_4 at 19:30 with bedtimeThreshold=19:00
+- **When**: engine evaluates
+- **Then**: nap_4 replaced by bedtime starting at 19:30; ww_4 keeps its natural length (16:30–19:30); no clipping
+- **Rule(s)**: R7.6, R7.11
 - **Source**: rule-derived (V3)
 
-### EC-BD7b: Bedtime threshold acts as a trigger when WW's natural end exceeds it
-- **Given**: cascade puts WW4 at 16:30–20:30 (natural); bedtimeThreshold=19:00
-- **When**: applyBedtime runs
-- **Then**: bedtime triggered at the next nap's projected start; WW4's natural end is preserved (not artificially clipped to 19:00)
+### EC-BD7b: Threshold not crossed => no bedtime emitted
+- **Given**: settings.wakeWindowsMinutes produces only 3 naps total, latest at 16:00; bedtimeThreshold=19:00
+- **When**: engine evaluates
+- **Then**: no bedtime in output (no nap crosses the threshold)
 - **Rule(s)**: R7.6
+- **Source**: rule-derived (V3)
+
+### EC-BD7c: Manual bedtime IS a hard wall — clips wake_windows that cross it
+- **Given**: user sets manual bedtime at 18:30; cascade had WW4 at 16:30–19:30 and nap_4 at 19:30
+- **When**: engine evaluates
+- **Then**: nap_4 dropped (R7.4 / R7.5); WW4.endTime clipped to 18:30 (R7.7); bedtime starts at 18:30
+- **Rule(s)**: R7.7, R7.4, R7.5
+- **Source**: rule-derived (V3)
+
+### EC-BD7d: Manual bedtime — WW leading into a dropped nap stretches to bedtime
+- **Given**: manual bedtime at 18:45; cascade had ww_4 at 16:30–18:25 and nap_4 at 18:25–19:25 (crosses bedtime, dropped)
+- **When**: engine evaluates
+- **Then**: ww_4.endTime stretches to 18:45 so the bedtime putdown chip doesn't float orphan
+- **Rule(s)**: R7.9
 - **Source**: rule-derived (V3)
 
 ### EC-BD8: WW starting at/after bedtime is dropped
@@ -1238,6 +1252,13 @@ referenced from `REQUIREMENTS.md`.
 ---
 
 ## Review Log
+
+### Review 2 (Jake, 2026-05-08) — Bedtime threshold semantics
+
+- **EC-BD7 → EC-BD7d**: split into 4 cases covering threshold-driven
+  vs. manual bedtime. Threshold-driven preserves WW length; manual
+  bedtime acts as a hard wall and clips. R7.6 vs R7.7 distinction
+  enforced.
 
 ### Review 1 (Jake, 2026-05-08) — Synced with REQUIREMENTS.md changes
 

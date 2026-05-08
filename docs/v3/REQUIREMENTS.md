@@ -129,8 +129,15 @@ type OwnerConfig = {
 
 Stored under `Settings.owners` (or a sibling doc). Defaults:
 `parent1.displayName = "Parent 1"`, `parent2.displayName = "Parent 2"`,
-`other = [{ id: 'caregiver1', displayName: "Caregiver" }]`. First-run
-setup screen lets the user fill in real names.
+`other = [{ id: 'caregiver1', displayName: "Caregiver" }]`.
+
+**`displayName` is a free-form, user-editable string** — the user
+types whatever they want in Settings ("Jake", "Mom", "Papa", "Kelly",
+"Grandma Rose"). The engine never inspects the string; it's purely
+for presentation. Only the slot identity (`parent1` / `parent2` /
+`other:id`) participates in template lookups and inheritance rules.
+
+First-run setup screen prompts the user to fill in real names.
 
 An `Owner` reference on an Event is `{ slot: OwnerSlot; otherId?: string }`
 (or just a string id under the hood). The display layer resolves to a
@@ -634,51 +641,72 @@ list.
 If a nap's `startTime < bedtime` but `endTime > bedtime`, drop the
 whole nap. Don't show a 5-minute sliver before sleep.
 
-### R7.6 Bedtime starts at the END of the preceding wake window — don't shorten the WW for bedtime
+### R7.6 `bedtimeThreshold` is a trigger: the first nap that would start at/after it becomes bedtime
 
-V2 had `bedtimeThreshold` clip the preceding WW to fit. V3 reverses
-this: the WW preceding bedtime ends at its NATURAL cascade time, and
-bedtime starts there. The WW is not shortened just because bedtime
-"should" be at a configured threshold.
+In plain English: as the engine projects the day forward, it checks
+each nap's start time. **The first nap whose start time is at or
+after `settings.bedtimeThreshold` is replaced by bedtime.** That
+nap's start time becomes bedtime's start time. The preceding wake
+window keeps its natural length — nothing is clipped or shortened.
 
-The `bedtimeThreshold` setting becomes a **trigger**, not a cap: if
-the cascade reaches a state where the next nap would start at/after
-bedtimeThreshold, that nap is replaced by bedtime starting at the
-WW's natural end.
+Concretely:
+- Settings: `bedtimeThreshold = 19:00`.
+- Cascade produces nap 4 starting at 19:30 (after a longer-than-usual
+  WW4).
+- Engine: nap 4 is replaced by bedtime; bedtime starts at 19:30.
+- WW4 stays at its natural 16:30–19:30 length. **No clipping.**
 
-- **Why**: the baby's actual wake window is what determines when
-  bedtime can start. Forcing bedtime to a fixed clock time (and
-  clipping the wake window to fit) creates impossible schedules — the
-  baby has 30 minutes of wake time after a short nap, then "must" go
-  to bed.
-- **Edge case it prevents**: WW4 truncated from 1:30 to 0:45 because
-  the engine wanted bedtime at exactly 19:00.
+If `bedtimeThreshold = 19:00` but the cascade only reaches nap 3 at
+17:00 with no nap 4, no bedtime is triggered (the day's nap chain
+ended before crossing the threshold).
 
-### R7.7 Wake windows starting at or after bedtime are dropped
+- **Why**: the baby's actual wake-window rhythm determines when
+  bedtime is *possible*. The threshold says "stop projecting more
+  naps after this point and call it bedtime instead," not "force the
+  last wake window to end at exactly this clock time."
+- **Edge case it prevents**: WW4 artificially truncated from
+  1h30 to 30 min just to fit a `19:00` bedtime when the cascade
+  naturally puts nap 4 at 19:30.
 
-`ww.startTime >= bedtime` → remove.
+### R7.7 Manual bedtime IS a hard wall — it clips wake windows that cross it
 
-### R7.8 Wake window leading into a dropped nap stretches to bedtime
+Threshold-driven bedtime (R7.6) preserves WW length. **Manual
+bedtime** (user explicitly recorded a bedtime time via drawer or End
+of day) is different: it's the user saying "we're going to bed AT this
+exact time." Wake windows that cross a manual bedtime ARE clipped to
+end at the bedtime start; naps starting at/after a manual bedtime are
+dropped (R7.4); naps that cross a manual bedtime are dropped (R7.5).
 
-If `nap_N` is dropped due to bedtime, `ww_N.endTime` is stretched to
-`bedtime.startTime`.
+- **Why**: manual = user intent. The user is authoritative.
+- **Edge case it prevents**: ignoring the user's "bedtime is at 18:30
+  tonight (we're going to a wedding)" because the natural cascade
+  said 19:30.
 
-- **Why**: closes the visual gap between WW end and the bedtime
-  putdown chip.
-- **Edge case it prevents**: the "bedtime putdown floating in space
-  with WW4 ending at 5:00" symptom.
+### R7.8 Wake windows starting at or after a manual bedtime are dropped
 
-### R7.9 Bedtime threshold default = `"19:00"` (settings)
+`ww.startTime >= manualBedtime.startTime` → remove. Threshold-driven
+bedtime never produces this case (R7.6: WW preserves natural length;
+the next nap is replaced, not the WW).
 
-User can edit; affects when the projected bedtime substitutes for the
-late nap.
+### R7.9 Wake window leading into a manual-bedtime-dropped nap stretches to bedtime
 
-### R7.10 Projected bedtime takes the substituted nap's `startTime`
+If a manual bedtime drops `nap_N` (R7.5), the preceding `ww_N.endTime`
+stretches to `bedtime.startTime` so the timeline doesn't render an
+orphan bedtime putdown.
 
-When the engine replaces nap_N with bedtime (because nap_N starts >=
-threshold), `bedtime.startTime = nap_N.startTime`.
+(Threshold-driven bedtime: WW already ends at the natural nap start,
+which IS the bedtime start, so no stretch is needed.)
 
-### R7.11 Bedtime renders with sage-tint fill, darker stroke
+### R7.10 Bedtime threshold default = `"19:00"` (settings)
+
+User can edit. Affects ONLY threshold-driven bedtime triggering.
+
+### R7.11 Threshold-driven bedtime takes the substituted nap's `startTime`
+
+When the cascade reaches `nap_N` whose start ≥ threshold, the engine
+replaces nap_N with bedtime where `bedtime.startTime = nap_N.startTime`.
+
+### R7.12 Bedtime renders with sage-tint fill, darker stroke
 
 Same fill family as nap (both = "baby asleep"), with stroke
 `--color-fg-soft` so it reads as "deeper sleep."
@@ -913,17 +941,28 @@ choice. (See R12.7.)
 - **Edge case it prevents**: template silently overwriting a cleared
   owner on every render.
 
-### R12.2 Projected naps inherit owner from the day's template, indexed by nap number
+### R12.2 Projected naps inherit owner from the day's template, by nap number
 
-In English: when today is configured to use a particular template
-(e.g. "Saturday template"), and that template specifies who's on duty
-for nap 1, nap 2, etc., the projected nap docs render with those
-owners. If no template is set, projected naps have NO default owner —
-they render unassigned until the user explicitly picks one.
+In plain English:
+
+> A template carries a list of owners — one entry for each nap of the
+> day. The first entry is for nap 1, the second is for nap 2, and so
+> on. When the engine projects today's naps and the day has a template,
+> each nap looks up its corresponding entry in the list and uses that
+> owner.
+
+Concrete example: today's template's nap-owner list reads
+`[Kelly, Jake, Daycare, Jake]`. The engine projects 4 naps. Nap 1
+gets Kelly, nap 2 gets Jake, nap 3 gets Daycare, nap 4 gets Jake.
+
+If the list has fewer entries than naps the day produces, the leftover
+naps have no owner. If no template is assigned to the day at all, no
+projected nap has an owner — they render unassigned until the user
+explicitly picks one (drawer or /day-templates picker).
 
 Schema:
 ```ts
-OwnershipTemplate.napOwners: OwnerRef[];  // index 0 = nap 1
+OwnershipTemplate.napOwners: OwnerRef[];
 ```
 
 ### R12.3 Projected wake windows inherit owner ONLY from the template, NOT from naps
@@ -956,16 +995,29 @@ Templates have an explicit `bedtimeOwner` field. No fallback to
 "last nap owner" — V3 makes this explicit. If the template doesn't
 specify, bedtime has no default owner.
 
-### R12.6 Projected bottles inherit owner from the template's bottle list, by index
+### R12.6 Projected bottles inherit owner from the day's template, by bottle number
 
-In English: when a template is set and it includes a list of bottle
-owners (e.g. "Bottle 1 = parent1, Bottle 2 = parent2"), each
-projected bottle N gets the owner at index N-1. If the template lacks
-a bottle owner list, projected bottles have no default owner.
+In plain English (same shape as R12.2 for naps):
+
+> A template can carry a list of bottle owners — one entry for each
+> bottle of the day. The first entry is for bottle 1, the second is
+> for bottle 2, and so on. When the engine projects today's bottles
+> and the day has a template, each bottle looks up its corresponding
+> entry in the list and uses that owner.
+
+Concrete example: today's template's bottle-owner list reads
+`[parent1, parent2, parent2, parent1, parent2]`. Projected bottle 1
+gets parent1, bottle 2 gets parent2, etc. (Note: bottle ordinals are
+chronological per R5.4, so "bottle 1" = the day's earliest bottle by
+time, regardless of the eventKey it has in Firestore.)
+
+If the list is shorter than the projected bottle chain, leftover
+bottles have no owner. If no template is assigned, projected bottles
+have no default owner.
 
 Schema:
 ```ts
-OwnershipTemplate.bottleOwners?: OwnerRef[];  // index 0 = bottle 1
+OwnershipTemplate.bottleOwners?: OwnerRef[];
 ```
 
 ### R12.7 Owner can be cleared explicitly (drawer "no owner" → field omitted)
@@ -1521,3 +1573,30 @@ Applied changes:
 - **§17.3**: Helper hint text on auto-fill of endTime.
 - **§17.9** (new): Buttons use terse labels; no descriptive subtitles.
 - **§19.3**: Settings defaults updated for new fields.
+
+### Review 2 (Jake, 2026-05-08)
+
+Refinements to Review 1:
+
+- **§1.7**: confirmed `parent1` / `parent2` `displayName` is a
+  user-editable free-form string ("Jake", "Mom", "Papa Joe", etc.).
+  Engine never inspects the string; only the slot id participates in
+  rules.
+- **§7.6/R7.7/R7.8**: rewrote bedtime model. The `bedtimeThreshold`
+  setting is a simple **trigger**: the first nap whose start ≥
+  threshold becomes bedtime. Threshold-driven bedtime preserves the
+  preceding wake window (no clipping). **Manual** bedtime is still a
+  hard wall that clips WW + drops naps; the two cases are now
+  separate sections (R7.6 trigger, R7.7 hard-wall manual).
+- **§12.2**: rewrote in fully plain English with a concrete example.
+  Removed the `[N-1]` notation; explained as "first entry = nap 1,
+  second entry = nap 2," etc.
+- **§12.6**: same plain-English rewrite for bottles. Notes that
+  bottle ordinals are chronological per R5.4, so "bottle 1" always
+  means the day's earliest bottle.
+- **other[]**: confirmed multiple distinct entries supported (no
+  change needed — already in §1.7.1).
+- **pump owner**: confirmed configurable via
+  `Settings.pumpOwnerSlot` (no change needed — already in R12.8).
+- **OUT_OF_SCOPE §3**: marked `moved-in` ✓ (per-day suppression now
+  R11.6).

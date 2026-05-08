@@ -62,18 +62,12 @@ flow, role-based UI gating. Heavy.
 **What it is**: ability to skip cook_dinner (or any recurring projected
 event) on a specific day without disabling globally in Settings.
 
-**Status**: `revisit-later` — recommend MOVING IN to V3.
+**Status**: `moved-in` ✓ (Jake review 1, 2026-05-08)
 
-**Rationale**: this is a small addition (~`Day.suppressedKeys: string[]`
-+ a "skip today" button on the chip's drawer + an engine rule that
-filters projected events whose key is in the day's suppression list).
-Probably 2-3 hours of work, gives real user value, fits cleanly into
-the rules-engine model. **Recommend moving to V3 scope**.
-
-**If Jake confirms moving in**: add as rule `R11.6` — "projected
-recurring events are suppressed if their key appears in
-`day.suppressedKeys`". Drawer adds "Skip today only" button for
-projected extras with `eventKey: "cook_dinner"`.
+**Where it landed**: `REQUIREMENTS.md` R11.6 — `Day.suppressedRecurringIds:
+string[]`. The drawer adds a "Skip today only" action for projected
+recurring events; tapping appends the recurring template's id to the
+active day's suppression list.
 
 ---
 
