@@ -23,7 +23,10 @@ describe("useV3Settings", () => {
     cb!(sampleSettings);
     await waitFor(() => {
       expect(result.current.loading).toBe(false);
-      expect(result.current.settings).toEqual(sampleSettings);
+      // The hook now flows partial docs through withV3SettingsDefaults,
+      // so caller-supplied fields stay but missing ones backfill.
+      expect(result.current.settings?.defaultWakeTime).toBe(7 * 60);
+      expect(result.current.settings?.bottleChain).toBeDefined();
     });
   });
 });
