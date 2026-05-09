@@ -521,14 +521,27 @@ their original eventKey. Lookups by `id` stay intact.
 - **Why**: changing eventKey in Firestore would break references and
   audit history.
 
-### R5.6 Projected bottles move to whichever nap edge is closer to the predicted interval
+### R5.6 Projected bottles move out of the [putdown..nap.end] no-feed region to whichever edge is closer to the predicted interval
 
-If a **projected** bottle's startTime falls strictly between a nap's
-start and end, the engine moves the bottle to whichever nap edge —
-before-nap-start or after-nap-end — lands closer to the previous
-bottle's start time + the predicted bottle interval at that point in
-the day. If the closer edge is in the past (`< nowMinutes`), move to
-the far edge instead.
+The "no-feed" region for each nap is
+`[nap.startTime - settings.putdownLeadMinutes, nap.endTime]` — the
+putdown wind-down (the last few minutes before sleep) is also no-bottle
+territory. Feeding right before putting baby down defeats the purpose
+of the wind-down; the bottle should land BEFORE the wind-down begins,
+not at the moment of sleep onset.
+
+If a **projected** bottle's startTime falls strictly inside the
+no-feed region, the engine moves it to whichever region edge —
+`nap.startTime - putdownLead` or `nap.endTime` — lands closer to the
+previous bottle's startTime + the predicted bottle interval. If the
+closer edge is in the past (`< nowMinutes`), move to the far edge
+instead.
+
+Adjacent / overlapping naps (e.g. a recorded nap and a projected nap
+covering similar times) are merged into a single connected region
+before edge selection, so the bottle always lands outside ALL
+overlapping naps' no-feed regions in one move (no oscillation cycle —
+see PR #42).
 
 **Recorded bottles are never moved.** A user-logged mid-nap bottle is
 genuine data (rare, but real — dream feed mid-stretch, parent woke
@@ -538,9 +551,11 @@ bottle's actual time per R5.1.
 - **Why** (predictive lens): the engine forecasts the *likely* next
   feed time. Bottles "before nap" vs "after nap" are both plausible;
   pick the one closer to the cadence the cascade was already
-  predicting.
-- **Edge case it prevents**: projection telling a parent to feed a
-  sleeping baby — but only when no actual feed happened in there.
+  predicting. The wind-down extension reflects real parent behavior:
+  you don't feed in the last 15 minutes before sleep.
+- **Edge case it prevents**: projection telling a parent to feed
+  during the wind-down (which the parent then ignores, breaking the
+  cadence forecast for the rest of the day).
 
 ### R5.7 Bottle overlap resolution iterates to a fixed point
 

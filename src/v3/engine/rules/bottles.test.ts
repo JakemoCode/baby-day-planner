@@ -204,6 +204,54 @@ describe("R5.1 — cascade resumes from the latest recorded bottle", () => {
   });
 });
 
+describe("R5.6 — projected bottle in the putdown wind-down moves to BEFORE the wind-down", () => {
+  it("a projected bottle landing 5 min before nap.start (inside the putdown lead) is pushed to nap.start - putdownLead", () => {
+    // putdownLeadMinutes = 15 (default). nap_1 starts at 10:00, so the
+    // wind-down region is [9:45, 10:00]. A projected bottle at 9:55
+    // sits inside the wind-down: it should move to 9:45, not stay at
+    // 9:55, and not snap to 10:00 (which is the nap's actual start).
+    const recordedNap1 = aRecordedNap({
+      id: "actual_nap_putdown",
+      eventKey: "nap_1",
+      start: 10 * 60,
+      end: 11 * 60,
+    });
+
+    const ctx = aContext({
+      day: aDay({ wakeTime: 7 * 60 + 5 }),
+      settings: aSettings({
+        // bottlesPerDay=2 with first at 7:15, second predicted 10:15.
+        // 10:15 lands inside recorded nap_1 [10:00, 11:00] → R5.6 fires.
+        // With putdown buffer the "no-go" region is [9:45, 11:00];
+        // predicted 10:15 closer to 11:00 (45) vs 9:45 (30) → 9:45 wins.
+        bottleChain: { bottlesPerDay: 2, bufferAfterWakeMinutes: 10 },
+        defaultBottleIntervalMinutes: 180,
+        wakeWindowsMinutes: [],
+        putdownLeadMinutes: 15,
+      }),
+      actuals: [recordedNap1],
+      nowMinutes: 8 * 60,
+    });
+
+    const out = projectDay(
+      {
+        day: ctx.day,
+        settings: ctx.settings,
+        actuals: ctx.actuals,
+        nowMinutes: ctx.nowMinutes,
+      },
+      { rules: ALL_WITH_NAPS },
+    );
+
+    const bottles = out
+      .filter((e) => e.type === "bottle" && e.lifecycle.state === "projected")
+      .sort((a, b) => a.startTime - b.startTime);
+    // Second projected bottle should land at the START of the putdown
+    // wind-down (9:45), not at nap.start (10:00) and not staying at 10:15.
+    expect(bottles[bottles.length - 1]!.startTime).toBe(9 * 60 + 45);
+  });
+});
+
 describe("R5.6 — convergence regression with various nowMinutes", () => {
   it.each([0, 5 * 60, 10 * 60, 15 * 60, 20 * 60])("converges with nowMinutes=%i", (now) => {
     const recordedBottle = aRecordedBottle({
@@ -284,19 +332,27 @@ describe("R5.6 — convergence regression (mirrors property-test failure)", () =
   });
 });
 
-describe("R5.6 — projected bottle inside a nap moves to the closer edge", () => {
-  it("placeholder bottle landing in nap_1 moves to nap_1.startTime when that's nearer the predicted interval", () => {
+describe("R5.6 — projected bottle inside a nap moves to the closer edge (with putdown buffer)", () => {
+  it("placeholder bottle landing in nap_1 moves to whichever edge of the [putdown..nap.end] region is closer", () => {
     // Setup:
     //   wake 7:00, buffer 10, interval 180, bottlesPerDay 4, now 8:00
-    //   recorded nap_1 from 9:30-11:00 (covers default placeholder slot 10:10)
+    //   recorded nap_1 from 9:30-11:00, putdownLead 15 (default)
+    //
+    // R5.6 treats each nap's "no-go" region as
+    //   [nap.start - putdownLead, nap.end]
+    // because the putdown wind-down is also no-bottle territory. So
+    // nap_1's region is [9:15, 11:00], not [9:30, 11:00].
     //
     // R5.11 places placeholders at 7:10, 10:10, 13:10, 16:10.
-    // bottle_2 at 10:10 is inside [9:30, 11:00].
+    // bottle_2 at 10:10 is inside [9:15, 11:00].
     //   predicted (prev 7:10 + 180) = 10:10
-    //   nap_1.start = 9:30, distance |10:10 - 9:30| = 40
-    //   nap_1.end   = 11:00, distance |11:00 - 10:10| = 50
-    //   → move to 9:30 (closer).
-    // 9:30 is in the future relative to nowMinutes=8:00, so no past-edge fallback.
+    //   region.start = 9:15, distance |10:10 - 9:15| = 55
+    //   region.end   = 11:00, distance |11:00 - 10:10| = 50
+    //   → move to 11:00 (after-edge closer once the wind-down extends the region).
+    //
+    // Cascade then projects nap_2 at [12:30, 13:30]; with putdown the
+    // region is [12:15, 13:30]. bottle_3 at 13:10 is inside; predicted
+    // from new bottle_2 (11:00) + 180 = 14:00, after-edge wins → 13:30.
     const recordedNap1 = aRecordedNap({
       id: "actual_nap_1",
       eventKey: "nap_1",
@@ -329,14 +385,14 @@ describe("R5.6 — projected bottle inside a nap moves to the closer edge", () =
       .filter((e) => e.type === "bottle")
       .sort((a, b) => a.startTime - b.startTime);
 
-    // bottle_2 (10:10) lands inside recorded nap_1 → moves to 9:30 (closer to predicted 10:10).
-    // R3.1 also projects nap_2 at [12:30, 13:30] (cascade from nap_1.end 11:00 + ww_2 90min).
-    // bottle_3 (13:10) lands inside that projected nap → moves to 12:30 (closer to predicted 12:30 from new bottle_2 9:30 + 180).
+    // With putdown-buffered regions, bottle_2 → 11:00 (nap_1 after-edge),
+    // bottle_3 → 13:30 (nap_2 after-edge), bottle_4 stays at 16:10
+    // (outside nap_3's [14:45, 16:00] region).
     expect(bottles.map((b) => b.startTime)).toEqual([
-      7 * 60 + 10, // 7:10 (unchanged)
-      9 * 60 + 30, // 9:30 (moved from 10:10 → nap_1.start)
-      12 * 60 + 30, // 12:30 (moved from 13:10 → projected nap_2.start)
-      16 * 60 + 10, // 16:10 (unchanged; no nap there)
+      7 * 60 + 10, // 7:10
+      11 * 60, // 11:00 (after recorded nap_1)
+      13 * 60 + 30, // 13:30 (after projected nap_2)
+      16 * 60 + 10, // 16:10
     ]);
 
     // No bottle's startTime falls strictly inside any nap.

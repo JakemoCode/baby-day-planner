@@ -182,9 +182,9 @@ const RuleMoveProjectedBottleOutOfNap: Rule = {
   // The evaluator's fixed-point loop ensures R5.6 picks up naps once
   // R3.1 emits them on a subsequent pass.
   dependsOn: ["R5.1", "R5.11"],
-  matches: (events) => findFirstOverlap(events) !== null,
+  matches: (events, ctx) => findFirstOverlap(events, ctx.settings.putdownLeadMinutes) !== null,
   produces: (events, ctx) => {
-    const overlap = findFirstOverlap(events);
+    const overlap = findFirstOverlap(events, ctx.settings.putdownLeadMinutes);
     if (!overlap) return events;
     const { bottle, region } = overlap;
     // Snap to the merged-interval boundary of transitively-overlapping
@@ -205,14 +205,19 @@ type Region = { start: number; end: number };
 type Overlap = { bottle: Event; region: Region };
 
 /**
- * Merge nap intervals that touch or overlap into a single connected
- * region. Returns regions sorted by start; each region's [start, end]
- * is the union boundary the bottle should clear.
+ * Merge nap intervals (extended on the front by `putdownLead` minutes
+ * to cover the wind-down window) into connected regions. The wind-down
+ * is "no bottles" territory — feeding right before the parent puts the
+ * baby down defeats the purpose. The bottle is moved to BEFORE the
+ * wind-down, not to nap.start.
+ *
+ * Returns regions sorted by start; each region's [start, end] is the
+ * union boundary the bottle must clear.
  */
-function mergedNapRegions(events: Event[]): Region[] {
+function mergedNapRegions(events: Event[], putdownLead: number): Region[] {
   const intervals: Region[] = events
     .filter((e) => e.type === "nap" && e.endTime !== undefined)
-    .map((e) => ({ start: e.startTime, end: e.endTime! }))
+    .map((e) => ({ start: e.startTime - putdownLead, end: e.endTime! }))
     .sort((a, b) => a.start - b.start);
   const merged: Region[] = [];
   for (const iv of intervals) {
@@ -226,8 +231,8 @@ function mergedNapRegions(events: Event[]): Region[] {
   return merged;
 }
 
-function findFirstOverlap(events: Event[]): Overlap | null {
-  const regions = mergedNapRegions(events);
+function findFirstOverlap(events: Event[], putdownLead: number): Overlap | null {
+  const regions = mergedNapRegions(events, putdownLead);
   if (regions.length === 0) return null;
   for (const event of events) {
     if (!isBottle(event) || !isProjected(event)) continue;
