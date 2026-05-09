@@ -2,21 +2,22 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import type { Event, OwnershipTemplate } from "@/domain";
-import { projectDay } from "@/domain";
-import { useDay } from "@/hooks/useDay";
-import { useEvents } from "@/hooks/useEvents";
+import type { Event, OwnershipTemplate } from "@/v3/schemas";
+import { isRecorded } from "@/v3/schemas";
 import { useNowMinutes } from "@/hooks/useNowMinutes";
-import { useSettings } from "@/hooks/useSettings";
-import { useTemplates } from "@/hooks/useTemplates";
+import { useV3Day } from "@/v3/hooks/useV3Day";
+import { useV3Events } from "@/v3/hooks/useV3Events";
+import { useV3Projection } from "@/v3/hooks/useV3Projection";
+import { useV3Settings } from "@/v3/hooks/useV3Settings";
+import { useV3Templates } from "@/v3/hooks/useV3Templates";
 import { LoadingState } from "@/components/shared/LoadingState";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { FAB } from "@/components/shared/FAB";
 import { FABTypePicker } from "@/components/shared/FABTypePicker";
-import { EventEditDrawer } from "@/components/shared/EventEditDrawer";
-import { buildCreateTemplate, type CreatableType } from "@/components/shared/createEventTemplate";
-import { TimelineV2 } from "@/components/Timeline/TimelineV2";
-import { TIMELINE_DEFAULTS } from "@/domain";
+import type { CreatableType } from "@/v3/components/shared/createEventTemplate";
+import { buildCreateTemplate } from "@/v3/components/shared/createEventTemplate";
+import { EventEditDrawerV3 } from "@/v3/components/shared/EventEditDrawerV3";
+import { TimelineV3 } from "@/v3/components/Timeline/TimelineV3";
 import styles from "./page.module.css";
 
 const CHILD_ID = process.env.NEXT_PUBLIC_DEFAULT_CHILD_ID ?? "aden";
@@ -38,33 +39,33 @@ function yesterdayDate(today: string): string {
 
 export default function TimelinePage() {
   const nowMinutes = useNowMinutes();
-  const { day, loading: dayLoading } = useDay(CHILD_ID);
-  const { settings, loading: settingsLoading } = useSettings(CHILD_ID);
+  const { day, loading: dayLoading } = useV3Day(CHILD_ID);
+  const { settings, loading: settingsLoading } = useV3Settings(CHILD_ID);
   const {
     events: actuals,
     createOptimistic,
     updateOptimistic,
     deleteOptimistic,
-  } = useEvents(CHILD_ID, day?.id ?? "");
-  const { templates } = useTemplates(CHILD_ID);
+  } = useV3Events(CHILD_ID, day?.id ?? "");
+  const { templates } = useV3Templates(CHILD_ID);
   const [drawer, setDrawer] = useState<DrawerState>({ open: false });
   const [pickerOpen, setPickerOpen] = useState(false);
 
   const template = useMemo<OwnershipTemplate | undefined>(() => {
-    if (!day?.ownershipTemplateId) return undefined;
-    return templates.find((t) => t.id === day.ownershipTemplateId);
+    if (!day?.templateId) return undefined;
+    return templates.find((t) => t.id === day.templateId);
   }, [day, templates]);
 
-  const projected = useMemo(() => {
-    if (!day || !settings) return [];
-    return projectDay({
-      day,
-      settings,
-      actuals,
-      ...(template ? { template } : {}),
-      nowMinutes,
-    });
-  }, [day, settings, actuals, template, nowMinutes]);
+  // useV3Projection requires day + settings; the early-return below
+  // ensures the engine output is never rendered with the placeholders.
+  // The placeholders exist only so React's hook order stays stable
+  // (hooks can't be called conditionally).
+  const projected = useV3Projection({
+    day: day ?? PLACEHOLDER_DAY,
+    settings: settings ?? PLACEHOLDER_SETTINGS,
+    actuals,
+    ...(template ? { template } : {}),
+  });
 
   if (dayLoading || settingsLoading) {
     return (
@@ -90,13 +91,14 @@ export default function TimelinePage() {
         </Link>
       </header>
 
-      <TimelineV2
+      <TimelineV3
         events={projected}
+        owners={settings.owners}
+        putdownLeadMinutes={settings.putdownLeadMinutes}
         nowMinutes={nowMinutes}
         scrollToNowOnMount
-        pxPerHour={settings?.timelinePxPerHour ?? TIMELINE_DEFAULTS.pxPerHour}
-        dimPast={settings?.timelineDimPast ?? TIMELINE_DEFAULTS.dimPast}
-        colorMode={settings?.timelineColorMode ?? TIMELINE_DEFAULTS.colorMode}
+        pxPerHour={settings.timelinePxPerHour}
+        dimPast={settings.timelineDimPast}
         onEventTap={(event) => setDrawer({ open: true, mode: "edit", event })}
       />
 
@@ -111,14 +113,14 @@ export default function TimelinePage() {
             dayId: day.id,
             actuals,
             settings,
-            nowHHMM: formatNowAsHHMM(nowMinutes),
+            nowMinutes,
           });
           setDrawer({ open: true, mode: "create", template: tpl });
         }}
         onCancel={() => setPickerOpen(false)}
       />
 
-      <EventEditDrawer
+      <EventEditDrawerV3
         key={
           drawer.open && drawer.mode === "edit"
             ? drawer.event.id
@@ -126,17 +128,20 @@ export default function TimelinePage() {
               ? drawer.template.id
               : "closed"
         }
+        owners={settings.owners}
+        nowMinutes={nowMinutes}
         existingEvents={projected}
         open={drawer.open}
         event={drawer.open ? (drawer.mode === "edit" ? drawer.event : drawer.template) : null}
         mode={drawer.open && drawer.mode === "edit" ? "edit" : "create"}
         onSave={async (event) => {
           if (drawer.open && drawer.mode === "edit") {
-            // Projected events are synthesized by the engine and have no
-            // Firestore doc — the first edit needs to CREATE the override,
-            // not update a non-existent record. Give it a fresh id so we
-            // don't write under the synthetic "proj-…" key.
-            if (drawer.event.source === "projected") {
+            // Projected events are synthesized by the engine and have
+            // no Firestore doc. The first user edit needs to CREATE an
+            // override, not update a non-existent record. Give it a
+            // fresh id so we don't write under the synthetic "proj-…"
+            // key.
+            if (!isRecorded(drawer.event.lifecycle)) {
               await createOptimistic({ ...event, id: `manual-${Date.now()}` });
             } else {
               await updateOptimistic(event.id, event);
@@ -148,9 +153,9 @@ export default function TimelinePage() {
         }}
         onCancel={() => setDrawer({ open: false })}
         onDelete={async (event) => {
-          // Same caveat — can't delete a projected event since it doesn't
-          // exist in Firestore. Just close the drawer.
-          if (drawer.open && drawer.mode === "edit" && drawer.event.source === "projected") {
+          // Can't delete a projected event — no Firestore doc. Just
+          // close the drawer.
+          if (drawer.open && drawer.mode === "edit" && !isRecorded(drawer.event.lifecycle)) {
             setDrawer({ open: false });
             return;
           }
@@ -162,8 +167,62 @@ export default function TimelinePage() {
   );
 }
 
-function formatNowAsHHMM(nowMinutes: number): string {
-  const h = Math.floor(nowMinutes / 60);
-  const m = nowMinutes % 60;
-  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
-}
+// useV3Projection has to be called every render to keep hook order
+// stable; these placeholders fill in until day + settings load. The
+// early-return above guarantees the engine output is never rendered
+// with them.
+const PLACEHOLDER_DAY = {
+  id: "",
+  childId: "",
+  date: "",
+  status: "active" as const,
+  suppressedRecurringIds: [] as string[],
+  suppressedDaycareDay: false,
+};
+
+const PLACEHOLDER_SETTINGS = {
+  childId: "",
+  defaultWakeTime: 7 * 60,
+  bedtimeThreshold: 19 * 60,
+  defaultNapLengthMinutes: 90,
+  shortNapThresholdMinutes: 45,
+  shortNapAdjustmentMinutes: 30,
+  wakeWindowsMinutes: [] as number[],
+  napDurationMin: 30,
+  napDurationMax: 180,
+  defaultBottleAmountOz: 5,
+  defaultBottleIntervalMinutes: 180,
+  bottleRules: [],
+  bottleChain: { bottlesPerDay: 5, bufferAfterWakeMinutes: 10 },
+  minBottleIntervalMinutes: 90,
+  putdownLeadMinutes: 15,
+  pumpTimes: [] as number[],
+  pumpOwnerSlot: "parent2" as const,
+  dreamFeedEnabled: false,
+  dreamFeedStart: 22 * 60,
+  dreamFeedEnd: 23 * 60,
+  dreamFeedOffsetAfterBedtimeMinutes: 180,
+  dailyRecurring: [],
+  daycare: {
+    enabled: false,
+    dropoffTime: 8 * 60,
+    pickupTime: 17 * 60,
+    ownerId: "",
+    weekdays: {
+      mon: false,
+      tue: false,
+      wed: false,
+      thu: false,
+      fri: false,
+      sat: false,
+      sun: false,
+    },
+  },
+  owners: {
+    parent1: { displayName: "", color: "#0af" },
+    parent2: { displayName: "", color: "#f0a" },
+    other: [] as Array<{ id: string; displayName: string; color: string }>,
+  },
+  timelinePxPerHour: 80,
+  timelineDimPast: true,
+};
