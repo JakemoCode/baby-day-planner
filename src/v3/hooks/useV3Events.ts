@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { db } from "@/lib/firebase/client";
+import { withV3EventDefaults } from "../firestore/eventDefaults";
 import {
   createEvent as createEventRepo,
   deleteEvent as deleteEventRepo,
@@ -28,7 +29,11 @@ export function useV3Events(childId: string, dayId: string): UseV3EventsResult {
     // doc id, which trips reserved-id validation (`__.*__`).
     if (!dayId) return;
     return watchEvents(db, childId, dayId, (next) => {
-      setEvents(next);
+      // Flow each doc through withV3EventDefaults so V2-shape leftovers
+      // (string startTime, source/status/recorded triplet, missing
+      // lifecycle / kind / hasPutdown) don't crash the engine. Removed
+      // once V2 reads stop entirely.
+      setEvents(next.map(withV3EventDefaults));
       setLoading(false);
     });
   }, [childId, dayId]);
