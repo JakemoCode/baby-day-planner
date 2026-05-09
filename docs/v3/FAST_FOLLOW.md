@@ -72,6 +72,43 @@ timeline.
 
 ---
 
+## §F3 — First-time user onboarding (dashboard)
+
+**Source**: cutover dogfooding, 2026-05-09 — Jake noted the dashboard
+isn't friendly to a first-time user with an empty Firestore.
+
+**Status**: `pending`
+
+**What**: when no settings doc exists yet, the dashboard should walk
+the user through initial setup instead of crashing or showing an
+empty/broken state. Minimum bar:
+- Detect "no settings" / "no day" state and route to a setup flow
+  rather than rendering a partial timeline / dashboard.
+- Setup flow collects: parent display names, default wake time,
+  bedtime threshold, default nap length, wake-window minutes.
+- Daycare + dailyRecurring + dream feed deferred to a "later" panel
+  inside the regular Settings page once basic setup is done.
+- After setup: write a complete V3 settings doc and redirect to
+  the dashboard with a "Start the day" CTA prominent.
+
+**Why fast-follow, not pre-V3**: not blocking the cutover (current
+users have data already). Becomes blocking the moment we want anyone
+besides Jake to try the app.
+
+**Estimated effort**: 1–2 days. Single PR after the cross-surface
+cutover stabilizes.
+
+**Acceptance**:
+- Visiting any authed route with no settings doc redirects to
+  `/welcome` (or wherever the setup flow lives).
+- Setup flow fields validate before the user can proceed.
+- After setup, settings doc satisfies the V3 schema with no
+  fall-through to `withV3SettingsDefaults`.
+- Existing users (with a complete settings doc) never see the
+  flow.
+
+---
+
 ## How items land here
 
 Two paths:
