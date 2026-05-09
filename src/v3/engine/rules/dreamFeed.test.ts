@@ -17,11 +17,12 @@ import {
 } from "../../__tests__/factories";
 import type { Rule } from "../evaluator";
 import { projectDay } from "../projectDay";
-import { RULES as BEDTIME_RULES } from "./bedtime";
-import { RULES as DREAM_RULES } from "./dreamFeed";
-import { RULES as NAP_RULES } from "./naps";
+import { ALL_RULES } from "./index";
 
-const ALL: Rule[] = [...NAP_RULES, ...BEDTIME_RULES, ...DREAM_RULES];
+// Dream feed transitively depends on bedtime + the owner-inheritance
+// chain (R12.5 stamps bedtime owner, R8.8 reads it). Run against the
+// full ruleset rather than maintaining a manual subset.
+const ALL: Rule[] = [...ALL_RULES];
 
 describe("R8.1 / R8.3 — dream feed projects when enabled and bedtime exists", () => {
   it("with bedtime at 19:00, offset 90, earliest 20:30, latest 21:00 → dream feed at 20:30", () => {

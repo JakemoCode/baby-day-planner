@@ -13,6 +13,7 @@ import type {
   EventType,
   Lifecycle,
   OwnerRef,
+  OwnershipTemplate,
   Settings,
   TimeMin,
 } from "../schemas";
@@ -102,6 +103,21 @@ export const PARENT1: OwnerRef = { slot: "parent1" };
 export const PARENT2: OwnerRef = { slot: "parent2" };
 export function otherOwner(id: string): OwnerRef {
   return { slot: "other", otherId: id };
+}
+
+// ---------------------------------------------------------------------------
+// Templates
+// ---------------------------------------------------------------------------
+
+export function aTemplate(overrides: Partial<OwnershipTemplate> = {}): OwnershipTemplate {
+  return {
+    id: overrides.id ?? "tpl_test",
+    displayName: overrides.displayName ?? "Test template",
+    napOwners: overrides.napOwners ?? [],
+    wakeWindowOwners: overrides.wakeWindowOwners ?? [],
+    ...(overrides.bottleOwners !== undefined ? { bottleOwners: overrides.bottleOwners } : {}),
+    ...(overrides.bedtimeOwner !== undefined ? { bedtimeOwner: overrides.bedtimeOwner } : {}),
+  };
 }
 
 // ---------------------------------------------------------------------------
