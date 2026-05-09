@@ -31,7 +31,7 @@ pnpm test
 echo "→ Integration tests"
 if nc -z localhost 8080 2>/dev/null; then
   echo "  (reusing existing Firestore emulator on :8080)"
-  pnpm exec vitest run src/repositories tests/integration
+  pnpm exec vitest run src/repositories src/v3/repositories tests/integration
 else
   echo "  (starting Firestore emulator)"
   pnpm test:integration
