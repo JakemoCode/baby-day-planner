@@ -17,4 +17,9 @@ describe("EmptyState", () => {
     renderWithAuth(<EmptyState title="No history yet" />);
     expect(screen.queryByText(/.+/, { selector: "p" })).toBeNull();
   });
+
+  it("exposes role='status' so screen readers announce it as a live region", () => {
+    renderWithAuth(<EmptyState title="No events recorded for this day." />);
+    expect(screen.getByRole("status")).toHaveTextContent("No events recorded for this day.");
+  });
 });

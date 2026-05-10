@@ -345,6 +345,31 @@ substantial duplicated patterns:
 
 ---
 
+### 1.19 Owner attrs not centralized after §1.2 / §1.4 polish
+
+**Source**: code-simplifier review of PR #90 (cleanup polish bundle).
+
+**What**: PR #90 fixed the `?? "transparent"` flattening bug across `Block.tsx` / `InstantChip.tsx` / `OwnerPickerV3.tsx`, but each component now does the conditional `--owner-color` spread + `data-owner` attribute open-coded in three slightly different shapes (Block merges with positioning; InstantChip and OwnerPickerV3 each ternary on the whole `style` prop). The `as React.CSSProperties` cast also lives at three sites.
+
+**Fix**: extract a small helper in `src/v3/ui/ownerStyle.ts`:
+
+```ts
+export function ownerAttrs(ref: OwnerRef | undefined, owners: OwnersConfig) {
+  const slotKey = ownerSlotKey(ref);
+  const color = ownerColor(ref, owners);
+  return {
+    ...(slotKey ? { "data-owner": slotKey } : {}),
+    style: color ? ({ "--owner-color": color } as React.CSSProperties) : undefined,
+  };
+}
+```
+
+Then `<Tag {...ownerAttrs(event.owner, owners)}>` (with InstantChip / OwnerPickerV3 inlining the helper directly) and `<Tag {...ownerAttrs(...)} style={{ ...positioning, ...ownerAttrs(...).style }}>` (Block, which merges with absolute-position vars).
+
+**Status**: pending. Pairs with §1.2/§1.4 — file-of-origin fixed but the duplicated shape was left for a follow-up to keep PR #90 strictly scoped to the §1 checklist.
+
+---
+
 ### 1.18 PR #81 (A0.4) — Drawer save test variable naming
 
 **Source**: code-reviewer of PR #81.
