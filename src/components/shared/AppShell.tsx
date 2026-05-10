@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { useDay } from "@/hooks/useDay";
+import { useV3Day } from "@/v3/hooks/useV3Day";
 import { BottomTabs } from "./BottomTabs";
 import { Header } from "./Header";
 import { KebabMenu } from "./KebabMenu";
@@ -17,7 +17,7 @@ export type AppShellProps = {
 const DEFAULT_CHILD_ID = process.env.NEXT_PUBLIC_DEFAULT_CHILD_ID ?? "aden";
 
 export function AppShell({ childId = DEFAULT_CHILD_ID, childName, children }: AppShellProps) {
-  const { day } = useDay(childId);
+  const { day } = useV3Day(childId);
   const dateProp = day?.date ? { date: day.date } : {};
 
   return (

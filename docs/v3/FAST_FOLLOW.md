@@ -294,6 +294,26 @@ done. Mostly `rm` + import-cleanup.
 
 ---
 
+## §F10 — Onboarding flow: child name + DOB (replace hardcoded `?? "aden"`)
+
+**Source**: Jake, 2026-05-10.
+
+**Status**: `pending`
+
+**What**: today the app reads `process.env.NEXT_PUBLIC_DEFAULT_CHILD_ID ?? "aden"` in multiple places (AppShell, page routes, hooks) and `childName="Aden"` is wired in similarly. Build a real first-run onboarding flow that captures child name + DOB, persists to Firestore (e.g. `/children/{childId}` doc with `displayName` + `dateOfBirth`), and routes everything off that instead of the env var fallback.
+
+**Why fast-follow, not in V3**: pure product/onboarding feature; engine-orthogonal. The hardcoded fallback is currently fine for the two-user (Jake/Kelly) deployment but blocks any broader use.
+
+**Bonus**: enables this codebase to be useful to other new parents. Worth designing the model with multi-child / multi-family support in mind even if v1 ships single-child.
+
+**Acceptance**:
+- New users land on an onboarding screen if no `/children/*` doc exists
+- `childId` derived from Firestore data, not env
+- All `?? "aden"` / `childName="Aden"` references removed
+- Existing data migration path documented (a one-shot script or just "type in Aden + DOB once")
+
+---
+
 ## How items land here
 
 Two paths:
