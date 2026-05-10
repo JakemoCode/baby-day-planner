@@ -1,34 +1,35 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import type { Day, Event, Owner, OwnershipTemplate } from "@/domain";
-import { makeEvent, projectDay } from "@/domain";
-import { useSettings } from "@/hooks/useSettings";
-import { useTemplates } from "@/hooks/useTemplates";
-import { saveTemplate } from "@/repositories/templates";
+import type { Day, Event, OwnerRef, OwnershipTemplate } from "@/v3/schemas";
+import { useV3Settings } from "@/v3/hooks/useV3Settings";
+import { useV3Templates } from "@/v3/hooks/useV3Templates";
+import { useV3Projection } from "@/v3/hooks/useV3Projection";
+import { PLACEHOLDER_SETTINGS } from "@/v3/hooks/projectionPlaceholders";
+import { saveTemplate } from "@/v3/repositories/templates";
+import { setOwnerInTemplate } from "@/v3/components/DayTemplates/setOwnerInTemplate";
+import { templateSlotForEvent } from "@/v3/components/DayTemplates/templateSlot";
+import { TemplateOwnerPicker } from "@/v3/components/DayTemplates/TemplateOwnerPicker";
+import { TimelineV3 } from "@/v3/components/Timeline/TimelineV3";
 import { db } from "@/lib/firebase/client";
 import { LoadingState } from "@/components/shared/LoadingState";
-import { TimelineV2 } from "@/components/Timeline/TimelineV2";
-import { TemplateOwnerPicker } from "@/components/DayTemplates/TemplateOwnerPicker";
-import { ASSIGNABLE_TYPES, setOwnerInTemplate } from "@/components/DayTemplates/setOwnerInTemplate";
 import styles from "./page.module.css";
 
 const CHILD_ID = process.env.NEXT_PUBLIC_DEFAULT_CHILD_ID ?? "aden";
 const SATURDAY_ID = "tmpl-saturday";
 const SUNDAY_ID = "tmpl-sunday";
 const SYNTHETIC_DAY_ID = "tmpl-projection";
-const SYNTHETIC_WAKE_TIME = "07:00";
 
 const DEFAULT_SAT: OwnershipTemplate = {
   id: SATURDAY_ID,
-  label: "Saturday",
+  displayName: "Saturday",
   napOwners: [],
   wakeWindowOwners: [],
 };
 
 const DEFAULT_SUN: OwnershipTemplate = {
   id: SUNDAY_ID,
-  label: "Sunday",
+  displayName: "Sunday",
   napOwners: [],
   wakeWindowOwners: [],
 };
@@ -36,52 +37,44 @@ const DEFAULT_SUN: OwnershipTemplate = {
 type DayKey = "saturday" | "sunday";
 
 export default function DayTemplatesPage() {
-  const { settings, loading: settingsLoading } = useSettings(CHILD_ID);
-  const { templates, loading: templatesLoading } = useTemplates(CHILD_ID);
+  const { settings, loading: settingsLoading } = useV3Settings(CHILD_ID);
+  const { templates, loading: templatesLoading } = useV3Templates(CHILD_ID);
   const [selectedDay, setSelectedDay] = useState<DayKey>("saturday");
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
-  // Local override after a save — Firestore listener isn't wired for templates,
-  // so we keep the latest edited copy here so the UI reflects new owners.
+  // Local override after a save — listTemplates is one-shot; this keeps
+  // the UI reflecting the latest edits without a manual refetch.
   const [edits, setEdits] = useState<Record<string, OwnershipTemplate>>({});
 
   const saturday = edits[SATURDAY_ID] ?? templates.find((t) => t.id === SATURDAY_ID) ?? DEFAULT_SAT;
   const sunday = edits[SUNDAY_ID] ?? templates.find((t) => t.id === SUNDAY_ID) ?? DEFAULT_SUN;
   const activeTemplate = selectedDay === "saturday" ? saturday : sunday;
 
+  // Synthetic day for the preview projection. V3 `Day` requires
+  // `suppressedRecurringIds` and `suppressedDaycareDay`; `wakeTime` is
+  // a TimeMin (number), not a "HH:MM" string.
   const syntheticDay: Day = useMemo(
     () => ({
       id: SYNTHETIC_DAY_ID,
       childId: CHILD_ID,
       date: "2026-01-04",
       status: "planned",
-      wakeTime: SYNTHETIC_WAKE_TIME,
-      createdAt: "2026-01-04T07:00:00Z",
+      wakeTime: settings?.defaultWakeTime ?? 7 * 60,
+      suppressedRecurringIds: [],
+      suppressedDaycareDay: false,
     }),
-    [],
+    [settings?.defaultWakeTime],
   );
 
-  const projected = useMemo(() => {
-    if (!settings) return [];
-    // Seed bottle_1 at wake time so the bottle chain projects a typical day's
-    // worth of bottles to assign owners against.
-    const seed: Event = makeEvent({
-      id: `${SYNTHETIC_DAY_ID}-bottle-1-seed`,
-      dayId: SYNTHETIC_DAY_ID,
-      eventKey: "bottle_1",
-      type: "bottle",
-      label: "Bottle 1",
-      startTime: SYNTHETIC_WAKE_TIME,
-      amountOz: settings.defaultBottleAmountOz,
-      source: "actual",
-      status: "actual",
-    });
-    return projectDay({
-      day: syntheticDay,
-      settings,
-      actuals: [seed],
-      template: activeTemplate,
-    });
-  }, [settings, syntheticDay, activeTemplate]);
+  // V3 engine projects bottle placeholders from `settings.bottleChain`,
+  // so no seed actuals are needed. PLACEHOLDER_SETTINGS keeps the hook
+  // order stable while real settings load; the early-return below
+  // guarantees we never render output derived from the placeholder.
+  const projected = useV3Projection({
+    day: syntheticDay,
+    settings: settings ?? PLACEHOLDER_SETTINGS,
+    actuals: [] as Event[],
+    template: activeTemplate,
+  });
 
   const selectedEvent = useMemo(
     () => projected.find((e) => e.id === selectedEventId) ?? null,
@@ -106,7 +99,7 @@ export default function DayTemplatesPage() {
     );
   }
 
-  const handleOwnerChange = async (owner: Owner) => {
+  const handleOwnerChange = async (owner: OwnerRef | undefined) => {
     if (!selectedEvent) return;
     const next = setOwnerInTemplate(activeTemplate, selectedEvent, owner);
     setEdits((prev) => ({ ...prev, [next.id]: next }));
@@ -151,23 +144,41 @@ export default function DayTemplatesPage() {
         </button>
       </div>
 
-      <TimelineV2
+      <TimelineV3
         events={projected}
+        owners={settings.owners}
+        putdownLeadMinutes={settings.putdownLeadMinutes}
         dimPast={false}
+        pxPerHour={settings.timelinePxPerHour}
         onEventTap={(event) => {
-          if (!ASSIGNABLE_TYPES.includes(event.type)) return;
+          // Gate via templateSlotForEvent — non-mappable events (extras,
+          // pumps) have no template slot and shouldn't open the picker.
+          if (templateSlotForEvent(event) === undefined) return;
           setSelectedEventId(event.id);
         }}
       />
 
       {selectedEvent && (
-        <TemplateOwnerPicker
-          event={selectedEvent}
-          onSelect={(owner) => {
-            void handleOwnerChange(owner);
-          }}
-          onCancel={() => setSelectedEventId(null)}
-        />
+        <div className={styles.pickerWrap}>
+          <div className={styles.pickerHeader}>
+            <span className={styles.pickerLabel}>Owner for {selectedEvent.label}</span>
+            <button
+              type="button"
+              className={styles.pickerCancel}
+              onClick={() => setSelectedEventId(null)}
+            >
+              Cancel
+            </button>
+          </div>
+          <TemplateOwnerPicker
+            event={selectedEvent}
+            template={activeTemplate}
+            owners={settings.owners}
+            onSelect={(owner) => {
+              void handleOwnerChange(owner);
+            }}
+          />
+        </div>
       )}
     </div>
   );
