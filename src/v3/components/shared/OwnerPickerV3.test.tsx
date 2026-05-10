@@ -83,4 +83,21 @@ describe("OwnerPickerV3", () => {
       "other:daycare",
     );
   });
+
+  it("sets --owner-color inline on each option from the configured palette", () => {
+    render(<OwnerPickerV3 owners={owners} value={undefined} onChange={() => {}} />);
+    expect(screen.getByRole("button", { name: "Jake" }).getAttribute("style")).toContain(
+      "--owner-color: #0af",
+    );
+    expect(screen.getByRole("button", { name: "Sam" }).getAttribute("style")).toContain(
+      "--owner-color: #f0a",
+    );
+    expect(screen.getByRole("button", { name: "Daycare" }).getAttribute("style")).toContain(
+      "--owner-color: #ccc",
+    );
+    // "None" has no owner ref → transparent fallback.
+    expect(screen.getByRole("button", { name: "None" }).getAttribute("style")).toContain(
+      "--owner-color: transparent",
+    );
+  });
 });

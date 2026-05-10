@@ -1,0 +1,95 @@
+/*
+ * V3 Pill chip with two-row layout when owner is set:
+ *   [dot] [ Bottle 1   7:00a ]
+ *         [ Jake             ]
+ *
+ * V3 difference from V2: dot color, border color, and owner-name text
+ * color are driven by the `--owner-color` CSS custom property set
+ * inline by the V3 component (from `ownerColor(event.owner, owners)`).
+ * If no owner is set, the property falls back to default tokens.
+ */
+
+.chip {
+  display: inline-flex;
+  /* Top-align so the dot sits with the label row, not centered against
+   * a tall two-row chip. */
+  align-items: flex-start;
+  gap: 6px;
+  padding: 3px 8px;
+  border-radius: 12px;
+  background: var(--color-surface-raised);
+  border: 1px solid var(--owner-color, var(--color-border));
+  font: inherit;
+  color: var(--color-fg);
+  cursor: pointer;
+  white-space: nowrap;
+  line-height: 1;
+  transition:
+    background var(--motion-fast) var(--easing-out),
+    border-color var(--motion-fast) var(--easing-out);
+}
+
+.chip[data-static="true"] {
+  cursor: default;
+}
+
+.chip:hover {
+  background: var(--color-bg);
+}
+
+.chip:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  /* Owner color drives the dot; sage accent is the no-owner default. */
+  background: var(--owner-color, var(--color-accent));
+  /* Nudge down 2px so the dot lines up with the label row's optical
+   * mid-x-height instead of sitting at the very top of the chip. */
+  margin-top: 3px;
+}
+
+/* === Content layout ================================================ */
+
+.body {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.topRow {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.label {
+  font-size: 12px;
+  font-weight: var(--weight-semibold);
+  white-space: nowrap;
+  line-height: 1;
+}
+
+.time {
+  font-size: 11px;
+  color: var(--color-muted);
+  white-space: nowrap;
+  line-height: 1;
+}
+
+.ownerName {
+  font-size: 11px;
+  font-weight: var(--weight-medium);
+  line-height: 1;
+  /* Owner name should hug the left edge of the chip body, not center
+   * itself by stretching to the chip's flex cross-axis width. */
+  align-self: flex-start;
+  text-align: left;
+  color: var(--owner-color, inherit);
+}

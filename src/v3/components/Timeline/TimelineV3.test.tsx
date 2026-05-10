@@ -3,8 +3,9 @@
  * V3 event shapes render, putdown synthesis works end-to-end, owner refs
  * resolve to display strings + slot data attributes.
  *
- * Geometry / styling parity with V2 is covered by the existing V2 tests
- * (the CSS modules are shared).
+ * Geometry parity with V2 is covered by the existing V2 tests. V3 owns
+ * its own CSS modules now, with owner color flowing through the
+ * `--owner-color` CSS custom property set inline by Block / InstantChip.
  */
 
 import { describe, expect, it, vi } from "vitest";
@@ -87,6 +88,38 @@ describe("TimelineV3", () => {
     const events: Event[] = [ev({ id: "nap1", owner: { slot: "parent1" } })];
     render(<TimelineV3 events={events} owners={owners} putdownLeadMinutes={15} />);
     expect(screen.getByText(/Jake/)).toBeInTheDocument();
+  });
+
+  it("sets --owner-color inline on blocks from the configured owner palette", () => {
+    const events: Event[] = [ev({ id: "nap1", owner: { slot: "parent1" } })];
+    render(<TimelineV3 events={events} owners={owners} putdownLeadMinutes={15} />);
+    const block = screen.getByTestId("timeline-block");
+    // Read the raw style attribute — jsdom normalizes hex to rgb() when
+    // accessed via .style, so assert against what the component emitted.
+    expect(block.getAttribute("style")).toContain("--owner-color: #0af");
+  });
+
+  it("sets --owner-color inline on instant chips from the configured owner palette", () => {
+    const events: Event[] = [
+      ev({
+        id: "bot1",
+        type: "bottle",
+        kind: "instant",
+        startTime: 7 * 60 + 30,
+        label: "Bottle 1",
+        owner: { slot: "other", otherId: "daycare" },
+      }),
+    ];
+    render(<TimelineV3 events={events} owners={owners} putdownLeadMinutes={15} />);
+    const chip = screen.getByTestId("instant-chip");
+    expect(chip.getAttribute("style")).toContain("--owner-color: #ccc");
+  });
+
+  it("falls back to transparent --owner-color when an event has no owner", () => {
+    const events: Event[] = [ev({ id: "nap1" })];
+    render(<TimelineV3 events={events} owners={owners} putdownLeadMinutes={15} />);
+    const block = screen.getByTestId("timeline-block");
+    expect(block.getAttribute("style")).toContain("--owner-color: transparent");
   });
 
   it("calls onEventTap with the parent event (never the synthetic putdown)", async () => {

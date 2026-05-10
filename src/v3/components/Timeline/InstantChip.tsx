@@ -1,9 +1,9 @@
 "use client";
 
-import styles from "@/components/Timeline/InstantChip.module.css";
+import styles from "./InstantChip.module.css";
 import type { Event, OwnersConfig } from "../../schemas";
 import { formatTimeShort } from "../../ui/time";
-import { ownerDisplayName } from "../../ui/owners";
+import { ownerColor, ownerDisplayName } from "../../ui/owners";
 import { ownerSlotKey } from "./ownerSlotKey";
 
 export type InstantChipProps = {
@@ -36,6 +36,7 @@ export function InstantChip({ event, owners, colorMode, onClick }: InstantChipPr
   const time = formatTimeShort(event.startTime);
   const label = chipText(event);
   const ownerName = ownerDisplayName(event.owner, owners);
+  const ownerColorValue = ownerColor(event.owner, owners) ?? "transparent";
   const slotKey = ownerSlotKey(event.owner);
   const a11y = `${event.label} at ${time}${ownerName ? ` ${ownerName}` : ""}`;
 
@@ -47,6 +48,7 @@ export function InstantChip({ event, owners, colorMode, onClick }: InstantChipPr
       data-static={!interactive}
       {...(slotKey ? { "data-owner": slotKey } : {})}
       className={styles.chip}
+      style={{ ["--owner-color" as string]: ownerColorValue } as React.CSSProperties}
       {...(interactive
         ? { type: "button" as const, onClick, "aria-label": a11y }
         : { role: "presentation" as const })}
