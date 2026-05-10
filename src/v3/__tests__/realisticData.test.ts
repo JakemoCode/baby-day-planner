@@ -185,36 +185,22 @@ describe("engine end-to-end with realistic fixtures", () => {
     expect(result.every((e) => Number.isFinite(e.startTime))).toBe(true);
   });
 
-  it.fails(
-    "V2-shape settings (after defaulter) + V2 day + V2 actuals → engine produces NaN pumps (BUG: pumpTimes string→TimeMin not converted)",
-    () => {
-      // EXPOSED FINDING: withV3SettingsDefaults does NOT convert
-      // pumpTimes from V2 strings ("10:30") to V3 TimeMin (630).
-      // Engine then emits projected pump events with startTime="14:30"
-      // (string) and eventKey="pump_NaN:NaN".
-      //
-      // FIX TARGET: Add a new step to PR-A0.12 (or fold into A0.1's
-      // settings work) — withV3SettingsDefaults must coerce pumpTimes
-      // entries from string to TimeMin if they arrive as strings.
-      // Same for any other TimeMin field that V2 stored as a string
-      // (defaultWakeTime, bedtimeThreshold are already covered by
-      // typeof number checks; verify others).
-      const settings = withV3SettingsDefaults(fixtures.settings.v2 as Partial<Settings>)!;
-      const day: Day = {
-        ...(fixtures.days.v2 as unknown as Day),
-        wakeTime: 7 * 60 + 30,
-        suppressedRecurringIds: [],
-        suppressedDaycareDay: false,
-      };
-      const actuals = [
-        fixtures.events.v2Bottle,
-        fixtures.events.v2NapInProgress,
-        fixtures.events.v2Overridden,
-      ].map((e) => withV3EventDefaults(e as Event));
-      const result = projectDay({ day, settings, actuals, nowMinutes: 10 * 60 });
-      expect(result.every((e) => Number.isFinite(e.startTime))).toBe(true);
-    },
-  );
+  it("V2-shape settings (after defaulter) + V2 day + V2 actuals → engine produces all-finite startTimes (PR-A0.12: pumpTimes string→TimeMin coerced)", () => {
+    const settings = withV3SettingsDefaults(fixtures.settings.v2 as Partial<Settings>)!;
+    const day: Day = {
+      ...(fixtures.days.v2 as unknown as Day),
+      wakeTime: 7 * 60 + 30,
+      suppressedRecurringIds: [],
+      suppressedDaycareDay: false,
+    };
+    const actuals = [
+      fixtures.events.v2Bottle,
+      fixtures.events.v2NapInProgress,
+      fixtures.events.v2Overridden,
+    ].map((e) => withV3EventDefaults(e as Event));
+    const result = projectDay({ day, settings, actuals, nowMinutes: 10 * 60 });
+    expect(result.every((e) => Number.isFinite(e.startTime))).toBe(true);
+  });
 
   it("V2-shape settings + actuals → engine produces sorted events (with the pump-NaN gap noted above)", () => {
     // Same input as the .fails() test above, but only asserts the
