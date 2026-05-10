@@ -69,4 +69,10 @@ describe("HistoryPage", () => {
     const lastCall = listArchivedDaysMock.mock.calls.at(-1) ?? [];
     expect(lastCall[2]).toBe(7);
   });
+
+  it("renders an error state when listArchivedDays rejects", async () => {
+    listArchivedDaysMock.mockRejectedValue(new Error("offline"));
+    renderWithAuth(<HistoryPage />);
+    expect(await screen.findByText(/couldn.t load history/i)).toBeVisible();
+  });
 });

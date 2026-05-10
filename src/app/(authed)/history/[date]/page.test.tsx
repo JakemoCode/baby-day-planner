@@ -5,7 +5,7 @@ import type { Day, Event, OwnersConfig, Settings } from "@/v3/schemas";
 
 const getDayByDateMock = vi.fn();
 const useV3SettingsMock = vi.fn();
-const useV3EventsMock = vi.fn();
+const listEventsMock = vi.fn();
 const useParamsMock = vi.fn();
 
 vi.mock("next/navigation", () => ({
@@ -16,12 +16,12 @@ vi.mock("@/v3/repositories/days", () => ({
   getDayByDate: (...args: unknown[]) => getDayByDateMock(...args),
 }));
 
-vi.mock("@/v3/hooks/useV3Settings", () => ({
-  useV3Settings: () => useV3SettingsMock(),
+vi.mock("@/v3/repositories/events", () => ({
+  listEvents: (...args: unknown[]) => listEventsMock(...args),
 }));
 
-vi.mock("@/v3/hooks/useV3Events", () => ({
-  useV3Events: (...args: unknown[]) => useV3EventsMock(...args),
+vi.mock("@/v3/hooks/useV3Settings", () => ({
+  useV3Settings: () => useV3SettingsMock(),
 }));
 
 vi.mock("@/lib/firebase/client", () => ({ db: {} }));
@@ -67,17 +67,11 @@ describe("ArchivedDayPage", () => {
   beforeEach(() => {
     getDayByDateMock.mockReset();
     useV3SettingsMock.mockReset();
-    useV3EventsMock.mockReset();
+    listEventsMock.mockReset();
     useParamsMock.mockReset();
     useParamsMock.mockReturnValue({ date: "2026-05-04" });
     useV3SettingsMock.mockReturnValue({ settings, loading: false });
-    useV3EventsMock.mockReturnValue({
-      events: [],
-      loading: false,
-      createOptimistic: vi.fn(),
-      updateOptimistic: vi.fn(),
-      deleteOptimistic: vi.fn(),
-    });
+    listEventsMock.mockResolvedValue([]);
   });
 
   it("renders the day-not-found empty state when no archived day matches", async () => {
@@ -95,17 +89,11 @@ describe("ArchivedDayPage", () => {
 
   it("passes events and settings through to the archived view", async () => {
     getDayByDateMock.mockResolvedValue(day);
-    useV3EventsMock.mockReturnValue({
-      events: [bottle],
-      loading: false,
-      createOptimistic: vi.fn(),
-      updateOptimistic: vi.fn(),
-      deleteOptimistic: vi.fn(),
-    });
+    listEventsMock.mockResolvedValue([bottle]);
     renderWithAuth(<ArchivedDayPage />);
     expect(await screen.findByRole("heading", { level: 1 })).toHaveTextContent(/May 4/i);
-    // useV3Events called with childId, dayId, owners
-    expect(useV3EventsMock).toHaveBeenCalledWith(expect.any(String), "day-1", owners);
+    // listEvents called with db, childId, dayId
+    expect(listEventsMock).toHaveBeenCalledWith(expect.anything(), expect.any(String), "day-1");
   });
 
   it("renders the back link to /history", async () => {
@@ -113,5 +101,18 @@ describe("ArchivedDayPage", () => {
     renderWithAuth(<ArchivedDayPage />);
     const link = await screen.findByRole("link", { name: /history/i });
     expect(link).toHaveAttribute("href", "/history");
+  });
+
+  it("renders an error state when getDayByDate rejects", async () => {
+    getDayByDateMock.mockRejectedValue(new Error("offline"));
+    renderWithAuth(<ArchivedDayPage />);
+    expect(await screen.findByText(/couldn.t load day/i)).toBeVisible();
+  });
+
+  it("renders an error state when listEvents rejects", async () => {
+    getDayByDateMock.mockResolvedValue(day);
+    listEventsMock.mockRejectedValue(new Error("offline"));
+    renderWithAuth(<ArchivedDayPage />);
+    expect(await screen.findByText(/couldn.t load events/i)).toBeVisible();
   });
 });
