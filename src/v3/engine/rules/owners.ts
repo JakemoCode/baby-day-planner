@@ -23,7 +23,7 @@
  *   R12.9 — extras / dailyRecurring carry their own defaults; not template-driven.
  */
 
-import type { Event, OwnerRef, OwnershipTemplate } from "../../schemas";
+import type { Event, OwnerSlotEntry, OwnershipTemplate } from "../../schemas";
 import type { Rule } from "../evaluator";
 import { hasType, isProjected } from "../helpers";
 
@@ -39,11 +39,11 @@ function templateOwnerByIndexRule(spec: {
   dependsOn: string[];
   type: Event["type"];
   keyPrefix: string;
-  ownerList: (t: OwnershipTemplate) => OwnerRef[] | undefined;
+  ownerList: (t: OwnershipTemplate) => OwnerSlotEntry[] | undefined;
 }): Rule {
   const isType = hasType(spec.type);
 
-  function ownersFor(template: OwnershipTemplate | undefined): OwnerRef[] | undefined {
+  function ownersFor(template: OwnershipTemplate | undefined): OwnerSlotEntry[] | undefined {
     if (!template) return undefined;
     const list = spec.ownerList(template);
     return list && list.length > 0 ? list : undefined;

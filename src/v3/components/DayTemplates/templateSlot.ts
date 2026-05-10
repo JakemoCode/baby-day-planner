@@ -14,7 +14,7 @@
  * eventKeys) return undefined.
  */
 
-import type { Event, OwnerRef, OwnershipTemplate } from "../../schemas";
+import type { Event, OwnerRef, OwnerSlotEntry, OwnershipTemplate } from "../../schemas";
 
 export type TemplateSlot =
   | { kind: "bedtime" }
@@ -55,14 +55,18 @@ export function getOwnerAt(template: OwnershipTemplate, slot: TemplateSlot): Own
 }
 
 /** Return a copy of `arr` with `owner` placed at index `i`, gap-filling
- * intermediate slots with `undefined`. The returned array is widened to
- * include `undefined` entries; callers tolerate sparse owners (tracked
- * separately as cleanup §1.6). */
-function placeAt(arr: ReadonlyArray<OwnerRef>, i: number, owner: OwnerRef | undefined): OwnerRef[] {
-  const next = arr.slice() as Array<OwnerRef | undefined>;
+ * intermediate slots with `undefined`. The schema models owner-list slots
+ * as `OwnerSlotEntry = OwnerRef | undefined`, so the gap-fill is honest
+ * in the type — engine R12.x rules skip undefined entries at projection. */
+function placeAt(
+  arr: ReadonlyArray<OwnerSlotEntry>,
+  i: number,
+  owner: OwnerSlotEntry,
+): OwnerSlotEntry[] {
+  const next: OwnerSlotEntry[] = arr.slice();
   while (next.length <= i) next.push(undefined);
   next[i] = owner;
-  return next as OwnerRef[];
+  return next;
 }
 
 /** Returns a new OwnershipTemplate with the slot's owner replaced.

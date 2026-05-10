@@ -152,14 +152,22 @@ export type Day = {
 // Templates
 // ---------------------------------------------------------------------------
 
+/**
+ * Owner-list slot. `undefined` means "no owner assigned at this index" —
+ * used for sparse writes (e.g. setting nap_3's owner before nap_2 has one).
+ * The engine's R12.x rules already gate on `owner ? { ...e, owner } : e`,
+ * so undefined entries are simply skipped at projection time.
+ */
+export type OwnerSlotEntry = OwnerRef | undefined;
+
 export type OwnershipTemplate = {
   id: string;
   /** User-named (R13.1): "Saturday", "Half-day Friday", "Travel", etc. */
   displayName: string;
-  napOwners: OwnerRef[];
+  napOwners: OwnerSlotEntry[];
   /** Template-only; no fallback to nap (R12.3, R4.1). */
-  wakeWindowOwners: OwnerRef[];
-  bottleOwners?: OwnerRef[];
+  wakeWindowOwners: OwnerSlotEntry[];
+  bottleOwners?: OwnerSlotEntry[];
   /** No lastNapOwner fallback (R12.5). */
   bedtimeOwner?: OwnerRef;
 };

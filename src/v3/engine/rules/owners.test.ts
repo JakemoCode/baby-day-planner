@@ -104,6 +104,32 @@ describe("R12.2 — projected naps inherit template.napOwners[N-1]", () => {
     expect(naps[3]!.owner).toBeUndefined();
   });
 
+  it("sparse napOwners (undefined slot in middle) → that nap has no owner; neighbors do", () => {
+    // Templates can carry sparse owner lists when a user assigns
+    // nap_3's owner before nap_2's. Since cleanup §1.6, the schema
+    // models this honestly as `(OwnerRef | undefined)[]` and the
+    // engine must skip undefined slots without stamping `undefined`
+    // onto the event.
+    const ctx = aContext({
+      day: aDay({ wakeTime: 7 * 60 }),
+      settings: aSettings({
+        wakeWindowsMinutes: [120, 135, 135, 150],
+        defaultNapLengthMinutes: 60,
+        bedtimeThreshold: 23 * 60,
+      }),
+      template: aTemplate({ napOwners: [PARENT1, undefined, PARENT2, PARENT1] }),
+      actuals: [],
+    });
+
+    const out = run(ctx);
+
+    const naps = out.filter((e) => e.type === "nap").sort((a, b) => a.startTime - b.startTime);
+    expect(naps[0]!.owner).toEqual(PARENT1);
+    expect(naps[1]!.owner).toBeUndefined();
+    expect(naps[2]!.owner).toEqual(PARENT2);
+    expect(naps[3]!.owner).toEqual(PARENT1);
+  });
+
   it("no template → no projected nap has an owner", () => {
     const ctx = aContext({
       day: aDay({ wakeTime: 7 * 60 }),

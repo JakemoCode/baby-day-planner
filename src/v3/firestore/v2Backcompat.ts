@@ -33,6 +33,7 @@ import type {
 import type {
   Lifecycle,
   OwnerRef,
+  OwnerSlotEntry,
   OwnersConfig,
   Settings as V3Settings,
   TimeMin,
@@ -250,7 +251,7 @@ export function withV2EventBackcompat(input: MaybeV3Event, owners?: OwnersConfig
 type MaybeV3Template = Record<string, unknown>;
 
 function ownerArrayToV2(
-  refs: ReadonlyArray<OwnerRef | string> | undefined,
+  refs: ReadonlyArray<OwnerSlotEntry | string> | undefined,
   owners: OwnersConfig | undefined,
 ): V2Owner[] {
   if (!refs) return [];
@@ -275,11 +276,11 @@ export function withV2TemplateBackcompat(
         : "";
 
   const napOwners = ownerArrayToV2(
-    input.napOwners as ReadonlyArray<OwnerRef | string> | undefined,
+    input.napOwners as ReadonlyArray<OwnerSlotEntry | string> | undefined,
     owners,
   );
   const wakeWindowOwners = ownerArrayToV2(
-    input.wakeWindowOwners as ReadonlyArray<OwnerRef | string> | undefined,
+    input.wakeWindowOwners as ReadonlyArray<OwnerSlotEntry | string> | undefined,
     owners,
   );
 
@@ -292,7 +293,7 @@ export function withV2TemplateBackcompat(
 
   if (input.bottleOwners !== undefined) {
     out.bottleOwners = ownerArrayToV2(
-      input.bottleOwners as ReadonlyArray<OwnerRef | string> | undefined,
+      input.bottleOwners as ReadonlyArray<OwnerSlotEntry | string> | undefined,
       owners,
     );
   }
