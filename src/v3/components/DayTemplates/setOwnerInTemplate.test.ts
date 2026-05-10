@@ -8,9 +8,9 @@
  *  - Index N is 1-based in the eventKey (`nap_2` → index 1).
  *  - When N exceeds the current array length, intermediate slots are
  *    filled with `undefined` (sparse) so the chosen index lines up.
- *    Consumers must tolerate undefined entries — there is no engine
- *    fallback owner here (V3 schemas allow OwnerRef[] only, so the
- *    type is widened internally during gap-fill).
+ *    The schema models gap-filled positions as `OwnerSlotEntry`
+ *    (`OwnerRef | undefined`) per cleanup §1.6, so consumers must
+ *    tolerate undefined entries; engine R12.x rules already skip them.
  *  - `owner === undefined` clears the slot (sets to `undefined`).
  *  - Unknown / malformed `eventKey` returns the template unchanged.
  */
