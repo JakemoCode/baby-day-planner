@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import type { OwnershipTemplate } from "@/domain";
 import { db } from "@/lib/firebase/client";
 import { listTemplates } from "@/repositories/templates";
+import { withV2TemplateBackcompat } from "@/v3/firestore/v2Backcompat";
 
 export type UseTemplatesResult = {
   templates: OwnershipTemplate[];
@@ -18,7 +19,7 @@ export function useTemplates(childId: string): UseTemplatesResult {
     let cancelled = false;
     listTemplates(db, childId).then((tt) => {
       if (!cancelled) {
-        setTemplates(tt);
+        setTemplates(tt.map((t) => withV2TemplateBackcompat(t)));
         setLoading(false);
       }
     });

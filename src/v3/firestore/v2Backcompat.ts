@@ -26,6 +26,7 @@ import type {
   EventSource,
   EventStatus,
   Owner as V2Owner,
+  OwnershipTemplate as V2Template,
   Settings as V2Settings,
 } from "@/domain";
 import type {
@@ -235,6 +236,67 @@ export function withV2EventBackcompat(input: MaybeV3Event, owners?: OwnersConfig
   if (endTime !== undefined) out.endTime = endTime;
   if (input.amountOz !== undefined) out.amountOz = input.amountOz as number;
   if (owner !== undefined) out.owner = owner;
+
+  return out;
+}
+
+// ---------------------------------------------------------------------------
+// OwnershipTemplate
+// ---------------------------------------------------------------------------
+
+/** Loose input — could be a V2 doc, V3 doc, or partial of either. */
+type MaybeV3Template = Record<string, unknown>;
+
+function ownerArrayToV2(
+  refs: ReadonlyArray<OwnerRef | string> | undefined,
+  owners: OwnersConfig | undefined,
+): V2Owner[] {
+  if (!refs) return [];
+  const out: V2Owner[] = [];
+  for (const r of refs) {
+    const v = ownerRefToV2(r, owners);
+    if (v !== undefined) out.push(v);
+  }
+  return out;
+}
+
+export function withV2TemplateBackcompat(
+  input: MaybeV3Template,
+  owners?: OwnersConfig,
+): V2Template {
+  // displayName (V3) → label (V2). Preserve label when already V2 shape.
+  const label =
+    typeof input.label === "string"
+      ? input.label
+      : typeof input.displayName === "string"
+        ? input.displayName
+        : "";
+
+  const napOwners = ownerArrayToV2(
+    input.napOwners as ReadonlyArray<OwnerRef | string> | undefined,
+    owners,
+  );
+  const wakeWindowOwners = ownerArrayToV2(
+    input.wakeWindowOwners as ReadonlyArray<OwnerRef | string> | undefined,
+    owners,
+  );
+
+  const out: V2Template = {
+    id: (input.id as string) ?? "",
+    label,
+    napOwners,
+    wakeWindowOwners,
+  };
+
+  if (input.bottleOwners !== undefined) {
+    out.bottleOwners = ownerArrayToV2(
+      input.bottleOwners as ReadonlyArray<OwnerRef | string> | undefined,
+      owners,
+    );
+  }
+
+  const bedtimeOwner = ownerRefToV2(input.bedtimeOwner as OwnerRef | string | undefined, owners);
+  if (bedtimeOwner !== undefined) out.bedtimeOwner = bedtimeOwner;
 
   return out;
 }
