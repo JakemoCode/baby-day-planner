@@ -18,6 +18,7 @@ import {
   getDay,
   getDayByDate,
   listArchivedDays,
+  startNewDay,
   updateDay,
   watchActiveDay,
 } from "./days";
@@ -109,5 +110,71 @@ describe("v3 days repository", () => {
     unsub();
     const last = seen[seen.length - 1];
     expect(last?.id).toBe("day-1");
+  });
+
+  // -------------------------------------------------------------------------
+  // startNewDay (PR-A0.2)
+  // -------------------------------------------------------------------------
+
+  it("startNewDay creates a V3-shape active day with TimeMin wakeTime", async () => {
+    const database = db();
+    const result = await startNewDay(database, "child-1", {
+      newDayId: "day-new",
+      newDate: "2026-05-09",
+      newWakeTime: 7 * 60 + 30,
+    });
+    expect(result.newDayId).toBe("day-new");
+    expect(result.archivedDayId).toBeNull();
+
+    const got = await getDay(database, "child-1", "day-new");
+    expect(got).not.toBeNull();
+    expect(got!.status).toBe("active");
+    expect(got!.wakeTime).toBe(7 * 60 + 30);
+    expect(got!.suppressedRecurringIds).toEqual([]);
+    expect(got!.suppressedDaycareDay).toBe(false);
+    // V3 schema doesn't carry archivedAt or createdAt — confirm absent
+    expect("archivedAt" in (got as object)).toBe(false);
+    expect("createdAt" in (got as object)).toBe(false);
+  });
+
+  it("startNewDay archives the previous active day in the same call", async () => {
+    const database = db();
+    await createDay(database, day({ id: "day-yesterday", date: "2026-05-08" }));
+    const result = await startNewDay(database, "child-1", {
+      newDayId: "day-today",
+      newDate: "2026-05-09",
+      newWakeTime: 7 * 60 + 15,
+    });
+    expect(result.archivedDayId).toBe("day-yesterday");
+
+    const yesterday = await getDay(database, "child-1", "day-yesterday");
+    expect(yesterday?.status).toBe("archived");
+
+    const today = await getDay(database, "child-1", "day-today");
+    expect(today?.status).toBe("active");
+  });
+
+  it("startNewDay carries templateId when provided", async () => {
+    const database = db();
+    await startNewDay(database, "child-1", {
+      newDayId: "day-with-tpl",
+      newDate: "2026-05-09",
+      newWakeTime: 7 * 60,
+      templateId: "tpl-saturday",
+    });
+    const got = await getDay(database, "child-1", "day-with-tpl");
+    expect(got?.templateId).toBe("tpl-saturday");
+  });
+
+  it("startNewDay omits templateId when not provided", async () => {
+    const database = db();
+    await startNewDay(database, "child-1", {
+      newDayId: "day-no-tpl",
+      newDate: "2026-05-09",
+      newWakeTime: 7 * 60,
+    });
+    const got = await getDay(database, "child-1", "day-no-tpl");
+    expect(got).not.toBeNull();
+    expect("templateId" in (got as object)).toBe(false);
   });
 });
