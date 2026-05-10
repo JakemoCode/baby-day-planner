@@ -2,7 +2,8 @@
 
 import type { Event, TimeMin } from "@/v3/schemas";
 import { newEventId } from "@/v3/lib/newEventId";
-import styles from "./ActionButton.module.css";
+import { currentLocalMinutes } from "@/v3/ui/time";
+import { ActionButton } from "./ActionButton";
 
 export type NapActionButtonProps = {
   inProgressNap: Event | undefined;
@@ -11,11 +12,6 @@ export type NapActionButtonProps = {
   onStart: (nap: Event) => Promise<void>;
   onEnd: (nap: Event, endTime: TimeMin) => Promise<void>;
 };
-
-function currentLocalMinutes(): TimeMin {
-  const now = new Date();
-  return now.getHours() * 60 + now.getMinutes();
-}
 
 export function NapActionButton({
   inProgressNap,
@@ -45,8 +41,8 @@ export function NapActionButton({
   };
 
   return (
-    <button type="button" className={`${styles.button} ${styles.secondary}`} onClick={handleClick}>
+    <ActionButton variant="secondary" onClick={handleClick}>
       {inProgressNap ? "End Nap" : "Start Nap Now"}
-    </button>
+    </ActionButton>
   );
 }

@@ -3,8 +3,9 @@
 import { useEffect, useState } from "react";
 import type { Event, TimeMin } from "@/v3/schemas";
 import { newEventId } from "@/v3/lib/newEventId";
+import { currentLocalMinutes } from "@/v3/ui/time";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
-import styles from "./ActionButton.module.css";
+import { ActionButton } from "./ActionButton";
 
 export type StartBottleButtonProps = {
   defaultAmountOz: number;
@@ -16,11 +17,6 @@ export type StartBottleButtonProps = {
   /** TimeMin of the most recent bottle. Used by the soon-after-last guard. */
   lastBottleTime?: TimeMin;
 };
-
-function currentLocalMinutes(): TimeMin {
-  const now = new Date();
-  return now.getHours() * 60 + now.getMinutes();
-}
 
 const FEEDBACK_DURATION_MS = 1500;
 
@@ -87,15 +83,9 @@ export function StartBottleButton({
 
   return (
     <>
-      <button
-        type="button"
-        className={styles.button}
-        onClick={handleClick}
-        disabled={pending}
-        aria-live="polite"
-      >
+      <ActionButton variant="primary" onClick={handleClick} disabled={pending} aria-live="polite">
         {label}
-      </button>
+      </ActionButton>
       <ConfirmDialog
         open={confirmOpen}
         title="Start another bottle now?"

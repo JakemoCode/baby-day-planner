@@ -1,6 +1,6 @@
 import type { Event, OwnersConfig, TimeMin } from "@/v3/schemas";
-import { formatTimeForDisplay } from "@/v3/ui/time";
-import { ownerColor, ownerDisplayName } from "@/v3/ui/owners";
+import { formatHoursMinutes, formatTimeForDisplay } from "@/v3/ui/time";
+import { OwnerPill } from "./OwnerPill";
 import styles from "./NextEventCard.module.css";
 
 export type NextEventCardProps = {
@@ -11,10 +11,7 @@ export type NextEventCardProps = {
 
 function formatDelta(deltaMinutes: number): { text: string; isNow: boolean } {
   if (deltaMinutes <= 0) return { text: "now", isNow: true };
-  if (deltaMinutes < 60) return { text: `in ${deltaMinutes} min`, isNow: false };
-  const h = Math.floor(deltaMinutes / 60);
-  const m = deltaMinutes % 60;
-  return { text: m === 0 ? `in ${h}h` : `in ${h}h ${m}m`, isNow: false };
+  return { text: `in ${formatHoursMinutes(deltaMinutes)}`, isNow: false };
 }
 
 export function NextEventCard({ event, nowMinutes, owners }: NextEventCardProps) {
@@ -27,9 +24,6 @@ export function NextEventCard({ event, nowMinutes, owners }: NextEventCardProps)
   }
 
   const delta = formatDelta(event.startTime - nowMinutes);
-  const ownerName = ownerDisplayName(event.owner, owners);
-  const color = ownerColor(event.owner, owners);
-  const ownerStyle = color ? ({ "--owner-color": color } as React.CSSProperties) : undefined;
 
   return (
     <article className={styles.card} aria-label="Next event">
@@ -40,11 +34,7 @@ export function NextEventCard({ event, nowMinutes, owners }: NextEventCardProps)
         <span className={`${styles.delta} ${delta.isNow ? styles.deltaNow : ""}`}>
           {delta.text}
         </span>
-        {ownerName && (
-          <span className={styles.owner} style={ownerStyle}>
-            {ownerName}
-          </span>
-        )}
+        <OwnerPill owner={event.owner} owners={owners} className={styles.owner} />
       </div>
     </article>
   );

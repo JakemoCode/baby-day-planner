@@ -1,7 +1,7 @@
 import type { Event, OwnersConfig, TimeMin } from "@/v3/schemas";
-import { formatTimeForDisplay } from "@/v3/ui/time";
-import { ownerDisplayName } from "@/v3/ui/owners";
-import styles from "./PreviewCard.module.css";
+import { formatHoursMinutes, formatTimeForDisplay } from "@/v3/ui/time";
+import { OwnerPill } from "./OwnerPill";
+import { PreviewCard } from "./PreviewCard";
 
 export type NextNapPreviewProps = {
   nap: Event | undefined;
@@ -28,50 +28,54 @@ function formatNapRange(start: TimeMin, end: TimeMin | undefined): string {
   return `${startStr} – ${endStr}`;
 }
 
-function formatDuration(minutes: number): string {
-  if (minutes < 60) return `${minutes}m`;
-  const h = Math.floor(minutes / 60);
-  const m = minutes % 60;
-  return m === 0 ? `${h}h` : `${h}h ${m}m`;
-}
-
 function formatLast(n: Event): string {
   if (n.endTime === undefined) {
     return `Last: started ${formatTimeForDisplay(n.startTime)} · in progress`;
   }
-  return `Last: ${formatNapRange(n.startTime, n.endTime)} · ${formatDuration(n.endTime - n.startTime)}`;
+  return `Last: ${formatNapRange(n.startTime, n.endTime)} · ${formatHoursMinutes(n.endTime - n.startTime)}`;
 }
 
 export function NextNapPreview({ nap, owners, lastNap, bedtime }: NextNapPreviewProps) {
+  const meta = lastNap ? formatLast(lastNap) : undefined;
+
   if (!nap) {
     if (bedtime) {
       return (
-        <article className={styles.card} aria-label="Next nap">
-          <p className={styles.heading}>Next nap</p>
-          <p className={styles.primary}>Bedtime at {formatTimeForDisplay(bedtime.startTime)}</p>
-          {lastNap && <p className={styles.meta}>{formatLast(lastNap)}</p>}
-        </article>
+        <PreviewCard
+          heading="Next nap"
+          ariaLabel="Next nap"
+          primary={`Bedtime at ${formatTimeForDisplay(bedtime.startTime)}`}
+          {...(meta !== undefined ? { meta } : {})}
+        />
       );
     }
     return (
-      <article className={styles.card} aria-label="Next nap">
-        <p className={styles.heading}>Next nap</p>
-        <p className={styles.empty}>No more naps today</p>
-        {lastNap && <p className={styles.meta}>{formatLast(lastNap)}</p>}
-      </article>
+      <PreviewCard
+        heading="Next nap"
+        ariaLabel="Next nap"
+        primary={null}
+        emptyMessage="No more naps today"
+        {...(meta !== undefined ? { meta } : {})}
+      />
     );
   }
 
   const range = formatNapRange(nap.startTime, nap.endTime);
-  const ownerName = ownerDisplayName(nap.owner, owners);
-  const subtitle = ownerName ? `${nap.label} · ${ownerName}` : nap.label;
+  const subtitle = nap.owner ? (
+    <>
+      {nap.label} <OwnerPill owner={nap.owner} owners={owners} />
+    </>
+  ) : (
+    nap.label
+  );
 
   return (
-    <article className={styles.card} aria-label="Next nap">
-      <p className={styles.heading}>Next nap</p>
-      <p className={styles.primary}>{range}</p>
-      <p className={styles.subtitle}>{subtitle}</p>
-      {lastNap && <p className={styles.meta}>{formatLast(lastNap)}</p>}
-    </article>
+    <PreviewCard
+      heading="Next nap"
+      ariaLabel="Next nap"
+      primary={range}
+      subtitle={subtitle}
+      {...(meta !== undefined ? { meta } : {})}
+    />
   );
 }

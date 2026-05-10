@@ -1,7 +1,7 @@
 import type { Event, OwnersConfig } from "@/v3/schemas";
 import { isRecorded } from "@/v3/schemas";
 import { formatTimeForDisplay } from "@/v3/ui/time";
-import styles from "./PreviewCard.module.css";
+import { PreviewCard } from "./PreviewCard";
 
 export type NextBottlePreviewProps = {
   bottle: Event | undefined;
@@ -29,25 +29,29 @@ export function NextBottlePreview({
   lastBottle,
   dreamFeed,
 }: NextBottlePreviewProps) {
+  const meta = lastBottle ? formatLast(lastBottle) : undefined;
+  const metaProp = meta !== undefined ? { meta } : {};
+
   if (!bottle) {
     if (dreamFeed && !bottle1Pending) {
       return (
-        <article className={styles.card} aria-label="Next bottle">
-          <p className={styles.heading}>Next bottle</p>
-          <p className={styles.primary}>
-            Dream feed at {formatTimeForDisplay(dreamFeed.startTime)}
-          </p>
-          {lastBottle && <p className={styles.meta}>{formatLast(lastBottle)}</p>}
-        </article>
+        <PreviewCard
+          heading="Next bottle"
+          ariaLabel="Next bottle"
+          primary={`Dream feed at ${formatTimeForDisplay(dreamFeed.startTime)}`}
+          {...metaProp}
+        />
       );
     }
     const message = bottle1Pending ? "Start first bottle for schedule" : "No more bottles today";
     return (
-      <article className={styles.card} aria-label="Next bottle">
-        <p className={styles.heading}>Next bottle</p>
-        <p className={styles.empty}>{message}</p>
-        {lastBottle && <p className={styles.meta}>{formatLast(lastBottle)}</p>}
-      </article>
+      <PreviewCard
+        heading="Next bottle"
+        ariaLabel="Next bottle"
+        primary={null}
+        emptyMessage={message}
+        {...metaProp}
+      />
     );
   }
 
@@ -58,11 +62,12 @@ export function NextBottlePreview({
     : `projected · based on ${ozPart} ${bottle.label}`.trim();
 
   return (
-    <article className={styles.card} aria-label="Next bottle">
-      <p className={styles.heading}>Next bottle</p>
-      <p className={styles.primary}>{formatTimeForDisplay(bottle.startTime)}</p>
-      <p className={styles.subtitle}>{subtitle}</p>
-      {lastBottle && <p className={styles.meta}>{formatLast(lastBottle)}</p>}
-    </article>
+    <PreviewCard
+      heading="Next bottle"
+      ariaLabel="Next bottle"
+      primary={formatTimeForDisplay(bottle.startTime)}
+      subtitle={subtitle}
+      {...metaProp}
+    />
   );
 }
