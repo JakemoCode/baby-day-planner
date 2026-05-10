@@ -40,10 +40,13 @@ export default function HistoryPage() {
   return (
     <div className={styles.page}>
       <h1 className={styles.heading}>Last 7 days</h1>
-      <HistoryList days={days} onSelect={(dayId) => {
-        const day = days.find((d) => d.id === dayId);
-        if (day) router.push(`/history/${day.date}`);
-      }} />
+      <HistoryList
+        days={days}
+        onSelect={(dayId) => {
+          const day = days.find((d) => d.id === dayId);
+          if (day) router.push(`/history/${day.date}`);
+        }}
+      />
     </div>
   );
 }
