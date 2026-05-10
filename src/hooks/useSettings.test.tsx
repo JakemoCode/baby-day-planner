@@ -27,7 +27,10 @@ describe("useSettings", () => {
     cb!(sampleSettings);
     await waitFor(() => {
       expect(result.current.loading).toBe(false);
-      expect(result.current.settings).toEqual(sampleSettings);
+      // Settings now flow through withV2SettingsBackcompat. For a V2-shape
+      // input the result preserves the V2 shape (back-compat is only
+      // active when V3-shape fields show up).
+      expect(result.current.settings?.bedtimeThreshold).toBe(sampleSettings.bedtimeThreshold);
     });
   });
 

@@ -9,6 +9,7 @@ import {
   updateEvent as updateEventRepo,
   watchEvents,
 } from "@/repositories/events";
+import { withV2EventBackcompat } from "@/v3/firestore/v2Backcompat";
 
 export type UseEventsResult = {
   events: Event[];
@@ -28,7 +29,12 @@ export function useEvents(childId: string, dayId: string): UseEventsResult {
     // doc ID, which trips reserved-id validation (`__.*__`).
     if (!dayId) return;
     return watchEvents(db, childId, dayId, (next) => {
-      setEvents(next);
+      // Flow each doc through the V3 → V2 back-compat shim. V2 surfaces
+      // (Dashboard, Tomorrow, History) keep working when /timeline (V3)
+      // writes V3-shape event docs. Owner info on V3 docs is dropped
+      // (slot identity can't survive the round-trip without OwnersConfig
+      // here); cosmetic loss only — no crash.
+      setEvents(next.map((e) => withV2EventBackcompat(e)));
       setLoading(false);
     });
   }, [childId, dayId]);
