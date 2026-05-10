@@ -18,9 +18,7 @@ describe("OwnerPill", () => {
   });
 
   it("resolves 'other' owner via owners.other[id]", () => {
-    render(
-      <OwnerPill owner={{ slot: "other", otherId: "daycare" }} owners={owners} />,
-    );
+    render(<OwnerPill owner={{ slot: "other", otherId: "daycare" }} owners={owners} />);
     expect(screen.getByText("Daycare")).toBeVisible();
   });
 
@@ -37,13 +35,7 @@ describe("OwnerPill", () => {
   });
 
   it("composes optional className with the base pill class", () => {
-    render(
-      <OwnerPill
-        owner={{ slot: "parent2" }}
-        owners={owners}
-        className="custom-variant"
-      />,
-    );
+    render(<OwnerPill owner={{ slot: "parent2" }} owners={owners} className="custom-variant" />);
     expect(screen.getByText("Kelly").className).toMatch(/custom-variant/);
   });
 });

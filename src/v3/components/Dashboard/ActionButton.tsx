@@ -37,13 +37,7 @@ export function ActionButton({
   const cls = [styles.button, variantClass, className].filter(Boolean).join(" ");
   const ariaProps = ariaLive !== undefined ? { "aria-live": ariaLive } : {};
   return (
-    <button
-      type="button"
-      className={cls}
-      onClick={onClick}
-      disabled={disabled}
-      {...ariaProps}
-    >
+    <button type="button" className={cls} onClick={onClick} disabled={disabled} {...ariaProps}>
       {children}
     </button>
   );

@@ -43,9 +43,7 @@ export function PreviewCard({
       ) : (
         emptyMessage !== undefined && <p className={styles.empty}>{emptyMessage}</p>
       )}
-      {primary !== null && subtitle !== undefined && (
-        <p className={styles.subtitle}>{subtitle}</p>
-      )}
+      {primary !== null && subtitle !== undefined && <p className={styles.subtitle}>{subtitle}</p>}
       {meta !== undefined && <p className={styles.meta}>{meta}</p>}
     </article>
   );

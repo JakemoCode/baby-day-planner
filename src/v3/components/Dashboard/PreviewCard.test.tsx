@@ -26,13 +26,7 @@ describe("PreviewCard", () => {
   });
 
   it("renders empty state when primary is null", () => {
-    render(
-      <PreviewCard
-        heading="Next nap"
-        primary={null}
-        emptyMessage="No more naps today"
-      />,
-    );
+    render(<PreviewCard heading="Next nap" primary={null} emptyMessage="No more naps today" />);
     expect(screen.getByText("No more naps today")).toBeVisible();
   });
 
@@ -61,9 +55,7 @@ describe("PreviewCard", () => {
   });
 
   it("omits meta paragraph entirely when meta is undefined", () => {
-    const { container } = render(
-      <PreviewCard heading="Next nap" primary="9:45 AM" />,
-    );
+    const { container } = render(<PreviewCard heading="Next nap" primary="9:45 AM" />);
     // Only heading + primary paragraphs rendered.
     expect(container.querySelectorAll("p")).toHaveLength(2);
   });
