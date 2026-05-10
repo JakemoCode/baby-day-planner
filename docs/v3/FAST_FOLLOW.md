@@ -109,6 +109,157 @@ cutover stabilizes.
 
 ---
 
+## §F4 — Owner color picker as themes, not raw hex
+
+**Source**: cutover dogfooding, 2026-05-09 — `OwnersConfigEditor`
+(PR #64) currently exposes a free-text hex input for each owner's
+color. Jake wants a curated palette instead.
+
+**Status**: `pending`
+
+**What**: replace the hex `<input type="text">` in
+`OwnersConfigEditor` with a swatch picker constrained to a set
+theme. The theme lives in `tokens.css` as named CSS variables
+(`--owner-sage`, `--owner-terracotta`, `--owner-dusty-blue`,
+`--owner-coral`, …); the picker shows them as labeled swatches
+and writes the variable name (or its resolved value) onto
+`OwnersConfig.{parent1,parent2,other[].color`.
+
+Multiple themes possible later (light / dark / high-contrast)
+without changing any owner data — only the variable resolves
+differently per theme.
+
+**Why fast-follow, not pre-V3**: pure UI. Doesn't change the
+engine, the wire format on `OwnersConfig.color`, or any selector
+contract. Pairs naturally with §F2 (palette refresh).
+
+**Estimated effort**: 0.5 day. Single PR after §F2 lands so the
+swatch set is the refreshed palette, not the legacy one.
+
+**Acceptance**:
+- No free-text hex input in `OwnersConfigEditor`.
+- Swatches are accessible buttons (Tab to focus, Enter / Space
+  to select; `aria-pressed` on the active one).
+- The selected swatch's color value (or token name) is what
+  Firestore stores — no hex anywhere in the form code.
+- Existing owners with arbitrary stored hex values render
+  correctly (closest-swatch fallback or sentinel "Custom" tile).
+
+---
+
+## §F5 — Wake windows: include "after wake-up" before nap 1
+
+**Source**: cutover dogfooding, 2026-05-09 — V3 settings page
+(PR #64) labels wake-window rows "After nap 1, After nap 2, …"
+but the FIRST wake window of the day is the gap between
+ending-bedtime (morning wake-up) and nap 1, not the gap after
+any nap.
+
+**Status**: `pending`
+
+**What**: relabel + reframe so the editor shows:
+- "After wake-up" (morning) → drives nap 1's start
+- "After nap 1" → drives nap 2's start
+- "After nap 2" → drives nap 3's start
+- …
+
+The data shape (`wakeWindowsMinutes: number[]`) doesn't need to
+change — `wakeWindowsMinutes[0]` already corresponds to the gap
+after wake, `[1]` to after nap 1, etc., per R3.x. Only the
+labels need fixing. Verify the engine treats index 0 as
+post-wake (R3.1 / R4.1) and adjust if not.
+
+**Why fast-follow, not in PR #64**: cosmetic labeling fix; not
+blocking dogfooding (the math works). Worth doing as a small
+cleanup PR after the cutover stabilizes.
+
+**Estimated effort**: 30 minutes. Likely just a text change in
+`OwnersConfigEditor`'s sibling `WakeWindowsRow` helper.
+
+**Acceptance**:
+- First wake-window row labeled "After wake-up" (or similar).
+- Subsequent rows labeled by the nap they follow.
+- Engine output unchanged for the same input array (verify via
+  R3 / R4 unit tests still passing).
+
+---
+
+## §F6 — Better time / duration input UX
+
+**Source**: cutover dogfooding, 2026-05-09 — native HTML
+`<input type="time">` is awkward on desktop: typing minutes
+directly doesn't work, you have to use arrow keys or the
+browser's time-picker popup.
+
+**Status**: `pending`
+
+**What**: replace native time inputs across the V3 settings
+page (and EventEditDrawerV3) with a custom picker:
+- Two-finger / two-thumb clock-face picker on touch
+- Direct numeric typing on desktop ("0830" → 8:30 AM)
+- Inline validation (out-of-range gets clamped or rejected)
+- Same UX for absolute times (TimeMin) AND durations
+  (where "02:30" means 2h 30m)
+
+**Why fast-follow, not pre-V3**: native input works for the
+engine's correctness — just not for ergonomics. Worth doing
+once after dogfooding identifies how often time entry happens
+in real use.
+
+**Estimated effort**: 1–2 days. Single picker component lands
+in `src/v3/components/shared/`, then call sites swap in.
+
+**Acceptance**:
+- No `<input type="time">` left in V3 component tree
+  (timeline drawer, settings page, anywhere else).
+- Picker handles both absolute time and duration semantics
+  (consumers pass a mode prop).
+- Touch and desktop UX both feel native.
+- Direct keyboard typing works on desktop without touching
+  the popup.
+
+---
+
+## §F7 — Delete the V2 ← V3 back-compat shim
+
+**Source**: PR #66 — `src/v3/firestore/v2Backcompat.ts` was added
+as a transitional shim so V2 surfaces (Dashboard, Tomorrow,
+History, Day-templates, AppShell) keep reading the V3-shape
+Firestore docs that PR #60 (timeline) and PR #64 (settings)
+write.
+
+**Status**: `pending` — blocked on the cross-surface cutover
+
+**What**: when the last V2 surface is cut over to V3 hooks,
+delete the shim and its consumers:
+- Delete `src/v3/firestore/v2Backcompat.ts` + its test file
+  (when added).
+- Remove the `withV2SettingsBackcompat` call from
+  `src/hooks/useSettings.ts`.
+- Remove the `withV2EventBackcompat` call from
+  `src/hooks/useEvents.ts`.
+- Likely the V2 hooks themselves (`src/hooks/useSettings.ts`,
+  `useEvents.ts`, `useDay.ts`, `useTemplates.ts`) delete at the
+  same time, alongside `src/domain/`, `src/repositories/`, and
+  V2 components.
+
+**Why fast-follow, not now**: the shim is doing real work right
+now (without it, every V2 page crashes on V3 docs). It deletes
+naturally as part of the V2 cleanup once cross-surface cutover
+finishes.
+
+**Estimated effort**: 30 minutes once cross-surface cutover is
+done. Mostly `rm` + import-cleanup.
+
+**Acceptance**:
+- No file in `src/v3/` imports anything from `@/domain` or
+  `@/hooks/use{Day,Events,Settings,Templates}`.
+- `grep -r "v2Backcompat" src/` returns empty.
+- `pnpm typecheck && pnpm test && pnpm test:integration` all
+  pass.
+
+---
+
 ## How items land here
 
 Two paths:
