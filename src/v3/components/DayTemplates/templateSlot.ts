@@ -41,10 +41,7 @@ export function templateSlotForEvent(event: Event): TemplateSlot | undefined {
 
 /** Read the owner currently assigned to the slot in the template.
  * Returns undefined when the slot is empty or out of bounds. */
-export function getOwnerAt(
-  template: OwnershipTemplate,
-  slot: TemplateSlot,
-): OwnerRef | undefined {
+export function getOwnerAt(template: OwnershipTemplate, slot: TemplateSlot): OwnerRef | undefined {
   switch (slot.kind) {
     case "bedtime":
       return template.bedtimeOwner;
@@ -61,11 +58,7 @@ export function getOwnerAt(
  * intermediate slots with `undefined`. The returned array is widened to
  * include `undefined` entries; callers tolerate sparse owners (tracked
  * separately as cleanup §1.6). */
-function placeAt(
-  arr: ReadonlyArray<OwnerRef>,
-  i: number,
-  owner: OwnerRef | undefined,
-): OwnerRef[] {
+function placeAt(arr: ReadonlyArray<OwnerRef>, i: number, owner: OwnerRef | undefined): OwnerRef[] {
   const next = arr.slice() as Array<OwnerRef | undefined>;
   while (next.length <= i) next.push(undefined);
   next[i] = owner;
