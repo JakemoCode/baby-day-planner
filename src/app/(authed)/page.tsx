@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import type { Event, OwnershipTemplate } from "@/v3/schemas";
 import { isRecorded } from "@/v3/schemas";
+import { reduceLifecycle } from "@/v3/lifecycle";
 import {
   currentWakeWindow,
   nextBottle,
@@ -170,6 +171,9 @@ export default function DashboardPage() {
   // preview card would, hide the preview to avoid redundancy.
   const nextType = next?.type;
   const hideBottlePreview = nextType === "bottle" || nextType === "dream_feed";
+  // V3 has no top-level "putdown" EventType; putdowns are render-only,
+  // injected by `expandPutdown` in TimelineV3 and never surface through
+  // `nextEvent(projected, ...)`. So nap + bedtime cover the suppression.
   const hideNapPreview = nextType === "nap" || nextType === "bedtime";
 
   const handleLogBottle = async (bottle: Event) => {
@@ -180,9 +184,12 @@ export default function DashboardPage() {
   };
   const handleEndNap = async (nap: Event, endTime: number) => {
     if (!day || day.id === "") return;
+    // committedAt on a completed nap = the START time (preserved from the
+    // `started` lifecycle), NOT the end time. reduceLifecycle handles this
+    // — END copies committedAt forward from the started state.
     await updateOptimistic(nap.id, {
       endTime,
-      lifecycle: { state: "completed", committedAt: endTime },
+      lifecycle: reduceLifecycle(nap.lifecycle, { type: "END", at: endTime }),
     });
   };
   const handleStartDay = async ({ useTomorrowPlan: _ }: { useTomorrowPlan: boolean }) => {

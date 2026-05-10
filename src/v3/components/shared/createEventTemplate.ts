@@ -12,6 +12,7 @@
  */
 
 import { newEventId } from "../../lib/newEventId";
+import { isRecorded } from "../../schemas";
 import type { Event, EventType, Settings, TimeMin } from "../../schemas";
 
 export type CreatableType = "bottle" | "nap" | "pump" | "extra";
@@ -92,6 +93,13 @@ export function buildCreateTemplate({
   };
 }
 
+/**
+ * Count events of a given type that are RECORDED (started/completed).
+ * Projected entries are excluded so the FAB-create ordinal agrees with
+ * the dashboard's `uniqueRecordedKeys` count — otherwise a lingering
+ * projected bottle would push FAB-created events to `bottle_N+1` while
+ * StartBottleButton emits `bottle_N`.
+ */
 function countByType(events: Event[], type: EventType): number {
-  return events.filter((e) => e.type === type).length;
+  return events.filter((e) => e.type === type && isRecorded(e.lifecycle)).length;
 }

@@ -211,6 +211,44 @@ describe("DashboardPage (V3)", () => {
     expect(screen.getByRole("button", { name: /Add an event/i })).toBeVisible();
   });
 
+  it("handleEndNap preserves the nap's start time as committedAt (not the end time)", async () => {
+    const startedNap: Event = {
+      id: "n-started",
+      dayId: "day-1",
+      eventKey: "nap_1",
+      type: "nap",
+      kind: "block",
+      label: "Nap 1",
+      startTime: 9 * 60,
+      hasPutdown: false,
+      // committedAt = the START time captured when the user tapped Start.
+      lifecycle: { state: "started", committedAt: 9 * 60 },
+    };
+    const { updateOptimistic } = setupHooks({
+      actuals: [startedNap],
+      nowMinutes: 10 * 60, // user taps End at 10:00
+    });
+    renderWithAuth(<DashboardPage />);
+
+    const endBtn = screen.getByRole("button", { name: /End Nap/i });
+    endBtn.click();
+
+    // microtask drain so the await in handleEndNap resolves
+    await Promise.resolve();
+
+    expect(updateOptimistic).toHaveBeenCalledTimes(1);
+    const [, patch] = updateOptimistic.mock.calls[0] as [
+      string,
+      { endTime: number; lifecycle: { state: string; committedAt: number } },
+    ];
+    // endTime is whatever wall clock the button captured — don't pin it.
+    expect(typeof patch.endTime).toBe("number");
+    expect(patch.lifecycle.state).toBe("completed");
+    // committedAt MUST be the original start (9:00), NOT the end time.
+    expect(patch.lifecycle.committedAt).toBe(9 * 60);
+    expect(patch.lifecycle.committedAt).not.toBe(patch.endTime);
+  });
+
   it("uniqueRecordedKeys counts distinct eventKey across recorded actuals only", () => {
     // Two recorded bottle docs with the SAME eventKey (Start/End pair),
     // plus one projected bottle (must be ignored). nextNumber should be 2,
