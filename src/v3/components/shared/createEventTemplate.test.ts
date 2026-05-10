@@ -98,6 +98,32 @@ describe("buildCreateTemplate (V3)", () => {
     expect(tpl.label).toBe("Bottle 3");
   });
 
+  it("ignores projected bottles when numbering — agrees with uniqueRecordedKeys", () => {
+    // 1 recorded + 1 projected → next ordinal is 2, NOT 3. Without the
+    // lifecycle filter the FAB path drifts ahead of StartBottleButton.
+    const projectedBottle: Event = {
+      id: "b-proj",
+      dayId: "d-1",
+      eventKey: "bottle_2",
+      type: "bottle",
+      kind: "instant",
+      startTime: 11 * 60,
+      label: "Bottle 2",
+      amountOz: 5,
+      hasPutdown: false,
+      lifecycle: { state: "projected" },
+    };
+    const tpl = buildCreateTemplate({
+      type: "bottle",
+      dayId: "d-1",
+      actuals: [recordedBottle(1, 7 * 60), projectedBottle],
+      settings: settings(),
+      nowMinutes: NOW,
+    });
+    expect(tpl.eventKey).toBe("bottle_2");
+    expect(tpl.label).toBe("Bottle 2");
+  });
+
   it("seeds a nap template as block-kind without endTime (drawer fills end)", () => {
     const tpl = buildCreateTemplate({
       type: "nap",

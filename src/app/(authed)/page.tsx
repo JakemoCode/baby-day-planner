@@ -1,36 +1,40 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import type { Event, OwnershipTemplate } from "@/domain";
+import type { Event, OwnershipTemplate } from "@/v3/schemas";
+import { isRecorded } from "@/v3/schemas";
+import { reduceLifecycle } from "@/v3/lifecycle";
 import {
   currentWakeWindow,
   nextBottle,
   nextEvent,
   nextNap,
-  parseTime,
-  projectDay,
   projectedBedtime,
-} from "@/domain";
-import { useDay } from "@/hooks/useDay";
-import { useEvents } from "@/hooks/useEvents";
-import { useSettings } from "@/hooks/useSettings";
-import { useTemplates } from "@/hooks/useTemplates";
+} from "@/v3/selectors";
 import { useNowMinutes } from "@/hooks/useNowMinutes";
-import { startNewDay } from "@/repositories/startNewDay";
+import { newEventId } from "@/v3/lib/newEventId";
+import { useV3Day } from "@/v3/hooks/useV3Day";
+import { useV3Events } from "@/v3/hooks/useV3Events";
+import { useV3Settings } from "@/v3/hooks/useV3Settings";
+import { useV3Templates } from "@/v3/hooks/useV3Templates";
+import { useV3Projection } from "@/v3/hooks/useV3Projection";
+import { PLACEHOLDER_DAY, PLACEHOLDER_SETTINGS } from "@/v3/hooks/projectionPlaceholders";
+import { startNewDay } from "@/v3/repositories/days";
 import { db } from "@/lib/firebase/client";
 import { LoadingState } from "@/components/shared/LoadingState";
 import { FAB } from "@/components/shared/FAB";
 import { FABTypePicker } from "@/components/shared/FABTypePicker";
-import { EventEditDrawer } from "@/components/shared/EventEditDrawer";
-import { buildCreateTemplate, type CreatableType } from "@/components/shared/createEventTemplate";
-import { CurrentWakeWindowStatus } from "@/components/Dashboard/CurrentWakeWindowStatus";
-import { EndOfDayCard } from "@/components/Dashboard/EndOfDayCard";
-import { NapActionButton } from "@/components/Dashboard/NapActionButton";
-import { NextBottlePreview } from "@/components/Dashboard/NextBottlePreview";
-import { NextEventCard } from "@/components/Dashboard/NextEventCard";
-import { NextNapPreview } from "@/components/Dashboard/NextNapPreview";
-import { StartBottleButton } from "@/components/Dashboard/StartBottleButton";
-import { StartDayButton } from "@/components/Dashboard/StartDayButton";
+import type { CreatableType } from "@/v3/components/shared/createEventTemplate";
+import { buildCreateTemplate } from "@/v3/components/shared/createEventTemplate";
+import { EventEditDrawerV3 } from "@/v3/components/shared/EventEditDrawerV3";
+import { CurrentWakeWindowStatus } from "@/v3/components/Dashboard/CurrentWakeWindowStatus";
+import { EndOfDayCard } from "@/v3/components/Dashboard/EndOfDayCard";
+import { NapActionButton } from "@/v3/components/Dashboard/NapActionButton";
+import { NextBottlePreview } from "@/v3/components/Dashboard/NextBottlePreview";
+import { NextEventCard } from "@/v3/components/Dashboard/NextEventCard";
+import { NextNapPreview } from "@/v3/components/Dashboard/NextNapPreview";
+import { StartBottleButton } from "@/v3/components/Dashboard/StartBottleButton";
+import { StartDayButton } from "@/v3/components/Dashboard/StartDayButton";
 import styles from "./page.module.css";
 
 const CHILD_ID = process.env.NEXT_PUBLIC_DEFAULT_CHILD_ID ?? "aden";
@@ -40,30 +44,56 @@ type DrawerState =
   | { open: true; mode: "create"; template: Event }
   | { open: true; mode: "edit"; event: Event };
 
+/**
+ * Whether the drawer's edit target already has a Firestore doc.
+ * Projected events have no doc; overridden / recorded events do.
+ * Used at save time to route create vs update.
+ */
+function isPersistedActual(eventId: string, actuals: ReadonlyArray<Event>): boolean {
+  return actuals.some((a) => a.id === eventId);
+}
+
+function todayDate(): string {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function currentWakeTimeMin(): number {
+  const d = new Date();
+  return d.getHours() * 60 + d.getMinutes();
+}
+
 export default function DashboardPage() {
   const nowMinutes = useNowMinutes();
-  const { day, loading: dayLoading } = useDay(CHILD_ID);
-  const { settings, loading: settingsLoading } = useSettings(CHILD_ID);
-  const { events: actuals, createOptimistic } = useEvents(CHILD_ID, day?.id ?? "");
-  const { templates } = useTemplates(CHILD_ID);
+  const { day, loading: dayLoading } = useV3Day(CHILD_ID);
+  const { settings, loading: settingsLoading } = useV3Settings(CHILD_ID);
+  const {
+    events: actuals,
+    createOptimistic,
+    updateOptimistic,
+  } = useV3Events(CHILD_ID, day?.id ?? "", settings?.owners);
+  const { templates } = useV3Templates(CHILD_ID);
   const [drawer, setDrawer] = useState<DrawerState>({ open: false });
   const [pickerOpen, setPickerOpen] = useState(false);
 
   const template = useMemo<OwnershipTemplate | undefined>(() => {
-    if (!day?.ownershipTemplateId) return undefined;
-    return templates.find((t) => t.id === day.ownershipTemplateId);
+    if (!day?.templateId) return undefined;
+    return templates.find((t) => t.id === day.templateId);
   }, [day, templates]);
 
-  const projected = useMemo(() => {
-    if (!day || !settings) return [];
-    return projectDay({
-      day,
-      settings,
-      actuals,
-      ...(template ? { template } : {}),
-      nowMinutes,
-    });
-  }, [day, settings, actuals, template, nowMinutes]);
+  // Hook order must stay stable, so we always call useV3Projection with
+  // PLACEHOLDER_DAY/PLACEHOLDER_SETTINGS when the real values aren't loaded.
+  // The early return below ensures projected output is never rendered with
+  // those placeholders.
+  const projected = useV3Projection({
+    day: day ?? PLACEHOLDER_DAY,
+    settings: settings ?? PLACEHOLDER_SETTINGS,
+    actuals,
+    ...(template ? { template } : {}),
+  });
 
   if (dayLoading || settingsLoading) {
     return (
@@ -73,30 +103,25 @@ export default function DashboardPage() {
     );
   }
 
-  // No active day → start-of-day prompt
-  if (!day || !settings || !day.wakeTime) {
+  // Wake gate: explicit undefined check — `wakeTime: 0` is technically
+  // valid (midnight) and must NOT be treated as "no day yet".
+  if (!day || !settings || day.wakeTime === undefined) {
     const handleStart = async () => {
-      const now = new Date().toISOString();
-      const today = now.slice(0, 10);
-      const wakeTime = formatNowAsHHMM();
       await startNewDay(db, CHILD_ID, {
         newDayId: `day-${Date.now()}`,
-        newDate: today,
-        newWakeTime: wakeTime,
-        now,
+        newDate: todayDate(),
+        newWakeTime: currentWakeTimeMin(),
       });
     };
     return (
       <div className={styles.page}>
-        <EndOfDayCard afterMidnight hasTomorrowPlan={false} onStart={() => handleStart()} />
+        <EndOfDayCard afterMidnight hasTomorrowPlan={false} onStart={handleStart} />
       </div>
     );
   }
 
-  // After bedtime, no upcoming events
   const next = nextEvent(projected, nowMinutes);
-  const bedtimeMinutes = parseTime(settings.bedtimeThreshold);
-  const afterBedtime = nowMinutes >= bedtimeMinutes;
+  const afterBedtime = nowMinutes >= settings.bedtimeThreshold;
   const isEndOfDay = !next && afterBedtime;
 
   if (isEndOfDay) {
@@ -116,44 +141,40 @@ export default function DashboardPage() {
   const nb = nextBottle(projected, nowMinutes);
   const nn = nextNap(projected, nowMinutes);
   const cww = currentWakeWindow(projected, nowMinutes);
-  const inProgressNap = actuals.find((e) => e.type === "nap" && !e.endTime);
-  const bottle1Pending = !actuals.some((e) => e.type === "bottle");
+  const inProgressNap = actuals.find((e) => e.type === "nap" && e.lifecycle.state === "started");
+  const bottle1Pending = !actuals.some((e) => e.type === "bottle" && isRecorded(e.lifecycle));
+
   // "Next" ordinals = unique nap/bottle slots that are RECORDED (the
-  // user committed a specific time). Owner-only annotations have
-  // recorded: false and don't bump the ordinal. Dedupe by eventKey so
-  // the Start/End pair (two docs, same key) doesn't double-count.
+  // user committed a specific time). Owner-only annotations have a
+  // non-recorded lifecycle and don't bump the ordinal. Dedupe by
+  // eventKey so the Start/End pair (same doc updated) doesn't double-count.
   const uniqueRecordedKeys = (type: Event["type"]) => {
     const seen = new Set<string>();
     for (const e of actuals) {
       if (e.type !== type) continue;
-      if (!e.recorded) continue;
+      if (!isRecorded(e.lifecycle)) continue;
       seen.add(e.eventKey);
     }
     return seen.size;
   };
   const nextBottleNumber = uniqueRecordedKeys("bottle") + 1;
   const nextNapNumber = uniqueRecordedKeys("nap") + 1;
-  const lastBottleTime = lastTimeForType(actuals, "bottle");
   const lastBottle = lastEventOfType(actuals, "bottle");
   const lastNap = lastEventOfType(actuals, "nap");
+  const lastBottleTime = lastBottle?.startTime;
   const upcomingDreamFeed = projected.find(
-    (e) => e.type === "dream_feed" && parseTime(e.startTime) >= nowMinutes,
+    (e) => e.type === "dream_feed" && e.startTime >= nowMinutes,
   );
   const bedtime = projectedBedtime(projected);
 
   // Smart suppression: when NextEventCard already announces the same fact a
-  // preview card would, hide the preview to avoid three cards saying "bedtime
-  // is coming" in different words.
+  // preview card would, hide the preview to avoid redundancy.
   const nextType = next?.type;
   const hideBottlePreview = nextType === "bottle" || nextType === "dream_feed";
-  const hideNapPreview = nextType === "nap" || nextType === "bedtime" || nextType === "putdown";
-
-  // Putdown events name their parent via eventKey suffix (`${parent}_putdown`).
-  // Look up the parent so the next-event label can include "…at 6:35 PM".
-  const nextTargetEvent =
-    next && next.type === "putdown"
-      ? projected.find((e) => `${e.eventKey}_putdown` === next.eventKey)
-      : undefined;
+  // V3 has no top-level "putdown" EventType; putdowns are render-only,
+  // injected by `expandPutdown` in TimelineV3 and never surface through
+  // `nextEvent(projected, ...)`. So nap + bedtime cover the suppression.
+  const hideNapPreview = nextType === "nap" || nextType === "bedtime";
 
   const handleLogBottle = async (bottle: Event) => {
     await createOptimistic(bottle);
@@ -161,33 +182,32 @@ export default function DashboardPage() {
   const handleStartNap = async (nap: Event) => {
     await createOptimistic(nap);
   };
-  const handleEndNap = async (nap: Event, endTime: string) => {
-    // Update via createOptimistic since we don't expose updateOptimistic at this level here
-    // (could refactor to use updateOptimistic — for v1 we recreate the doc).
-    await createOptimistic({ ...nap, endTime, status: "completed" });
+  const handleEndNap = async (nap: Event, endTime: number) => {
+    if (!day || day.id === "") return;
+    // committedAt on a completed nap = the START time (preserved from the
+    // `started` lifecycle), NOT the end time. reduceLifecycle handles this
+    // — END copies committedAt forward from the started state.
+    await updateOptimistic(nap.id, {
+      endTime,
+      lifecycle: reduceLifecycle(nap.lifecycle, { type: "END", at: endTime }),
+    });
   };
   const handleStartDay = async ({ useTomorrowPlan: _ }: { useTomorrowPlan: boolean }) => {
-    const now = new Date().toISOString();
-    const today = now.slice(0, 10);
     await startNewDay(db, CHILD_ID, {
       newDayId: `day-${Date.now()}`,
-      newDate: today,
-      newWakeTime: formatNowAsHHMM(),
-      now,
+      newDate: todayDate(),
+      newWakeTime: currentWakeTimeMin(),
     });
   };
 
   return (
     <div className={styles.page}>
-      <NextEventCard
-        event={next}
-        nowMinutes={nowMinutes}
-        {...(nextTargetEvent ? { targetEvent: nextTargetEvent } : {})}
-      />
+      <NextEventCard event={next} nowMinutes={nowMinutes} owners={settings.owners} />
       {!hideBottlePreview && (
         <NextBottlePreview
           bottle={nb}
           bottle1Pending={bottle1Pending}
+          owners={settings.owners}
           {...(lastBottle ? { lastBottle } : {})}
           {...(upcomingDreamFeed ? { dreamFeed: upcomingDreamFeed } : {})}
         />
@@ -195,11 +215,12 @@ export default function DashboardPage() {
       {!hideNapPreview && (
         <NextNapPreview
           nap={nn}
+          owners={settings.owners}
           {...(lastNap ? { lastNap } : {})}
           {...(bedtime ? { bedtime } : {})}
         />
       )}
-      <CurrentWakeWindowStatus wakeWindow={cww} />
+      <CurrentWakeWindowStatus wakeWindow={cww} owners={settings.owners} />
 
       <div className={styles.actions}>
         <StartBottleButton
@@ -208,7 +229,7 @@ export default function DashboardPage() {
           nextNumber={nextBottleNumber}
           onLog={handleLogBottle}
           minIntervalMinutes={settings.minBottleIntervalMinutes ?? 20}
-          {...(lastBottleTime ? { lastBottleTime } : {})}
+          {...(lastBottleTime !== undefined ? { lastBottleTime } : {})}
         />
         <div className={styles.actionsRow}>
           <NapActionButton
@@ -228,19 +249,19 @@ export default function DashboardPage() {
         open={pickerOpen}
         onSelect={(type: CreatableType) => {
           setPickerOpen(false);
-          const template = buildCreateTemplate({
+          const tpl = buildCreateTemplate({
             type,
             dayId: day.id,
             actuals,
             settings,
-            nowHHMM: formatNowAsHHMM(),
+            nowMinutes,
           });
-          setDrawer({ open: true, mode: "create", template });
+          setDrawer({ open: true, mode: "create", template: tpl });
         }}
         onCancel={() => setPickerOpen(false)}
       />
 
-      <EventEditDrawer
+      <EventEditDrawerV3
         key={
           drawer.open && drawer.mode === "edit"
             ? drawer.event.id
@@ -248,12 +269,22 @@ export default function DashboardPage() {
               ? drawer.template.id
               : "closed"
         }
+        owners={settings.owners}
+        nowMinutes={nowMinutes}
         existingEvents={projected}
         open={drawer.open}
         event={drawer.open ? (drawer.mode === "edit" ? drawer.event : drawer.template) : null}
         mode={drawer.open && drawer.mode === "edit" ? "edit" : "create"}
         onSave={async (event) => {
-          await createOptimistic(event);
+          if (drawer.open && drawer.mode === "edit") {
+            if (isPersistedActual(drawer.event.id, actuals)) {
+              await updateOptimistic(event.id, event);
+            } else {
+              await createOptimistic({ ...event, id: newEventId("manual") });
+            }
+          } else {
+            await createOptimistic(event);
+          }
           setDrawer({ open: false });
         }}
         onCancel={() => setDrawer({ open: false })}
@@ -262,17 +293,8 @@ export default function DashboardPage() {
   );
 }
 
-function lastTimeForType(events: Event[], type: Event["type"]): string | undefined {
-  return lastEventOfType(events, type)?.startTime;
-}
-
 function lastEventOfType(events: Event[], type: Event["type"]): Event | undefined {
   return events
-    .filter((e) => e.type === type && (e.source === "actual" || e.source === "manual"))
-    .sort((a, b) => parseTime(b.startTime) - parseTime(a.startTime))[0];
-}
-
-function formatNowAsHHMM(): string {
-  const d = new Date();
-  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+    .filter((e) => e.type === type && isRecorded(e.lifecycle))
+    .sort((a, b) => b.startTime - a.startTime)[0];
 }
