@@ -16,22 +16,23 @@
  * `ownerStyleVar(color)` directly.
  */
 
+import type { CSSProperties } from "react";
 import type { OwnerRef, OwnersConfig } from "../schemas";
 import { ownerSlotKey } from "../components/Timeline/ownerSlotKey";
 import { ownerColor } from "./owners";
 
 export type OwnerAttrs = {
   "data-owner"?: string;
-  style?: React.CSSProperties;
+  style?: CSSProperties;
 };
 
 /** Inline-style object containing only `--owner-color`, or undefined when no color.
- * The `as React.CSSProperties` cast is required: `csstype`'s Properties has no
+ * The `as CSSProperties` cast is required: `csstype`'s Properties has no
  * index signature for `--*` custom properties, so the literal must be cast.
  * (Verified: dropping the cast errors TS2353. §1.4 removed the redundant inner
  * `["--owner-color" as string]` index cast but the outer one stays.) */
-export function ownerStyleVar(color: string | null): React.CSSProperties | undefined {
-  return color ? ({ "--owner-color": color } as React.CSSProperties) : undefined;
+export function ownerStyleVar(color: string | null): CSSProperties | undefined {
+  return color ? ({ "--owner-color": color } as CSSProperties) : undefined;
 }
 
 /** All the spreadable attributes a tinted owner element needs. */

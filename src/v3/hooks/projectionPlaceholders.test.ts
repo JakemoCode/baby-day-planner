@@ -10,9 +10,9 @@ import type { Day, Settings } from "../schemas";
 import { PLACEHOLDER_DAY, PLACEHOLDER_SETTINGS } from "./projectionPlaceholders";
 
 it("PLACEHOLDER_DAY conforms to Day", () => {
-  expectTypeOf(PLACEHOLDER_DAY).toMatchTypeOf<Day>();
+  expectTypeOf(PLACEHOLDER_DAY).toEqualTypeOf<Day>();
 });
 
 it("PLACEHOLDER_SETTINGS conforms to Settings", () => {
-  expectTypeOf(PLACEHOLDER_SETTINGS).toMatchTypeOf<Settings>();
+  expectTypeOf(PLACEHOLDER_SETTINGS).toEqualTypeOf<Settings>();
 });
