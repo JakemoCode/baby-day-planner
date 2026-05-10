@@ -3,8 +3,8 @@
 import styles from "./InstantChip.module.css";
 import type { Event, OwnersConfig } from "../../schemas";
 import { formatTimeShort } from "../../ui/time";
-import { ownerDisplayName } from "../../ui/owners";
-import { ownerAttrs } from "../../ui/ownerStyle";
+import { ownerColor, ownerDisplayName } from "../../ui/owners";
+import { ownerStyleVar } from "../../ui/ownerStyle";
 import { ownerSlotKey } from "./ownerSlotKey";
 
 export type InstantChipProps = {
@@ -47,7 +47,8 @@ export function InstantChip({ event, owners, colorMode, onClick }: InstantChipPr
       data-color-mode={colorMode}
       data-static={!interactive}
       className={styles.chip}
-      {...ownerAttrs(event.owner, owners)}
+      style={ownerStyleVar(ownerColor(event.owner, owners))}
+      {...(slotKey ? { "data-owner": slotKey } : {})}
       {...(interactive
         ? { type: "button" as const, onClick, "aria-label": a11y }
         : { role: "presentation" as const })}

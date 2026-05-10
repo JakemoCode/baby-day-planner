@@ -17,6 +17,11 @@
  *
  * The value type matches the rest of `CSSProperties`: string, number,
  * or undefined (so React still strips an unset value from the DOM).
+ *
+ * Note: CSS custom properties are an open namespace, so this index
+ * signature cannot catch typos — `"--owner-coler"` compiles. If a
+ * variable appears to have no effect, verify the key matches exactly
+ * in both the style prop and the consuming CSS rule.
  */
 
 import "react";
