@@ -24,6 +24,7 @@
 
 import type { Event, OwnerRef, OwnershipTemplate, OwnersConfig } from "../../schemas";
 import { OwnerPickerV3 } from "../shared/OwnerPickerV3";
+import { getOwnerAt, templateSlotForEvent } from "./templateSlot";
 
 export type TemplateOwnerPickerProps = {
   event: Event;
@@ -32,47 +33,13 @@ export type TemplateOwnerPickerProps = {
   onSelect: (owner: OwnerRef | undefined) => void;
 };
 
-const NAP_RE = /^nap_(\d+)$/;
-const WAKE_RE = /^wake_window_(\d+)$/;
-const BOTTLE_RE = /^bottle_(\d+)$/;
-
-function indexOf(re: RegExp, eventKey: string): number {
-  const m = re.exec(eventKey);
-  if (!m) return -1;
-  return Number(m[1]) - 1;
-}
-
-/**
- * Read the OwnerRef the template currently assigns to this event, or
- * undefined when the slot is empty / unrecognised. Mirrors the dispatch
- * in setOwnerInTemplate so the picker shows the same source of truth
- * the page will mutate.
- */
-function ownerFromTemplate(template: OwnershipTemplate, event: Event): OwnerRef | undefined {
-  const { eventKey } = event;
-
-  if (eventKey === "bedtime") {
-    return template.bedtimeOwner;
-  }
-
-  const napIdx = indexOf(NAP_RE, eventKey);
-  if (napIdx >= 0) return template.napOwners[napIdx];
-
-  const wwIdx = indexOf(WAKE_RE, eventKey);
-  if (wwIdx >= 0) return template.wakeWindowOwners[wwIdx];
-
-  const bottleIdx = indexOf(BOTTLE_RE, eventKey);
-  if (bottleIdx >= 0) return (template.bottleOwners ?? [])[bottleIdx];
-
-  return undefined;
-}
-
 export function TemplateOwnerPicker({
   event,
   template,
   owners,
   onSelect,
 }: TemplateOwnerPickerProps) {
-  const current = ownerFromTemplate(template, event);
+  const slot = templateSlotForEvent(event);
+  const current = slot === undefined ? undefined : getOwnerAt(template, slot);
   return <OwnerPickerV3 owners={owners} value={current} onChange={onSelect} label={event.label} />;
 }
