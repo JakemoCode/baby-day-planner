@@ -37,14 +37,12 @@ export function InstantCluster({
       data-testid="instant-cluster"
       data-past={past}
       className={styles.cluster}
-      style={
-        {
-          top: `${topPx}px`,
-          right: `${rightPx}px`,
-          width: `${widthPx}px`,
-          ["--leader-width" as string]: `${leaderWidthPx}px`,
-        } as React.CSSProperties
-      }
+      style={{
+        top: `${topPx}px`,
+        right: `${rightPx}px`,
+        width: `${widthPx}px`,
+        "--leader-width": `${leaderWidthPx}px`,
+      }}
     >
       {items.map((event) => (
         <InstantChip
