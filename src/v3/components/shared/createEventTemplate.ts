@@ -11,6 +11,7 @@
  * the new event.
  */
 
+import { newEventId } from "../../lib/newEventId";
 import type { Event, EventType, Settings, TimeMin } from "../../schemas";
 
 export type CreatableType = "bottle" | "nap" | "pump" | "extra";
@@ -31,12 +32,10 @@ export function buildCreateTemplate({
   settings,
   nowMinutes,
 }: BuildTemplateInput): Event {
-  const idStamp = Date.now();
-
   if (type === "bottle") {
     const nextN = countByType(actuals, "bottle") + 1;
     return {
-      id: `bottle-${idStamp}`,
+      id: newEventId("bottle"),
       dayId,
       eventKey: `bottle_${nextN}`,
       type: "bottle",
@@ -52,7 +51,7 @@ export function buildCreateTemplate({
   if (type === "nap") {
     const nextN = countByType(actuals, "nap") + 1;
     return {
-      id: `nap-${idStamp}`,
+      id: newEventId("nap"),
       dayId,
       eventKey: `nap_${nextN}`,
       type: "nap",
@@ -65,10 +64,11 @@ export function buildCreateTemplate({
   }
 
   if (type === "pump") {
+    const pumpId = newEventId("pump");
     return {
-      id: `pump-${idStamp}`,
+      id: pumpId,
       dayId,
-      eventKey: `pump_${idStamp}`,
+      eventKey: pumpId,
       type: "pump",
       kind: "instant",
       label: "Pump",
@@ -78,10 +78,11 @@ export function buildCreateTemplate({
     };
   }
 
+  const extraId = newEventId("extra");
   return {
-    id: `extra-${idStamp}`,
+    id: extraId,
     dayId,
-    eventKey: `extra_${idStamp}`,
+    eventKey: extraId,
     type: "extra",
     kind: "block",
     label: "",

@@ -1,5 +1,6 @@
 "use client";
 
+import { newEventId } from "../../lib/newEventId";
 import type { OwnersConfig } from "../../schemas";
 import styles from "./OwnersConfigEditor.module.css";
 
@@ -21,7 +22,7 @@ export function OwnersConfigEditor({ value, onChange }: OwnersConfigEditorProps)
   };
 
   const addOther = () => {
-    const id = `other_${Date.now()}`;
+    const id = newEventId("other");
     onChange({
       ...value,
       other: [...value.other, { id, displayName: "", color: "#999" }],

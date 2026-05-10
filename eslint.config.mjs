@@ -25,6 +25,7 @@ const eslintConfig = defineConfig([
     "test-results/**",
     "coverage/**",
     "docs/**",
+    ".claude/**",
   ]),
 ]);
 
