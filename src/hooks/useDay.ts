@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import type { Day } from "@/domain";
 import { db } from "@/lib/firebase/client";
 import { watchActiveDay } from "@/repositories/days";
+import { withV2DayBackcompat } from "@/v3/firestore/v2Backcompat";
 
 export type UseDayResult = {
   day: Day | null;
@@ -16,7 +17,7 @@ export function useDay(childId: string): UseDayResult {
 
   useEffect(() => {
     return watchActiveDay(db, childId, (d) => {
-      setDay(d);
+      setDay(withV2DayBackcompat(d));
       setLoading(false);
     });
   }, [childId]);

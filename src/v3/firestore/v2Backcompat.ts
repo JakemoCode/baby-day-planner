@@ -22,6 +22,7 @@
  */
 
 import type {
+  Day as V2Day,
   Event as V2Event,
   EventSource,
   EventStatus,
@@ -36,6 +37,7 @@ import type {
   Settings as V3Settings,
   TimeMin,
 } from "../schemas";
+import { formatHM24 } from "../ui/time";
 
 // ---------------------------------------------------------------------------
 // Time
@@ -297,6 +299,54 @@ export function withV2TemplateBackcompat(
 
   const bedtimeOwner = ownerRefToV2(input.bedtimeOwner as OwnerRef | string | undefined, owners);
   if (bedtimeOwner !== undefined) out.bedtimeOwner = bedtimeOwner;
+
+  return out;
+}
+
+// ---------------------------------------------------------------------------
+// Day
+// ---------------------------------------------------------------------------
+
+/** Loose input — could be a V2 doc, V3 doc, or partial of either. */
+type MaybeV3Day = Record<string, unknown> & {
+  id?: string;
+  childId?: string;
+  date?: string;
+  status?: V2Day["status"];
+  wakeTime?: TimeMin | string;
+  templateId?: string;
+  ownershipTemplateId?: string;
+  createdAt?: string;
+  archivedAt?: string;
+};
+
+export function withV2DayBackcompat(input: MaybeV3Day | null): V2Day | null {
+  if (input === null) return null;
+
+  const wakeTimeRaw = input.wakeTime;
+  const wakeTime =
+    typeof wakeTimeRaw === "number"
+      ? formatHM24(wakeTimeRaw)
+      : typeof wakeTimeRaw === "string"
+        ? wakeTimeRaw
+        : undefined;
+
+  const ownershipTemplateId = input.ownershipTemplateId ?? input.templateId;
+
+  const date = input.date ?? "";
+  const createdAt = input.createdAt ?? `${date}T00:00:00Z`;
+
+  const out: V2Day = {
+    id: input.id ?? "",
+    childId: input.childId ?? "",
+    date,
+    status: (input.status ?? "active") as V2Day["status"],
+    createdAt,
+  };
+
+  if (wakeTime !== undefined) out.wakeTime = wakeTime;
+  if (ownershipTemplateId !== undefined) out.ownershipTemplateId = ownershipTemplateId;
+  if (input.archivedAt !== undefined) out.archivedAt = input.archivedAt;
 
   return out;
 }
