@@ -51,4 +51,92 @@ describe("withV3SettingsDefaults", () => {
   it("returns null when the input itself is null (lets the hook stay loading)", () => {
     expect(withV3SettingsDefaults(null)).toBeNull();
   });
+
+  // PR-A0.12: V2 string time fields → TimeMin coercion. The realistic
+  // fixture exposed that without these, the engine emits NaN-keyed pump
+  // events. Coercion is a transitional safety net — see TODO(PR-C1) in
+  // the implementation.
+  describe("V2 string time field coercion", () => {
+    it("coerces pumpTimes string entries to TimeMin", () => {
+      const out = withV3SettingsDefaults({
+        childId: "c1",
+        pumpTimes: ["10:30", "14:30"] as unknown as number[],
+      })!;
+      expect(out.pumpTimes).toEqual([10 * 60 + 30, 14 * 60 + 30]);
+    });
+
+    it("preserves numeric pumpTimes entries unchanged", () => {
+      const out = withV3SettingsDefaults({
+        childId: "c1",
+        pumpTimes: [630, 870],
+      })!;
+      expect(out.pumpTimes).toEqual([630, 870]);
+    });
+
+    it("coerces pumpTimes mixed string/number entries", () => {
+      const out = withV3SettingsDefaults({
+        childId: "c1",
+        pumpTimes: ["10:30", 870] as unknown as number[],
+      })!;
+      expect(out.pumpTimes).toEqual([630, 870]);
+    });
+
+    it("coerces bedtimeThreshold string to TimeMin", () => {
+      const out = withV3SettingsDefaults({
+        childId: "c1",
+        bedtimeThreshold: "19:00" as unknown as number,
+      })!;
+      expect(out.bedtimeThreshold).toBe(19 * 60);
+    });
+
+    it("coerces defaultWakeTime string to TimeMin", () => {
+      const out = withV3SettingsDefaults({
+        childId: "c1",
+        defaultWakeTime: "07:30" as unknown as number,
+      })!;
+      expect(out.defaultWakeTime).toBe(7 * 60 + 30);
+    });
+
+    it("coerces dreamFeedStart string to TimeMin", () => {
+      const out = withV3SettingsDefaults({
+        childId: "c1",
+        dreamFeedStart: "22:00" as unknown as number,
+      })!;
+      expect(out.dreamFeedStart).toBe(22 * 60);
+    });
+
+    it("coerces dreamFeedEnd string to TimeMin", () => {
+      const out = withV3SettingsDefaults({
+        childId: "c1",
+        dreamFeedEnd: "23:30" as unknown as number,
+      })!;
+      expect(out.dreamFeedEnd).toBe(23 * 60 + 30);
+    });
+
+    it("coerces dailyRecurring[].time string to TimeMin", () => {
+      const out = withV3SettingsDefaults({
+        childId: "c1",
+        dailyRecurring: [
+          {
+            id: "cook-dinner",
+            label: "Cook Dinner",
+            time: "17:00" as unknown as number,
+            enabled: true,
+          },
+        ],
+      })!;
+      expect(out.dailyRecurring[0]!.time).toBe(17 * 60);
+    });
+
+    it("malformed time string falls back to 0 rather than NaN", () => {
+      const out = withV3SettingsDefaults({
+        childId: "c1",
+        pumpTimes: ["not-a-time"] as unknown as number[],
+        bedtimeThreshold: "garbage" as unknown as number,
+      })!;
+      expect(out.pumpTimes).toEqual([0]);
+      expect(out.bedtimeThreshold).toBe(0);
+      expect(Number.isFinite(out.bedtimeThreshold)).toBe(true);
+    });
+  });
 });

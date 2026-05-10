@@ -15,7 +15,27 @@
  * displayNames so the UI prompts the user to set them.
  */
 
-import type { Settings } from "../schemas";
+import type { Settings, TimeMin } from "../schemas";
+
+/**
+ * Parse "HH:MM" → TimeMin (minutes since midnight). If already a number,
+ * pass through. Returns 0 for malformed strings (defensive — engine still
+ * runs, value is visibly wrong but not NaN).
+ *
+ * TODO(PR-C1): Remove this helper and all V2 string→TimeMin coercion
+ * below once the V2 cleanup wave wipes string-shaped time fields from
+ * Firestore. After cleanup, all callers write TimeMin numbers directly.
+ */
+function parseTimeStringOrNumber(value: string | number): TimeMin {
+  if (typeof value === "number") return value;
+  if (typeof value !== "string") return 0;
+  const match = /^(\d{1,2}):(\d{2})$/.exec(value);
+  if (!match) return 0;
+  const h = Number(match[1]);
+  const m = Number(match[2]);
+  if (!Number.isFinite(h) || !Number.isFinite(m)) return 0;
+  return h * 60 + m;
+}
 
 const DEFAULTS: Omit<Settings, "childId"> = {
   defaultWakeTime: 7 * 60,
@@ -65,7 +85,7 @@ const DEFAULTS: Omit<Settings, "childId"> = {
 
 export function withV3SettingsDefaults(input: Partial<Settings> | null): Settings | null {
   if (input === null) return null;
-  return {
+  const merged: Settings = {
     ...DEFAULTS,
     ...input,
     childId: input.childId ?? "",
@@ -81,4 +101,25 @@ export function withV3SettingsDefaults(input: Partial<Settings> | null): Setting
       other: input.owners?.other ?? DEFAULTS.owners.other,
     },
   };
+
+  // TODO(PR-C1): Remove the V2 string→TimeMin coercion below once the V2
+  // cleanup wave wipes string-shaped time fields from Firestore.
+  const rawPumpTimes = (input.pumpTimes ?? merged.pumpTimes) as Array<string | number>;
+  merged.pumpTimes = rawPumpTimes.map((v) => parseTimeStringOrNumber(v));
+  merged.bedtimeThreshold = parseTimeStringOrNumber(
+    merged.bedtimeThreshold as unknown as string | number,
+  );
+  merged.defaultWakeTime = parseTimeStringOrNumber(
+    merged.defaultWakeTime as unknown as string | number,
+  );
+  merged.dreamFeedStart = parseTimeStringOrNumber(
+    merged.dreamFeedStart as unknown as string | number,
+  );
+  merged.dreamFeedEnd = parseTimeStringOrNumber(merged.dreamFeedEnd as unknown as string | number);
+  merged.dailyRecurring = merged.dailyRecurring.map((entry) => ({
+    ...entry,
+    time: parseTimeStringOrNumber(entry.time as unknown as string | number),
+  }));
+
+  return merged;
 }
