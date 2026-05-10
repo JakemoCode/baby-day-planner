@@ -307,10 +307,11 @@ adversarial reviews and unblock the page swaps.
   `PLACEHOLDER_DAY: Day` and `PLACEHOLDER_SETTINGS: Settings`
 - Strict types from `@/v3/schemas` so schema additions break
   compilation here
-- `PLACEHOLDER_DAY` must include explicit `wakeTime: undefined` (Day
-  schema declares it optional but TypeScript's structural typing under
-  `exactOptionalPropertyTypes: true` may require explicit absence vs.
-  presence handling)
+- `PLACEHOLDER_DAY` must OMIT the `wakeTime` field entirely. Earlier
+  plan revisions said to set `wakeTime: undefined` explicitly, but
+  under `exactOptionalPropertyTypes: true` that errors with TS2375
+  (`wakeTime?: TimeMin` does not admit explicit undefined). Field
+  omission satisfies the type cleanly.
 - **Update timeline page (PR #60 already merged) in same PR** to
   import from this module
 - Long-term TODO comment in the module: "make `useV3Projection`
@@ -528,6 +529,8 @@ grep -rn 'from "@/components/Dashboard/' src/
 grep -rn 'from "@/components/Tomorrow/' src/
 grep -rn 'from "@/components/History/' src/
 grep -rn 'from "@/components/DayTemplates/' src/
+# v2 backcompat shim must be fully unhooked before deletion:
+grep -rn 'from "@/v3/firestore/v2Backcompat"' src/
 # V3 must not import V2 CSS:
 grep -rn 'from "@/components/Timeline.*\.module\.css"' src/v3/
 grep -rn 'from "@/components/shared.*\.module\.css"' src/v3/

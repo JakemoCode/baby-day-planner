@@ -22,38 +22,7 @@ _All §1 items resolved as of 2026-05-10 — see §5. Add new entries here as th
 
 ## §2 — Plan / doc updates
 
-### 2.1 Plan v5: explicit `wakeTime: undefined` doesn't typecheck
-
-**Source**: PR-A0.10 agent, 2026-05-10.
-
-**What**: `docs/v3/CUTOVER_PLAN.md` PR-A0.10 spec says
-"`PLACEHOLDER_DAY` must explicitly include `wakeTime: undefined` for
-`exactOptionalPropertyTypes` safety". This is wrong — under
-`exactOptionalPropertyTypes`, declaring `wakeTime: undefined` for an
-optional `wakeTime?: TimeMin` is a TS error (TS2375). The agent
-correctly omitted the field instead.
-
-**Fix**: update plan v5/v6 to say "omit the `wakeTime` field" instead.
-
-**Status**: pending. Fold into next plan amendment.
-
----
-
-### 2.2 PR-C1 audit list missing one grep
-
-**Source**: PR-A0.7 / PR-A0.8 implementation.
-
-**What**: PR-C1's pre-merge audit list grep for V2 hook imports but
-doesn't explicitly grep for `from "@/v3/firestore/v2Backcompat"`. The
-shim file deletion in PR-C1 already kills imports transitively, but
-adding the explicit grep makes the audit airtight.
-
-**Fix**: add to PR-C1 wipe pre-merge audits:
-```bash
-grep -rn 'from "@/v3/firestore/v2Backcompat"' src/
-```
-
-**Status**: pending. Fold into next plan amendment.
+_All §2 items resolved as of 2026-05-10 — see §5._
 
 ---
 
@@ -158,7 +127,9 @@ the false-alarm class entirely.
 | 1.16 | Dashboard cards duplicate the same patterns | PR #89 | 2026-05-10 |
 | 1.17 | Drawer save logic minor polish | PR-Tail | 2026-05-10 |
 | 1.18 | Drawer save test variable naming | PR #90 | 2026-05-10 |
-| 1.19 | Owner attrs not centralized after §1.2 polish | PR-Tail | 2026-05-10 |
+| 1.19 | Owner attrs not centralized after §1.2 polish | PR #92 | 2026-05-10 |
+| 2.1 | Plan v5 wakeTime: undefined doesn't typecheck | PR-Housekeeping | 2026-05-10 |
+| 2.2 | PR-C1 audit list missing v2Backcompat grep | PR-Housekeeping | 2026-05-10 |
 
 ---
 
