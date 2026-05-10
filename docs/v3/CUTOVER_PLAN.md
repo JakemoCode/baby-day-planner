@@ -1,14 +1,31 @@
-# V2 → V3 Full Cutover Plan v4 (FINAL)
+# V2 → V3 Full Cutover Plan v5 (FINAL)
 
-> **Status**: ratified after 3 adversarial review cycles (47 issues
-> surfaced, 45 actionable, all addressed). Ready to execute.
->
-> **Authors / reviewers**: drafted with Explore + code-reviewer
-> subagents over 2026-05-09 dogfooding session.
+> **Status**: ratified after 3 adversarial review cycles + a 4th
+> self-deception audit + a realistic-data fixture exercise + a
+> Dashboard sketch exercise (PR #68). 47 + 13 issues surfaced; all
+> addressed. **Confidence: ~92%.**
 >
 > **Mandate**: cut every authed route over to V3 hooks + V3 components
 > + V3 Firestore shape. End state: zero V2 code in `src/`, zero V2
 > vestiges in V3 code, every defensive shim deleted in PR-C1.
+>
+> **Changes from v4**:
+> - PR-A0.11 (CSS owner-color refactor) added to numbered Phase A0 list
+>   (was only in risk table; coloring is broken on V3 timeline today)
+> - PR-A0.12 added: `pumpTimes` string→TimeMin coercion in
+>   `withV3SettingsDefaults` (caught by realistic-data fixture)
+> - PR-A0.5 spec now explicitly names `OwnerPickerV3.tsx` import update
+> - PR-A0.4 spec now requires `formToEvent` to emit `overridden`
+>   lifecycle when user saves owner-only edit on a projected event
+> - PR-A0.4 verification reframed: per-rule eventKey dedup handles
+>   overridden actuals (not the `checkRealityWins` guard)
+> - PR-A0.4 + PR-A0.9 must merge atomically (or A0.9 first) to avoid
+>   `Date.now()` window in V3 code
+> - PR-A0.10 spec adds explicit `wakeTime: undefined` in placeholder
+> - PR-A2 spec now references the Dashboard sketch
+>   (`docs/v3/sketches/dashboard-v3.tsx.draft`) for per-card prop
+>   contracts
+> - Total scope: **24 PRs** (was 22)
 
 ---
 
@@ -180,23 +197,33 @@ adversarial reviews and unblock the page swaps.
 - Tests: 8 unit tests (each event-key path + clear + invalid eventKey
   no-op)
 
-### PR-A0.4 — Drawer save logic refinement (atomic with timeline page update)
+### PR-A0.4 — Drawer save logic + lifecycle dispatch (atomic with timeline page update)
 
-- Replace `isRecorded(drawer.event.lifecycle)` with
-  `actuals.some(a => a.id === drawer.event.id)` in timeline page
+- **Replace `isRecorded(drawer.event.lifecycle)` with
+  `actuals.some(a => a.id === drawer.event.id)`** in timeline page
   drawer onSave
-- **Engine R0 verification (sub-step)**: confirm V3 evaluator
-  suppresses projected events when an overridden actual exists for
-  the same eventKey. If not, add the rule first as PR-A0.4a. The
-  current reality-wins guard handles this for `started`/`completed`
-  (`isRecorded`). For `overridden`, a separate dedup pass may be
-  needed. Verify with a unit test in PR-A0.4a if necessary.
+- **CRITICAL: `formToEvent` must emit `overridden` lifecycle for
+  owner-only edits on projected events.** Verify the existing
+  `formToEvent.ts` does this. If not, add the projected→overridden
+  transition. Without this, drawer save writes
+  `lifecycle: { state: "projected" }` to Firestore and the engine
+  treats the doc as a projection, breaking dedup semantics.
+- **Engine R0 verification (corrected understanding)**:
+  `checkRealityWins` does NOT cover overridden events (only
+  started/completed). Per-rule dedup by eventKey IS what handles
+  overridden — verified for naps, bottles, pumps, dailyRecurring,
+  daycare, dreamFeed, bedtime. PR-A0.4 unit test must verify each
+  projecting rule suppresses projection when an overridden actual
+  exists for the same eventKey.
 - Update timeline page in same PR (atomic — no divergence between
   Timeline and planned Dashboard/Tomorrow)
 - Tests in `EventEditDrawerV3.test.tsx`: **fixture must put the
   overridden event with the same id in both `actuals` and
   `drawer.event`** so the test exercises the real flow
 - Update `v3_strategy.md` memory entry with new save-flow rule
+- **Dependency: PR-A0.9 must merge before or atomically with A0.4** to
+  avoid a `Date.now()`-still-present window in V3 code that the C1
+  pre-merge audit would flag
 
 ### PR-A0.5 — Duplicate (NOT move) shared CSS modules into V3
 
@@ -206,7 +233,20 @@ adversarial reviews and unblock the page swaps.
     → `src/v3/components/Timeline/`
   - `src/components/shared/{EventEditDrawer,OwnerPicker,FAB,FABTypePicker,ConfirmDialog}.module.css`
     → `src/v3/components/shared/`
-- Update V3 component imports to point to V3 paths
+- **Update V3 component imports to point to V3 paths — explicit list
+  (these all currently import from `@/components/...` V2 paths):**
+  - `src/v3/components/Timeline/TimelineV3.tsx` →
+    `./TimelineV2.module.css` (or rename to `Timeline.module.css`)
+  - `src/v3/components/Timeline/Block.tsx` → `./Block.module.css`
+  - `src/v3/components/Timeline/InstantChip.tsx` →
+    `./InstantChip.module.css`
+  - `src/v3/components/Timeline/InstantCluster.tsx` →
+    `./InstantCluster.module.css`
+  - `src/v3/components/Timeline/NowBar.tsx` → `./NowBar.module.css`
+  - `src/v3/components/shared/EventEditDrawerV3.tsx` →
+    `./EventEditDrawer.module.css`
+  - `src/v3/components/shared/OwnerPickerV3.tsx` →
+    `./OwnerPicker.module.css`
 - V2 components keep their original CSS imports unchanged
 - Pre-push gate must pass
 
@@ -267,11 +307,65 @@ adversarial reviews and unblock the page swaps.
   `PLACEHOLDER_DAY: Day` and `PLACEHOLDER_SETTINGS: Settings`
 - Strict types from `@/v3/schemas` so schema additions break
   compilation here
+- `PLACEHOLDER_DAY` must include explicit `wakeTime: undefined` (Day
+  schema declares it optional but TypeScript's structural typing under
+  `exactOptionalPropertyTypes: true` may require explicit absence vs.
+  presence handling)
 - **Update timeline page (PR #60 already merged) in same PR** to
   import from this module
 - Long-term TODO comment in the module: "make `useV3Projection`
   handle null day/settings internally"
 - Tests: type-check only
+
+### PR-A0.11 — Owner color via CSS custom properties (NEW from confidence audit)
+
+- **Why**: V3 timeline currently has NO owner color tints because
+  `Block.module.css` and `InstantChip.module.css` hardcode V2 owner
+  values: `[data-owner="Jake"]`, `[data-owner="Kelly"]`,
+  `[data-owner="Daycare"]`. V3 emits slot keys (`parent1`, `parent2`,
+  `other:<id>`). Selectors don't match — no styling applied. Visual
+  regression already happening on the live timeline.
+- **Approach**: refactor V3 Timeline + drawer CSS to use the
+  `--owner-color` CSS custom property set inline by V3 components
+  from `ownerColor(event.owner, owners)` (already exists in
+  `src/v3/ui/owners.ts`)
+- Files to refactor (V3 copies of CSS from PR-A0.5; V2 originals
+  untouched):
+  - `src/v3/components/Timeline/Block.module.css`
+  - `src/v3/components/Timeline/InstantChip.module.css`
+  - `src/v3/components/shared/OwnerPicker.module.css`
+- Files to update (V3 components set inline style):
+  - `src/v3/components/Timeline/Block.tsx`: spread
+    `{ '--owner-color': ownerColor(event.owner, owners) ?? 'transparent' }`
+    onto root style
+  - `src/v3/components/Timeline/InstantChip.tsx`: same
+  - `src/v3/components/shared/OwnerPickerV3.tsx`: same per-button
+- CSS pattern in V3 modules:
+  - Replace `[data-owner="Jake"] { background: var(--color-jake-bg); }`
+    with `.block { background: color-mix(in srgb, var(--owner-color) 20%, transparent); }`
+  - Border stripe: `border-left-color: var(--owner-color);`
+- Pairs with §F4 (themed owner colors fast-follow item)
+- Tests: visual hand-test plus an RTL test that asserts
+  `style="--owner-color: #..."` is present on the rendered Block
+
+### PR-A0.12 — `withV3SettingsDefaults` coerces V2 string values to TimeMin (NEW from realistic-data fixture)
+
+- **Why**: realistic-data fixture exposed that
+  `withV3SettingsDefaults` doesn't convert V2 `pumpTimes: ["10:30", "14:30"]`
+  to V3 `[630, 870]`. Engine emits projected pumps with
+  `eventKey="pump_NaN:NaN"`. (Tracked as `it.fails` in
+  `src/v3/__tests__/realisticData.test.ts`.)
+- **Fix**: in `withV3SettingsDefaults`, coerce on read:
+  - `pumpTimes`: map any string entry through `parseHM24` → TimeMin
+  - `bedtimeThreshold`, `defaultWakeTime`, `dreamFeedStart`,
+    `dreamFeedEnd`: same string→TimeMin coercion if present as string
+  - Also handle `dailyRecurring[].time` if any V2 doc had it as string
+- Update tests: the `it.fails` test in `realisticData.test.ts`
+  graduates to a passing assertion
+- **Cleanup target (PR-C1)**: this string-coercion logic deletes once
+  no V2 string-time docs remain in production (defaulter becomes
+  pure V3-only). Add a TODO comment marking the V2-coercion lines for
+  removal in PR-C1.
 
 ---
 
@@ -289,22 +383,22 @@ adversarial reviews and unblock the page swaps.
 
 ### PR-A2 — V3 dashboard cards (`src/v3/components/Dashboard/`)
 
-8 card files + tests:
-- `NextEventCard`
-- `NextBottlePreview`
-- `NextNapPreview`
-- `CurrentWakeWindowStatus`
-- `NapActionButton`
-- `StartBottleButton`
-- `StartDayButton`
-- `EndOfDayCard`
+**Reference: `docs/v3/sketches/dashboard-v3.tsx.draft`** for exact
+prop contracts surfaced by the sketch exercise.
 
-Notes:
-- `StartBottleButton`: emits Event with `completed` lifecycle; id from
-  `newEventId("bottle")`
-- `NapActionButton`: Start emits `started` lifecycle; End calls
-  `updateOptimistic` on existing started nap (NOT `createOptimistic` —
-  fixes V2 bug)
+8 card files + tests with explicit prop shapes:
+- `NextEventCard` — props: `{ event: Event | undefined; nowMinutes: TimeMin; owners: OwnersConfig }`. Drops V2's `targetEvent` putdown lookup entirely (V3 has no putdown event).
+- `NextBottlePreview` — props: `{ bottle: Event | undefined; bottle1Pending: boolean; owners: OwnersConfig; lastBottle?: Event; dreamFeed?: Event }`
+- `NextNapPreview` — props: `{ nap: Event | undefined; owners: OwnersConfig; lastNap?: Event; bedtime?: Event }`
+- `CurrentWakeWindowStatus` — props: `{ wakeWindow: Event | undefined; owners: OwnersConfig }`
+- `NapActionButton` — props: `{ inProgressNap: Event | undefined; dayId: string; nextNumber: number; onStart: (nap: Event) => Promise<void>; onEnd: (nap: Event, endTime: TimeMin) => Promise<void> }`. **Note: `onEnd` `endTime` is TimeMin, not string (V2 was string).**
+- `StartBottleButton` — props: `{ defaultAmountOz: number; dayId: string; nextNumber: number; onLog: (bottle: Event) => Promise<void>; minIntervalMinutes: number; lastBottleTime?: TimeMin }`. **`lastBottleTime` is TimeMin.**
+- `StartDayButton` — props: `{ hasTomorrowPlan: boolean; onStart: (input: { useTomorrowPlan: boolean }) => Promise<void> }`
+- `EndOfDayCard` — props: `{ afterMidnight: boolean; hasTomorrowPlan: boolean; onStart: () => Promise<void> }`
+
+Behavior notes (all TDD'd):
+- `StartBottleButton`: emits Event with `completed` lifecycle; id from `newEventId("bottle")` (PR-A0.9)
+- `NapActionButton`: Start emits `started` lifecycle (id from `newEventId("nap")`); End calls `updateOptimistic(nap.id, { endTime, lifecycle: { state: "completed", committedAt: endTime } })` on the existing started nap — NOT `createOptimistic` (fixes V2 bug where End created a duplicate doc)
 - `StartDayButton`: callback receives intent; page wires `startNewDay`
 - `EndOfDayCard`: takes onStart callback wired to V3 `startNewDay`
 - Per-card hand-test plan in PR body
@@ -559,22 +653,34 @@ writes fail (rules reject).
 
 ## Total scope
 
-- 16 Phase A0/A PRs (foundation + primitives)
-- 5 Phase B PRs (page swaps)
-- 1 Phase C PR (clean wipe)
-- **22 PRs total**
+- 12 Phase A0 PRs (foundation fixes — A0.1 through A0.12)
+- 5 Phase A PRs (primitives — A1 through A5)
+- 5 Phase B PRs (page swaps — B1 through B5)
+- 1 Phase C PR (clean wipe — C1)
+- 1 follow-up TODO ticket: End-Bedtime → next-day-wake auto-linkage
+- **24 PRs total**
 
 ---
 
 ## Confidence
 
-After 3 review cycles surfacing 47 issues (45 actionable, all
-addressed):
+After 3 review cycles + self-deception audit + realistic-data fixture
++ Dashboard sketch:
 
-- **Critical issues**: all addressed via Phase A0 prerequisites
-- **Important issues**: all addressed
+- **Critical issues found and addressed**: 7 (4 from review #3, 3 from
+  self-deception audit). All have explicit PR placements.
+- **Important issues found and addressed**: ~30
+- **Real-data bugs caught**: 1 (pumpTimes string→TimeMin) — tracked
+  as `it.fails` in `realisticData.test.ts`; PR-A0.12 fixes
+- **Per-component contract specs**: surfaced via Dashboard sketch
+  (`docs/v3/sketches/dashboard-v3.tsx.draft`); other Phase B sketches
+  optional but follow same pattern
 - **Wipe completeness**: 14 deletion targets + 5 code-level wipes +
   16 pre-merge audits
 - **TypeScript verification**: end-to-end at every PR
 
-Plan v4 is ready to execute.
+**Confidence: ~92%** that Dashboard + Timeline work end-to-end after
+Phase C with no follow-up fixes needed. Remaining ~8% is real-world
+edges + execution discipline over 24 PRs.
+
+Plan v5 is ready to execute.
