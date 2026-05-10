@@ -1,9 +1,9 @@
 "use client";
 
-import styles from "@/components/Timeline/Block.module.css";
+import styles from "./Block.module.css";
 import type { Event, OwnersConfig } from "../../schemas";
 import { formatTimeForDisplay, formatTimeShort } from "../../ui/time";
-import { ownerDisplayName } from "../../ui/owners";
+import { ownerColor, ownerDisplayName } from "../../ui/owners";
 import { PUTDOWN_KIND_TAG } from "./expandPutdown";
 import { ownerSlotKey } from "./ownerSlotKey";
 
@@ -56,6 +56,7 @@ export function Block({
   const Tag = interactive ? "button" : "div";
   const range = event.endTime !== undefined ? formatRange(event.startTime, event.endTime) : "";
   const ownerName = ownerDisplayName(event.owner, owners);
+  const ownerColorValue = ownerColor(event.owner, owners) ?? "transparent";
   const slotKey = ownerSlotKey(event.owner);
   const a11y = `${event.label}${range ? ` ${range}` : ""}${ownerName ? ` ${ownerName}` : ""}`;
   const napShortForm = event.type === "nap" && heightPx < NAP_TWO_ROW_THRESHOLD_PX;
@@ -74,12 +75,15 @@ export function Block({
       data-static={!interactive}
       {...(slotKey ? { "data-owner": slotKey } : {})}
       className={styles.block}
-      style={{
-        top: `${topPx}px`,
-        height: `${heightPx}px`,
-        left: `${leftPx}px`,
-        right: `${rightPx}px`,
-      }}
+      style={
+        {
+          top: `${topPx}px`,
+          height: `${heightPx}px`,
+          left: `${leftPx}px`,
+          right: `${rightPx}px`,
+          ["--owner-color" as string]: ownerColorValue,
+        } as React.CSSProperties
+      }
       {...(interactive
         ? { type: "button" as const, onClick, "aria-label": a11y }
         : { role: "presentation" as const })}

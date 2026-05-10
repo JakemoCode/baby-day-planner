@@ -1,0 +1,62 @@
+/*
+ * V3 OwnerPicker — slot-based picker.
+ *
+ * V3 difference from V2: the pressed-state tint comes from the
+ * `--owner-color` CSS custom property set inline on each option button
+ * (from `ownerColor(opt.ref, owners)`). Selectors are owner-name agnostic.
+ */
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.label {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  color: var(--color-fg-soft);
+}
+
+.group {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-2);
+}
+
+.option {
+  min-height: var(--tap-target-min);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-fg-soft);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  cursor: pointer;
+  transition:
+    background var(--motion-fast) var(--easing-out),
+    border-color var(--motion-fast) var(--easing-out);
+}
+
+.option:hover:not([aria-pressed="true"]) {
+  border-color: var(--color-border-strong);
+}
+
+.option:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.option[aria-pressed="true"] {
+  color: var(--color-fg);
+  border-color: transparent;
+  /* 30% mix keeps the pressed background readable behind the label. */
+  background: color-mix(in srgb, var(--owner-color, var(--color-accent-soft)) 30%, transparent);
+}
+
+/* "None" has --owner-color: transparent, which would render the pressed
+ * background as fully transparent. Override with the sage accent fill. */
+.option[aria-pressed="true"][data-owner="none"] {
+  background: var(--color-accent-soft);
+}

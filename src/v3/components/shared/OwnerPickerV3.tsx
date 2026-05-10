@@ -1,8 +1,9 @@
 "use client";
 
-import styles from "@/components/shared/OwnerPicker.module.css";
+import styles from "./OwnerPicker.module.css";
 import type { OwnerRef, OwnersConfig } from "../../schemas";
 import { ownerRefEquals } from "../../schemas";
+import { ownerColor } from "../../ui/owners";
 
 export type OwnerPickerV3Props = {
   owners: OwnersConfig;
@@ -47,6 +48,11 @@ export function OwnerPickerV3({ owners, value, onChange, label }: OwnerPickerV3P
               className={styles.option}
               data-owner={opt.slotKey}
               aria-pressed={pressed}
+              style={
+                {
+                  ["--owner-color" as string]: ownerColor(opt.ref, owners) ?? "transparent",
+                } as React.CSSProperties
+              }
               onClick={() => onChange(opt.ref)}
             >
               {opt.displayName}
