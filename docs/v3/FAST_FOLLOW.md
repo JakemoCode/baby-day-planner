@@ -341,6 +341,38 @@ Replace with: explicit **Save** button at section or page level + a transient su
 
 ---
 
+## §F12 — Confirm Tomorrow plan + auto-promote on Start Day
+
+**Source**: Jake, 2026-05-10 (during PR-B3 review).
+
+**Status**: `pending`
+
+**What**: today, promoting Tomorrow is a manual action that the user must remember to take when they wake. Add a "Confirm tomorrow plan" affordance on the Tomorrow page (Save / Confirm button) that captures the planned wakeTime / templateId / extras into a persisted "tomorrow plan" doc. Then on the Dashboard's "Start Day" action, if a confirmed tomorrow plan exists for today's date, auto-promote it instead of starting empty.
+
+**Why fast-follow**: PR-B3 already persists extras on promote (data correctness). This is the next-level UX — relieves the user of remembering to promote, gives confidence the night-before planning isn't wasted.
+
+**Open design questions**:
+- Schema: new `/children/{id}/tomorrowPlan/{date}` doc, or extend `Day` shape with a `planned` status?
+- Confirm vs save — one-tap commit or preview-then-lock?
+- Edits after confirmation: re-confirm, or auto-update?
+- If user manually taps Start Day with a confirmed plan present, prompt or apply silently?
+
+---
+
+## §F13 — TemplateOwnerPicker should own its own chrome (onCancel + section header)
+
+**Source**: code-simplifier review of PR-B5, 2026-05-10.
+
+**Status**: `pending`
+
+**What**: V3 `TemplateOwnerPicker` (in `src/v3/components/DayTemplates/`) has no `onCancel` prop. PR-B5 had to recreate sticky-card chrome around it: `.pickerWrap`, `.pickerHeader`, `.pickerLabel`, `.pickerCancel` plus header markup like `Owner for {selectedEvent.label}`. Any other consumer would have to duplicate this.
+
+**Fix**: add `onCancel?: () => void` and an optional title slot/label prop to `TemplateOwnerPicker`. The DayTemplates page can then drop the four `.picker*` CSS classes plus the wrapper div.
+
+**Why fast-follow**: small focused refactor; one component + one consumer. PR-B5 already shipped with the workaround so no rush, but the longer it sits the more callers might copy it.
+
+---
+
 ## How items land here
 
 Two paths:
