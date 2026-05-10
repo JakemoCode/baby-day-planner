@@ -268,12 +268,12 @@ export function withV2TemplateBackcompat(
   owners?: OwnersConfig,
 ): V2Template {
   // displayName (V3) → label (V2). Preserve label when already V2 shape.
-  const label =
-    typeof input.label === "string"
-      ? input.label
-      : typeof input.displayName === "string"
-        ? input.displayName
-        : "";
+  let label = "";
+  if (typeof input.label === "string") {
+    label = input.label;
+  } else if (typeof input.displayName === "string") {
+    label = input.displayName;
+  }
 
   const napOwners = ownerArrayToV2(
     input.napOwners as ReadonlyArray<OwnerSlotEntry | string> | undefined,
