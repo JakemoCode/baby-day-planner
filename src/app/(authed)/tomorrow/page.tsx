@@ -6,8 +6,9 @@ import type { Day, Event, OwnerRef, OwnershipTemplate } from "@/v3/schemas";
 import { useV3Settings } from "@/v3/hooks/useV3Settings";
 import { useV3Templates } from "@/v3/hooks/useV3Templates";
 import { startNewDay } from "@/v3/repositories/days";
+import { createEvent } from "@/v3/repositories/events";
 import { saveTemplate } from "@/v3/repositories/templates";
-import { newEventId } from "@/v3/lib/newEventId";
+import { newDayId } from "@/v3/lib/newEventId";
 import { db } from "@/lib/firebase/client";
 import { LoadingState } from "@/components/shared/LoadingState";
 import { EventEditDrawerV3 } from "@/v3/components/shared/EventEditDrawerV3";
@@ -20,6 +21,11 @@ import { setOwnerInTemplate } from "@/v3/components/DayTemplates/setOwnerInTempl
 import styles from "./page.module.css";
 
 const CHILD_ID = process.env.NEXT_PUBLIC_DEFAULT_CHILD_ID ?? "aden";
+
+// Anchor the Tomorrow page's "now" to noon so create-templates and
+// drawer constraints land in the middle of the planned day rather
+// than wherever the user happens to be browsing from.
+const TOMORROW_ANCHOR_MINUTES = 12 * 60;
 
 type DrawerState =
   | { open: false }
@@ -87,12 +93,30 @@ export default function TomorrowPage() {
   }
 
   const handlePromote = async () => {
+    const promotedDayId = newDayId();
     await startNewDay(db, CHILD_ID, {
-      newDayId: `day-${Date.now()}`,
+      newDayId: promotedDayId,
       newDate: tomorrowDateString(),
       newWakeTime: form.wakeTime,
       ...(form.templateId ? { templateId: form.templateId } : {}),
     });
+    // Persist the planned extras to the freshly-created day. Jake's
+    // product call (2026-05-10): users planning Tomorrow must trust
+    // that extras survive promotion. Non-atomic by design — Firestore
+    // transactions can't span the day write + N event writes; if any
+    // event fails the day still exists with partial extras and the
+    // user can re-add. Log loudly so the failure isn't silent.
+    for (const extra of extras) {
+      try {
+        await createEvent(db, CHILD_ID, { ...extra, dayId: promotedDayId });
+      } catch (err) {
+        console.error("[tomorrow] failed to persist extra on promote", {
+          eventId: extra.id,
+          dayId: promotedDayId,
+          err,
+        });
+      }
+    }
     router.replace("/");
   };
 
@@ -102,7 +126,7 @@ export default function TomorrowPage() {
       dayId: tomorrowDay.id,
       actuals: extras,
       settings,
-      nowMinutes: 12 * 60,
+      nowMinutes: TOMORROW_ANCHOR_MINUTES,
     });
     setDrawer({ open: true, mode: "create", template: tpl });
   };
@@ -163,7 +187,7 @@ export default function TomorrowPage() {
               : "closed"
         }
         owners={settings.owners}
-        nowMinutes={12 * 60}
+        nowMinutes={TOMORROW_ANCHOR_MINUTES}
         existingEvents={extras}
         open={drawer.open}
         event={drawer.open ? (drawer.mode === "edit" ? drawer.event : drawer.template) : null}
@@ -173,8 +197,13 @@ export default function TomorrowPage() {
             if (isPersistedActual(drawer.event.id, extras)) {
               setExtras((prev) => prev.map((e) => (e.id === event.id ? event : e)));
             } else {
-              const persisted: Event = { ...event, id: newEventId("manual") };
-              setExtras((prev) => [...prev, persisted]);
+              // Don't re-ID — the projected event's id (built via
+              // `buildCreateTemplate`/`newEventId`) is already
+              // collision-safe. Re-IDing would make a SECOND edit of
+              // the same projected event miss `isPersistedActual`
+              // (which checks the original projected id) and fall
+              // into this branch again, duplicating the extra.
+              setExtras((prev) => [...prev, event]);
             }
           } else {
             setExtras((prev) => [...prev, event]);

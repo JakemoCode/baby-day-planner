@@ -18,6 +18,7 @@ import type { OwnersConfig, OwnershipTemplate, Settings } from "@/v3/schemas";
 import { useV3Settings } from "@/v3/hooks/useV3Settings";
 import { useV3Templates } from "@/v3/hooks/useV3Templates";
 import { startNewDay } from "@/v3/repositories/days";
+import { createEvent } from "@/v3/repositories/events";
 import TomorrowPage from "./page";
 
 const replace = vi.fn();
@@ -35,6 +36,10 @@ vi.mock("@/v3/hooks/useV3Templates", () => ({
 
 vi.mock("@/v3/repositories/days", () => ({
   startNewDay: vi.fn(async () => ({ archivedDayId: null, newDayId: "day-x" })),
+}));
+
+vi.mock("@/v3/repositories/events", () => ({
+  createEvent: vi.fn(async () => undefined),
 }));
 
 vi.mock("@/v3/repositories/templates", () => ({
@@ -116,7 +121,10 @@ describe("TomorrowPage (V3)", () => {
     expect(screen.getByText(/loading tomorrow/i)).toBeVisible();
   });
 
-  it("shows loading until templates resolve (one-shot fetch)", () => {
+  // V3 listTemplates is a one-shot fetch (not a snapshot listener), so
+  // the loading flag is the only signal the page has to wait on before
+  // the template <select> can render its options.
+  it("shows loading until templates resolve", () => {
     vi.mocked(useV3Templates).mockReturnValueOnce({ templates: [], loading: true });
     render(<TomorrowPage />);
     expect(screen.getByText(/loading tomorrow/i)).toBeVisible();
@@ -151,8 +159,69 @@ describe("TomorrowPage (V3)", () => {
     const args = vi.mocked(startNewDay).mock.calls[0]?.[2];
     expect(args).toBeDefined();
     expect(args?.newWakeTime).toBe(7 * 60);
-    expect(args?.newDayId).toMatch(/^day-/);
     expect(replace).toHaveBeenCalledWith("/");
+  });
+
+  it("persists buffered extras to the new day on promote", async () => {
+    render(<TomorrowPage />);
+    // Add two extras through the drawer.
+    await userEvent.click(screen.getByRole("button", { name: /add extra event/i }));
+    await userEvent.click(screen.getByRole("button", { name: /^save$/i }));
+    await userEvent.click(screen.getByRole("button", { name: /add extra event/i }));
+    await userEvent.click(screen.getByRole("button", { name: /^save$/i }));
+
+    await userEvent.click(screen.getByRole("button", { name: /promote to today/i }));
+
+    // Both extras should be written to the events repo, stamped with
+    // the new day's id (the same id passed to startNewDay).
+    const promoteArgs = vi.mocked(startNewDay).mock.calls[0]?.[2];
+    const newDayId = promoteArgs?.newDayId;
+    expect(newDayId).toBeDefined();
+    expect(createEvent).toHaveBeenCalledTimes(2);
+    for (const call of vi.mocked(createEvent).mock.calls) {
+      expect(call[2].dayId).toBe(newDayId);
+    }
+  });
+
+  it("uses a UUID-based newDayId (no Date.now()-style ids)", async () => {
+    render(<TomorrowPage />);
+    await userEvent.click(screen.getByRole("button", { name: /promote to today/i }));
+    const args = vi.mocked(startNewDay).mock.calls[0]?.[2];
+    // V3 ids must come from crypto.randomUUID() (PR-C1 audit). The
+    // `day_` prefix + UUID shape is what newDayId() emits — the old
+    // `day-${Date.now()}` regression would not match.
+    expect(args?.newDayId).toMatch(/^day_[0-9a-f]{8}-/);
+  });
+
+  it("editing the same projected event twice does not duplicate the extra", async () => {
+    render(<TomorrowPage />);
+    // First "add extra" creates a projected template event and saves
+    // it into extras. Re-opening that same event via the timeline tap
+    // routes through the edit-of-projected branch; the bug being
+    // guarded against is a second save creating a duplicate entry.
+    await userEvent.click(screen.getByRole("button", { name: /add extra event/i }));
+    await userEvent.click(screen.getByRole("button", { name: /^save$/i }));
+
+    // Find the projected extra in the timeline and tap it to re-edit.
+    const extraBlock = screen
+      .getAllByTestId("timeline-block")
+      .find((el) => el.dataset.type === "extra");
+    expect(extraBlock).toBeDefined();
+    await userEvent.click(extraBlock!);
+    await userEvent.click(screen.getByRole("button", { name: /^save$/i }));
+
+    // Tap and save again — verifies the dedup invariant on a 3rd pass.
+    const extraBlock2 = screen
+      .getAllByTestId("timeline-block")
+      .filter((el) => el.dataset.type === "extra");
+    expect(extraBlock2).toHaveLength(1);
+    await userEvent.click(extraBlock2[0]!);
+    await userEvent.click(screen.getByRole("button", { name: /^save$/i }));
+
+    const finalExtras = screen
+      .getAllByTestId("timeline-block")
+      .filter((el) => el.dataset.type === "extra");
+    expect(finalExtras).toHaveLength(1);
   });
 
   it("promote forwards the selected templateId", async () => {
