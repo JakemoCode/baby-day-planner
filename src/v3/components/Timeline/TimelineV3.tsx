@@ -7,7 +7,7 @@ import { InstantCluster } from "./InstantCluster";
 import { NowBar } from "./NowBar";
 import { PUTDOWN_KIND_TAG, expandPutdownBlocks } from "./expandPutdown";
 import { groupInstants } from "./groupInstants";
-import styles from "@/components/Timeline/TimelineV2.module.css";
+import styles from "./TimelineV2.module.css";
 
 export type TimelineV3Props = {
   events: Event[];
