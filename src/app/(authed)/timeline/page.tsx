@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import type { Event, OwnershipTemplate } from "@/v3/schemas";
 import { isRecorded } from "@/v3/schemas";
 import { useNowMinutes } from "@/hooks/useNowMinutes";
+import { newEventId } from "@/v3/lib/newEventId";
 import { useV3Day } from "@/v3/hooks/useV3Day";
 import { useV3Events } from "@/v3/hooks/useV3Events";
 import { useV3Projection } from "@/v3/hooks/useV3Projection";
@@ -142,7 +143,7 @@ export default function TimelinePage() {
             // fresh id so we don't write under the synthetic "proj-…"
             // key.
             if (!isRecorded(drawer.event.lifecycle)) {
-              await createOptimistic({ ...event, id: `manual-${Date.now()}` });
+              await createOptimistic({ ...event, id: newEventId("manual") });
             } else {
               await updateOptimistic(event.id, event);
             }

@@ -97,7 +97,7 @@ export function isRecorded(lifecycle: Lifecycle): boolean {
  * They are derived from nap interval rules; never user-recorded directly.
  */
 export type Event = {
-  /** Firestore doc id (collision-safe via Date.now() suffix). */
+  /** Firestore doc id (collision-safe via crypto.randomUUID() — see newEventId). */
   id: string;
   /** Parent day. */
   dayId: string;
