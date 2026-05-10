@@ -3,13 +3,14 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import type { Day } from "@/domain";
-import { useEvents } from "@/hooks/useEvents";
-import { getDayByDate } from "@/repositories/days";
+import type { Day } from "@/v3/schemas";
+import { useV3Events } from "@/v3/hooks/useV3Events";
+import { useV3Settings } from "@/v3/hooks/useV3Settings";
+import { getDayByDate } from "@/v3/repositories/days";
 import { db } from "@/lib/firebase/client";
 import { LoadingState } from "@/components/shared/LoadingState";
 import { EmptyState } from "@/components/shared/EmptyState";
-import { ArchivedDayView } from "@/components/History/ArchivedDayView";
+import { ArchivedDayView } from "@/v3/components/History/ArchivedDayView";
 import styles from "./page.module.css";
 
 const CHILD_ID = process.env.NEXT_PUBLIC_DEFAULT_CHILD_ID ?? "aden";
@@ -19,6 +20,7 @@ export default function ArchivedDayPage() {
   const date = params?.date ?? "";
   const [day, setDay] = useState<Day | null>(null);
   const [loading, setLoading] = useState(true);
+  const { settings, loading: settingsLoading } = useV3Settings(CHILD_ID);
 
   useEffect(() => {
     let cancelled = false;
@@ -33,9 +35,9 @@ export default function ArchivedDayPage() {
     };
   }, [date]);
 
-  const { events } = useEvents(CHILD_ID, day?.id ?? "");
+  const { events } = useV3Events(CHILD_ID, day?.id ?? "", settings?.owners);
 
-  if (loading) {
+  if (loading || settingsLoading) {
     return (
       <div className={styles.page}>
         <LoadingState label="Loading day" />
@@ -43,7 +45,7 @@ export default function ArchivedDayPage() {
     );
   }
 
-  if (!day) {
+  if (!day || !settings) {
     return (
       <div className={styles.page}>
         <Link href="/history" className={styles.backLink}>
@@ -59,7 +61,12 @@ export default function ArchivedDayPage() {
       <Link href="/history" className={styles.backLink}>
         ← History
       </Link>
-      <ArchivedDayView day={day} events={events} />
+      <ArchivedDayView
+        day={day}
+        events={events}
+        owners={settings.owners}
+        putdownLeadMinutes={settings.putdownLeadMinutes}
+      />
     </div>
   );
 }
