@@ -276,7 +276,8 @@ describe("EventEditDrawerV3", () => {
         owners={owners}
         nowMinutes={NOW}
         onSave={async (event) => {
-          const exists = actuals.some((a) => a.id === overriddenNap.id);
+          // Mirror the page's `actuals.some(a => a.id === drawer.event.id)` check.
+          const exists = actuals.some((a) => a.id === event.id);
           if (exists) {
             await updateOptimistic(event.id, event);
           } else {

@@ -95,9 +95,9 @@ describe("OwnerPickerV3", () => {
     expect(screen.getByRole("button", { name: "Daycare" }).getAttribute("style")).toContain(
       "--owner-color: #ccc",
     );
-    // "None" has no owner ref → transparent fallback.
-    expect(screen.getByRole("button", { name: "None" }).getAttribute("style")).toContain(
-      "--owner-color: transparent",
+    // "None" has no owner ref → property omitted so CSS fallback (border / accent) applies.
+    expect(screen.getByRole("button", { name: "None" }).getAttribute("style") ?? "").not.toContain(
+      "--owner-color",
     );
   });
 });

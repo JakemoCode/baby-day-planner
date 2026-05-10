@@ -21,6 +21,22 @@ export function formatHM24(minutes: TimeMin): string {
   return `${String(h24).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
 }
 
+/**
+ * Inverse of `formatHM24`. Parses an "HH:MM" 24-hour string (the format
+ * `<input type="time">` emits) into a TimeMin. Returns `undefined` for
+ * malformed or out-of-range input — callers decide how to handle it
+ * (typically: ignore the change so the field's previous value sticks).
+ */
+export function parseHM24(raw: string): TimeMin | undefined {
+  const m = /^(\d{2}):(\d{2})$/.exec(raw);
+  if (!m) return undefined;
+  const h = Number(m[1]);
+  const min = Number(m[2]);
+  if (!Number.isFinite(h) || !Number.isFinite(min)) return undefined;
+  if (h < 0 || h > 23 || min < 0 || min > 59) return undefined;
+  return h * 60 + min;
+}
+
 export function formatTimeForDisplay(minutes: TimeMin): string {
   const { h24, m } = clockFace(minutes);
   const period = h24 >= 12 ? "PM" : "AM";

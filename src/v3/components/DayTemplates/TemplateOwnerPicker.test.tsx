@@ -7,8 +7,7 @@
  */
 
 import { describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
+import { render, screen, userEvent } from "@/test-utils";
 import type { Event, OwnersConfig, OwnershipTemplate } from "../../schemas";
 import { TemplateOwnerPicker } from "./TemplateOwnerPicker";
 
@@ -27,6 +26,19 @@ const napEvent: Event = {
   startTime: 9 * 60,
   endTime: 10 * 60,
   label: "Nap 1",
+  hasPutdown: false,
+  lifecycle: { state: "projected" },
+};
+
+const wakeWindowEvent: Event = {
+  id: "ww-1",
+  dayId: "day-1",
+  eventKey: "wake_window_1",
+  type: "wake_window",
+  kind: "block",
+  startTime: 8 * 60,
+  endTime: 9 * 60,
+  label: "Wake window 1",
   hasPutdown: false,
   lifecycle: { state: "projected" },
 };
@@ -122,6 +134,22 @@ describe("TemplateOwnerPicker (V3)", () => {
     );
     await userEvent.click(screen.getByRole("button", { name: "None" }));
     expect(onSelect).toHaveBeenCalledWith(undefined);
+  });
+
+  it("reads wake_window owner from template.wakeWindowOwners by index", () => {
+    const template = makeTemplate({
+      wakeWindowOwners: [{ slot: "parent2" }],
+    });
+    render(
+      <TemplateOwnerPicker
+        event={wakeWindowEvent}
+        template={template}
+        owners={owners}
+        onSelect={() => {}}
+      />,
+    );
+    expect(screen.getByRole("button", { name: "Sam" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "Jake" })).toHaveAttribute("aria-pressed", "false");
   });
 
   it("reads bottle owner from template.bottleOwners by index", () => {

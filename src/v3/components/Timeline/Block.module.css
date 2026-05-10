@@ -96,13 +96,13 @@
 }
 
 /* === Owner stripe (only in type-mode; drops in owner-mode per §11.C)
- * The stripe is a left border in the configured owner color. When no
- * owner is set, the fallback transparent value yields no visible stripe
- * because there's no contrast against the block's transparent fill.
+ * The stripe is a 5px left border in the configured owner color, gated
+ * on `[data-owner]` so unowned blocks don't reserve the 5px of layout
+ * width — keeps the lane edge consistent for the no-owner case.
  */
 
-.block[data-color-mode="type"] {
-  border-left: 5px solid var(--owner-color, transparent);
+.block[data-color-mode="type"][data-owner] {
+  border-left: 5px solid var(--owner-color);
 }
 
 /* === Variant-specific shape =================================== */

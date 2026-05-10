@@ -115,11 +115,11 @@ describe("TimelineV3", () => {
     expect(chip.getAttribute("style")).toContain("--owner-color: #ccc");
   });
 
-  it("falls back to transparent --owner-color when an event has no owner", () => {
+  it("omits --owner-color when an event has no owner (CSS handles the fallback)", () => {
     const events: Event[] = [ev({ id: "nap1" })];
     render(<TimelineV3 events={events} owners={owners} putdownLeadMinutes={15} />);
     const block = screen.getByTestId("timeline-block");
-    expect(block.getAttribute("style")).toContain("--owner-color: transparent");
+    expect(block.getAttribute("style") ?? "").not.toContain("--owner-color");
   });
 
   it("calls onEventTap with the parent event (never the synthetic putdown)", async () => {
