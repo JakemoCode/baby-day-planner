@@ -2,20 +2,21 @@
 
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
-import type { Day, Event, Owner, OwnershipTemplate } from "@/domain";
-import { useSettings } from "@/hooks/useSettings";
-import { useTemplates } from "@/hooks/useTemplates";
-import { startNewDay } from "@/repositories/startNewDay";
-import { saveTemplate } from "@/repositories/templates";
+import type { Day, Event, OwnerRef, OwnershipTemplate } from "@/v3/schemas";
+import { useV3Settings } from "@/v3/hooks/useV3Settings";
+import { useV3Templates } from "@/v3/hooks/useV3Templates";
+import { startNewDay } from "@/v3/repositories/days";
+import { saveTemplate } from "@/v3/repositories/templates";
+import { newEventId } from "@/v3/lib/newEventId";
 import { db } from "@/lib/firebase/client";
 import { LoadingState } from "@/components/shared/LoadingState";
-import { EventEditDrawer } from "@/components/shared/EventEditDrawer";
-import { buildCreateTemplate } from "@/components/shared/createEventTemplate";
-import { TomorrowForm, type TomorrowFormState } from "@/components/Tomorrow/TomorrowForm";
-import { TomorrowPreview } from "@/components/Tomorrow/TomorrowPreview";
-import { PromoteTomorrowButton } from "@/components/Tomorrow/PromoteTomorrowButton";
-import { TemplateOwnerPicker } from "@/components/DayTemplates/TemplateOwnerPicker";
-import { ASSIGNABLE_TYPES, setOwnerInTemplate } from "@/components/DayTemplates/setOwnerInTemplate";
+import { EventEditDrawerV3 } from "@/v3/components/shared/EventEditDrawerV3";
+import { buildCreateTemplate } from "@/v3/components/shared/createEventTemplate";
+import { TomorrowForm, type TomorrowFormValue } from "@/v3/components/Tomorrow/TomorrowForm";
+import { TomorrowPreview } from "@/v3/components/Tomorrow/TomorrowPreview";
+import { PromoteTomorrowButton } from "@/v3/components/Tomorrow/PromoteTomorrowButton";
+import { TemplateOwnerPicker } from "@/v3/components/DayTemplates/TemplateOwnerPicker";
+import { setOwnerInTemplate } from "@/v3/components/DayTemplates/setOwnerInTemplate";
 import styles from "./page.module.css";
 
 const CHILD_ID = process.env.NEXT_PUBLIC_DEFAULT_CHILD_ID ?? "aden";
@@ -31,19 +32,30 @@ function tomorrowDateString(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
+/**
+ * Whether the drawer's edit target already lives in the local extras
+ * list. Page-local mirror of the timeline's `isPersistedActual` check —
+ * here "persisted" means "in the extras buffer that will be promoted",
+ * not "in Firestore". Single source of truth so onSave/onDelete can't
+ * drift between create and update branches.
+ */
+function isPersistedActual(eventId: string, actuals: ReadonlyArray<Event>): boolean {
+  return actuals.some((a) => a.id === eventId);
+}
+
 export default function TomorrowPage() {
   const router = useRouter();
-  const { settings, loading: settingsLoading } = useSettings(CHILD_ID);
-  const { templates } = useTemplates(CHILD_ID);
+  const { settings, loading: settingsLoading } = useV3Settings(CHILD_ID);
+  const { templates, loading: templatesLoading } = useV3Templates(CHILD_ID);
 
-  const [form, setForm] = useState<TomorrowFormState>({
-    wakeTime: "07:00",
-    extras: [],
-  });
+  const [form, setForm] = useState<TomorrowFormValue>({ wakeTime: 7 * 60 });
+  const [extras, setExtras] = useState<Event[]>([]);
   const [drawer, setDrawer] = useState<DrawerState>({ open: false });
   const [pickedEvent, setPickedEvent] = useState<Event | null>(null);
-  // Local override of the selected template so owner edits in the preview
-  // reflect immediately without waiting for the listener round-trip.
+  // Local override of the selected template so owner edits in the
+  // preview reflect immediately without waiting for the listener
+  // round-trip. (V3 listTemplates is one-shot, so without this the
+  // preview wouldn't update at all until next mount.)
   const [templateOverride, setTemplateOverride] = useState<OwnershipTemplate | null>(null);
 
   const tomorrowDay = useMemo<Day>(() => {
@@ -53,9 +65,10 @@ export default function TomorrowPage() {
       date: tomorrowDateString(),
       status: "planned",
       wakeTime: form.wakeTime,
-      createdAt: new Date().toISOString(),
+      suppressedRecurringIds: [],
+      suppressedDaycareDay: false,
     };
-    if (form.templateId) day.ownershipTemplateId = form.templateId;
+    if (form.templateId) day.templateId = form.templateId;
     return day;
   }, [form.wakeTime, form.templateId]);
 
@@ -65,49 +78,43 @@ export default function TomorrowPage() {
     return templates.find((t) => t.id === form.templateId);
   }, [form.templateId, templates, templateOverride]);
 
-  if (settingsLoading || !settings) {
+  if (settingsLoading || !settings || templatesLoading) {
     return (
       <div className={styles.page}>
-        <LoadingState label="Loading settings" />
+        <LoadingState label="Loading tomorrow" />
       </div>
     );
   }
 
   const handlePromote = async () => {
-    const now = new Date().toISOString();
     await startNewDay(db, CHILD_ID, {
       newDayId: `day-${Date.now()}`,
       newDate: tomorrowDateString(),
       newWakeTime: form.wakeTime,
-      ...(form.templateId ? { ownershipTemplateId: form.templateId } : {}),
-      now,
+      ...(form.templateId ? { templateId: form.templateId } : {}),
     });
     router.replace("/");
+  };
+
+  const handleAddExtra = () => {
+    const tpl = buildCreateTemplate({
+      type: "extra",
+      dayId: tomorrowDay.id,
+      actuals: extras,
+      settings,
+      nowMinutes: 12 * 60,
+    });
+    setDrawer({ open: true, mode: "create", template: tpl });
   };
 
   return (
     <div className={styles.page}>
       <section className={styles.section}>
         <h2 className={styles.sectionTitle}>Plan</h2>
-        <TomorrowForm
-          value={form}
-          templates={templates}
-          onChange={setForm}
-          onAddExtra={() => {
-            const tpl = buildCreateTemplate({
-              type: "extra",
-              dayId: tomorrowDay.id,
-              actuals: form.extras,
-              settings,
-              nowHHMM: "12:00",
-            });
-            setDrawer({ open: true, mode: "create", template: tpl });
-          }}
-          onEditExtra={(event) => setDrawer({ open: true, mode: "edit", event })}
-          onRemoveExtra={(id) =>
-            setForm({ ...form, extras: form.extras.filter((e) => e.id !== id) })
-          }
-        />
+        <TomorrowForm value={form} templates={templates} onChange={setForm} />
+        <button type="button" onClick={handleAddExtra}>
+          Add extra event
+        </button>
       </section>
 
       <section className={styles.section}>
@@ -115,37 +122,39 @@ export default function TomorrowPage() {
         <TomorrowPreview
           day={tomorrowDay}
           settings={settings}
+          owners={settings.owners}
           {...(selectedTemplate ? { template: selectedTemplate } : {})}
-          extras={form.extras}
-          {...(form.bottle1Time ? { bottle1Time: form.bottle1Time } : {})}
+          extras={extras}
           onEventTap={(event) => {
             if (event.type === "extra") {
               setDrawer({ open: true, mode: "edit", event });
               return;
             }
-            if (!ASSIGNABLE_TYPES.includes(event.type)) return;
-            if (!selectedTemplate) return; // need a template to write owners into
+            // Owner picker only meaningful when a template is selected;
+            // without one there's nowhere to write the picked owner.
+            if (!selectedTemplate) return;
             setPickedEvent(event);
           }}
         />
       </section>
 
-      <PromoteTomorrowButton onPromote={handlePromote} disabled={!form.wakeTime} />
+      <PromoteTomorrowButton onPromote={handlePromote} />
 
       {pickedEvent && selectedTemplate && (
         <TemplateOwnerPicker
           event={pickedEvent}
-          onSelect={(owner: Owner) => {
+          template={selectedTemplate}
+          owners={settings.owners}
+          onSelect={(owner: OwnerRef | undefined) => {
             const next = setOwnerInTemplate(selectedTemplate, pickedEvent, owner);
             setTemplateOverride(next);
             setPickedEvent(null);
             void saveTemplate(db, CHILD_ID, next);
           }}
-          onCancel={() => setPickedEvent(null)}
         />
       )}
 
-      <EventEditDrawer
+      <EventEditDrawerV3
         key={
           drawer.open && drawer.mode === "edit"
             ? drawer.event.id
@@ -153,22 +162,36 @@ export default function TomorrowPage() {
               ? drawer.template.id
               : "closed"
         }
+        owners={settings.owners}
+        nowMinutes={12 * 60}
+        existingEvents={extras}
         open={drawer.open}
         event={drawer.open ? (drawer.mode === "edit" ? drawer.event : drawer.template) : null}
         mode={drawer.open && drawer.mode === "edit" ? "edit" : "create"}
         onSave={(event) => {
-          setForm((prev) => {
-            const others = prev.extras.filter((e) => e.id !== event.id);
-            return { ...prev, extras: [...others, event] };
-          });
+          if (drawer.open && drawer.mode === "edit") {
+            if (isPersistedActual(drawer.event.id, extras)) {
+              setExtras((prev) => prev.map((e) => (e.id === event.id ? event : e)));
+            } else {
+              const persisted: Event = { ...event, id: newEventId("manual") };
+              setExtras((prev) => [...prev, persisted]);
+            }
+          } else {
+            setExtras((prev) => [...prev, event]);
+          }
           setDrawer({ open: false });
         }}
         onCancel={() => setDrawer({ open: false })}
         onDelete={(event) => {
-          setForm((prev) => ({
-            ...prev,
-            extras: prev.extras.filter((e) => e.id !== event.id),
-          }));
+          if (
+            drawer.open &&
+            drawer.mode === "edit" &&
+            !isPersistedActual(drawer.event.id, extras)
+          ) {
+            setDrawer({ open: false });
+            return;
+          }
+          setExtras((prev) => prev.filter((e) => e.id !== event.id));
           setDrawer({ open: false });
         }}
       />
