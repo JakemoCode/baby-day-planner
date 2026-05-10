@@ -20,6 +20,7 @@ import {
   onSnapshot,
   orderBy,
   query,
+  runTransaction,
   setDoc,
   updateDoc,
   where,
@@ -27,7 +28,7 @@ import {
 } from "firebase/firestore";
 import { dayPath, daysCollectionPath } from "@/lib/firestore/paths";
 import { v3DayConverter } from "../firestore/converters";
-import type { Day } from "../schemas";
+import type { Day, TimeMin } from "../schemas";
 
 function dayRef(db: Firestore, childId: string, dayId: string) {
   return doc(db, dayPath(childId, dayId)).withConverter(v3DayConverter);
@@ -88,5 +89,65 @@ export function watchActiveDay(
   const q = query(daysRef(db, childId), where("status", "==", "active"), limit(1));
   return onSnapshot(q, (snap) => {
     cb(snap.empty ? null : snap.docs[0]!.data());
+  });
+}
+
+// ---------------------------------------------------------------------------
+// startNewDay
+// ---------------------------------------------------------------------------
+
+export type StartNewDayInput = {
+  newDayId: string;
+  newDate: string;
+  newWakeTime: TimeMin;
+  templateId?: string;
+};
+
+export type StartNewDayResult = {
+  archivedDayId: string | null;
+  newDayId: string;
+};
+
+/**
+ * Archives the current active day (if any) and creates a new one in
+ * a Firestore transaction. The active-day query happens OUTSIDE the
+ * transaction (Firestore can't run collection queries inside), so a
+ * race between query and transaction-start is theoretically possible.
+ * In a single-family deployment, the worst case is a second concurrent
+ * call that briefly leaves two active days; the watcher resolves to
+ * whichever wrote last. Acceptable; documented in ARCHITECTURE_V3.md.
+ *
+ * V3 day write deliberately omits `archivedAt` and `createdAt` (V2
+ * carried these; V3 schema does not). Status is the only signal of
+ * archive state; `Day.date` carries the date.
+ */
+export async function startNewDay(
+  db: Firestore,
+  childId: string,
+  input: StartNewDayInput,
+): Promise<StartNewDayResult> {
+  const activeQuery = query(daysRef(db, childId), where("status", "==", "active"), limit(1));
+  const activeSnap = await getDocs(activeQuery);
+  const activeDoc = activeSnap.empty ? null : activeSnap.docs[0]!;
+
+  return runTransaction(db, async (tx) => {
+    if (activeDoc) {
+      tx.update(activeDoc.ref, { status: "archived" });
+    }
+    const newDay: Day = {
+      id: input.newDayId,
+      childId,
+      date: input.newDate,
+      status: "active",
+      wakeTime: input.newWakeTime,
+      suppressedRecurringIds: [],
+      suppressedDaycareDay: false,
+      ...(input.templateId !== undefined ? { templateId: input.templateId } : {}),
+    };
+    tx.set(dayRef(db, childId, input.newDayId), newDay);
+    return {
+      archivedDayId: activeDoc?.id ?? null,
+      newDayId: input.newDayId,
+    };
   });
 }

@@ -210,6 +210,23 @@ Adds:
 - `suppressedRecurringIds: string[]` — per-day skip of recurring
   projections (see R11.6).
 
+Drops (vs V2):
+- `archivedAt: string` — V2 stamped this on archive; V3 just flips
+  `status: "archived"`. Engine doesn't read it; `Day.date` carries
+  chronological order for history.
+- `createdAt: string` — V2 stamped this on day creation; V3 doesn't
+  carry it. Same rationale (engine doesn't read; date suffices).
+- `ownershipTemplateId: string` — renamed to `templateId` in V3.
+  `withV3DayDefaults` (PR-A0.1) remaps reads of legacy V2 docs
+  during the cutover; remap drops in PR-C1.
+
+`startNewDay` (PR-A0.2) is non-atomic by design: the active-day
+query happens outside the transaction (Firestore can't run
+collection queries inside `runTransaction`). Race window between
+query and transaction is acceptable in single-family deployment;
+worst case is a brief overlap of two active days resolved by the
+watcher reading the most recent.
+
 ### 1.3 OwnershipTemplate shape
 
 ```ts
