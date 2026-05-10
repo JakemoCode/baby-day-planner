@@ -25,7 +25,11 @@ export type OwnerAttrs = {
   style?: React.CSSProperties;
 };
 
-/** Inline-style object containing only `--owner-color`, or undefined when no color. */
+/** Inline-style object containing only `--owner-color`, or undefined when no color.
+ * The `as React.CSSProperties` cast is required: `csstype`'s Properties has no
+ * index signature for `--*` custom properties, so the literal must be cast.
+ * (Verified: dropping the cast errors TS2353. §1.4 removed the redundant inner
+ * `["--owner-color" as string]` index cast but the outer one stays.) */
 export function ownerStyleVar(color: string | null): React.CSSProperties | undefined {
   return color ? ({ "--owner-color": color } as React.CSSProperties) : undefined;
 }
