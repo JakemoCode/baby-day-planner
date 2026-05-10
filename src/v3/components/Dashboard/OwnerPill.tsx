@@ -1,6 +1,6 @@
-import type { CSSProperties } from "react";
 import type { OwnerRef, OwnersConfig } from "@/v3/schemas";
 import { ownerColor, ownerDisplayName } from "@/v3/ui/owners";
+import { ownerStyleVar } from "@/v3/ui/ownerStyle";
 import styles from "./OwnerPill.module.css";
 
 export type OwnerPillProps = {
@@ -21,11 +21,9 @@ export function OwnerPill({ owner, owners, className }: OwnerPillProps) {
   if (!owner) return null;
   const name = ownerDisplayName(owner, owners);
   if (!name) return null;
-  const color = ownerColor(owner, owners);
-  const style = color ? ({ "--owner-color": color } as CSSProperties) : undefined;
   const cls = className ? `${styles.pill} ${className}` : styles.pill;
   return (
-    <span className={cls} style={style}>
+    <span className={cls} style={ownerStyleVar(ownerColor(owner, owners))}>
       {name}
     </span>
   );

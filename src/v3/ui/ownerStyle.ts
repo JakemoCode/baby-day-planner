@@ -27,12 +27,10 @@ export type OwnerAttrs = {
 };
 
 /** Inline-style object containing only `--owner-color`, or undefined when no color.
- * The `as CSSProperties` cast is required: `csstype`'s Properties has no
- * index signature for `--*` custom properties, so the literal must be cast.
- * (Verified: dropping the cast errors TS2353. §1.4 removed the redundant inner
- * `["--owner-color" as string]` index cast but the outer one stays.) */
+ * No `as CSSProperties` cast — the project-wide `--*` augmentation in
+ * `src/types/react-css.d.ts` opens CSSProperties for custom properties. */
 export function ownerStyleVar(color: string | null): CSSProperties | undefined {
-  return color ? ({ "--owner-color": color } as CSSProperties) : undefined;
+  return color ? { "--owner-color": color } : undefined;
 }
 
 /** All the spreadable attributes a tinted owner element needs. */
