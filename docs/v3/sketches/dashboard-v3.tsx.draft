@@ -1,0 +1,398 @@
+// SKETCH — not committed code. Written to surface plan-vs-reality gaps
+// for the Dashboard cutover (PR-B2). Saved as .draft so vitest/eslint
+// don't pick it up. Renamed to .tsx and moved to src/app/(authed)/page.tsx
+// during PR-B2 execution.
+//
+// What this exercise surfaces:
+// - Which V3 components / hooks / utilities Dashboard actually needs
+// - Which currently exist vs. need to be built in Phase A0/A
+// - Where TypeScript will complain (= contract mismatches the plan
+//   needs to address before PR-B2 can compile)
+// - The exact import shape for each missing piece
+
+"use client";
+
+import Link from "next/link";
+import { useMemo, useState } from "react";
+
+// EXISTING — V3 schemas
+import type { Event, OwnershipTemplate } from "@/v3/schemas";
+import { isRecorded } from "@/v3/schemas";
+
+// EXISTING — V3 hooks
+import { useNowMinutes } from "@/hooks/useNowMinutes"; // V2 path; lives outside @/v3 but is V3-compatible (returns TimeMin)
+import { useV3Day } from "@/v3/hooks/useV3Day";
+import { useV3Events } from "@/v3/hooks/useV3Events"; // signature today is (childId, dayId); PR-A0.6 adds owners?
+import { useV3Projection } from "@/v3/hooks/useV3Projection";
+import { useV3Settings } from "@/v3/hooks/useV3Settings";
+import { useV3Templates } from "@/v3/hooks/useV3Templates";
+
+// PR-A1 — V3 selectors (does not exist yet)
+import {
+  currentWakeWindow,
+  nextBottle,
+  nextEvent,
+  nextNap,
+  projectedBedtime,
+} from "@/v3/selectors";
+
+// PR-A0.10 — placeholder constants (do not exist yet)
+import {
+  PLACEHOLDER_DAY,
+  PLACEHOLDER_SETTINGS,
+} from "@/v3/hooks/projectionPlaceholders";
+
+// PR-A0.2 — V3 startNewDay (does not exist yet on V3 days repo)
+import { startNewDay } from "@/v3/repositories/days";
+
+// PR-A0.9 — collision-safe id (does not exist yet)
+import { newEventId } from "@/v3/lib/newEventId";
+
+// EXISTING — Firebase client
+import { db } from "@/lib/firebase/client";
+
+// EXISTING — V3 shared
+import { EventEditDrawerV3 } from "@/v3/components/shared/EventEditDrawerV3";
+import { buildCreateTemplate, type CreatableType } from "@/v3/components/shared/createEventTemplate";
+
+// V2 reuses — presentational, no shape concerns (per plan, no V3 versions needed)
+import { LoadingState } from "@/components/shared/LoadingState";
+import { FAB } from "@/components/shared/FAB";
+import { FABTypePicker } from "@/components/shared/FABTypePicker";
+
+// PR-A2 — V3 dashboard cards (do not exist yet)
+import { CurrentWakeWindowStatus } from "@/v3/components/Dashboard/CurrentWakeWindowStatus";
+import { EndOfDayCard } from "@/v3/components/Dashboard/EndOfDayCard";
+import { NapActionButton } from "@/v3/components/Dashboard/NapActionButton";
+import { NextBottlePreview } from "@/v3/components/Dashboard/NextBottlePreview";
+import { NextEventCard } from "@/v3/components/Dashboard/NextEventCard";
+import { NextNapPreview } from "@/v3/components/Dashboard/NextNapPreview";
+import { StartBottleButton } from "@/v3/components/Dashboard/StartBottleButton";
+import { StartDayButton } from "@/v3/components/Dashboard/StartDayButton";
+
+import styles from "./page.module.css";
+
+const CHILD_ID = process.env.NEXT_PUBLIC_DEFAULT_CHILD_ID ?? "aden";
+
+type DrawerState =
+  | { open: false }
+  | { open: true; mode: "create"; template: Event }
+  | { open: true; mode: "edit"; event: Event };
+
+export default function DashboardPage() {
+  const nowMinutes = useNowMinutes();
+  const { day, loading: dayLoading } = useV3Day(CHILD_ID);
+  const { settings, loading: settingsLoading } = useV3Settings(CHILD_ID);
+  const { templates } = useV3Templates(CHILD_ID);
+
+  // PR-A0.6 — useV3Events takes optional owners arg; pass settings.owners
+  // here so V2 string owners on legacy events backfill to correct slots
+  const {
+    events: actuals,
+    createOptimistic,
+    updateOptimistic,
+    // deleteOptimistic — Dashboard doesn't need it
+  } = useV3Events(CHILD_ID, day?.id ?? "", settings?.owners);
+
+  const [drawer, setDrawer] = useState<DrawerState>({ open: false });
+  const [pickerOpen, setPickerOpen] = useState(false);
+
+  const template = useMemo<OwnershipTemplate | undefined>(() => {
+    if (!day?.templateId) return undefined; // V3 field
+    return templates.find((t) => t.id === day.templateId);
+  }, [day, templates]);
+
+  // useV3Projection requires day + settings non-null. Use placeholders
+  // until both load. The early-return below ensures the engine output
+  // is never rendered with placeholders.
+  const projected = useV3Projection({
+    day: day ?? PLACEHOLDER_DAY,
+    settings: settings ?? PLACEHOLDER_SETTINGS,
+    actuals,
+    ...(template ? { template } : {}),
+  });
+
+  if (dayLoading || settingsLoading) {
+    return (
+      <div className={styles.page}>
+        <LoadingState label="Loading today" />
+      </div>
+    );
+  }
+
+  // No active day, or wakeTime hasn't been set yet → Start Day prompt
+  // GOTCHA: V3 wakeTime is TimeMin | undefined. Use === undefined,
+  // never truthy (TimeMin 0 is falsy = midnight wake).
+  if (!day || !settings || day.wakeTime === undefined) {
+    const handleStart = async () => {
+      const now = new Date();
+      const today = now.toISOString().slice(0, 10);
+      const wakeMin = now.getHours() * 60 + now.getMinutes();
+      await startNewDay(db, CHILD_ID, {
+        newDayId: `day-${newEventId("d")}`,
+        newDate: today,
+        newWakeTime: wakeMin,
+      });
+    };
+    return (
+      <div className={styles.page}>
+        <EndOfDayCard
+          afterMidnight
+          hasTomorrowPlan={false}
+          onStart={handleStart}
+        />
+      </div>
+    );
+  }
+
+  // After bedtime, no upcoming events → end-of-day card
+  // GOTCHA: bedtimeThreshold is TimeMin (number) — direct comparison,
+  // no parseTime conversion (commitment #3)
+  const next = nextEvent(projected, nowMinutes);
+  const afterBedtime = nowMinutes >= settings.bedtimeThreshold;
+  const isEndOfDay = !next && afterBedtime;
+
+  if (isEndOfDay) {
+    return (
+      <div className={styles.page}>
+        <EndOfDayCard
+          afterMidnight={false}
+          hasTomorrowPlan={false}
+          onStart={async () => {
+            // Won't fire pre-midnight; kept for type safety
+          }}
+        />
+      </div>
+    );
+  }
+
+  const nb = nextBottle(projected, nowMinutes);
+  const nn = nextNap(projected, nowMinutes);
+  const cww = currentWakeWindow(projected, nowMinutes);
+  const inProgressNap = actuals.find(
+    (e) => e.type === "nap" && e.endTime === undefined && e.lifecycle.state === "started",
+  );
+  const bottle1Pending = !actuals.some((e) => e.type === "bottle");
+
+  // Ordinal helpers: count distinct eventKeys among RECORDED events
+  // (V2 used `recorded:true`; V3 uses isRecorded(lifecycle))
+  const uniqueRecordedKeys = (type: Event["type"]) => {
+    const seen = new Set<string>();
+    for (const e of actuals) {
+      if (e.type !== type) continue;
+      if (!isRecorded(e.lifecycle)) continue;
+      seen.add(e.eventKey);
+    }
+    return seen.size;
+  };
+  const nextBottleNumber = uniqueRecordedKeys("bottle") + 1;
+  const nextNapNumber = uniqueRecordedKeys("nap") + 1;
+
+  const lastEventOfType = (type: Event["type"]): Event | undefined =>
+    actuals
+      .filter((e) => e.type === type && isRecorded(e.lifecycle))
+      .sort((a, b) => b.startTime - a.startTime)[0];
+
+  const lastBottle = lastEventOfType("bottle");
+  const lastNap = lastEventOfType("nap");
+  const lastBottleTime = lastBottle?.startTime;
+
+  // GOTCHA: dream feed comparison uses TimeMin direct (no parseTime)
+  const upcomingDreamFeed = projected.find(
+    (e) => e.type === "dream_feed" && e.startTime >= nowMinutes,
+  );
+
+  const bedtime = projectedBedtime(projected); // returns Event | undefined (V3 selector)
+
+  // Smart suppression
+  const nextType = next?.type;
+  const hideBottlePreview = nextType === "bottle" || nextType === "dream_feed";
+  const hideNapPreview = nextType === "nap" || nextType === "bedtime";
+  // V3 has no "putdown" type — V2 had nextType === "putdown" check; drop it
+
+  // V3 has no putdown event; renderer synthesizes from hasPutdown flag.
+  // Dashboard's "next event card" doesn't need to look up a parent.
+  // (V2 had: nextTargetEvent for nextType === "putdown" — drop it in V3)
+
+  const handleLogBottle = async (bottle: Event) => {
+    await createOptimistic(bottle);
+  };
+  const handleStartNap = async (nap: Event) => {
+    await createOptimistic(nap);
+  };
+  const handleEndNap = async (nap: Event, endTime: number) => {
+    // V3 fix: updateOptimistic on the existing started nap (V2 bug:
+    // V2 created a NEW doc here, leaving the started doc orphaned)
+    await updateOptimistic(nap.id, {
+      endTime,
+      lifecycle: { state: "completed", committedAt: endTime },
+    });
+  };
+  const handleStartDay = async ({ useTomorrowPlan: _ }: { useTomorrowPlan: boolean }) => {
+    const now = new Date();
+    const today = now.toISOString().slice(0, 10);
+    const wakeMin = now.getHours() * 60 + now.getMinutes();
+    await startNewDay(db, CHILD_ID, {
+      newDayId: `day-${newEventId("d")}`,
+      newDate: today,
+      newWakeTime: wakeMin,
+    });
+  };
+
+  return (
+    <div className={styles.page}>
+      <NextEventCard
+        event={next}
+        nowMinutes={nowMinutes}
+        owners={settings.owners}
+      />
+      {!hideBottlePreview && (
+        <NextBottlePreview
+          bottle={nb}
+          bottle1Pending={bottle1Pending}
+          owners={settings.owners}
+          {...(lastBottle ? { lastBottle } : {})}
+          {...(upcomingDreamFeed ? { dreamFeed: upcomingDreamFeed } : {})}
+        />
+      )}
+      {!hideNapPreview && (
+        <NextNapPreview
+          nap={nn}
+          owners={settings.owners}
+          {...(lastNap ? { lastNap } : {})}
+          {...(bedtime ? { bedtime } : {})}
+        />
+      )}
+      <CurrentWakeWindowStatus wakeWindow={cww} owners={settings.owners} />
+
+      <div className={styles.actions}>
+        <StartBottleButton
+          defaultAmountOz={settings.defaultBottleAmountOz}
+          dayId={day.id}
+          nextNumber={nextBottleNumber}
+          onLog={handleLogBottle}
+          minIntervalMinutes={settings.minBottleIntervalMinutes}
+          {...(lastBottleTime !== undefined ? { lastBottleTime } : {})}
+        />
+        <div className={styles.actionsRow}>
+          <NapActionButton
+            inProgressNap={inProgressNap}
+            dayId={day.id}
+            nextNumber={nextNapNumber}
+            onStart={handleStartNap}
+            onEnd={handleEndNap}
+          />
+          <StartDayButton hasTomorrowPlan={false} onStart={handleStartDay} />
+        </div>
+      </div>
+
+      <FAB label="Add an event" onClick={() => setPickerOpen(true)} />
+
+      <FABTypePicker
+        open={pickerOpen}
+        onSelect={(type: CreatableType) => {
+          setPickerOpen(false);
+          const tpl = buildCreateTemplate({
+            type,
+            dayId: day.id,
+            actuals,
+            settings,
+            nowMinutes,
+          });
+          setDrawer({ open: true, mode: "create", template: tpl });
+        }}
+        onCancel={() => setPickerOpen(false)}
+      />
+
+      <EventEditDrawerV3
+        key={
+          drawer.open && drawer.mode === "edit"
+            ? drawer.event.id
+            : drawer.open && drawer.mode === "create"
+              ? drawer.template.id
+              : "closed"
+        }
+        owners={settings.owners}
+        nowMinutes={nowMinutes}
+        existingEvents={projected}
+        open={drawer.open}
+        event={drawer.open ? (drawer.mode === "edit" ? drawer.event : drawer.template) : null}
+        mode={drawer.open && drawer.mode === "edit" ? "edit" : "create"}
+        onSave={async (event) => {
+          if (drawer.open && drawer.mode === "edit") {
+            // PR-A0.4 logic: actuals-membership distinguishes
+            // first-override-of-projected from re-edit-of-existing.
+            // (Replaces V2's `isRecorded` check which was wrong for
+            // already-overridden events being re-edited.)
+            const exists = actuals.some((a) => a.id === drawer.event.id);
+            if (exists) {
+              await updateOptimistic(event.id, event);
+            } else {
+              await createOptimistic({ ...event, id: newEventId("manual") });
+            }
+          } else {
+            await createOptimistic(event);
+          }
+          setDrawer({ open: false });
+        }}
+        onCancel={() => setDrawer({ open: false })}
+      />
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// SKETCH FINDINGS (what compiling this would tell us)
+// ---------------------------------------------------------------------------
+// These are surfaced by writing the page against the proposed V3 surface
+// before any of Phase A0 / A is built. Each item below is something the
+// plan needs to address explicitly:
+//
+// 1. useV3Events signature: PR-A0.6 must add the `owners?: OwnersConfig`
+//    third argument. Sketch uses 3-arg form.
+//
+// 2. PLACEHOLDER_DAY / PLACEHOLDER_SETTINGS must be exported from
+//    @/v3/hooks/projectionPlaceholders (PR-A0.10).
+//
+// 3. startNewDay must be exported from @/v3/repositories/days (PR-A0.2)
+//    with the `{ newDayId, newDate, newWakeTime, templateId? }` input
+//    shape. Sketch uses TimeMin newWakeTime.
+//
+// 4. newEventId must be exported from @/v3/lib/newEventId (PR-A0.9).
+//
+// 5. V3 selectors (nextEvent, nextBottle, nextNap, currentWakeWindow,
+//    projectedBedtime) must be exported from @/v3/selectors (PR-A1).
+//    projectedBedtime returns Event | undefined (NOT string).
+//
+// 6. V3 dashboard cards must be exported from @/v3/components/Dashboard
+//    (PR-A2). Each takes V3 Event/OwnersConfig/TimeMin props:
+//    - NextEventCard: { event, nowMinutes, owners }
+//    - NextBottlePreview: { bottle, bottle1Pending, owners, lastBottle?, dreamFeed? }
+//    - NextNapPreview: { nap, owners, lastNap?, bedtime? }
+//    - CurrentWakeWindowStatus: { wakeWindow, owners }
+//    - StartBottleButton: { defaultAmountOz, dayId, nextNumber, onLog, minIntervalMinutes, lastBottleTime? (TimeMin) }
+//    - NapActionButton: { inProgressNap, dayId, nextNumber, onStart, onEnd: (nap, endTime: TimeMin) => Promise }
+//    - StartDayButton: { hasTomorrowPlan, onStart: ({ useTomorrowPlan }) => Promise }
+//    - EndOfDayCard: { afterMidnight, hasTomorrowPlan, onStart }
+//
+// 7. NextEventCard takes `event` not `targetEvent` for putdown lookup
+//    — V3 has no putdown event type, so the V2 "find target via
+//    eventKey suffix" pattern is dropped entirely.
+//
+// 8. handleEndNap signature changed: takes `endTime: number` (TimeMin)
+//    not `endTime: string` (HH:MM). NapActionButton must pass TimeMin.
+//
+// 9. EventEditDrawerV3 takes `nowMinutes` and `owners` as required
+//    props (verified in the existing component).
+//
+// 10. Dashboard's `inProgressNap` check uses lifecycle.state === "started"
+//     instead of V2's `endTime === undefined` (V3 has explicit lifecycle).
+//
+// 11. The "wakeTime check" must use === undefined (TimeMin 0 = midnight
+//     would be falsy under truthy check).
+//
+// 12. The dream feed lookup uses TimeMin direct comparison: no
+//     parseTime needed.
+//
+// 13. The bedtime check (nowMinutes >= settings.bedtimeThreshold) uses
+//     TimeMin direct: no parseTime needed.
