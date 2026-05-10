@@ -1,6 +1,6 @@
 "use client";
 
-import styles from "@/components/Timeline/InstantCluster.module.css";
+import styles from "./InstantCluster.module.css";
 import type { Event, OwnersConfig } from "../../schemas";
 import { InstantChip } from "./InstantChip";
 

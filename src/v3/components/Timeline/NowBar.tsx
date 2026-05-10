@@ -1,6 +1,6 @@
 "use client";
 
-import styles from "@/components/Timeline/NowBar.module.css";
+import styles from "./NowBar.module.css";
 import type { TimeMin } from "../../schemas";
 import { formatTimeForDisplay } from "../../ui/time";
 
