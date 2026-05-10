@@ -46,7 +46,7 @@ export default function TimelinePage() {
     createOptimistic,
     updateOptimistic,
     deleteOptimistic,
-  } = useV3Events(CHILD_ID, day?.id ?? "");
+  } = useV3Events(CHILD_ID, day?.id ?? "", settings?.owners);
   const { templates } = useV3Templates(CHILD_ID);
   const [drawer, setDrawer] = useState<DrawerState>({ open: false });
   const [pickerOpen, setPickerOpen] = useState(false);

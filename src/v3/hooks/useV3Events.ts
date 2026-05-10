@@ -9,7 +9,7 @@ import {
   updateEvent as updateEventRepo,
   watchEvents,
 } from "../repositories/events";
-import type { Event } from "../schemas";
+import type { Event, OwnersConfig } from "../schemas";
 
 export type UseV3EventsResult = {
   events: Event[];
@@ -19,7 +19,11 @@ export type UseV3EventsResult = {
   deleteOptimistic: (eventId: string) => Promise<void>;
 };
 
-export function useV3Events(childId: string, dayId: string): UseV3EventsResult {
+export function useV3Events(
+  childId: string,
+  dayId: string,
+  owners?: OwnersConfig,
+): UseV3EventsResult {
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -31,12 +35,13 @@ export function useV3Events(childId: string, dayId: string): UseV3EventsResult {
     return watchEvents(db, childId, dayId, (next) => {
       // Flow each doc through withV3EventDefaults so V2-shape leftovers
       // (string startTime, source/status/recorded triplet, missing
-      // lifecycle / kind / hasPutdown) don't crash the engine. Removed
-      // once V2 reads stop entirely.
-      setEvents(next.map(withV3EventDefaults));
+      // lifecycle / kind / hasPutdown) don't crash the engine. Pass the
+      // owners config so V2 string `owner` display names can be resolved
+      // back to the correct slot ref. Removed once V2 reads stop entirely.
+      setEvents(next.map((e) => withV3EventDefaults(e, owners)));
       setLoading(false);
     });
-  }, [childId, dayId]);
+  }, [childId, dayId, owners]);
 
   const createOptimistic = useCallback(
     async (event: Event) => {

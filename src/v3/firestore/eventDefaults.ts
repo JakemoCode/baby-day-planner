@@ -14,7 +14,15 @@
  * stop, this either retires or stays as cheap insurance.
  */
 
-import type { Event, EventKind, EventType, Lifecycle, OwnerRef, TimeMin } from "../schemas";
+import type {
+  Event,
+  EventKind,
+  EventType,
+  Lifecycle,
+  OwnerRef,
+  OwnersConfig,
+  TimeMin,
+} from "../schemas";
 
 type V2EventLike = {
   id?: string;
@@ -70,21 +78,29 @@ function deriveKind(input: V2EventLike): EventKind {
   return "instant";
 }
 
-function deriveOwner(input: V2EventLike): OwnerRef | undefined {
+function deriveOwner(input: V2EventLike, owners?: OwnersConfig): OwnerRef | undefined {
   const raw = input.owner;
   if (raw === undefined || raw === null || raw === "") return undefined;
   if (typeof raw === "object") return raw;
-  // V2 owners were free display strings. We can't recover the original
-  // slot identity post-hoc; map any truthy string onto parent1 so the
-  // engine has a slot. The user can re-edit in the drawer to fix.
+  // V2 owners were free display strings. When an owners config is
+  // available, look the string up against the configured displayNames so
+  // we can recover the original slot identity. Otherwise (or on miss),
+  // fall back to parent1 so the engine has *something*; the user can
+  // re-edit in the drawer to fix it.
+  if (owners) {
+    if (raw === owners.parent1.displayName) return { slot: "parent1" };
+    if (raw === owners.parent2.displayName) return { slot: "parent2" };
+    const match = owners.other.find((o) => o.displayName === raw);
+    if (match) return { slot: "other", otherId: match.id };
+  }
   return { slot: "parent1" };
 }
 
-export function withV3EventDefaults(input: Event | V2EventLike): Event {
+export function withV3EventDefaults(input: Event | V2EventLike, owners?: OwnersConfig): Event {
   const raw = input as V2EventLike;
   const startTime = asTimeMin(raw.startTime) ?? 0;
   const endTime = asTimeMin(raw.endTime);
-  const owner = deriveOwner(raw);
+  const owner = deriveOwner(raw, owners);
   const lifecycle = deriveLifecycle(raw, startTime);
   const kind = deriveKind(raw);
 
