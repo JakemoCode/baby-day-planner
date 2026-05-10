@@ -1,12 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { act, renderHook, waitFor } from "@testing-library/react";
-import type { Event } from "../schemas";
+import type { Event, OwnersConfig } from "../schemas";
 import { useV3Events } from "./useV3Events";
+import type * as EventDefaultsModule from "../firestore/eventDefaults";
 
 const watchEventsMock = vi.fn();
 const createEventMock = vi.fn().mockResolvedValue(undefined);
 const updateEventMock = vi.fn().mockResolvedValue(undefined);
 const deleteEventMock = vi.fn().mockResolvedValue(undefined);
+const withV3EventDefaultsMock = vi.fn();
 
 vi.mock("../repositories/events", () => ({
   watchEvents: (...args: unknown[]) => watchEventsMock(...args),
@@ -14,6 +16,15 @@ vi.mock("../repositories/events", () => ({
   updateEvent: (...args: unknown[]) => updateEventMock(...args),
   deleteEvent: (...args: unknown[]) => deleteEventMock(...args),
 }));
+vi.mock("../firestore/eventDefaults", async () => {
+  const actual = await vi.importActual<typeof EventDefaultsModule>("../firestore/eventDefaults");
+  return {
+    withV3EventDefaults: (...args: Parameters<typeof actual.withV3EventDefaults>) => {
+      withV3EventDefaultsMock(...args);
+      return actual.withV3EventDefaults(...args);
+    },
+  };
+});
 vi.mock("@/lib/firebase/client", () => ({ db: {} }));
 
 const baseEvent = (overrides: Partial<Event>): Event => ({
@@ -36,6 +47,25 @@ describe("useV3Events", () => {
     createEventMock.mockClear();
     updateEventMock.mockClear();
     deleteEventMock.mockClear();
+    withV3EventDefaultsMock.mockClear();
+  });
+
+  it("passes owners through to withV3EventDefaults inside the watcher callback", async () => {
+    let cb: ((events: Event[]) => void) | undefined;
+    watchEventsMock.mockImplementation((_db, _cid, _did, callback) => {
+      cb = callback;
+      return () => {};
+    });
+    const owners: OwnersConfig = {
+      parent1: { displayName: "Jake", color: "#111" },
+      parent2: { displayName: "Sam", color: "#222" },
+      other: [{ id: "daycare", displayName: "Daycare", color: "#333" }],
+    };
+    const { result } = renderHook(() => useV3Events("child-1", "day-1", owners));
+    const incoming = baseEvent({});
+    cb!([incoming]);
+    await waitFor(() => expect(result.current.events).toHaveLength(1));
+    expect(withV3EventDefaultsMock).toHaveBeenCalledWith(incoming, owners);
   });
 
   it("exposes V3 events from the repo watcher", async () => {

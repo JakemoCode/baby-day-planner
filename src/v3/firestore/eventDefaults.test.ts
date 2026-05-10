@@ -9,8 +9,14 @@
  */
 
 import { describe, expect, it } from "vitest";
-import type { Event } from "../schemas";
+import type { Event, OwnersConfig } from "../schemas";
 import { withV3EventDefaults } from "./eventDefaults";
+
+const ownersConfig: OwnersConfig = {
+  parent1: { displayName: "Jake", color: "#111" },
+  parent2: { displayName: "Sam", color: "#222" },
+  other: [{ id: "daycare", displayName: "Daycare", color: "#333" }],
+};
 
 describe("withV3EventDefaults", () => {
   it("passes through a fully-shaped V3 event unchanged", () => {
@@ -195,6 +201,79 @@ describe("withV3EventDefaults", () => {
       lifecycle: { state: "projected" },
     };
     expect(withV3EventDefaults(v3).owner).toEqual({ slot: "parent2" });
+  });
+
+  it("resolves V2 owner string to parent1 slot when displayName matches", () => {
+    const v2 = {
+      id: "n-1",
+      dayId: "d-1",
+      eventKey: "nap_1",
+      type: "nap",
+      label: "Nap 1",
+      startTime: "09:00",
+      endTime: "10:30",
+      owner: "Jake",
+    } as unknown as Event;
+    expect(withV3EventDefaults(v2, ownersConfig).owner).toEqual({ slot: "parent1" });
+  });
+
+  it("resolves V2 owner string to parent2 slot when displayName matches", () => {
+    const v2 = {
+      id: "n-1",
+      dayId: "d-1",
+      eventKey: "nap_1",
+      type: "nap",
+      label: "Nap 1",
+      startTime: "09:00",
+      endTime: "10:30",
+      owner: "Sam",
+    } as unknown as Event;
+    expect(withV3EventDefaults(v2, ownersConfig).owner).toEqual({ slot: "parent2" });
+  });
+
+  it("resolves V2 owner string to other slot+id when displayName matches", () => {
+    const v2 = {
+      id: "n-1",
+      dayId: "d-1",
+      eventKey: "nap_1",
+      type: "nap",
+      label: "Nap 1",
+      startTime: "09:00",
+      endTime: "10:30",
+      owner: "Daycare",
+    } as unknown as Event;
+    expect(withV3EventDefaults(v2, ownersConfig).owner).toEqual({
+      slot: "other",
+      otherId: "daycare",
+    });
+  });
+
+  it("falls back to parent1 when V2 owner string does not match any owner displayName", () => {
+    const v2 = {
+      id: "n-1",
+      dayId: "d-1",
+      eventKey: "nap_1",
+      type: "nap",
+      label: "Nap 1",
+      startTime: "09:00",
+      endTime: "10:30",
+      owner: "Unknown",
+    } as unknown as Event;
+    expect(withV3EventDefaults(v2, ownersConfig).owner).toEqual({ slot: "parent1" });
+  });
+
+  it("falls back to parent1 when no owners config is supplied", () => {
+    const v2 = {
+      id: "n-1",
+      dayId: "d-1",
+      eventKey: "nap_1",
+      type: "nap",
+      label: "Nap 1",
+      startTime: "09:00",
+      endTime: "10:30",
+      owner: "Jake",
+    } as unknown as Event;
+    expect(withV3EventDefaults(v2).owner).toEqual({ slot: "parent1" });
   });
 
   it("strips owner when the V2 string is empty / falsy", () => {
