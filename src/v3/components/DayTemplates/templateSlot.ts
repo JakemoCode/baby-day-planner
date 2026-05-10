@@ -20,33 +20,22 @@ export type TemplateSlot =
   | { kind: "bedtime" }
   | { kind: "nap" | "wakeWindow" | "bottle"; index: number };
 
-const NAP_RE = /^nap_(\d+)$/;
-const WAKE_RE = /^wake_window_(\d+)$/;
-const BOTTLE_RE = /^bottle_(\d+)$/;
-
-function indexOf(re: RegExp, eventKey: string): number {
-  const m = re.exec(eventKey);
-  if (!m) return -1;
-  return Number(m[1]) - 1;
-}
+const INDEXED_PATTERNS = [
+  ["nap", /^nap_(\d+)$/],
+  ["wakeWindow", /^wake_window_(\d+)$/],
+  ["bottle", /^bottle_(\d+)$/],
+] as const;
 
 /** Returns undefined for events that don't map to a template slot
  * (e.g. extras, pumps, malformed eventKeys). Index is 0-based — the
  * 1-based suffix in the eventKey (`nap_1`) maps to index 0. */
 export function templateSlotForEvent(event: Event): TemplateSlot | undefined {
   const { eventKey } = event;
-
   if (eventKey === "bedtime") return { kind: "bedtime" };
-
-  const napIdx = indexOf(NAP_RE, eventKey);
-  if (napIdx >= 0) return { kind: "nap", index: napIdx };
-
-  const wwIdx = indexOf(WAKE_RE, eventKey);
-  if (wwIdx >= 0) return { kind: "wakeWindow", index: wwIdx };
-
-  const bottleIdx = indexOf(BOTTLE_RE, eventKey);
-  if (bottleIdx >= 0) return { kind: "bottle", index: bottleIdx };
-
+  for (const [kind, re] of INDEXED_PATTERNS) {
+    const m = re.exec(eventKey);
+    if (m) return { kind, index: Number(m[1]) - 1 };
+  }
   return undefined;
 }
 
