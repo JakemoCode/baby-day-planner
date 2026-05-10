@@ -246,6 +246,61 @@ describe("EventEditDrawerV3", () => {
     expect(screen.queryByRole("button", { name: "Delete" })).not.toBeInTheDocument();
   });
 
+  // PR-A0.4: re-edits of an already-overridden event must update the
+  // existing Firestore doc, not create a duplicate. The timeline page's
+  // onSave routes via `actuals.some(a => a.id === drawer.event.id)` —
+  // this wrapper mirrors that logic so we can verify the routing
+  // contract from the drawer-level test surface.
+  it("re-edit of an overridden actual routes to update, not create (actuals-membership)", async () => {
+    const overriddenNap: Event = {
+      id: "manual-X",
+      dayId: "d-1",
+      eventKey: "nap_2",
+      type: "nap",
+      kind: "block",
+      startTime: 11 * 60,
+      endTime: 12 * 60,
+      label: "Nap 2",
+      hasPutdown: false,
+      lifecycle: { state: "overridden", annotatedAt: 10 * 60 },
+    };
+    const actuals: Event[] = [overriddenNap];
+    const createOptimistic = vi.fn();
+    const updateOptimistic = vi.fn();
+
+    render(
+      <EventEditDrawerV3
+        open
+        mode="edit"
+        event={overriddenNap}
+        owners={owners}
+        nowMinutes={NOW}
+        onSave={async (event) => {
+          const exists = actuals.some((a) => a.id === overriddenNap.id);
+          if (exists) {
+            await updateOptimistic(event.id, event);
+          } else {
+            await createOptimistic({ ...event, id: "manual-NEW" });
+          }
+        }}
+        onCancel={() => {}}
+      />,
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Sam" }));
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(updateOptimistic).toHaveBeenCalledTimes(1);
+    expect(updateOptimistic.mock.calls[0]![0]).toBe("manual-X");
+    const next: Event = updateOptimistic.mock.calls[0]![1];
+    expect(next.id).toBe("manual-X");
+    expect(next.owner).toEqual({ slot: "parent2" });
+    // Already-overridden source keeps its original annotatedAt — only
+    // projected→overridden transitions stamp NOW. The contract under
+    // test here is the create-vs-update routing, not the lifecycle math.
+    expect(next.lifecycle).toEqual({ state: "overridden", annotatedAt: 10 * 60 });
+    expect(createOptimistic).not.toHaveBeenCalled();
+  });
+
   it("delete button is shown for already-recorded events", () => {
     render(
       <EventEditDrawerV3

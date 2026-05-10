@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import type { Event, OwnershipTemplate } from "@/v3/schemas";
-import { isRecorded } from "@/v3/schemas";
 import { useNowMinutes } from "@/hooks/useNowMinutes";
 import { newEventId } from "@/v3/lib/newEventId";
 import { useV3Day } from "@/v3/hooks/useV3Day";
@@ -138,15 +137,18 @@ export default function TimelinePage() {
         mode={drawer.open && drawer.mode === "edit" ? "edit" : "create"}
         onSave={async (event) => {
           if (drawer.open && drawer.mode === "edit") {
-            // Projected events are synthesized by the engine and have
-            // no Firestore doc. The first user edit needs to CREATE an
-            // override, not update a non-existent record. Give it a
-            // fresh id so we don't write under the synthetic "proj-…"
-            // key.
-            if (!isRecorded(drawer.event.lifecycle)) {
-              await createOptimistic({ ...event, id: newEventId("manual") });
-            } else {
+            // PR-A0.4: route create vs update by actuals-membership, not
+            // by lifecycle state. A projected event has no Firestore doc
+            // (id=`proj-…`), so it's never in `actuals` → create with a
+            // fresh id. An overridden event already has a doc
+            // (id=`manual-…`) and IS in `actuals` → update in place.
+            // Using lifecycle alone would re-create on every edit and
+            // leave duplicate docs sharing one eventKey.
+            const exists = actuals.some((a) => a.id === drawer.event.id);
+            if (exists) {
               await updateOptimistic(event.id, event);
+            } else {
+              await createOptimistic({ ...event, id: newEventId("manual") });
             }
           } else {
             await createOptimistic(event);
@@ -155,11 +157,15 @@ export default function TimelinePage() {
         }}
         onCancel={() => setDrawer({ open: false })}
         onDelete={async (event) => {
-          // Can't delete a projected event — no Firestore doc. Just
-          // close the drawer.
-          if (drawer.open && drawer.mode === "edit" && !isRecorded(drawer.event.lifecycle)) {
-            setDrawer({ open: false });
-            return;
+          // Can't delete an event with no Firestore doc. Routing by
+          // actuals-membership (PR-A0.4) keeps this consistent with
+          // onSave: not in `actuals` → no doc → just close.
+          if (drawer.open && drawer.mode === "edit") {
+            const exists = actuals.some((a) => a.id === drawer.event.id);
+            if (!exists) {
+              setDrawer({ open: false });
+              return;
+            }
           }
           await deleteOptimistic(event.id);
           setDrawer({ open: false });
