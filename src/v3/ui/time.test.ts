@@ -75,10 +75,6 @@ describe("formatHoursMinutes — minute count → compact h/m", () => {
     expect(formatHoursMinutes(65)).toBe("1h 5m");
     expect(formatHoursMinutes(125)).toBe("2h 5m");
   });
-  it("prefix is prepended when min > 0", () => {
-    expect(formatHoursMinutes(12, { prefix: "in " })).toBe("in 12m");
-    expect(formatHoursMinutes(65, { prefix: "in " })).toBe("in 1h 5m");
-  });
 });
 
 describe("currentLocalMinutes — wall clock → TimeMin", () => {

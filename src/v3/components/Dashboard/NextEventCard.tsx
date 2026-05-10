@@ -11,7 +11,7 @@ export type NextEventCardProps = {
 
 function formatDelta(deltaMinutes: number): { text: string; isNow: boolean } {
   if (deltaMinutes <= 0) return { text: "now", isNow: true };
-  return { text: formatHoursMinutes(deltaMinutes, { prefix: "in " }), isNow: false };
+  return { text: `in ${formatHoursMinutes(deltaMinutes)}`, isNow: false };
 }
 
 export function NextEventCard({ event, nowMinutes, owners }: NextEventCardProps) {

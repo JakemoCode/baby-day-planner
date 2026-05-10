@@ -40,16 +40,14 @@ export function formatTimeShort(minutes: TimeMin): string {
  *   45 → "45m"
  *   60 → "1h"
  *   65 → "1h 5m"
- * An optional `prefix` (e.g. "in ") is prepended verbatim when `min > 0`.
- * Used by dashboard previews for both deltas ("in 12m") and durations ("1h 5m").
+ * Used by dashboard previews for both deltas (caller concats "in ") and
+ * durations.
  */
-export function formatHoursMinutes(min: number, opts?: { prefix?: string }): string {
-  const prefix = opts?.prefix ?? "";
-  if (min < 60) return `${prefix}${min}m`;
+export function formatHoursMinutes(min: number): string {
+  if (min < 60) return `${min}m`;
   const h = Math.floor(min / 60);
   const m = min % 60;
-  const body = m === 0 ? `${h}h` : `${h}h ${m}m`;
-  return `${prefix}${body}`;
+  return m === 0 ? `${h}h` : `${h}h ${m}m`;
 }
 
 /**
