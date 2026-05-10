@@ -161,6 +161,206 @@ or delete the file.
 
 ---
 
+### 1.9 PR #82 (A4) — Test imports bare RTL instead of `@/test-utils`
+
+**Source**: code-reviewer of PR #82.
+
+**What**: `src/v3/components/DayTemplates/TemplateOwnerPicker.test.tsx`
+imports `render`/`screen` directly from `@testing-library/react` and
+`userEvent` from `@testing-library/user-event`. Project convention
+(used elsewhere) is `@/test-utils` which re-exports both plus shared
+test wrappers.
+
+**Fix**:
+```ts
+import { render, screen, userEvent } from "@/test-utils";
+```
+
+**Status**: pending. Bundle into polish PR.
+
+---
+
+### 1.10 PR #82 (A4) — Missing `wake_window_N` test coverage
+
+**Source**: code-reviewer of PR #82.
+
+**What**: spec calls for nap_N / wake_window_N / bottle_N / bedtime
+coverage in `TemplateOwnerPicker.test.tsx`. Nap, bottle, bedtime
+have dedicated tests; `wake_window_N` is absent. The branch in the
+component (line 62) is untested.
+
+**Fix**: add a test with `wake_window_1` event and a template whose
+`wakeWindowOwners[0]` is set; assert the correct button is
+`aria-pressed="true"`.
+
+**Status**: pending. Bundle into polish PR.
+
+---
+
+### 1.11 PR #82 + PR #73 — Duplicate eventKey dispatch logic
+
+**Source**: code-simplifier review of PR #82.
+
+**What**: `TemplateOwnerPicker.tsx` (read side) and
+`setOwnerInTemplate.ts` (write side) both do nearly-identical
+`eventKey` regex dispatch (`NAP_RE`, `WAKE_RE`, `BOTTLE_RE`, plus
+the `bedtime` literal). Duplicated logic risks drift.
+
+**Fix**: extract a shared module
+`src/v3/components/DayTemplates/templateSlot.ts`:
+
+```ts
+type TemplateSlot =
+  | { kind: "bedtime" }
+  | { kind: "nap" | "wakeWindow" | "bottle"; index: number };
+
+export function templateSlotForEvent(event: Event): TemplateSlot | undefined;
+export function getOwnerAt(template, slot): OwnerRef | undefined;
+export function setOwnerAt(template, slot, owner): OwnershipTemplate;
+```
+
+Then both consumers become thin wrappers over a single dispatch.
+
+**Status**: pending. Refactor candidate; own dedicated PR.
+
+---
+
+### 1.12 PR #85 (A3) — Duplicate `parseLocalDate` across history files
+
+**Source**: code-simplifier review of PR #85.
+
+**What**: `parseLocalDate` defined identically in
+`ArchivedDayView.tsx` and `HistoryDayCard.tsx`. Two near-identical
+`Intl.DateTimeFormat` instances differ only by `year`.
+
+**Fix**: extract to `src/v3/lib/date.ts` with
+`parseLocalDate(date: string): Date` and
+`formatLocalDate(date, opts: { withYear?: boolean })`.
+
+**Status**: pending. Bundle into polish PR.
+
+---
+
+### 1.13 PR #85 (A3) — ArchivedDayView empty-state divergence
+
+**Source**: code-simplifier review of PR #85.
+
+**What**: `ArchivedDayView` rolls its own `.empty` div + CSS.
+`HistoryList` (sibling component in the same PR) uses the shared
+`<EmptyState>` component. Inconsistent.
+
+**Fix**: switch `ArchivedDayView` to use `<EmptyState>`; delete the
+`.empty` rule from `ArchivedDayView.module.css`.
+
+**Status**: pending. Bundle into polish PR.
+
+---
+
+### 1.14 PR #84 (A5) — Dead CSS in `TomorrowForm.module.css`
+
+**Source**: code-simplifier review of PR #84.
+
+**What**: `TomorrowForm.module.css` has ~100 of 147 lines of unused
+classes (`.hint`, `.section`, `.sectionHeader`, `.sectionTitle`,
+`.addButton`, `.extraList`, `.extraRow`, `.extraButton`,
+`.extraTime`, `.removeButton`, `.empty`). Leftovers from V2's
+richer form.
+
+**Fix**: delete unreferenced classes from the V3 file. Keep only
+`.form`, `.field`, `.label`, `.input`, `.select`.
+
+**Status**: pending. Bundle into polish PR.
+
+---
+
+### 1.15 PR #84 (A5) — `PromoteTomorrowButton` focus ring invisible
+
+**Source**: code-simplifier review of PR #84.
+
+**What**: Focus ring is `outline: 2px solid var(--color-accent)` on
+top of a `background: var(--color-accent)` button — accent-on-accent
+disappears.
+
+**Fix**: use `var(--color-fg)` or apply `outline-offset` so the
+ring is visible against the button background.
+
+**Status**: pending. Bundle into polish PR.
+
+---
+
+### 1.16 PR #79 (A0.11) reflagged: V3 dashboard cards duplicate the same patterns
+
+**Source**: code-simplifier review of PR #86.
+
+**What**: 8 dashboard cards in `src/v3/components/Dashboard/` share
+substantial duplicated patterns:
+- **PreviewCard shell**: `NextBottlePreview` + `NextNapPreview`
+  render the same JSX skeleton 3× each (next/empty/alt-event
+  branches). Already share `PreviewCard.module.css`.
+- **OwnerPill / `--owner-color` style**: `NextEventCard` +
+  `CurrentWakeWindowStatus` build the same pill + style object.
+  `NextNapPreview` uses `ownerDisplayName` but skips color.
+- **`currentLocalMinutes()`**: duplicated verbatim in
+  `NapActionButton` and `StartBottleButton`.
+- **`formatDelta` / `formatDuration`**: near-identical h/m
+  formatters in `NextEventCard` and `NextNapPreview`.
+- **`formatLast`**: both preview cards have their own copy.
+- **Action button class composition**: `NapActionButton` does
+  `${styles.button} ${styles.secondary}`; `StartDayButton` does
+  similar with different module imports.
+
+**Fix candidates**:
+- Extract `<PreviewCard heading primary|empty subtitle meta />` —
+  highest value
+- Extract `<OwnerPill owner owners />` or `useOwnerStyle()` hook
+- Hoist `currentLocalMinutes()` to `@/v3/ui/time`
+- Consolidate `formatDelta`/`formatDuration` into
+  `formatHoursMinutes(min, { prefix? })` in `@/v3/ui/time`
+- Extract `<ActionButton variant="primary"|"secondary"|"danger">`
+
+**Status**: pending. Coherent body of work — own dedicated PR
+(probably as a single dashboard refactor PR rather than scattered).
+
+---
+
+### 1.17 PR #81 (A0.4) — Drawer save logic minor polish
+
+**Source**: code-simplifier review of PR #81.
+
+**What** (low priority):
+- Duplicated `actuals.some(...)` checks in `onSave` and `onDelete`
+  — extract once: `const isPersisted = drawer.open && drawer.mode === "edit" && actuals.some(a => a.id === drawer.event.id)`
+- Three multi-line "PR-A0.4 actuals-membership" comments could
+  collapse to one named helper (`isPersistedActual`)
+- Linear `actuals.some` is O(n); a memoized `Set<string>` of ids
+  or an `id.startsWith("proj-")` shortcut would suffice — though
+  the page renders are small enough that this rarely matters
+- Test wrapper duplicates page logic instead of importing it; if
+  the routing contract matters, lift it into a tiny pure
+  `routeSave(event, actuals)` helper and unit-test that
+
+**Fix**: refactor when next touching the file.
+
+**Status**: pending. Bundle into polish PR.
+
+---
+
+### 1.18 PR #81 (A0.4) — Drawer save test variable naming
+
+**Source**: code-reviewer of PR #81.
+
+**What**: test stub uses `actuals.some(a => a.id === overriddenNap.id)`
+where the spec calls for mirroring `drawer.event.id`. Functionally
+equivalent (same value, same closure), but the comment on the page
+explicitly references `drawer.event.id` so the test stub should
+mirror that name to make intent explicit.
+
+**Fix**: rename or add a clarifying comment.
+
+**Status**: pending. Trivial; bundle into polish PR.
+
+---
+
 ## §2 — Plan / doc updates
 
 ### 2.1 Plan v5: explicit `wakeTime: undefined` doesn't typecheck
@@ -242,6 +442,36 @@ PR-A0.8 agent flagged a flaky test in
 `annotatedAt` timestamp comparison. Pre-existing (not caused by
 A0.8). PR-A0.4 (PR #81) added more tests in the same file —
 verify the flake is still present (or now resolved) after A0.4 merges.
+
+### 4.4 Per-PR review loop must be enforced (lesson learned)
+
+Captured in memory at
+`feedback_parallel_pr_review_loop.md`. For multi-PR campaigns:
+- Every PR an agent opens MUST trigger code-reviewer +
+  code-simplifier dispatch in the SAME response.
+- Use per-PR task triples (`PR-X impl`, `PR-X reviewer`,
+  `PR-X simplifier`) — never a single fuzzy "review loop" task.
+- Phase-complete status is mechanically blocked until all triples
+  close.
+
+**Why captured**: 2026-05-10 V3 cutover Phase A0 — dispatched
+reviews on first 6 PRs (#72-#77), then dropped the loop for
+#80-#86 while marking the phase "done." Caught by Jake. Root
+cause: I let "PR opened" stand in for "PR done" without enforcing
+the review step.
+
+### 4.5 Reviewer Bash-permission denial pattern
+
+`feature-dev:code-reviewer` and `code-simplifier:*` agents
+sometimes hit "no Bash permission" denials when dispatched against
+open PRs. Without `gh pr diff`, they review the local working
+tree on whatever branch is checked out — produces false-alarm
+"missing changes" / "wrong file" reports (PR #76, #82, #84, #85
+review agents all hit this).
+
+**Mitigation**: paste `gh pr diff <num>` output INTO the agent
+prompt body rather than asking the agent to fetch it. Eliminates
+the false-alarm class entirely.
 
 ---
 
