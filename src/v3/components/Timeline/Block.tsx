@@ -4,6 +4,7 @@ import styles from "./Block.module.css";
 import type { Event, OwnersConfig } from "../../schemas";
 import { formatTimeForDisplay, formatTimeShort } from "../../ui/time";
 import { ownerColor, ownerDisplayName } from "../../ui/owners";
+import { ownerStyleVar } from "../../ui/ownerStyle";
 import { PUTDOWN_KIND_TAG } from "./expandPutdown";
 import { ownerSlotKey } from "./ownerSlotKey";
 
@@ -75,15 +76,13 @@ export function Block({
       data-static={!interactive}
       {...(slotKey ? { "data-owner": slotKey } : {})}
       className={styles.block}
-      style={
-        {
-          top: `${topPx}px`,
-          height: `${heightPx}px`,
-          left: `${leftPx}px`,
-          right: `${rightPx}px`,
-          ...(ownerColorValue ? { "--owner-color": ownerColorValue } : {}),
-        } as React.CSSProperties
-      }
+      style={{
+        top: `${topPx}px`,
+        height: `${heightPx}px`,
+        left: `${leftPx}px`,
+        right: `${rightPx}px`,
+        ...ownerStyleVar(ownerColorValue),
+      }}
       {...(interactive
         ? { type: "button" as const, onClick, "aria-label": a11y }
         : { role: "presentation" as const })}

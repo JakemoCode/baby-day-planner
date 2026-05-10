@@ -4,6 +4,7 @@ import styles from "./OwnerPicker.module.css";
 import type { OwnerRef, OwnersConfig } from "../../schemas";
 import { ownerRefEquals } from "../../schemas";
 import { ownerColor } from "../../ui/owners";
+import { ownerStyleVar } from "../../ui/ownerStyle";
 
 export type OwnerPickerV3Props = {
   owners: OwnersConfig;
@@ -41,7 +42,6 @@ export function OwnerPickerV3({ owners, value, onChange, label }: OwnerPickerV3P
       <div className={styles.group} role="group" aria-label={label ?? "Owner"}>
         {options.map((opt) => {
           const pressed = isSelected(value, opt.ref);
-          const color = ownerColor(opt.ref, owners);
           return (
             <button
               key={opt.slotKey}
@@ -49,7 +49,7 @@ export function OwnerPickerV3({ owners, value, onChange, label }: OwnerPickerV3P
               className={styles.option}
               data-owner={opt.slotKey}
               aria-pressed={pressed}
-              style={color ? ({ "--owner-color": color } as React.CSSProperties) : undefined}
+              style={ownerStyleVar(ownerColor(opt.ref, owners))}
               onClick={() => onChange(opt.ref)}
             >
               {opt.displayName}

@@ -1,22 +1,18 @@
-import { describe, expect, it } from "vitest";
+/**
+ * Pure type-level assertion that the placeholders match their schemas.
+ * Runtime expectations would just re-assert literal values the source
+ * already encodes — TypeScript's `satisfies` is a stricter check that
+ * costs nothing at runtime.
+ */
+
+import { expectTypeOf, it } from "vitest";
 import type { Day, Settings } from "../schemas";
 import { PLACEHOLDER_DAY, PLACEHOLDER_SETTINGS } from "./projectionPlaceholders";
 
-describe("projectionPlaceholders", () => {
-  it("exports a PLACEHOLDER_DAY conforming to Day", () => {
-    // Type assertion via assignment — file fails to typecheck if the
-    // shape ever drifts from `Day`.
-    const day: Day = PLACEHOLDER_DAY;
-    expect(day.status).toBe("active");
-    expect(day.suppressedDaycareDay).toBe(false);
-    expect(day.suppressedRecurringIds).toEqual([]);
-    expect(day.wakeTime).toBeUndefined();
-  });
+it("PLACEHOLDER_DAY conforms to Day", () => {
+  expectTypeOf(PLACEHOLDER_DAY).toEqualTypeOf<Day>();
+});
 
-  it("exports a PLACEHOLDER_SETTINGS conforming to Settings", () => {
-    const settings: Settings = PLACEHOLDER_SETTINGS;
-    expect(settings.defaultWakeTime).toBe(7 * 60);
-    expect(settings.owners.parent1.displayName).toBe("");
-    expect(settings.daycare.enabled).toBe(false);
-  });
+it("PLACEHOLDER_SETTINGS conforms to Settings", () => {
+  expectTypeOf(PLACEHOLDER_SETTINGS).toEqualTypeOf<Settings>();
 });

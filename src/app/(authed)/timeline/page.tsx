@@ -28,6 +28,17 @@ type DrawerState =
   | { open: true; mode: "create"; template: Event }
   | { open: true; mode: "edit"; event: Event };
 
+/**
+ * Whether the drawer's edit target already has a Firestore doc.
+ * Projected events have no doc (id starts `proj-`); overridden / recorded
+ * events do (id starts `manual-`). Used to route create vs update at
+ * save and to decide whether delete has a doc to remove. Single source
+ * of truth so onSave and onDelete can't drift.
+ */
+function isPersistedActual(eventId: string, actuals: ReadonlyArray<Event>): boolean {
+  return actuals.some((a) => a.id === eventId);
+}
+
 function yesterdayDate(today: string): string {
   const [y, m, d] = today.split("-").map(Number);
   const date = new Date(y ?? 1970, (m ?? 1) - 1, d ?? 1);
@@ -137,15 +148,7 @@ export default function TimelinePage() {
         mode={drawer.open && drawer.mode === "edit" ? "edit" : "create"}
         onSave={async (event) => {
           if (drawer.open && drawer.mode === "edit") {
-            // PR-A0.4: route create vs update by actuals-membership, not
-            // by lifecycle state. A projected event has no Firestore doc
-            // (id=`proj-…`), so it's never in `actuals` → create with a
-            // fresh id. An overridden event already has a doc
-            // (id=`manual-…`) and IS in `actuals` → update in place.
-            // Using lifecycle alone would re-create on every edit and
-            // leave duplicate docs sharing one eventKey.
-            const exists = actuals.some((a) => a.id === drawer.event.id);
-            if (exists) {
+            if (isPersistedActual(drawer.event.id, actuals)) {
               await updateOptimistic(event.id, event);
             } else {
               await createOptimistic({ ...event, id: newEventId("manual") });
@@ -157,15 +160,13 @@ export default function TimelinePage() {
         }}
         onCancel={() => setDrawer({ open: false })}
         onDelete={async (event) => {
-          // Can't delete an event with no Firestore doc. Routing by
-          // actuals-membership (PR-A0.4) keeps this consistent with
-          // onSave: not in `actuals` → no doc → just close.
-          if (drawer.open && drawer.mode === "edit") {
-            const exists = actuals.some((a) => a.id === drawer.event.id);
-            if (!exists) {
-              setDrawer({ open: false });
-              return;
-            }
+          if (
+            drawer.open &&
+            drawer.mode === "edit" &&
+            !isPersistedActual(drawer.event.id, actuals)
+          ) {
+            setDrawer({ open: false });
+            return;
           }
           await deleteOptimistic(event.id);
           setDrawer({ open: false });
