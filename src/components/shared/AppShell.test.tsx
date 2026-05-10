@@ -6,8 +6,8 @@ vi.mock("next/navigation", () => ({
   usePathname: () => "/",
 }));
 
-vi.mock("@/hooks/useDay", () => ({
-  useDay: () => ({ day: { date: "2026-05-05" }, loading: false }),
+vi.mock("@/v3/hooks/useV3Day", () => ({
+  useV3Day: () => ({ day: { date: "2026-05-05" }, loading: false }),
 }));
 
 vi.mock("@/hooks/useSyncStatus", () => ({
