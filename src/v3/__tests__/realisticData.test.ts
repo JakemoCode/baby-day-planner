@@ -202,7 +202,7 @@ describe("engine end-to-end with realistic fixtures", () => {
     expect(result.every((e) => Number.isFinite(e.startTime))).toBe(true);
   });
 
-  it("V2-shape settings + actuals → engine produces sorted events (with the pump-NaN gap noted above)", () => {
+  it("V2-shape settings + actuals → engine does not throw and preserves recorded events", () => {
     // Same input as the .fails() test above, but only asserts the
     // engine doesn't throw. Catches future regressions where V2-shape
     // input would crash the engine entirely.

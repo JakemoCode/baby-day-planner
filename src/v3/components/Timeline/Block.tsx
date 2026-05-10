@@ -56,7 +56,7 @@ export function Block({
   const Tag = interactive ? "button" : "div";
   const range = event.endTime !== undefined ? formatRange(event.startTime, event.endTime) : "";
   const ownerName = ownerDisplayName(event.owner, owners);
-  const ownerColorValue = ownerColor(event.owner, owners) ?? "transparent";
+  const ownerColorValue = ownerColor(event.owner, owners);
   const slotKey = ownerSlotKey(event.owner);
   const a11y = `${event.label}${range ? ` ${range}` : ""}${ownerName ? ` ${ownerName}` : ""}`;
   const napShortForm = event.type === "nap" && heightPx < NAP_TWO_ROW_THRESHOLD_PX;
@@ -81,7 +81,7 @@ export function Block({
           height: `${heightPx}px`,
           left: `${leftPx}px`,
           right: `${rightPx}px`,
-          ["--owner-color" as string]: ownerColorValue,
+          ...(ownerColorValue ? { "--owner-color": ownerColorValue } : {}),
         } as React.CSSProperties
       }
       {...(interactive

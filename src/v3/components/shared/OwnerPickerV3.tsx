@@ -41,6 +41,7 @@ export function OwnerPickerV3({ owners, value, onChange, label }: OwnerPickerV3P
       <div className={styles.group} role="group" aria-label={label ?? "Owner"}>
         {options.map((opt) => {
           const pressed = isSelected(value, opt.ref);
+          const color = ownerColor(opt.ref, owners);
           return (
             <button
               key={opt.slotKey}
@@ -48,11 +49,7 @@ export function OwnerPickerV3({ owners, value, onChange, label }: OwnerPickerV3P
               className={styles.option}
               data-owner={opt.slotKey}
               aria-pressed={pressed}
-              style={
-                {
-                  ["--owner-color" as string]: ownerColor(opt.ref, owners) ?? "transparent",
-                } as React.CSSProperties
-              }
+              style={color ? ({ "--owner-color": color } as React.CSSProperties) : undefined}
               onClick={() => onChange(opt.ref)}
             >
               {opt.displayName}

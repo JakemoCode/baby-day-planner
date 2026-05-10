@@ -5,7 +5,7 @@ import styles from "./EventEditDrawer.module.css";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import type { Event, EventType, OwnerRef, OwnersConfig, TimeMin } from "../../schemas";
 import { isRecorded } from "../../schemas";
-import { formatHM24, formatTimeForDisplay } from "../../ui/time";
+import { formatHM24, formatTimeForDisplay, parseHM24 } from "../../ui/time";
 import { OwnerPickerV3 } from "./OwnerPickerV3";
 import { formToEvent, type FormState } from "./formToEvent";
 
@@ -30,16 +30,6 @@ export type EventEditDrawerV3Props = {
 };
 
 type FormErrors = { startTime?: string; endTime?: string };
-
-function parseTimeInput(s: string): TimeMin | undefined {
-  const m = /^(\d{2}):(\d{2})$/.exec(s);
-  if (!m) return undefined;
-  const h = Number(m[1]);
-  const min = Number(m[2]);
-  if (!Number.isFinite(h) || !Number.isFinite(min)) return undefined;
-  if (min < 0 || min > 59) return undefined;
-  return h * 60 + min;
-}
 
 function validateForm(
   type: EventType,
@@ -172,7 +162,7 @@ export function EventEditDrawerV3({
   const errors = validateForm(type, form.startTime, form.endTime, sourceEvent.id, existingEvents);
 
   const handleStartTimeChange = (raw: string) => {
-    const next = parseTimeInput(raw);
+    const next = parseHM24(raw);
     if (!showEndTime || next === undefined) {
       setForm((prev) => ({ ...prev, startTime: next }));
       return;
@@ -258,9 +248,7 @@ export function EventEditDrawerV3({
               type="time"
               className={styles.input}
               value={timeInputValue(form.endTime)}
-              onChange={(e) =>
-                setForm((prev) => ({ ...prev, endTime: parseTimeInput(e.target.value) }))
-              }
+              onChange={(e) => setForm((prev) => ({ ...prev, endTime: parseHM24(e.target.value) }))}
               {...(errors.endTime ? { "aria-invalid": true } : {})}
             />
             {errors.endTime && (

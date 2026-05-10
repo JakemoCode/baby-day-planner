@@ -1,5 +1,6 @@
 import type { Day, Event, OwnersConfig, TimeMin } from "@/v3/schemas";
 import { TimelineV3 } from "@/v3/components/Timeline/TimelineV3";
+import { EmptyState } from "@/components/shared/EmptyState";
 import styles from "./ArchivedDayView.module.css";
 
 export type ArchivedDayViewProps = {
@@ -36,9 +37,7 @@ export function ArchivedDayView({
         <h1 className={styles.heading}>{DATE_FORMATTER.format(parseLocalDate(day.date))}</h1>
       </header>
       {events.length === 0 ? (
-        <div className={styles.empty} role="status">
-          No events recorded for this day.
-        </div>
+        <EmptyState title="No events recorded for this day." />
       ) : (
         // Archived days are entirely past; nowMinutes omitted so dimPast is a
         // no-op. Read-only view — no scroll-to-now, no NowBar.

@@ -36,7 +36,7 @@ export function InstantChip({ event, owners, colorMode, onClick }: InstantChipPr
   const time = formatTimeShort(event.startTime);
   const label = chipText(event);
   const ownerName = ownerDisplayName(event.owner, owners);
-  const ownerColorValue = ownerColor(event.owner, owners) ?? "transparent";
+  const ownerColorValue = ownerColor(event.owner, owners);
   const slotKey = ownerSlotKey(event.owner);
   const a11y = `${event.label} at ${time}${ownerName ? ` ${ownerName}` : ""}`;
 
@@ -48,7 +48,9 @@ export function InstantChip({ event, owners, colorMode, onClick }: InstantChipPr
       data-static={!interactive}
       {...(slotKey ? { "data-owner": slotKey } : {})}
       className={styles.chip}
-      style={{ ["--owner-color" as string]: ownerColorValue } as React.CSSProperties}
+      style={
+        ownerColorValue ? ({ "--owner-color": ownerColorValue } as React.CSSProperties) : undefined
+      }
       {...(interactive
         ? { type: "button" as const, onClick, "aria-label": a11y }
         : { role: "presentation" as const })}
