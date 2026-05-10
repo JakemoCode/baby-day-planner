@@ -28,7 +28,7 @@ describe("NextEventCard", () => {
     render(<NextEventCard event={ev()} nowMinutes={9 * 60 + 18} owners={owners} />);
     expect(screen.getByText("Nap 2")).toBeVisible();
     expect(screen.getByText("9:30 AM")).toBeVisible();
-    expect(screen.getByText(/in 12 min/i)).toBeVisible();
+    expect(screen.getByText(/in 12m/i)).toBeVisible();
   });
 
   it("shows 'now' when delta is 0", () => {

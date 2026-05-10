@@ -4,8 +4,14 @@
  * builds human-readable time.
  */
 
-import { describe, expect, it } from "vitest";
-import { formatHM24, formatTimeForDisplay, formatTimeShort } from "./time";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  currentLocalMinutes,
+  formatHM24,
+  formatHoursMinutes,
+  formatTimeForDisplay,
+  formatTimeShort,
+} from "./time";
 
 describe("formatHM24 — TimeMin → 'HH:MM' (zero-padded 24h)", () => {
   it("formats midnight", () => {
@@ -53,5 +59,41 @@ describe("formatTimeShort — TimeMin → tight axis form", () => {
   });
   it("cross-day TimeMin wraps", () => {
     expect(formatTimeShort(25 * 60)).toBe("1a");
+  });
+});
+
+describe("formatHoursMinutes — minute count → compact h/m", () => {
+  it("under an hour renders as 'Nm'", () => {
+    expect(formatHoursMinutes(45)).toBe("45m");
+    expect(formatHoursMinutes(0)).toBe("0m");
+  });
+  it("whole hours drop minutes", () => {
+    expect(formatHoursMinutes(60)).toBe("1h");
+    expect(formatHoursMinutes(120)).toBe("2h");
+  });
+  it("hour + minutes use 'Xh Ym'", () => {
+    expect(formatHoursMinutes(65)).toBe("1h 5m");
+    expect(formatHoursMinutes(125)).toBe("2h 5m");
+  });
+  it("prefix is prepended when min > 0", () => {
+    expect(formatHoursMinutes(12, { prefix: "in " })).toBe("in 12m");
+    expect(formatHoursMinutes(65, { prefix: "in " })).toBe("in 1h 5m");
+  });
+});
+
+describe("currentLocalMinutes — wall clock → TimeMin", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+  it("reads current local hours and minutes", () => {
+    vi.setSystemTime(new Date(2026, 4, 10, 9, 30, 0));
+    expect(currentLocalMinutes()).toBe(9 * 60 + 30);
+  });
+  it("returns 0 at local midnight", () => {
+    vi.setSystemTime(new Date(2026, 4, 10, 0, 0, 0));
+    expect(currentLocalMinutes()).toBe(0);
   });
 });

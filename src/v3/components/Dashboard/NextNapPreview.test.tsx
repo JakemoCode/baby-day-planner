@@ -31,9 +31,11 @@ describe("NextNapPreview", () => {
     expect(screen.getByText(/Nap 2/)).toBeVisible();
   });
 
-  it("includes owner display name in subtitle when set", () => {
+  it("includes owner pill in subtitle when set", () => {
     render(<NextNapPreview nap={nap({ owner: { slot: "parent1" } })} owners={owners} />);
-    expect(screen.getByText(/Nap 2 · Jake/)).toBeVisible();
+    // Label + colored OwnerPill (replaces the prior text-only "· Jake").
+    expect(screen.getByText(/Nap 2/)).toBeVisible();
+    expect(screen.getByText("Jake")).toBeVisible();
   });
 
   it("renders empty state when no nap scheduled", () => {

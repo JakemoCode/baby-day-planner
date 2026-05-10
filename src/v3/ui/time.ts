@@ -34,3 +34,30 @@ export function formatTimeShort(minutes: TimeMin): string {
   const h12 = h24 % 12 === 0 ? 12 : h24 % 12;
   return m === 0 ? `${h12}${period}` : `${h12}:${String(m).padStart(2, "0")}${period}`;
 }
+
+/**
+ * Format a non-negative minute count as a compact hours/minutes string.
+ *   45 → "45m"
+ *   60 → "1h"
+ *   65 → "1h 5m"
+ * An optional `prefix` (e.g. "in ") is prepended verbatim when `min > 0`.
+ * Used by dashboard previews for both deltas ("in 12m") and durations ("1h 5m").
+ */
+export function formatHoursMinutes(min: number, opts?: { prefix?: string }): string {
+  const prefix = opts?.prefix ?? "";
+  if (min < 60) return `${prefix}${min}m`;
+  const h = Math.floor(min / 60);
+  const m = min % 60;
+  const body = m === 0 ? `${h}h` : `${h}h ${m}m`;
+  return `${prefix}${body}`;
+}
+
+/**
+ * Read the wall clock and return the current local time as a TimeMin
+ * (minutes since local midnight). Used by action buttons that log
+ * "now" events.
+ */
+export function currentLocalMinutes(): TimeMin {
+  const now = new Date();
+  return now.getHours() * 60 + now.getMinutes();
+}

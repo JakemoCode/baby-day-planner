@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
-import actionStyles from "./ActionButton.module.css";
+import { ActionButton } from "./ActionButton";
 import styles from "./StartDayButton.module.css";
 
 export type StartDayButtonProps = {
@@ -43,13 +43,13 @@ export function StartDayButton({ hasTomorrowPlan, onStart }: StartDayButtonProps
   return (
     <>
       <div className={styles.row}>
-        <button
-          type="button"
-          className={`${actionStyles.button} ${styles.main}`}
+        <ActionButton
+          variant="primary"
+          className={styles.main}
           onClick={() => setPendingChoice(hasTomorrowPlan ? "plan" : "blank")}
         >
           {primaryLabel}
-        </button>
+        </ActionButton>
         {hasTomorrowPlan && (
           <div className={styles.overflow} ref={overflowRef}>
             <button
