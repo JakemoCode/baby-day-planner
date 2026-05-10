@@ -9,6 +9,7 @@ import { newEventId } from "@/v3/lib/newEventId";
 import { useV3Day } from "@/v3/hooks/useV3Day";
 import { useV3Events } from "@/v3/hooks/useV3Events";
 import { useV3Projection } from "@/v3/hooks/useV3Projection";
+import { PLACEHOLDER_DAY, PLACEHOLDER_SETTINGS } from "@/v3/hooks/projectionPlaceholders";
 import { useV3Settings } from "@/v3/hooks/useV3Settings";
 import { useV3Templates } from "@/v3/hooks/useV3Templates";
 import { LoadingState } from "@/components/shared/LoadingState";
@@ -167,63 +168,3 @@ export default function TimelinePage() {
     </div>
   );
 }
-
-// useV3Projection has to be called every render to keep hook order
-// stable; these placeholders fill in until day + settings load. The
-// early-return above guarantees the engine output is never rendered
-// with them.
-const PLACEHOLDER_DAY = {
-  id: "",
-  childId: "",
-  date: "",
-  status: "active" as const,
-  suppressedRecurringIds: [] as string[],
-  suppressedDaycareDay: false,
-};
-
-const PLACEHOLDER_SETTINGS = {
-  childId: "",
-  defaultWakeTime: 7 * 60,
-  bedtimeThreshold: 19 * 60,
-  defaultNapLengthMinutes: 90,
-  shortNapThresholdMinutes: 45,
-  shortNapAdjustmentMinutes: 30,
-  wakeWindowsMinutes: [] as number[],
-  napDurationMin: 30,
-  napDurationMax: 180,
-  defaultBottleAmountOz: 5,
-  defaultBottleIntervalMinutes: 180,
-  bottleRules: [],
-  bottleChain: { bottlesPerDay: 5, bufferAfterWakeMinutes: 10 },
-  minBottleIntervalMinutes: 90,
-  putdownLeadMinutes: 15,
-  pumpTimes: [] as number[],
-  pumpOwnerSlot: "parent2" as const,
-  dreamFeedEnabled: false,
-  dreamFeedStart: 22 * 60,
-  dreamFeedEnd: 23 * 60,
-  dreamFeedOffsetAfterBedtimeMinutes: 180,
-  dailyRecurring: [],
-  daycare: {
-    enabled: false,
-    dropoffTime: 8 * 60,
-    pickupTime: 17 * 60,
-    ownerId: "",
-    weekdays: {
-      mon: false,
-      tue: false,
-      wed: false,
-      thu: false,
-      fri: false,
-      sat: false,
-      sun: false,
-    },
-  },
-  owners: {
-    parent1: { displayName: "", color: "#0af" },
-    parent2: { displayName: "", color: "#f0a" },
-    other: [] as Array<{ id: string; displayName: string; color: string }>,
-  },
-  timelinePxPerHour: 80,
-  timelineDimPast: true,
-};
