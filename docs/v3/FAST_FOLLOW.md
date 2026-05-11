@@ -145,6 +145,16 @@ swatch set is the refreshed palette, not the legacy one.
 - Existing owners with arbitrary stored hex values render
   correctly (closest-swatch fallback or sentinel "Custom" tile).
 
+**Pixel-level alignment punchlist (deferred from PR #108 audit)**:
+- Jake's owner pill is ~5-blue warmer than V2 (cream-toned `--color-bg`
+  bleeds through the 20% mix). Math in `docs/v3/V2_CSS_DRIFT_AUDIT.md`.
+  Possible fixes: bump mix to 25%, use `--color-surface` instead of
+  `--color-bg`, or revert to per-owner pre-mixed `--owner-color-tint`
+  tokens (loses owner-agnostic affordance).
+- `CurrentWakeWindowStatus.dot` is hardcoded `var(--color-accent)`; V2
+  varied it per owner. Wire to `var(--owner-color, var(--color-accent))`
+  if the per-owner indicator is desired.
+
 ---
 
 ## §F5 — Wake windows: include "after wake-up" before nap 1
