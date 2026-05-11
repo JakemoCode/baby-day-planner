@@ -108,4 +108,26 @@ describe("NextBottlePreview", () => {
     );
     expect(screen.getByText(/start first bottle for schedule/i)).toBeVisible();
   });
+
+  // §F9 PORT — oz formatting contract previously asserted in V2.
+
+  it("renders whole-number oz without a trailing zero ('5 oz', not '5.0 oz')", () => {
+    render(
+      <NextBottlePreview bottle={bottle({ amountOz: 5 })} bottle1Pending={false} owners={owners} />,
+    );
+    const subtitle = screen.getByText(/projected.*Bottle 2/i);
+    expect(subtitle.textContent).toContain("5 oz");
+    expect(subtitle.textContent).not.toContain("5.0 oz");
+  });
+
+  it("preserves fractional oz ('4.5 oz')", () => {
+    render(
+      <NextBottlePreview
+        bottle={bottle({ amountOz: 4.5 })}
+        bottle1Pending={false}
+        owners={owners}
+      />,
+    );
+    expect(screen.getByText(/4\.5 oz/)).toBeVisible();
+  });
 });

@@ -155,4 +155,75 @@ describe("TimelineV3", () => {
     expect(screen.getByTestId("now-line")).toBeInTheDocument();
     expect(screen.getByTestId("now-pill")).toHaveTextContent("9:30 AM");
   });
+
+  // §F9 PORT — coverage previously asserted in V2 timeline tests.
+
+  it("does NOT render the now-bar when nowMinutes is omitted", () => {
+    render(<TimelineV3 events={[ev({ id: "nap1" })]} owners={owners} putdownLeadMinutes={15} />);
+    expect(screen.queryByTestId("now-line")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("now-pill")).not.toBeInTheDocument();
+  });
+
+  it("marks past blocks with data-past='true' when dimPast + nowMinutes provided", () => {
+    // Nap at 9:00–10:00; "now" is 11:00 → nap is fully in the past.
+    render(
+      <TimelineV3
+        events={[ev({ id: "nap1" })]}
+        owners={owners}
+        putdownLeadMinutes={15}
+        nowMinutes={11 * 60}
+        dimPast
+      />,
+    );
+    const block = screen.getByTestId("timeline-block");
+    expect(block).toHaveAttribute("data-past", "true");
+  });
+
+  it("marks past instant clusters with data-past='true' when dimPast + nowMinutes provided", () => {
+    const events: Event[] = [
+      ev({
+        id: "bot1",
+        type: "bottle",
+        kind: "instant",
+        startTime: 7 * 60 + 30,
+        label: "Bottle 1",
+      }),
+    ];
+    render(
+      <TimelineV3
+        events={events}
+        owners={owners}
+        putdownLeadMinutes={15}
+        nowMinutes={11 * 60}
+        dimPast
+      />,
+    );
+    const cluster = screen.getByTestId("instant-cluster");
+    expect(cluster).toHaveAttribute("data-past", "true");
+  });
+
+  it("respects pxPerHour — the timeline height scales proportionally", () => {
+    const events: Event[] = [ev({ id: "nap1" })];
+    const { container, rerender } = render(
+      <TimelineV3 events={events} owners={owners} putdownLeadMinutes={15} pxPerHour={60} />,
+    );
+    const inner60 = container.querySelector("[style*='height']") as HTMLElement | null;
+    const height60 = parseFloat(inner60?.style.height ?? "0");
+
+    rerender(
+      <TimelineV3 events={events} owners={owners} putdownLeadMinutes={15} pxPerHour={120} />,
+    );
+    const inner120 = container.querySelector("[style*='height']") as HTMLElement | null;
+    const height120 = parseFloat(inner120?.style.height ?? "0");
+
+    expect(height60).toBeGreaterThan(0);
+    // Doubling pxPerHour doubles the rendered height (within rounding tolerance).
+    expect(height120).toBeCloseTo(height60 * 2, 0);
+  });
+
+  // §11.A wake-instant deduplication: WAIVED. V3's EventType union does not
+  // include "wake" (per src/v3/schemas.ts — wake is derived from Day.wakeTime,
+  // never a top-level event), so the conflict the V2 test guarded against
+  // cannot be constructed with valid V3 data. The architecture removes the
+  // bug class entirely.
 });
