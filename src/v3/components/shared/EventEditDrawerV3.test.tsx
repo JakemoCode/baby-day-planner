@@ -7,7 +7,7 @@
  */
 
 import { describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { Event, OwnersConfig } from "../../schemas";
 import { EventEditDrawerV3 } from "./EventEditDrawerV3";
@@ -348,9 +348,11 @@ describe("EventEditDrawerV3", () => {
     expect(screen.queryByLabelText("End time")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Amount (oz)")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Label")).not.toBeInTheDocument();
-    // Owner picker is present (slot buttons render with owner display names).
-    expect(screen.getByRole("button", { name: "Jake" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Sam" })).toBeInTheDocument();
+    // Owner picker is the only field — assert via the picker's group role
+    // so a stray "Jake"-named button elsewhere can't false-positive.
+    const ownerGroup = screen.getByRole("group", { name: /owner/i });
+    expect(within(ownerGroup).getByRole("button", { name: "Jake" })).toBeInTheDocument();
+    expect(within(ownerGroup).getByRole("button", { name: "Sam" })).toBeInTheDocument();
   });
 
   it("extra form shows label + start + end + owner picker", () => {
