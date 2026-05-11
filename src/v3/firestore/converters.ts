@@ -1,14 +1,10 @@
 /**
  * V3 Firestore data converters.
  *
- * The V3 Event type is structurally what the engine emits and what we
- * persist — no normalization needed. These are typed passthroughs that
- * give us a clean type-tag for Firestore queries built with
- * `withConverter(...)`.
- *
- * The V2 event converter coerces legacy `kind`/`recorded` fields; V3
- * starts with a clean emulator (per the cutover plan) so we don't carry
- * that scaffolding forward.
+ * Day + Event converters apply their respective defaulters on read so
+ * partial / hand-edited docs become engine-safe across every read path.
+ * Settings + template converters are typed passthroughs — V3 always
+ * writes those fully-shaped.
  */
 
 import type {
@@ -18,6 +14,7 @@ import type {
 } from "firebase/firestore";
 import type { Day, Event, OwnershipTemplate, Settings } from "../schemas";
 import { withV3DayDefaults } from "./dayDefaults";
+import { withV3EventDefaults } from "./eventDefaults";
 
 function passthrough<T extends object>(): FirestoreDataConverter<T> {
   return {
@@ -26,19 +23,28 @@ function passthrough<T extends object>(): FirestoreDataConverter<T> {
   };
 }
 
-export const v3EventConverter = passthrough<Event>();
 export const v3SettingsConverter = passthrough<Settings>();
 export const v3TemplateConverter = passthrough<OwnershipTemplate>();
 
 /**
- * Day converter applies `withV3DayDefaults` on read so V2-shape day
- * docs (and partial V3 docs) become engine-safe Day objects across
- * every read path: `getDay`, `getDayByDate`, `listArchivedDays`,
- * `watchActiveDay`. Write path stays passthrough — V3 callers always
- * supply a fully-shaped Day.
- *
- * The defaulter remains in `useV3Day` as defense in depth; both
- * applications are idempotent.
+ * Event converter applies `withV3EventDefaults` on read so partial docs
+ * become engine-safe Events across every read path, including consumers
+ * that bypass `useV3Events` (e.g. the one-shot `listEvents` call in the
+ * history detail page). Without this, a partial doc missing `lifecycle`
+ * or `kind` would crash the engine / renderer downstream.
+ */
+export const v3EventConverter: FirestoreDataConverter<Event> = {
+  toFirestore: (data) => data,
+  fromFirestore: (snap: QueryDocumentSnapshot, opts?: SnapshotOptions) => {
+    return withV3EventDefaults(snap.data(opts) as Partial<Event>);
+  },
+};
+
+/**
+ * Day converter applies `withV3DayDefaults` on read so partial day docs
+ * become engine-safe Day objects across every read path: `getDay`,
+ * `getDayByDate`, `listArchivedDays`, `watchActiveDay`. Write path stays
+ * passthrough — V3 callers always supply a fully-shaped Day.
  */
 export const v3DayConverter: FirestoreDataConverter<Day> = {
   toFirestore: (data) => data,

@@ -35,8 +35,7 @@ service cloud.firestore {
           allow create: if isAllowlisted()
             && request.resource.data.dayId == dayId
             && request.resource.data.id == eventId
-            && (request.resource.data.startTime is int
-              || isString(request.resource.data.startTime));
+            && request.resource.data.startTime is int;
           allow update, delete: if isAllowlisted();
         }
       }

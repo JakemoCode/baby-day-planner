@@ -2,7 +2,7 @@
 
 import { db } from "@/lib/firebase/client";
 import { LoadingState } from "@/components/shared/LoadingState";
-import { SettingsAccount } from "@/components/Settings/SettingsAccount";
+import { SettingsAccount } from "@/v3/components/shared/SettingsAccount";
 import { OwnersConfigEditor } from "@/v3/components/Settings/OwnersConfigEditor";
 import { withV3SettingsDefaults } from "@/v3/firestore/settingsDefaults";
 import { useV3Settings } from "@/v3/hooks/useV3Settings";

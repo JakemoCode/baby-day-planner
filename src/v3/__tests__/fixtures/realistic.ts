@@ -1,18 +1,19 @@
 /**
- * Realistic Firestore document fixtures spanning the V2 → V3 cutover.
+ * Realistic Firestore document fixtures.
  *
- * Three shape categories cover what real production data looks like
- * during and after the cutover:
+ * Two shape categories cover what real production data looks like:
  *
- *   v2: pre-cutover writes (V2 settings page, V2 dashboard, V2 drawer)
- *   v3: post-cutover writes (V3 settings page, V3 timeline drawer)
- *   partial: V3-shape doc missing fields the schema added later, OR
- *            V2 doc missing fields V2 itself added late
+ *   v3:      fully-shaped V3 docs (the happy path)
+ *   partial: V3-shape doc missing fields the schema added later, or
+ *            partially-filled docs that exercise the defaulter's
+ *            backfill paths. (Two `Settings` fixtures named `v2` /
+ *            `mixed` predate PR-C1 and survive as partial-fill probes
+ *            — renaming them would ripple through several tests.)
  *
- * These fixtures are typed loosely (Record<string, unknown>) because
- * Firestore returns whatever it has — the converters and defaulters
- * are the layer that promises a typed shape. Tests that assert against
- * the fixtures expose the real-world failure modes of the defaulters.
+ * Typed loosely (Record<string, unknown>) because Firestore returns
+ * whatever it has — the converters and defaulters are the layer that
+ * promises a typed shape. Tests that assert against the fixtures
+ * expose the real-world failure modes of the defaulters.
  */
 
 // ---------------------------------------------------------------------------
@@ -126,16 +127,6 @@ export const mixedSettingsDoc: Record<string, unknown> = {
 // Day fixtures
 // ---------------------------------------------------------------------------
 
-export const v2DayDoc: Record<string, unknown> = {
-  id: "day-2026-05-09",
-  childId: "aden",
-  date: "2026-05-09",
-  status: "active",
-  wakeTime: "07:30", // V2: HH:MM string
-  ownershipTemplateId: "tpl-weekday", // V2 field name
-  createdAt: "2026-05-09T07:30:00Z",
-};
-
 export const v3DayDoc: Record<string, unknown> = {
   id: "day-2026-05-09",
   childId: "aden",
@@ -161,65 +152,6 @@ export const partialV3DayDoc: Record<string, unknown> = {
 // ---------------------------------------------------------------------------
 // Event fixtures
 // ---------------------------------------------------------------------------
-
-export const v2EventBottleDoc: Record<string, unknown> = {
-  id: "bottle-1",
-  dayId: "day-2026-05-09",
-  eventKey: "bottle_1",
-  type: "bottle",
-  kind: "instant",
-  label: "Bottle 1",
-  startTime: "07:30",
-  amountOz: 5,
-  source: "actual",
-  status: "completed",
-  recorded: true,
-  owner: "Jake", // V2 free string
-};
-
-export const v2EventNapInProgressDoc: Record<string, unknown> = {
-  id: "nap-1",
-  dayId: "day-2026-05-09",
-  eventKey: "nap_1",
-  type: "nap",
-  kind: "block",
-  label: "Nap 1",
-  startTime: "09:00",
-  // no endTime — in progress
-  source: "actual",
-  status: "active",
-  recorded: true,
-  owner: "Kelly",
-};
-
-export const v2EventOverriddenDoc: Record<string, unknown> = {
-  id: "manual-1715000000000",
-  dayId: "day-2026-05-09",
-  eventKey: "nap_2",
-  type: "nap",
-  kind: "block",
-  label: "Nap 2",
-  startTime: "13:00",
-  endTime: "14:30",
-  source: "manual",
-  status: "overridden",
-  recorded: false,
-  owner: "Daycare",
-};
-
-export const v2EventNoOwnerDoc: Record<string, unknown> = {
-  id: "pump-1",
-  dayId: "day-2026-05-09",
-  eventKey: "pump_10:30",
-  type: "pump",
-  kind: "instant",
-  label: "Pump",
-  startTime: "10:30",
-  source: "manual",
-  status: "completed",
-  recorded: true,
-  // no owner — V2 omits when unknown
-};
 
 export const v3EventBottleDoc: Record<string, unknown> = {
   id: "bottle-aaaa-bbbb-cccc",
@@ -281,14 +213,6 @@ export const partialV3EventDoc: Record<string, unknown> = {
 // Template fixtures
 // ---------------------------------------------------------------------------
 
-export const v2TemplateDoc: Record<string, unknown> = {
-  id: "tpl-weekday",
-  label: "Weekday", // V2 field name
-  napOwners: ["Jake", "Kelly", "Jake", "Kelly"], // V2 strings
-  wakeWindowOwners: [],
-  bedtimeOwner: "Jake",
-};
-
 export const v3TemplateDoc: Record<string, unknown> = {
   id: "tpl-weekday",
   displayName: "Weekday", // V3 field name
@@ -309,22 +233,16 @@ export const fixtures = {
     mixed: mixedSettingsDoc,
   },
   days: {
-    v2: v2DayDoc,
     v3: v3DayDoc,
     partialV3: partialV3DayDoc,
   },
   events: {
-    v2Bottle: v2EventBottleDoc,
-    v2NapInProgress: v2EventNapInProgressDoc,
-    v2Overridden: v2EventOverriddenDoc,
-    v2NoOwner: v2EventNoOwnerDoc,
     v3Bottle: v3EventBottleDoc,
     v3NapStarted: v3EventNapStartedDoc,
     v3Overridden: v3EventOverriddenDoc,
     partialV3: partialV3EventDoc,
   },
   templates: {
-    v2: v2TemplateDoc,
     v3: v3TemplateDoc,
   },
 };
