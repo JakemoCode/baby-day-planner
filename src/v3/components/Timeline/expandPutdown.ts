@@ -12,15 +12,27 @@ import type { Event, EventType, TimeMin } from "../../schemas";
 
 export const PUTDOWN_KIND_TAG = "__putdown__";
 
-export function expandPutdownBlocks(events: Event[], putdownLeadMinutes: TimeMin): Event[] {
+export function expandPutdownBlocks(
+  events: Event[],
+  putdownLeadMinutes: TimeMin,
+  nowMinutes?: TimeMin,
+): Event[] {
   const out: Event[] = [];
   for (const e of events) {
     out.push(e);
-    if (e.hasPutdown) {
+    if (e.hasPutdown && isStillFuture(e, nowMinutes)) {
       out.push(syntheticPutdown(e, putdownLeadMinutes));
     }
   }
   return out;
+}
+
+// R6.7 — suppress the synthetic putdown when the parent's moment has
+// passed. `nowMinutes` undefined means "no clock provided, render every
+// hasPutdown event" — that's the read-only archived-day path.
+function isStillFuture(parent: Event, nowMinutes: TimeMin | undefined): boolean {
+  if (nowMinutes === undefined) return true;
+  return parent.startTime > nowMinutes;
 }
 
 function syntheticPutdown(parent: Event, lead: TimeMin): Event {

@@ -43,7 +43,10 @@ describe("R6 — hasPutdown flag on projected naps and bedtime", () => {
     expect(nap!.hasPutdown).toBe(true);
   });
 
-  it("projected nap whose start is in the past gets hasPutdown=false", () => {
+  it("projected nap whose start is in the past still gets hasPutdown=true (renderer gates by time)", () => {
+    // R6.1's "is this still future" decision moved out of the engine and
+    // into the renderer (expandPutdownBlocks). The engine just asks "does
+    // this lifecycle still point to a future intent?" Projected qualifies.
     const ctx = aContext({
       day: aDay({ wakeTime: 7 * 60 }),
       settings: aSettings({ wakeWindowsMinutes: [120] }),
@@ -63,7 +66,7 @@ describe("R6 — hasPutdown flag on projected naps and bedtime", () => {
 
     const nap = out.find((e) => e.eventKey === "nap_1");
     expect(nap).toBeDefined();
-    expect(nap!.hasPutdown).toBe(false);
+    expect(nap!.hasPutdown).toBe(true);
   });
 
   it("projected bedtime in the future gets hasPutdown=true", () => {

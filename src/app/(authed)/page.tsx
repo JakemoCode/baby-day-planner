@@ -21,6 +21,7 @@ import { useV3Templates } from "@/v3/hooks/useV3Templates";
 import { useV3Projection } from "@/v3/hooks/useV3Projection";
 import { PLACEHOLDER_DAY, PLACEHOLDER_SETTINGS } from "@/v3/hooks/projectionPlaceholders";
 import { startNewDay } from "@/v3/repositories/days";
+import { DEFAULT_WAKE_TIME } from "@/v3/firestore/settingsDefaults";
 import { db } from "@/lib/firebase/client";
 import { LoadingState } from "@/components/shared/LoadingState";
 import { FAB } from "@/components/shared/FAB";
@@ -51,11 +52,6 @@ function todayDate(): string {
   const m = String(d.getMonth() + 1).padStart(2, "0");
   const day = String(d.getDate()).padStart(2, "0");
   return `${y}-${m}-${day}`;
-}
-
-function currentWakeTimeMin(): number {
-  const d = new Date();
-  return d.getHours() * 60 + d.getMinutes();
 }
 
 export default function DashboardPage() {
@@ -99,10 +95,13 @@ export default function DashboardPage() {
   // valid (midnight) and must NOT be treated as "no day yet".
   if (!day || !settings || day.wakeTime === undefined) {
     const handleStart = async () => {
+      // Anchor the new day at `settings.defaultWakeTime`, not wall-clock.
+      // Tapping Start at 2:30 PM should NOT rotate the whole projected day
+      // to start at 2:30 PM. Fallback to 7am only if settings hasn't loaded.
       await startNewDay(db, CHILD_ID, {
         newDayId: `day-${Date.now()}`,
         newDate: todayDate(),
-        newWakeTime: currentWakeTimeMin(),
+        newWakeTime: settings?.defaultWakeTime ?? DEFAULT_WAKE_TIME,
       });
     };
     return (
@@ -185,10 +184,13 @@ export default function DashboardPage() {
     });
   };
   const handleStartDay = async ({ useTomorrowPlan: _ }: { useTomorrowPlan: boolean }) => {
+    // See note above — anchor the new day at `settings.defaultWakeTime`,
+    // not wall-clock. `settings` is always non-null here (past the loading
+    // + wake gates), so a fallback isn't structurally needed.
     await startNewDay(db, CHILD_ID, {
       newDayId: `day-${Date.now()}`,
       newDate: todayDate(),
-      newWakeTime: currentWakeTimeMin(),
+      newWakeTime: settings.defaultWakeTime,
     });
   };
 

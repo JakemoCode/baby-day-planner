@@ -212,6 +212,42 @@ describe("R7.7 — manual bedtime is the user's authoritative declaration", () =
   });
 });
 
+describe("R7.4b — projected wake_windows after bedtime are dropped", () => {
+  it("drops wake_window_N entries that fall at/after the bedtime substitution", () => {
+    // 5 wake-windows configured. R3.1 emits all 5 up-front; R7.6 substitutes
+    // a nap for bedtime; the new R7.4b rule drops any wake_window that
+    // ended up at/after bedtime.startTime so cross-day wake_windows don't
+    // visually collide with bedtime's tail on the timeline.
+    const ctx = aContext({
+      day: aDay({ wakeTime: 7 * 60 }),
+      settings: aSettings({
+        wakeWindowsMinutes: [120, 135, 135, 150, 180],
+        defaultNapLengthMinutes: 60,
+        bedtimeThreshold: 19 * 60,
+        defaultWakeTime: 7 * 60,
+      }),
+      actuals: [],
+    });
+
+    const out = projectDay(
+      {
+        day: ctx.day,
+        settings: ctx.settings,
+        actuals: ctx.actuals,
+        nowMinutes: ctx.nowMinutes,
+      },
+      { rules: ALL },
+    );
+
+    const bedtime = out.find((e) => e.type === "bedtime");
+    expect(bedtime).toBeDefined();
+    const orphanWakeWindows = out.filter(
+      (e) => e.type === "wake_window" && e.startTime >= bedtime!.startTime,
+    );
+    expect(orphanWakeWindows).toHaveLength(0);
+  });
+});
+
 // Tiny use to avoid lint warning until further bedtime tests reference these.
 void aProjectedBedtime;
 void aRecordedNap;

@@ -1,4 +1,5 @@
 import type { Day, Settings } from "@/v3/schemas";
+import { DEFAULT_OWNER_COLORS } from "@/v3/firestore/settingsDefaults";
 
 // TODO(post-cutover): make useV3Projection handle null day/settings
 // internally so placeholders aren't needed.
@@ -65,8 +66,8 @@ export const PLACEHOLDER_SETTINGS: Settings = {
     },
   },
   owners: {
-    parent1: { displayName: "", color: "#0af" },
-    parent2: { displayName: "", color: "#f0a" },
+    parent1: { displayName: "", color: DEFAULT_OWNER_COLORS.parent1 },
+    parent2: { displayName: "", color: DEFAULT_OWNER_COLORS.parent2 },
     other: [],
   },
   timelinePxPerHour: 80,

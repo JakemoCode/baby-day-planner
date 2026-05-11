@@ -91,7 +91,7 @@ export function TimelineV3({
       };
     }
 
-    const expanded = expandPutdownBlocks(events, putdownLeadMinutes);
+    const expanded = expandPutdownBlocks(events, putdownLeadMinutes, nowMinutes);
 
     const starts = expanded.map((e) => e.startTime);
     const ends = expanded.map((e) => e.endTime ?? e.startTime);
@@ -106,7 +106,7 @@ export function TimelineV3({
       originMinutes: origin,
       heightPx: height,
     };
-  }, [events, pxPerMin, putdownLeadMinutes]);
+  }, [events, pxPerMin, putdownLeadMinutes, nowMinutes]);
 
   useEffect(() => {
     if (hasScrolledRef.current) return;
@@ -174,7 +174,11 @@ export function TimelineV3({
             const top = yOf(event.startTime);
             const end = event.endTime ?? event.startTime;
             // Min tappable height (24px) for very short blocks so user can
-            // always tap to edit even a 1-minute accidental nap.
+            // always tap to edit even a 1-minute accidental nap. Putdowns
+            // also use this clamp — at 80px/hour, a 15-min lead is 20px
+            // natural and the label needs ~22px to fit without clipping.
+            // The 4px visual "overlap" into the parent block is intentional
+            // and predates the V3 cutover.
             const naturalH = (end - event.startTime) * pxPerMin;
             const heightPxBlock = Math.max(24, naturalH);
             // Putdown synthetics are not user-tappable in V3 — the
