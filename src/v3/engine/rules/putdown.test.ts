@@ -43,12 +43,10 @@ describe("R6 — hasPutdown flag on projected naps and bedtime", () => {
     expect(nap!.hasPutdown).toBe(true);
   });
 
-  it("hasPutdown stays true regardless of nowMinutes — renderer gates by time", () => {
-    // R6.1 is now purely structural: every nap/bedtime gets hasPutdown=true.
-    // The temporal "is the putdown still in the future" decision lives in
-    // expandPutdownBlocks (see Timeline tests for that gate). Bundling
-    // them in the engine broke owner-edit on projected naps (lifecycle
-    // shifts to `overridden` and the engine used to clear hasPutdown).
+  it("projected nap whose start is in the past still gets hasPutdown=true (renderer gates by time)", () => {
+    // R6.1's "is this still future" decision moved out of the engine and
+    // into the renderer (expandPutdownBlocks). The engine just asks "does
+    // this lifecycle still point to a future intent?" Projected qualifies.
     const ctx = aContext({
       day: aDay({ wakeTime: 7 * 60 }),
       settings: aSettings({ wakeWindowsMinutes: [120] }),

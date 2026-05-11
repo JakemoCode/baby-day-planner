@@ -4,17 +4,20 @@
  * Source: docs/v3/REQUIREMENTS.md §6.
  *
  * R6.1: putdown is purely predictive — never recorded, never persisted.
- * The engine sets `hasPutdown: true` on every nap and bedtime, regardless
- * of lifecycle. The renderer (`expandPutdownBlocks`) decides whether to
- * inject the synthetic block based on whether the event is still in the
- * future (R6.7 — suppress when the moment has passed).
+ * The engine sets `hasPutdown: true` on naps and bedtimes whose lifecycle
+ * still points to a future moment (`projected` or `overridden`). The
+ * renderer (`expandPutdownBlocks`) further gates by `nowMinutes` — R6.7
+ * suppresses the synthetic when the moment has passed in real time.
  *
- * Why the engine doesn't gate by lifecycle: an owner-only drawer edit
- * transitions a projected nap to `overridden`, which is still a
- * time-preserving annotation pointing to a future event. The putdown
- * window is still relevant. Bundling the temporal gate with lifecycle
- * dropped that case. The renderer owns "is this still in the future"
- * because it owns time.
+ * Why both `projected` AND `overridden`: an owner-only drawer edit
+ * promotes a projected event to `overridden` (time-preserving annotation).
+ * The putdown window is still relevant. The pre-fix code only allowed
+ * `projected`, so owner edits silently killed the putdown block.
+ *
+ * Why NOT `started`/`completed`: those represent reality, not prediction.
+ * On an archived-day read (renderer's `nowMinutes` unavailable), the
+ * renderer would otherwise inject phantom putdown visuals around
+ * historical recorded events.
  *
  * R6.2: derived from the parent event; no separate Firestore doc.
  */
@@ -24,7 +27,8 @@ import type { Rule } from "../evaluator";
 
 const RuleSetHasPutdown: Rule = {
   id: "R6.1",
-  description: "Set hasPutdown=true on every nap and bedtime event (renderer gates temporally)",
+  description:
+    "Set hasPutdown=true on naps/bedtimes whose lifecycle still points to a future moment",
   matches: (events) => events.some((e) => deriveHasPutdown(e) !== e.hasPutdown),
   produces: (events) =>
     events.map((e) => {
@@ -35,7 +39,9 @@ const RuleSetHasPutdown: Rule = {
 };
 
 function deriveHasPutdown(e: Event): boolean {
-  return e.type === "nap" || e.type === "bedtime";
+  if (e.type !== "nap" && e.type !== "bedtime") return false;
+  const state = e.lifecycle.state;
+  return state === "projected" || state === "overridden";
 }
 
 export const RULES: Rule[] = [RuleSetHasPutdown];

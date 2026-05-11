@@ -21,6 +21,7 @@ import { useV3Templates } from "@/v3/hooks/useV3Templates";
 import { useV3Projection } from "@/v3/hooks/useV3Projection";
 import { PLACEHOLDER_DAY, PLACEHOLDER_SETTINGS } from "@/v3/hooks/projectionPlaceholders";
 import { startNewDay } from "@/v3/repositories/days";
+import { DEFAULT_WAKE_TIME } from "@/v3/firestore/settingsDefaults";
 import { db } from "@/lib/firebase/client";
 import { LoadingState } from "@/components/shared/LoadingState";
 import { FAB } from "@/components/shared/FAB";
@@ -100,7 +101,7 @@ export default function DashboardPage() {
       await startNewDay(db, CHILD_ID, {
         newDayId: `day-${Date.now()}`,
         newDate: todayDate(),
-        newWakeTime: settings?.defaultWakeTime ?? 7 * 60,
+        newWakeTime: settings?.defaultWakeTime ?? DEFAULT_WAKE_TIME,
       });
     };
     return (

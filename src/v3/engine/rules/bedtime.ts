@@ -75,68 +75,45 @@ function findFirstProjectedNapReachingThreshold(events: Event[], threshold: numb
 }
 
 /**
- * R7.4 — Projected naps starting at/after the bedtime event are removed.
+ * R7.4 / R7.4b — Projected naps and wake_windows at/after bedtime drop.
  *
- * §0 reality wins: recorded naps after bedtime are kept untouched. The
- * evaluator's reality-wins guard would throw if this rule tried to drop one.
+ * R3.1 emits one wake_window + one nap per entry in `wakeWindowsMinutes`
+ * up-front, before R7.6 substitutes a nap for bedtime. Whichever indices
+ * land past bedtime would otherwise survive (naps as ghost entries,
+ * wake_windows pushed into cross-day TimeMin colliding with the bedtime
+ * block on the timeline).
+ *
+ * §0 reality wins: recorded naps after bedtime are kept untouched. Wake
+ * windows are always projected (per schema), so reality-wins is moot for
+ * them.
  *
  * R7.5 (projected nap crossing bedtime) is naturally subsumed: such a nap
  * is replaced by bedtime via R7.6 (which always picks the FIRST projected
- * nap whose start ≥ threshold), and any later naps caught here.
+ * nap whose start ≥ threshold).
  */
-const RuleDropProjectedNapsAfterBedtime: Rule = {
-  id: "R7.4",
-  description: "Drop projected naps starting at/after a bedtime event (recorded naps stand)",
-  dependsOn: ["R7.6"],
-  matches: (events) => {
-    const bedtime = events.find(isBedtime);
-    if (!bedtime) return false;
-    return events.some((e) => isProjectedNapAfter(e, bedtime.startTime));
-  },
-  produces: (events) => {
-    const bedtime = events.find(isBedtime)!;
-    return events.filter((e) => !isProjectedNapAfter(e, bedtime.startTime));
-  },
-};
-
-function isProjectedNapAfter(event: Event, threshold: number): boolean {
-  return isNap(event) && isProjected(event) && event.startTime >= threshold;
+function dropProjectedAfterBedtime(id: string, isType: (e: Event) => boolean): Rule {
+  const isProjectedTypeAfter = (e: Event, threshold: number) =>
+    isType(e) && isProjected(e) && e.startTime >= threshold;
+  return {
+    id,
+    description: `Drop projected ${id} events starting at/after the bedtime event`,
+    dependsOn: ["R7.6"],
+    matches: (events) => {
+      const bedtime = events.find(isBedtime);
+      if (!bedtime) return false;
+      return events.some((e) => isProjectedTypeAfter(e, bedtime.startTime));
+    },
+    produces: (events) => {
+      const bedtime = events.find(isBedtime)!;
+      return events.filter((e) => !isProjectedTypeAfter(e, bedtime.startTime));
+    },
+  };
 }
 
-/**
- * R7.4b — Projected wake_windows starting at/after the bedtime event are
- * removed. R3.1 emits one wake_window per entry in `wakeWindowsMinutes`
- * up-front, before R7.6 substitutes a nap for bedtime. Without this rule,
- * any wake_window whose index lands past bedtime is left orphaned in
- * cross-day time (TimeMin ≥ 1440), visually colliding with the bedtime
- * block's tail on the timeline.
- *
- * Wake windows are always projected (per schema docstring on `Event`),
- * so reality-wins doesn't interfere.
- */
 const isWakeWindow = hasType("wake_window");
-
-const RuleDropProjectedWakeWindowsAfterBedtime: Rule = {
-  id: "R7.4b",
-  description: "Drop projected wake_windows starting at/after a bedtime event",
-  dependsOn: ["R7.6"],
-  matches: (events) => {
-    const bedtime = events.find(isBedtime);
-    if (!bedtime) return false;
-    return events.some((e) => isProjectedWakeWindowAfter(e, bedtime.startTime));
-  },
-  produces: (events) => {
-    const bedtime = events.find(isBedtime)!;
-    return events.filter((e) => !isProjectedWakeWindowAfter(e, bedtime.startTime));
-  },
-};
-
-function isProjectedWakeWindowAfter(event: Event, threshold: number): boolean {
-  return isWakeWindow(event) && isProjected(event) && event.startTime >= threshold;
-}
 
 export const RULES: Rule[] = [
   RuleThresholdBedtime,
-  RuleDropProjectedNapsAfterBedtime,
-  RuleDropProjectedWakeWindowsAfterBedtime,
+  dropProjectedAfterBedtime("R7.4", isNap),
+  dropProjectedAfterBedtime("R7.4b", isWakeWindow),
 ];

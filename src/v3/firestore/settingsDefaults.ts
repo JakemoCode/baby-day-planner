@@ -37,8 +37,23 @@ function parseTimeStringOrNumber(value: string | number): TimeMin {
   return h * 60 + m;
 }
 
+/** Schema fallback for `Settings.defaultWakeTime` — 7:00 AM as TimeMin.
+ * Re-exported so consumers that need to construct day docs before the
+ * live settings doc has loaded (Dashboard pre-wake-gate, etc.) can
+ * reference the same value rather than re-typing `7 * 60`. */
+export const DEFAULT_WAKE_TIME = 7 * 60;
+
+/** Pastels matching the legacy `--color-owner-jake` / `--color-owner-kelly`
+ * tokens. Re-exported so `projectionPlaceholders.ts` mirrors the same
+ * values without drift. The §F4 fast-follow will replace this with a
+ * theme picker. */
+export const DEFAULT_OWNER_COLORS = {
+  parent1: "#7a8fa8",
+  parent2: "#ce8e7e",
+} as const;
+
 const DEFAULTS: Omit<Settings, "childId"> = {
-  defaultWakeTime: 7 * 60,
+  defaultWakeTime: DEFAULT_WAKE_TIME,
   bedtimeThreshold: 19 * 60,
   defaultNapLengthMinutes: 90,
   shortNapThresholdMinutes: 45,
@@ -75,11 +90,8 @@ const DEFAULTS: Omit<Settings, "childId"> = {
     },
   },
   owners: {
-    // Pastels matching the legacy `--color-owner-jake` / `--color-owner-kelly`
-    // tokens in src/styles/tokens.css. The §F4 fast-follow replaces these
-    // with a theme picker; until then, sane defaults that don't blind people.
-    parent1: { displayName: "", color: "#7a8fa8" },
-    parent2: { displayName: "", color: "#ce8e7e" },
+    parent1: { displayName: "", color: DEFAULT_OWNER_COLORS.parent1 },
+    parent2: { displayName: "", color: DEFAULT_OWNER_COLORS.parent2 },
     other: [],
   },
   timelinePxPerHour: 80,
