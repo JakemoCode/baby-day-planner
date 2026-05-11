@@ -84,4 +84,46 @@ describe("expandPutdownBlocks", () => {
     expect(putdown?.startTime).toBe(19 * 60 - 20);
     expect(putdown?.endTime).toBe(19 * 60);
   });
+
+  // Temporal gate moved from engine R6.1 to here. The engine sets
+  // hasPutdown=true on every nap/bedtime; the renderer decides whether
+  // the putdown window is still in the future.
+  describe("R6.7 — temporal gate (suppress when parent has passed)", () => {
+    it("skips the synthetic when parent.startTime <= nowMinutes", () => {
+      const past = ev({ id: "nap-past", hasPutdown: true, startTime: 9 * 60 });
+      const out = expandPutdownBlocks([past], 15, 10 * 60);
+      expect(out.find((e) => e.id === "putdown:nap-past")).toBeUndefined();
+    });
+
+    it("emits the synthetic when parent.startTime > nowMinutes", () => {
+      const future = ev({ id: "nap-future", hasPutdown: true, startTime: 14 * 60 });
+      const out = expandPutdownBlocks([future], 15, 10 * 60);
+      expect(out.find((e) => e.id === "putdown:nap-future")).toBeDefined();
+    });
+
+    it("emits the synthetic for every hasPutdown event when nowMinutes omitted (archived day)", () => {
+      const recorded = ev({
+        id: "nap-rec",
+        hasPutdown: true,
+        startTime: 9 * 60,
+        lifecycle: { state: "completed", committedAt: 9 * 60 },
+      });
+      const out = expandPutdownBlocks([recorded], 15);
+      expect(out.find((e) => e.id === "putdown:nap-rec")).toBeDefined();
+    });
+
+    it("overridden lifecycle still gets the synthetic when parent is future", () => {
+      // The actual user bug: owner-only drawer edit on a projected nap
+      // promotes lifecycle to `overridden` (time preserved). Putdown
+      // must still render.
+      const overridden = ev({
+        id: "nap-ov",
+        hasPutdown: true,
+        startTime: 14 * 60,
+        lifecycle: { state: "overridden", annotatedAt: 10 * 60 },
+      });
+      const out = expandPutdownBlocks([overridden], 15, 10 * 60);
+      expect(out.find((e) => e.id === "putdown:nap-ov")).toBeDefined();
+    });
+  });
 });

@@ -65,8 +65,8 @@ export const PLACEHOLDER_SETTINGS: Settings = {
     },
   },
   owners: {
-    parent1: { displayName: "", color: "#0af" },
-    parent2: { displayName: "", color: "#f0a" },
+    parent1: { displayName: "", color: "#7a8fa8" },
+    parent2: { displayName: "", color: "#ce8e7e" },
     other: [],
   },
   timelinePxPerHour: 80,

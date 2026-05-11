@@ -53,11 +53,6 @@ function todayDate(): string {
   return `${y}-${m}-${day}`;
 }
 
-function currentWakeTimeMin(): number {
-  const d = new Date();
-  return d.getHours() * 60 + d.getMinutes();
-}
-
 export default function DashboardPage() {
   const nowMinutes = useNowMinutes();
   const { day, loading: dayLoading } = useV3Day(CHILD_ID);
@@ -99,10 +94,13 @@ export default function DashboardPage() {
   // valid (midnight) and must NOT be treated as "no day yet".
   if (!day || !settings || day.wakeTime === undefined) {
     const handleStart = async () => {
+      // Anchor the new day at `settings.defaultWakeTime`, not wall-clock.
+      // Tapping Start at 2:30 PM should NOT rotate the whole projected day
+      // to start at 2:30 PM. Fallback to 7am only if settings hasn't loaded.
       await startNewDay(db, CHILD_ID, {
         newDayId: `day-${Date.now()}`,
         newDate: todayDate(),
-        newWakeTime: currentWakeTimeMin(),
+        newWakeTime: settings?.defaultWakeTime ?? 7 * 60,
       });
     };
     return (
@@ -185,10 +183,13 @@ export default function DashboardPage() {
     });
   };
   const handleStartDay = async ({ useTomorrowPlan: _ }: { useTomorrowPlan: boolean }) => {
+    // See note above — anchor the new day at `settings.defaultWakeTime`,
+    // not wall-clock. `settings` is always non-null here (past the loading
+    // + wake gates), so a fallback isn't structurally needed.
     await startNewDay(db, CHILD_ID, {
       newDayId: `day-${Date.now()}`,
       newDate: todayDate(),
-      newWakeTime: currentWakeTimeMin(),
+      newWakeTime: settings.defaultWakeTime,
     });
   };
 

@@ -103,4 +103,40 @@ function isProjectedNapAfter(event: Event, threshold: number): boolean {
   return isNap(event) && isProjected(event) && event.startTime >= threshold;
 }
 
-export const RULES: Rule[] = [RuleThresholdBedtime, RuleDropProjectedNapsAfterBedtime];
+/**
+ * R7.4b — Projected wake_windows starting at/after the bedtime event are
+ * removed. R3.1 emits one wake_window per entry in `wakeWindowsMinutes`
+ * up-front, before R7.6 substitutes a nap for bedtime. Without this rule,
+ * any wake_window whose index lands past bedtime is left orphaned in
+ * cross-day time (TimeMin ≥ 1440), visually colliding with the bedtime
+ * block's tail on the timeline.
+ *
+ * Wake windows are always projected (per schema docstring on `Event`),
+ * so reality-wins doesn't interfere.
+ */
+const isWakeWindow = hasType("wake_window");
+
+const RuleDropProjectedWakeWindowsAfterBedtime: Rule = {
+  id: "R7.4b",
+  description: "Drop projected wake_windows starting at/after a bedtime event",
+  dependsOn: ["R7.6"],
+  matches: (events) => {
+    const bedtime = events.find(isBedtime);
+    if (!bedtime) return false;
+    return events.some((e) => isProjectedWakeWindowAfter(e, bedtime.startTime));
+  },
+  produces: (events) => {
+    const bedtime = events.find(isBedtime)!;
+    return events.filter((e) => !isProjectedWakeWindowAfter(e, bedtime.startTime));
+  },
+};
+
+function isProjectedWakeWindowAfter(event: Event, threshold: number): boolean {
+  return isWakeWindow(event) && isProjected(event) && event.startTime >= threshold;
+}
+
+export const RULES: Rule[] = [
+  RuleThresholdBedtime,
+  RuleDropProjectedNapsAfterBedtime,
+  RuleDropProjectedWakeWindowsAfterBedtime,
+];
