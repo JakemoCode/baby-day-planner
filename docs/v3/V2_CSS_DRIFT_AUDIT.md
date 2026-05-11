@@ -30,7 +30,8 @@
 | Files identical to V2 | 8 |
 | Files where every diff is owner-mechanism (kept) | 12 |
 | Files with a real regression (restored) | 3 |
-| V3-only files (no V2 ancestor — skipped) | 2 |
+| V3-only files (genuinely out of scope) | 1 |
+| V3-only files audited via V2's inlined markup | 1 |
 | Files where V2 had unused classes V3 dropped (cleanup, not regression) | 2 |
 | Ambiguous items needing Jake's call | 1 |
 
