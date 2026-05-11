@@ -98,6 +98,29 @@ const DEFAULTS: Omit<Settings, "childId"> = {
   timelineDimPast: true,
 };
 
+/**
+ * One-time migration: rewrite the cutover-era bright placeholder colors
+ * (`#0af` / `#f0a`) — which were never intended as production palette
+ * values — to the legacy pastels. Applied silently on every read so
+ * dev/prod docs written under the old defaults converge without a
+ * separate migration script. Safe to remove once no `OwnersConfig` docs
+ * carry the legacy placeholder values (§F4 theme picker supersedes).
+ */
+const LEGACY_PLACEHOLDER_COLORS: Record<"parent1" | "parent2", string> = {
+  parent1: "#0af",
+  parent2: "#f0a",
+};
+
+function migrateOwnerSlot(
+  slot: { displayName: string; color: string },
+  key: "parent1" | "parent2",
+): { displayName: string; color: string } {
+  if (slot.color === LEGACY_PLACEHOLDER_COLORS[key]) {
+    return { ...slot, color: DEFAULT_OWNER_COLORS[key] };
+  }
+  return slot;
+}
+
 export function withV3SettingsDefaults(input: Partial<Settings> | null): Settings | null {
   if (input === null) return null;
   const merged: Settings = {
@@ -111,8 +134,14 @@ export function withV3SettingsDefaults(input: Partial<Settings> | null): Setting
       weekdays: { ...DEFAULTS.daycare.weekdays, ...input.daycare?.weekdays },
     },
     owners: {
-      parent1: { ...DEFAULTS.owners.parent1, ...input.owners?.parent1 },
-      parent2: { ...DEFAULTS.owners.parent2, ...input.owners?.parent2 },
+      parent1: migrateOwnerSlot(
+        { ...DEFAULTS.owners.parent1, ...input.owners?.parent1 },
+        "parent1",
+      ),
+      parent2: migrateOwnerSlot(
+        { ...DEFAULTS.owners.parent2, ...input.owners?.parent2 },
+        "parent2",
+      ),
       other: input.owners?.other ?? DEFAULTS.owners.other,
     },
   };
