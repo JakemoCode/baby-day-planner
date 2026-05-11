@@ -33,11 +33,9 @@ export function useV3Events(
     // doc id, which trips reserved-id validation (`__.*__`).
     if (!dayId) return;
     return watchEvents(db, childId, dayId, (next) => {
-      // Flow each doc through withV3EventDefaults so V2-shape leftovers
-      // (string startTime, source/status/recorded triplet, missing
-      // lifecycle / kind / hasPutdown) don't crash the engine. Pass the
-      // owners config so V2 string `owner` display names can be resolved
-      // back to the correct slot ref. Removed once V2 reads stop entirely.
+      // Defense-in-depth: fill hasPutdown / kind / lifecycle defaults
+      // on partial / hand-edited docs. The converter applies the same
+      // defaulter, so this is a belt-and-suspenders pass.
       setEvents(next.map((e) => withV3EventDefaults(e, owners)));
       setLoading(false);
     });

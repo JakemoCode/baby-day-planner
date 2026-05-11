@@ -2,12 +2,8 @@
  * Realistic data smoke tests.
  *
  * Runs the V3 engine + defaulters against fixtures mirroring real
- * Firestore states. Catches defaulter blind spots BEFORE production.
- *
- * Failures here are P0.
- *
- * Note: V2 ← V3 back-compat shim tests removed in PR-C1 (shim deleted
- * with V2). The remaining V3-only assertions stay.
+ * Firestore states (clean V3, partial V3, partial-of-any-shape).
+ * Catches defaulter blind spots BEFORE production. Failures here are P0.
  */
 
 import { describe, expect, it } from "vitest";
@@ -31,9 +27,7 @@ describe("withV3SettingsDefaults — realistic data", () => {
   });
 
   it("a partial settings doc gets V3 defaults backfilled (does NOT crash engine)", () => {
-    // Doc lacks bottleChain, owners, daycare, dailyRecurring, dreamFeed* (flat).
-    // The shape happens to match an old V2 doc — fixtures kept for partial-fill
-    // coverage even after PR-C1 deleted the V2 surface.
+    // Doc lacks bottleChain, owners, daycare, dailyRecurring, dreamFeed*.
     const out = withV3SettingsDefaults(fixtures.settings.v2 as Partial<Settings>);
     expect(out).not.toBeNull();
     expect(out!.bottleChain).toBeDefined();
@@ -50,7 +44,7 @@ describe("withV3SettingsDefaults — realistic data", () => {
     expect(out!.daycare).toBeDefined();
   });
 
-  it("a mixed V2/V3 doc preserves V3 fields and fills missing", () => {
+  it("a partially-filled doc preserves explicit fields and fills missing", () => {
     const out = withV3SettingsDefaults(fixtures.settings.mixed as Partial<Settings>);
     expect(out).not.toBeNull();
     expect(out!.bedtimeThreshold).toBe(19 * 60); // V3 wrote, preserved
@@ -74,9 +68,6 @@ describe("withV3EventDefaults — realistic data", () => {
     expect(out.owner).toEqual({ slot: "parent1" });
   });
 
-  // V2 bridge tests (string time, triplet → lifecycle, free-string owner)
-  // removed in PR-C1 — V2 surface deleted.
-
   it("a partial V3 event (missing hasPutdown + lifecycle) gets defaults filled", () => {
     const out = withV3EventDefaults(fixtures.events.partialV3 as Event);
     expect(out.hasPutdown).toBe(false);
@@ -98,8 +89,6 @@ describe("engine end-to-end with realistic fixtures", () => {
     expect(result.every((e) => typeof e.startTime === "number")).toBe(true);
     expect(result.every((e) => Number.isFinite(e.startTime))).toBe(true);
   });
-
-  // V2-shape engine end-to-end tests removed in PR-C1.
 
   it("partial V3 settings (missing bottleChain etc.) + defaults → engine works", () => {
     const settings = withV3SettingsDefaults(fixtures.settings.partialV3 as Partial<Settings>)!;

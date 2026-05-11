@@ -8,8 +8,7 @@
  *
  * Applied in `v3DayConverter.fromFirestore` so all read paths
  * (`getDay`, `getDayByDate`, `listArchivedDays`, `watchActiveDay`)
- * benefit. Also applied in `useV3Day` for defense in depth (idempotent —
- * double-fill is a no-op).
+ * receive a fully-shaped Day.
  */
 
 import type { Day } from "../schemas";
