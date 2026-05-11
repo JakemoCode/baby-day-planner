@@ -12,6 +12,7 @@ import {
   projectedBedtime,
 } from "@/v3/selectors";
 import { useNowMinutes } from "@/hooks/useNowMinutes";
+import { isPersistedActual } from "@/v3/lib/isPersistedActual";
 import { newEventId } from "@/v3/lib/newEventId";
 import { useV3Day } from "@/v3/hooks/useV3Day";
 import { useV3Events } from "@/v3/hooks/useV3Events";
@@ -43,15 +44,6 @@ type DrawerState =
   | { open: false }
   | { open: true; mode: "create"; template: Event }
   | { open: true; mode: "edit"; event: Event };
-
-/**
- * Whether the drawer's edit target already has a Firestore doc.
- * Projected events have no doc; overridden / recorded events do.
- * Used at save time to route create vs update.
- */
-function isPersistedActual(eventId: string, actuals: ReadonlyArray<Event>): boolean {
-  return actuals.some((a) => a.id === eventId);
-}
 
 function todayDate(): string {
   const d = new Date();

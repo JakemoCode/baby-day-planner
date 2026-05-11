@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import type { Event, OwnershipTemplate } from "@/v3/schemas";
 import { useNowMinutes } from "@/hooks/useNowMinutes";
+import { isPersistedActual } from "@/v3/lib/isPersistedActual";
 import { newEventId } from "@/v3/lib/newEventId";
 import { useV3Day } from "@/v3/hooks/useV3Day";
 import { useV3Events } from "@/v3/hooks/useV3Events";
@@ -27,17 +28,6 @@ type DrawerState =
   | { open: false }
   | { open: true; mode: "create"; template: Event }
   | { open: true; mode: "edit"; event: Event };
-
-/**
- * Whether the drawer's edit target already has a Firestore doc.
- * Projected events have no doc (id starts `proj-`); overridden / recorded
- * events do (id starts `manual-`). Used to route create vs update at
- * save and to decide whether delete has a doc to remove. Single source
- * of truth so onSave and onDelete can't drift.
- */
-function isPersistedActual(eventId: string, actuals: ReadonlyArray<Event>): boolean {
-  return actuals.some((a) => a.id === eventId);
-}
 
 function yesterdayDate(today: string): string {
   const [y, m, d] = today.split("-").map(Number);

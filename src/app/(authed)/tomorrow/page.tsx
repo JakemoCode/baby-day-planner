@@ -8,6 +8,7 @@ import { useV3Templates } from "@/v3/hooks/useV3Templates";
 import { startNewDay } from "@/v3/repositories/days";
 import { createEvent } from "@/v3/repositories/events";
 import { saveTemplate } from "@/v3/repositories/templates";
+import { isPersistedActual } from "@/v3/lib/isPersistedActual";
 import { newDayId } from "@/v3/lib/newEventId";
 import { db } from "@/lib/firebase/client";
 import { LoadingState } from "@/components/shared/LoadingState";
@@ -36,17 +37,6 @@ function tomorrowDateString(): string {
   const d = new Date();
   d.setDate(d.getDate() + 1);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
-
-/**
- * Whether the drawer's edit target already lives in the local extras
- * list. Page-local mirror of the timeline's `isPersistedActual` check —
- * here "persisted" means "in the extras buffer that will be promoted",
- * not "in Firestore". Single source of truth so onSave/onDelete can't
- * drift between create and update branches.
- */
-function isPersistedActual(eventId: string, actuals: ReadonlyArray<Event>): boolean {
-  return actuals.some((a) => a.id === eventId);
 }
 
 export default function TomorrowPage() {
