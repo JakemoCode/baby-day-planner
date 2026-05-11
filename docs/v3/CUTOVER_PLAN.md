@@ -558,7 +558,22 @@ grep -rn 'Date\.now()' src/v3/ | grep -v 'test\|spec\|lastSyncedAt\|setNow\|setI
 - `src/lib/defaults/settings.ts`
 - `src/lib/firestore/converters.ts`
 - `src/repositories/` (entire directory)
-- `src/v3/firestore/v2Backcompat.{ts,test.ts}`
+- `src/v3/firestore/v2Backcompat.ts` (the shim itself)
+- `src/v3/firestore/v2DayBackcompat.test.ts` (deletes with the shim — tests live in V3 dir but cover V2-bridge behavior)
+- `src/v3/firestore/v2TemplateBackcompat.test.ts` (same)
+
+### Exemptions — files that LOOK V2 but stay
+
+The §F9 audit (`docs/v3/F9_TEST_AUDIT.md`) surfaced 4 corrections to the
+delete list above:
+
+- **KEEP `src/lib/firestore/paths.{ts,test.ts}`** — V3 repositories
+  import paths from this module. Deleting it would break V3.
+- **KEEP `src/hooks/useSyncStatus.{ts,test.tsx}`** — `SyncStatusIcon`
+  (a shared component PR-C1 does NOT delete) consumes it.
+- **IGNORE `src/v3/firestore/v2Backcompat.test.ts`** — does not exist;
+  prior catalog entry was wrong. Actual shim tests are the two
+  `v2{Day,Template}Backcompat.test.ts` files listed above.
 
 ### Code-level wipes within retained files
 
