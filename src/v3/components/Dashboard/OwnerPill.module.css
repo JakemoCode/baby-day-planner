@@ -6,5 +6,9 @@
   color: var(--color-fg-soft);
   padding: 2px var(--space-2);
   border-radius: var(--radius-pill);
-  background: var(--owner-color, var(--color-bg));
+  /* Tinted owner background — V2 used per-owner `-tint` tokens (~15%
+   * saturation pastels). V3 derives the tint from the configured
+   * `--owner-color` so any palette flows through. Falls back to the
+   * page background when no owner is set. */
+  background: color-mix(in srgb, var(--owner-color, transparent) 20%, var(--color-bg));
 }
