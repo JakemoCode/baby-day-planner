@@ -7,7 +7,7 @@
  */
 
 import { describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { Event, OwnersConfig } from "../../schemas";
 import { EventEditDrawerV3 } from "./EventEditDrawerV3";
@@ -316,5 +316,73 @@ describe("EventEditDrawerV3", () => {
       />,
     );
     expect(screen.getByRole("button", { name: "Delete" })).toBeInTheDocument();
+  });
+
+  // §F9 PORT — drawer per-type form coverage previously asserted in V2.
+
+  it("wake_window form shows only the owner picker (no time / amount / label inputs)", () => {
+    const ww: Event = {
+      id: "ww-1",
+      dayId: "d-1",
+      eventKey: "wake_window_1",
+      type: "wake_window",
+      kind: "block",
+      startTime: 8 * 60,
+      endTime: 9 * 60,
+      label: "Wake window 1",
+      hasPutdown: false,
+      lifecycle: { state: "projected" },
+    };
+    render(
+      <EventEditDrawerV3
+        open
+        mode="edit"
+        event={ww}
+        owners={owners}
+        nowMinutes={NOW}
+        onSave={() => {}}
+        onCancel={() => {}}
+      />,
+    );
+    expect(screen.queryByLabelText("Start time")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("End time")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Amount (oz)")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Label")).not.toBeInTheDocument();
+    // Owner picker is the only field — assert via the picker's group role
+    // so a stray "Jake"-named button elsewhere can't false-positive.
+    const ownerGroup = screen.getByRole("group", { name: /owner/i });
+    expect(within(ownerGroup).getByRole("button", { name: "Jake" })).toBeInTheDocument();
+    expect(within(ownerGroup).getByRole("button", { name: "Sam" })).toBeInTheDocument();
+  });
+
+  it("extra form shows label + start + end + owner picker", () => {
+    const extra: Event = {
+      id: "extra-1",
+      dayId: "d-1",
+      eventKey: "extra-1",
+      type: "extra",
+      kind: "block",
+      startTime: 14 * 60,
+      endTime: 15 * 60,
+      label: "Pediatrician",
+      hasPutdown: false,
+      lifecycle: { state: "projected" },
+    };
+    render(
+      <EventEditDrawerV3
+        open
+        mode="edit"
+        event={extra}
+        owners={owners}
+        nowMinutes={NOW}
+        onSave={() => {}}
+        onCancel={() => {}}
+      />,
+    );
+    expect(screen.getByLabelText("Label")).toHaveValue("Pediatrician");
+    expect(screen.getByLabelText("Start time")).toHaveValue("14:00");
+    expect(screen.getByLabelText("End time")).toHaveValue("15:00");
+    expect(screen.queryByLabelText("Amount (oz)")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Jake" })).toBeInTheDocument();
   });
 });
