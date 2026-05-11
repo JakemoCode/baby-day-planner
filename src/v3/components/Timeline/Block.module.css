@@ -107,9 +107,17 @@
 
 /* === Variant-specific shape =================================== */
 
-/* Putdown: narrower so the parent wake's label/time stay readable. */
+/* Putdown: narrower so the parent's label/time stay readable.
+ * Tightened vertical padding (1px vs the default 3px) so the synthetic
+ * block can use its true natural height (= putdownLeadMinutes × pxPerMin)
+ * without the 24px min-height clamp overflowing 4px into the adjacent
+ * parent block — that overlap was visible at the V2/V3 seam against
+ * darker fills (e.g. bedtime's sage). The 1px padding + 1.5px border on
+ * each side still leaves ~15px of content area, enough for the single-row
+ * `Putdown · 8:08p · Kelly` label at `--text-sm` × 1.2 line-height. */
 .block[data-type="putdown"] {
   border-radius: var(--radius-sm) 0 0 var(--radius-sm);
+  padding: 1px 6px;
 }
 
 /* Custom: outline-only sub-block anchored to the right of the lane. */
