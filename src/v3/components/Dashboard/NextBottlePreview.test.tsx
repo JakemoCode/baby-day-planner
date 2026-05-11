@@ -115,9 +115,8 @@ describe("NextBottlePreview", () => {
     render(
       <NextBottlePreview bottle={bottle({ amountOz: 5 })} bottle1Pending={false} owners={owners} />,
     );
-    const subtitle = screen.getByText(/projected.*Bottle 2/i);
-    expect(subtitle.textContent).toContain("5 oz");
-    expect(subtitle.textContent).not.toContain("5.0 oz");
+    // \b boundary excludes "5.0 oz" — fails loudly if the formatter regresses.
+    expect(screen.getByText(/projected.*\b5 oz\b/i)).toBeVisible();
   });
 
   it("preserves fractional oz ('4.5 oz')", () => {

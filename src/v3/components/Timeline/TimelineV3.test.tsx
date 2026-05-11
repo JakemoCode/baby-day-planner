@@ -204,17 +204,15 @@ describe("TimelineV3", () => {
 
   it("respects pxPerHour — the timeline height scales proportionally", () => {
     const events: Event[] = [ev({ id: "nap1" })];
-    const { container, rerender } = render(
+    const { rerender } = render(
       <TimelineV3 events={events} owners={owners} putdownLeadMinutes={15} pxPerHour={60} />,
     );
-    const inner60 = container.querySelector("[style*='height']") as HTMLElement | null;
-    const height60 = parseFloat(inner60?.style.height ?? "0");
+    const height60 = parseFloat(screen.getByTestId("timeline-inner").style.height);
 
     rerender(
       <TimelineV3 events={events} owners={owners} putdownLeadMinutes={15} pxPerHour={120} />,
     );
-    const inner120 = container.querySelector("[style*='height']") as HTMLElement | null;
-    const height120 = parseFloat(inner120?.style.height ?? "0");
+    const height120 = parseFloat(screen.getByTestId("timeline-inner").style.height);
 
     expect(height60).toBeGreaterThan(0);
     // Doubling pxPerHour doubles the rendered height (within rounding tolerance).

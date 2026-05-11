@@ -143,7 +143,11 @@ export function TimelineV3({
 
   return (
     <div ref={rootRef} className={styles.outer}>
-      <div className={styles.inner} style={{ height: `${heightPx}px` }}>
+      <div
+        data-testid="timeline-inner"
+        className={styles.inner}
+        style={{ height: `${heightPx}px` }}
+      >
         {hourTicks.map((t) => (
           <span
             key={`tick-${t.hour}`}
