@@ -1,7 +1,7 @@
 "use client";
 
 import { useAuth } from "@/lib/auth/useAuth";
-import styles from "./SettingsField.module.css";
+import styles from "./SettingsAccount.module.css";
 
 export function SettingsAccount() {
   const { user, signOut } = useAuth();

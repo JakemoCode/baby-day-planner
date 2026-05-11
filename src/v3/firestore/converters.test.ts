@@ -34,21 +34,7 @@ describe("v3DayConverter", () => {
     expect(back).toEqual(day);
   });
 
-  it("fromFirestore on a V2-shape doc fills suppression fields and remaps templateId", () => {
-    const v2Doc = {
-      id: "d-1",
-      childId: "c-1",
-      date: "2026-05-09",
-      status: "active",
-      wakeTime: "07:30", // V2 string — converter passes through unchanged
-      ownershipTemplateId: "tpl-weekday", // V2 field
-      createdAt: "2026-05-09T07:30:00Z", // V2-only field — silently dropped (not in V3 Day)
-    };
-    const back = v3DayConverter.fromFirestore(mockSnap(v2Doc));
-    expect(back.suppressedRecurringIds).toEqual([]);
-    expect(back.suppressedDaycareDay).toBe(false);
-    expect(back.templateId).toBe("tpl-weekday");
-  });
+  // V2-shape converter test removed in PR-C1 (V2 surface deleted).
 
   it("fromFirestore on a partial-V3 doc fills missing suppression fields", () => {
     const partial = {

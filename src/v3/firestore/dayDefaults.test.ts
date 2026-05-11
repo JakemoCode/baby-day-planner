@@ -1,13 +1,8 @@
 /**
- * V3 Day defensive defaults — bridge V2-shape and partial-V3 day docs
- * into a fully-shaped V3 Day on read so the engine doesn't crash on
- * `undefined.includes` (suppressedRecurringIds) or silently lose
- * template assignment (V2 wrote `ownershipTemplateId`; V3 reads
- * `templateId`).
- *
- * Transitional: the V2 ownershipTemplateId remap deletes in PR-C1
- * once no V2 day docs remain. The defaults filling stays as
- * legitimate optionality.
+ * V3 Day defensive defaults — fills `suppressedRecurringIds` (default
+ * `[]`) and `suppressedDaycareDay` (default `false`) on read so the
+ * engine doesn't crash on `undefined.includes`. V2 bridge removed in
+ * PR-C1.
  */
 
 import { describe, expect, it } from "vitest";
@@ -75,30 +70,7 @@ describe("withV3DayDefaults", () => {
     expect(out!.suppressedDaycareDay).toBe(true);
   });
 
-  it("remaps V2 ownershipTemplateId to V3 templateId when V3 field absent", () => {
-    const v2 = {
-      id: "d-1",
-      childId: "child-1",
-      date: "2026-05-09",
-      status: "active",
-      ownershipTemplateId: "tpl-weekday", // V2 field
-    } as unknown as Partial<Day>;
-    const out = withV3DayDefaults(v2);
-    expect(out!.templateId).toBe("tpl-weekday");
-  });
-
-  it("V3 templateId takes precedence over V2 ownershipTemplateId when both present", () => {
-    const mixed = {
-      id: "d-1",
-      childId: "child-1",
-      date: "2026-05-09",
-      status: "active",
-      templateId: "tpl-v3",
-      ownershipTemplateId: "tpl-v2",
-    } as unknown as Partial<Day>;
-    const out = withV3DayDefaults(mixed);
-    expect(out!.templateId).toBe("tpl-v3");
-  });
+  // V2 ownershipTemplateId remap tests removed in PR-C1 (V2 surface deleted).
 
   it("does not invent templateId when neither field is present", () => {
     const out = withV3DayDefaults({

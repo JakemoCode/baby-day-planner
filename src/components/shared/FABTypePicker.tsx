@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import type { CreatableType } from "./createEventTemplate";
+import type { CreatableType } from "@/v3/components/shared/createEventTemplate";
 import styles from "./FABTypePicker.module.css";
 
 export type FABTypePickerProps = {

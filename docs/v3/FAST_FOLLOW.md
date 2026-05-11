@@ -220,43 +220,10 @@ in `src/v3/components/shared/`, then call sites swap in.
 
 ---
 
-## §F7 — Delete the V2 ← V3 back-compat shim
+## §F7 — Delete the V2 ← V3 back-compat shim — `done` (PR-C1)
 
-**Source**: PR #66 — `src/v3/firestore/v2Backcompat.ts` was added
-as a transitional shim so V2 surfaces (Dashboard, Tomorrow,
-History, Day-templates, AppShell) keep reading the V3-shape
-Firestore docs that PR #60 (timeline) and PR #64 (settings)
-write.
-
-**Status**: `pending` — blocked on the cross-surface cutover
-
-**What**: when the last V2 surface is cut over to V3 hooks,
-delete the shim and its consumers:
-- Delete `src/v3/firestore/v2Backcompat.ts` + its test file
-  (when added).
-- Remove the `withV2SettingsBackcompat` call from
-  `src/hooks/useSettings.ts`.
-- Remove the `withV2EventBackcompat` call from
-  `src/hooks/useEvents.ts`.
-- Likely the V2 hooks themselves (`src/hooks/useSettings.ts`,
-  `useEvents.ts`, `useDay.ts`, `useTemplates.ts`) delete at the
-  same time, alongside `src/domain/`, `src/repositories/`, and
-  V2 components.
-
-**Why fast-follow, not now**: the shim is doing real work right
-now (without it, every V2 page crashes on V3 docs). It deletes
-naturally as part of the V2 cleanup once cross-surface cutover
-finishes.
-
-**Estimated effort**: 30 minutes once cross-surface cutover is
-done. Mostly `rm` + import-cleanup.
-
-**Acceptance**:
-- No file in `src/v3/` imports anything from `@/domain` or
-  `@/hooks/use{Day,Events,Settings,Templates}`.
-- `grep -r "v2Backcompat" src/` returns empty.
-- `pnpm typecheck && pnpm test && pnpm test:integration` all
-  pass.
+The shim, the V2 hooks, the V2 components, the V2 repos, `@/domain/`, and
+`src/lib/firestore/converters.ts` all deleted in PR-C1 (2026-05-11).
 
 ---
 
