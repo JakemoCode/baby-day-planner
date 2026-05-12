@@ -154,6 +154,30 @@ export default function SettingsPage() {
         />
       </Section>
 
+      <Section title="Timeline display">
+        <ColorModeRow
+          id="timelineColorMode"
+          label="Color encodes"
+          value={value.timelineColorMode}
+          onChange={(v) => set("timelineColorMode", v)}
+          help="Blocks can color-code by event type or by who owns the slot."
+        />
+        <NumberRow
+          id="timelinePxPerHour"
+          label="Pixels per hour"
+          value={value.timelinePxPerHour}
+          onChange={(v) => set("timelinePxPerHour", v)}
+          help="Vertical scale of the daily timeline. Higher = larger blocks. 70–220 recommended."
+        />
+        <CheckboxRow
+          id="timelineDimPast"
+          label="Dim past events"
+          value={value.timelineDimPast}
+          onChange={(v) => set("timelineDimPast", v)}
+          help="Renders events that have already passed at reduced opacity."
+        />
+      </Section>
+
       <SettingsAccount />
     </main>
   );
@@ -327,6 +351,68 @@ function PumpTimesRow({
       >
         + Add pump time
       </button>
+    </div>
+  );
+}
+
+function ColorModeRow({
+  id,
+  label,
+  value,
+  onChange,
+  help,
+}: {
+  id: string;
+  label: string;
+  value: "type" | "owner";
+  onChange: (next: "type" | "owner") => void;
+  help?: string;
+}) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+      <label htmlFor={id} style={{ fontSize: 14 }}>
+        {label}
+      </label>
+      <select
+        id={id}
+        value={value}
+        onChange={(e) => onChange(e.target.value as "type" | "owner")}
+        style={{ padding: 8, fontSize: 16, minHeight: 40 }}
+      >
+        <option value="type">Event type (recommended)</option>
+        <option value="owner">Owner</option>
+      </select>
+      {help && <small style={{ color: "var(--color-muted)", fontSize: 12 }}>{help}</small>}
+    </div>
+  );
+}
+
+function CheckboxRow({
+  id,
+  label,
+  value,
+  onChange,
+  help,
+}: {
+  id: string;
+  label: string;
+  value: boolean;
+  onChange: (next: boolean) => void;
+  help?: string;
+}) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+      <label htmlFor={id} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14 }}>
+        <input
+          id={id}
+          type="checkbox"
+          checked={value}
+          onChange={(e) => onChange(e.target.checked)}
+          style={{ width: 18, height: 18 }}
+        />
+        {label}
+      </label>
+      {help && <small style={{ color: "var(--color-muted)", fontSize: 12 }}>{help}</small>}
     </div>
   );
 }

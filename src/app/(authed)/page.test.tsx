@@ -103,6 +103,7 @@ function makeSettings(overrides: Partial<Settings> = {}): Settings {
       },
     },
     owners: OWNERS,
+    timelineColorMode: "type",
     timelinePxPerHour: 80,
     timelineDimPast: true,
     ...overrides,

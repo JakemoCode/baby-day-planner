@@ -173,6 +173,7 @@ export function aSettings(overrides: Partial<Settings> = {}): Settings {
       parent2: { displayName: "Parent 2", color: "--owner-2" },
       other: [],
     },
+    timelineColorMode: "type",
     timelinePxPerHour: 120,
     timelineDimPast: true,
     ...overrides,

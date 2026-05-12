@@ -11,11 +11,12 @@
 
 .chip {
   display: inline-flex;
-  /* Top-align so the dot sits with the label row, not centered against
-   * a tall two-row chip. */
-  align-items: flex-start;
+  /* Center-align so dot + label + time sit on the same optical baseline.
+   * Previously was flex-start with a magic-number margin-top on .dot —
+   * which fought vertical centering once the chip's padding grew. */
+  align-items: center;
   gap: 6px;
-  padding: 3px 8px;
+  padding: 6px 10px;
   border-radius: 12px;
   background: var(--color-surface-raised);
   border: 1px solid var(--owner-color, var(--color-border));
@@ -49,9 +50,6 @@
   flex-shrink: 0;
   /* Owner color drives the dot; sage accent is the no-owner default. */
   background: var(--owner-color, var(--color-accent));
-  /* Nudge down 2px so the dot lines up with the label row's optical
-   * mid-x-height instead of sitting at the very top of the chip. */
-  margin-top: 3px;
 }
 
 /* === Content layout ================================================ */
@@ -65,7 +63,11 @@
 
 .topRow {
   display: inline-flex;
-  align-items: baseline;
+  /* Center-align (was baseline) so the label + time share their optical
+   * mid-line rather than sitting on the same text baseline — at the
+   * differing font-sizes (12 / 11) baseline alignment made the time
+   * sit visually lower than the label. */
+  align-items: center;
   gap: 4px;
 }
 

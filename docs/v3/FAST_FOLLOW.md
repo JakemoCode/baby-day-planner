@@ -376,6 +376,42 @@ Jake noted "I don't see extra recurring events in settings? where'd that go?" �
 
 ---
 
+## §F15 — Migrate duplicating test fixture files to `aSettings()` factory
+
+**Source**: code-simplifier review of PR #111, 2026-05-11.
+
+**Status**: `pending`
+
+**What**: six test files duplicate full `Settings` literals instead of calling the existing `aSettings(overrides)` factory in `src/v3/__tests__/factories.ts`. Every schema field addition makes all six fail to compile and requires a synchronized edit (PR #111 used `re.sub` — that ritual is the smell).
+
+Files to migrate:
+- `src/app/(authed)/page.test.tsx`
+- `src/app/(authed)/day-templates/page.test.tsx`
+- `src/app/(authed)/tomorrow/page.test.tsx`
+- `src/v3/components/Tomorrow/TomorrowPreview.test.tsx`
+- `src/v3/components/shared/createEventTemplate.test.ts`
+- `src/v3/repositories/settings.test.ts`
+
+Each ~20-line literal collapses to 3-5 lines using `aSettings({ /* overrides */ })`. After this, schema additions only touch the factory.
+
+**Estimated effort**: 30 minutes, one PR, mechanical.
+
+---
+
+## §F16 — Settings page row helpers should use CSS Modules
+
+**Source**: code-reviewer of PR #111, 2026-05-11.
+
+**Status**: `pending`
+
+**What**: every row helper in `src/app/(authed)/settings/page.tsx` (`Section`, `TimeRow`, `NumberRow`, `WakeWindowsRow`, `PumpTimesRow`, `OwnerSlotRow`, `ColorModeRow`, `CheckboxRow`) uses inline `style={{ ... }}` for layout, font size, and colors. Project standard (`CLAUDE.md`) is CSS Modules + tokens only — no runtime CSS-in-JS.
+
+The whole file violates the standard, not just the two new helpers added in PR #111. PR #111 matched the existing convention rather than departing from it for two rows — the proper fix is to migrate the whole file in one pass.
+
+**Estimated effort**: 1-2 hours. Move all row layout into `page.module.css` with proper class names.
+
+---
+
 ## How items land here
 
 Two paths:

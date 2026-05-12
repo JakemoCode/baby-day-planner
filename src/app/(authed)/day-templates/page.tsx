@@ -148,6 +148,7 @@ export default function DayTemplatesPage() {
         events={projected}
         owners={settings.owners}
         putdownLeadMinutes={settings.putdownLeadMinutes}
+        colorMode={settings.timelineColorMode}
         dimPast={false}
         pxPerHour={settings.timelinePxPerHour}
         onEventTap={(event) => {
