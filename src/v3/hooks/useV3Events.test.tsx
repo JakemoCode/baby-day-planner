@@ -149,4 +149,63 @@ describe("useV3Events", () => {
     renderHook(() => useV3Events("child-1", ""));
     expect(watchEventsMock).not.toHaveBeenCalled();
   });
+
+  describe("dayId-change re-subscription (audit P0-2 seam)", () => {
+    // The dashboard chain: useV3Day delivers a new day → page rerenders
+    // with the new day.id → useV3Events is called with the new dayId
+    // and must (a) stop watching the previous dayId, (b) start watching
+    // the new one. Without this, events from the OLD day still appear
+    // on the dashboard after a "Start New Day" cycle.
+    it("transitions from empty dayId to a real one: subscribes once, with the new id", () => {
+      const unsub = vi.fn();
+      watchEventsMock.mockReturnValue(unsub);
+
+      const { rerender } = renderHook(({ dayId }) => useV3Events("child-1", dayId), {
+        initialProps: { dayId: "" },
+      });
+      // Empty → no subscription yet.
+      expect(watchEventsMock).not.toHaveBeenCalled();
+
+      rerender({ dayId: "day-new" });
+      // Real id → exactly one subscription with the new id.
+      expect(watchEventsMock).toHaveBeenCalledTimes(1);
+      const [, childId, dayId] = watchEventsMock.mock.calls[0]!;
+      expect(childId).toBe("child-1");
+      expect(dayId).toBe("day-new");
+    });
+
+    it("transitions from one real dayId to another: unsubscribes from the old, subscribes to the new", () => {
+      const unsubA = vi.fn();
+      const unsubB = vi.fn();
+      watchEventsMock.mockReturnValueOnce(unsubA).mockReturnValueOnce(unsubB);
+
+      const { rerender } = renderHook(({ dayId }) => useV3Events("child-1", dayId), {
+        initialProps: { dayId: "day-A" },
+      });
+      expect(watchEventsMock).toHaveBeenCalledTimes(1);
+      expect(watchEventsMock.mock.calls[0]?.[2]).toBe("day-A");
+      expect(unsubA).not.toHaveBeenCalled();
+
+      rerender({ dayId: "day-B" });
+      // Old subscription torn down, new one started with day-B.
+      expect(unsubA).toHaveBeenCalledTimes(1);
+      expect(watchEventsMock).toHaveBeenCalledTimes(2);
+      expect(watchEventsMock.mock.calls[1]?.[2]).toBe("day-B");
+    });
+
+    it("transitions from real dayId back to empty: unsubscribes and does NOT re-subscribe", () => {
+      const unsub = vi.fn();
+      watchEventsMock.mockReturnValueOnce(unsub);
+
+      const { rerender } = renderHook(({ dayId }) => useV3Events("child-1", dayId), {
+        initialProps: { dayId: "day-old" },
+      });
+      expect(watchEventsMock).toHaveBeenCalledTimes(1);
+
+      rerender({ dayId: "" });
+      // Old subscription torn down; no new subscription.
+      expect(unsub).toHaveBeenCalledTimes(1);
+      expect(watchEventsMock).toHaveBeenCalledTimes(1);
+    });
+  });
 });
