@@ -94,9 +94,20 @@ const DEFAULTS: Omit<Settings, "childId"> = {
     parent2: { displayName: "", color: DEFAULT_OWNER_COLORS.parent2 },
     other: [],
   },
-  timelinePxPerHour: 80,
+  timelineColorMode: "type",
+  // V2's default was 120 px/hour. The cutover stub set 80 by accident
+  // and a one-time migration (below) converts legacy 80 values back to
+  // 120 on read.
+  timelinePxPerHour: 120,
   timelineDimPast: true,
 };
+
+/**
+ * Cutover-era stub default that was never an intentional product choice.
+ * Mirrors the `migrateOwnerSlot` pattern below. Removable once no docs
+ * carry the 80 value.
+ */
+const LEGACY_PX_PER_HOUR_STUB = 80;
 
 /**
  * One-time migration: rewrite the cutover-era bright placeholder colors
@@ -164,6 +175,12 @@ export function withV3SettingsDefaults(input: Partial<Settings> | null): Setting
     ...entry,
     time: parseTimeStringOrNumber(entry.time as unknown as string | number),
   }));
+
+  // One-time migration: rewrite the cutover-era 80 px/hour stub to V2's
+  // intended 120. See LEGACY_PX_PER_HOUR_STUB above.
+  if (merged.timelinePxPerHour === LEGACY_PX_PER_HOUR_STUB) {
+    merged.timelinePxPerHour = DEFAULTS.timelinePxPerHour;
+  }
 
   return merged;
 }

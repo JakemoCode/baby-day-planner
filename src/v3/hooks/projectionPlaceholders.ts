@@ -70,6 +70,7 @@ export const PLACEHOLDER_SETTINGS: Settings = {
     parent2: { displayName: "", color: DEFAULT_OWNER_COLORS.parent2 },
     other: [],
   },
+  timelineColorMode: "type",
   timelinePxPerHour: 80,
   timelineDimPast: true,
 };

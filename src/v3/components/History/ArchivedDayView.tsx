@@ -8,6 +8,7 @@ export type ArchivedDayViewProps = {
   events: Event[];
   owners: OwnersConfig;
   putdownLeadMinutes: TimeMin;
+  colorMode?: "type" | "owner";
   /** When provided, events become tappable and forward to this handler. */
   onEditEvent?: (event: Event) => void;
 };
@@ -29,6 +30,7 @@ export function ArchivedDayView({
   events,
   owners,
   putdownLeadMinutes,
+  colorMode,
   onEditEvent,
 }: ArchivedDayViewProps) {
   return (
@@ -46,6 +48,7 @@ export function ArchivedDayView({
           owners={owners}
           putdownLeadMinutes={putdownLeadMinutes}
           dimPast={false}
+          {...(colorMode ? { colorMode } : {})}
           {...(onEditEvent ? { onEventTap: onEditEvent } : {})}
         />
       )}

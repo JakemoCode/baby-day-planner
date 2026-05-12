@@ -53,6 +53,7 @@ export function TomorrowPreview({
       events={events}
       owners={owners}
       putdownLeadMinutes={settings.putdownLeadMinutes}
+      colorMode={settings.timelineColorMode}
       dimPast={false}
       {...(onEventTap ? { onEventTap } : {})}
     />

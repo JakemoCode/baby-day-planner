@@ -53,6 +53,7 @@ const settings: Settings = {
     },
   },
   owners,
+  timelineColorMode: "type",
   timelinePxPerHour: 80,
   timelineDimPast: false,
 };

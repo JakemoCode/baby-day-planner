@@ -48,6 +48,7 @@ const settings = (overrides: Partial<Settings>): Settings =>
       parent2: { displayName: "Sam", color: "#f0a" },
       other: [],
     },
+    timelineColorMode: "type",
     timelinePxPerHour: 80,
     timelineDimPast: true,
     ...overrides,

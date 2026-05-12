@@ -98,6 +98,7 @@ const baseSettings: Settings = {
     },
   },
   owners,
+  timelineColorMode: "type",
   timelinePxPerHour: 80,
   timelineDimPast: false,
 };

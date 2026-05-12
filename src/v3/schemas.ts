@@ -269,6 +269,12 @@ export type Settings = {
   owners: OwnersConfig;
 
   // Display
+  /**
+   * Whether timeline blocks encode event type via fill color (default) or
+   * encode owner via fill color. V2 stored this; V3 had dropped it during
+   * cutover and is now restored.
+   */
+  timelineColorMode: "type" | "owner";
   timelinePxPerHour: number;
   timelineDimPast: boolean;
 };
