@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { renderWithAuth, screen } from "@/test-utils";
+import { renderWithAuth, screen, userEvent } from "@/test-utils";
 import type { Day, Event, OwnersConfig, Settings } from "@/v3/schemas";
 import DashboardPage from "./page";
 
@@ -14,6 +14,7 @@ const useV3TemplatesMock = vi.fn();
 const useV3ProjectionMock = vi.fn();
 const useNowMinutesMock = vi.fn();
 const startNewDayMock = vi.fn();
+const saveSettingsMock = vi.fn();
 
 vi.mock("@/v3/hooks/useV3Day", () => ({
   useV3Day: (...args: unknown[]) => useV3DayMock(...args),
@@ -35,6 +36,9 @@ vi.mock("@/hooks/useNowMinutes", () => ({
 }));
 vi.mock("@/v3/repositories/days", () => ({
   startNewDay: (...args: unknown[]) => startNewDayMock(...args),
+}));
+vi.mock("@/v3/repositories/settings", () => ({
+  saveSettings: (...args: unknown[]) => saveSettingsMock(...args),
 }));
 vi.mock("@/lib/firebase/client", () => ({
   db: {},
@@ -175,6 +179,79 @@ describe("DashboardPage (V3)", () => {
     setupHooks({ day: makeDay({ wakeTime: undefined as unknown as number }) });
     renderWithAuth(<DashboardPage />);
     expect(screen.getByLabelText(/Start the new day/i)).toBeVisible();
+  });
+
+  describe("Start New Day flow from the wake-gate", () => {
+    // These tests close the audit-flagged P0 gap: page.test.tsx had a
+    // startNewDayMock declared but never triggered. The wake-gate
+    // handler was completely uncovered. The "Start New Day → no
+    // settings doc → silent failure" bug that shipped during
+    // click-test would have been caught here.
+    it("clicks through Start → Confirm → seeds default settings AND archives+creates day when no settings exist", async () => {
+      setupHooks({ day: null, settings: null });
+      renderWithAuth(<DashboardPage />);
+      await userEvent.click(screen.getByRole("button", { name: /Start New Day/i }));
+      await userEvent.click(screen.getByRole("button", { name: /^Confirm$/i }));
+
+      // Settings doc must be seeded BEFORE the day, otherwise the wake-
+      // gate re-fires on `!settings` after the day write and the user
+      // sees no state change.
+      expect(saveSettingsMock).toHaveBeenCalledTimes(1);
+      const [, savedChildId, savedSettings] = saveSettingsMock.mock.calls[0] as [
+        unknown,
+        string,
+        Settings,
+      ];
+      expect(savedChildId).toBe("aden");
+      // Seeded settings come from `withV3SettingsDefaults({childId})`, which
+      // produces the canonical defaults. defaultWakeTime is 7am.
+      expect(savedSettings.defaultWakeTime).toBe(7 * 60);
+      expect(savedSettings.childId).toBe("aden");
+
+      expect(startNewDayMock).toHaveBeenCalledTimes(1);
+      const [, childId, input] = startNewDayMock.mock.calls[0] as [
+        unknown,
+        string,
+        { newDayId: string; newDate: string; newWakeTime: number },
+      ];
+      expect(childId).toBe("aden");
+      expect(input.newDayId).toMatch(/^day-\d+$/);
+      expect(typeof input.newDate).toBe("string");
+      expect(input.newDate).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+      // No settings → falls back to DEFAULT_WAKE_TIME (7am).
+      expect(input.newWakeTime).toBe(7 * 60);
+    });
+
+    it("when settings already exist: skips the saveSettings call; just archives+creates day", async () => {
+      setupHooks({ day: null, settings: makeSettings({ defaultWakeTime: 8 * 60 + 15 }) });
+      renderWithAuth(<DashboardPage />);
+      await userEvent.click(screen.getByRole("button", { name: /Start New Day/i }));
+      await userEvent.click(screen.getByRole("button", { name: /^Confirm$/i }));
+
+      // Settings already present → no bootstrap write.
+      expect(saveSettingsMock).not.toHaveBeenCalled();
+      // Day created with the actual configured wake time, not the default.
+      expect(startNewDayMock).toHaveBeenCalledTimes(1);
+      const [, , input] = startNewDayMock.mock.calls[0] as [
+        unknown,
+        string,
+        { newWakeTime: number },
+      ];
+      expect(input.newWakeTime).toBe(8 * 60 + 15);
+    });
+
+    it("when day exists but wakeTime is undefined: same flow (seeds settings if missing, then archives+creates)", async () => {
+      setupHooks({
+        day: makeDay({ wakeTime: undefined as unknown as number }),
+        settings: null,
+      });
+      renderWithAuth(<DashboardPage />);
+      await userEvent.click(screen.getByRole("button", { name: /Start New Day/i }));
+      await userEvent.click(screen.getByRole("button", { name: /^Confirm$/i }));
+
+      expect(saveSettingsMock).toHaveBeenCalledTimes(1);
+      expect(startNewDayMock).toHaveBeenCalledTimes(1);
+    });
   });
 
   it("wake-gate: Day with wakeTime === 0 (midnight) is a valid active day", () => {
