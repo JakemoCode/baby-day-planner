@@ -447,18 +447,6 @@ The whole file violates the standard, not just the two new helpers added in PR #
 
 ---
 
-## §F20 — Changing nap time removes putdown
-
-**Source**: Jake, 2026-05-12 click-test.
-
-**Status**: `pending`
-
-**What**: when the user edits a nap's start time, the putdown block that was displayed before the edit disappears. Putdown is render-only (`expandPutdown.ts`) and should re-derive from the edited nap. Investigate whether the override creates a state that fails the `deriveHasPutdown` gate (lifecycle `projected` | `overridden` only) — the edited nap may be persisting as `completed` and losing its putdown affordance.
-
-**Why fast-follow**: visual regression; cascade math itself is correct.
-
----
-
 ## How items land here
 
 Two paths:
