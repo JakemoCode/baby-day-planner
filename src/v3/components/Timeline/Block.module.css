@@ -107,9 +107,17 @@
 
 /* === Variant-specific shape =================================== */
 
-/* Putdown: narrower so the parent wake's label/time stay readable. */
+/* Putdown: narrower so the parent's label/time stay readable.
+ * Zero vertical padding (vs the default 3px) so the synthetic block
+ * can use its true natural height (= putdownLeadMinutes × pxPerMin)
+ * without the 24px min-height clamp overflowing into the adjacent
+ * parent block. Math: 20px block - 1.5px × 2 border = 17px content,
+ * which clears the 16.8px line-height of `--text-sm × 1.2`. The
+ * matching putdown floor of 20px lives in TimelineV3.tsx — keep both
+ * values in sync if either changes. */
 .block[data-type="putdown"] {
   border-radius: var(--radius-sm) 0 0 var(--radius-sm);
+  padding: 0 6px;
 }
 
 /* Custom: outline-only sub-block anchored to the right of the lane. */

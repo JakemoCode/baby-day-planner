@@ -173,17 +173,21 @@ export function TimelineV3({
             const { leftPx, rightPx } = blockGeometry(event);
             const top = yOf(event.startTime);
             const end = event.endTime ?? event.startTime;
-            // Min tappable height (24px) for very short blocks so user can
-            // always tap to edit even a 1-minute accidental nap. Putdowns
-            // also use this clamp — at 80px/hour, a 15-min lead is 20px
-            // natural and the label needs ~22px to fit without clipping.
-            // The 4px visual "overlap" into the parent block is intentional
-            // and predates the V3 cutover.
-            const naturalH = (end - event.startTime) * pxPerMin;
-            const heightPxBlock = Math.max(24, naturalH);
             // Putdown synthetics are not user-tappable in V3 — the
             // parent event is what gets edited. Tap the parent instead.
             const isPutdown = event.eventKey === PUTDOWN_KIND_TAG;
+            // Min height differs by event type:
+            // - Tappable blocks: 24px floor so a 1-minute accidental nap
+            //   still gets a thumb-sized target.
+            // - Putdown synthetics: not tappable, but need a 20px
+            //   legibility floor (17px content area = clears
+            //   `--text-sm` × 1.2 line-height = 16.8px) to ensure the
+            //   single-row label `Putdown · 8:08p · Kelly` doesn't clip.
+            //   The matching `padding: 0 6px` lives in Block.module.css
+            //   — keep both in sync.
+            const naturalH = (end - event.startTime) * pxPerMin;
+            const minH = isPutdown ? 20 : 24;
+            const heightPxBlock = Math.max(minH, naturalH);
             const tap = onEventTap && !isPutdown ? () => onEventTap(event) : undefined;
             return (
               <Block
