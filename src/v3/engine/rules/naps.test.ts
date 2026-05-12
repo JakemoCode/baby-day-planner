@@ -11,6 +11,7 @@ import { aContext, aDay, aRecordedNap, aSettings } from "../../__tests__/factori
 import type { Event } from "../../schemas";
 import { projectDay } from "../projectDay";
 import { RULES as NAP_RULES } from "./naps";
+import { ALL_RULES } from "./index";
 
 describe("R3.1 — projected nap chain from wakeWindowsMinutes", () => {
   it("with [120, 90] WWs, wake at 7:00, projects ww_1, nap_1, ww_2, nap_2", () => {
@@ -442,7 +443,7 @@ describe("Cascade invariant — wake_window/nap boundaries (Jake 2026-05-12)", (
         actuals: ctx.actuals,
         nowMinutes: ctx.nowMinutes,
       },
-      { rules: NAP_RULES },
+      { rules: ALL_RULES },
     );
     assertInvariant(out, 7 * 60);
   });
@@ -466,7 +467,7 @@ describe("Cascade invariant — wake_window/nap boundaries (Jake 2026-05-12)", (
         actuals: ctx.actuals,
         nowMinutes: ctx.nowMinutes,
       },
-      { rules: NAP_RULES },
+      { rules: ALL_RULES },
     );
     assertInvariant(out, 7 * 60);
   });
@@ -489,7 +490,7 @@ describe("Cascade invariant — wake_window/nap boundaries (Jake 2026-05-12)", (
         actuals: ctx.actuals,
         nowMinutes: ctx.nowMinutes,
       },
-      { rules: NAP_RULES },
+      { rules: ALL_RULES },
     );
     assertInvariant(out, 7 * 60);
   });
@@ -517,7 +518,7 @@ describe("Cascade invariant — wake_window/nap boundaries (Jake 2026-05-12)", (
         actuals: ctx.actuals,
         nowMinutes: ctx.nowMinutes,
       },
-      { rules: NAP_RULES },
+      { rules: ALL_RULES },
     );
     assertInvariant(out, 7 * 60);
   });
