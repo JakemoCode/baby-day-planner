@@ -274,8 +274,8 @@ function WakeWindowsRow({
     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
       {value.map((mins, i) => (
         <div key={i} style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          <label htmlFor={`ww-${i}`} style={{ fontSize: 14, minWidth: 70 }}>
-            After nap {i + 1}
+          <label htmlFor={`ww-${i}`} style={{ fontSize: 14, minWidth: 100 }}>
+            {i === 0 ? "After wake-up" : `After nap ${i}`}
           </label>
           <input
             id={`ww-${i}`}
