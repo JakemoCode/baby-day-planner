@@ -1,6 +1,7 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { renderWithAuth, screen, userEvent } from "@/test-utils";
 import type { Day, Event, OwnersConfig, Settings } from "@/v3/schemas";
+import { aSettings } from "@/v3/__tests__/factories";
 import DashboardPage from "./page";
 
 // ---------------------------------------------------------------------------
@@ -68,51 +69,14 @@ function makeDay(overrides: Partial<Day> = {}): Day {
 }
 
 function makeSettings(overrides: Partial<Settings> = {}): Settings {
-  return {
+  // wakeWindowsMinutes empty so the engine doesn't project naps in
+  // tests that only care about the day/event wiring.
+  return aSettings({
     childId: "aden",
-    defaultWakeTime: 7 * 60,
-    bedtimeThreshold: 19 * 60,
-    defaultNapLengthMinutes: 90,
-    shortNapThresholdMinutes: 45,
-    shortNapAdjustmentMinutes: 30,
     wakeWindowsMinutes: [],
-    napDurationMin: 30,
-    napDurationMax: 180,
-    defaultBottleAmountOz: 5,
-    defaultBottleIntervalMinutes: 180,
-    bottleRules: [],
-    bottleIntervalRules: [],
-    bottleChain: { bottlesPerDay: 5, bufferAfterWakeMinutes: 10 },
-    minBottleIntervalMinutes: 90,
-    putdownLeadMinutes: 15,
-    pumpTimes: [],
-    pumpOwnerSlot: "parent2",
-    dreamFeedEnabled: false,
-    dreamFeedStart: 22 * 60,
-    dreamFeedEnd: 23 * 60,
-    dreamFeedOffsetAfterBedtimeMinutes: 180,
-    dailyRecurring: [],
-    daycare: {
-      enabled: false,
-      dropoffTime: 8 * 60,
-      pickupTime: 17 * 60,
-      ownerId: "",
-      weekdays: {
-        mon: false,
-        tue: false,
-        wed: false,
-        thu: false,
-        fri: false,
-        sat: false,
-        sun: false,
-      },
-    },
     owners: OWNERS,
-    timelineColorMode: "type",
-    timelinePxPerHour: 80,
-    timelineDimPast: true,
     ...overrides,
-  };
+  });
 }
 
 function setupHooks({
