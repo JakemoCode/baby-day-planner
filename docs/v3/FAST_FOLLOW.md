@@ -412,6 +412,34 @@ The whole file violates the standard, not just the two new helpers added in PR #
 
 ---
 
+## §F17 — Deprecate "Start Day" button; auto-anchor day at `defaultWakeTime`
+
+**Source**: Jake, 2026-05-11 — extending §F12. The deeper architectural take behind "fixing the day starting at 2:30pm or 7pm or whenever Start Day is pressed."
+
+**Status**: `pending`
+
+**What**: today, a Day doc only gains a `wakeTime` (and starts rendering as "active") when the user taps **Start Day** on the Dashboard. The button has been a source of two distinct bugs:
+1. **Wall-clock anchoring** (fixed in PR #107): `wakeTime` used to be the click time. If Jake forgot to tap until 2:30 PM, the timeline rotated to start at 2:30 PM. Now uses `settings.defaultWakeTime`.
+2. **Forgetting to tap at all**: the button is a manual ritual on top of a fact the system already knows (today's date + `defaultWakeTime`). It exists only because the data model conflates "day exists" with "day has been confirmed by a human."
+
+**Architectural fix**: the Day should auto-anchor at `defaultWakeTime` the moment the calendar date flips. No button required. The "started" affordance moves to *Bedtime end* (which already exists and is the actual semantic boundary). Combined with §F12, the user's only morning interaction is recording the first bottle / wake-up — no ceremonial taps.
+
+**Why fast-follow, not pre-V3**: the engine doesn't care — `wakeTime` is just a `TimeMin` on the Day doc. This is a UX + day-creation-lifecycle change, not a rules change.
+
+**Open design questions**:
+- Where does day creation happen? Client-side on first load of the new date, or a cron / scheduled job?
+- What if the user wakes earlier than `defaultWakeTime`? Recording the first bottle / "End bedtime" event should retroactively update `wakeTime` (or the engine should treat `defaultWakeTime` as a fallback when no real wake event has been recorded yet).
+- Backwards compat with the "planned" / "active" status field on `Day` — does "active" still mean anything if days auto-anchor?
+- Combine with §F12: if a confirmed tomorrow plan exists, apply it on date-flip; otherwise auto-create with `defaultWakeTime` and an empty template.
+
+**Acceptance**:
+- "Start Day" button removed from the Dashboard.
+- Opening the app on a new calendar date shows today's timeline anchored at `defaultWakeTime` with zero taps.
+- Recording the first event of the day Just Works without any "you need to start the day first" gating.
+- Click-time NEVER influences `Day.wakeTime`.
+
+---
+
 ## How items land here
 
 Two paths:
