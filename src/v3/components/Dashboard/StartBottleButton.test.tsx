@@ -1,16 +1,35 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { Event, TimeMin } from "@/v3/schemas";
 import { StartBottleButton } from "./StartBottleButton";
 
-function nowMinusMinutes(min: number): TimeMin {
-  const d = new Date();
-  const total = d.getHours() * 60 + d.getMinutes() - min;
-  return ((total % (24 * 60)) + 24 * 60) % (24 * 60);
+// Audit P2-4: this file previously called `new Date()` at test time
+// inside a `nowMinusMinutes` helper. Tests running within a few
+// seconds of a minute boundary (esp. midnight) computed a wrap-around
+// modulo that flipped the confirm-dialog branch. Replaced with fake
+// timers pinned to a deterministic time; the helper computes
+// TimeMin offsets relative to that fixed clock instead of wall time.
+
+const FIXED_NOW = new Date("2026-05-12T14:30:00.000");
+const NOW_MIN: TimeMin = 14 * 60 + 30; // 870
+
+/** TimeMin `min` minutes before the pinned NOW_MIN. Pure math — no
+ *  wall-clock involved; no midnight-wraparound surprises. */
+function timeMinMinusMinutes(min: number): TimeMin {
+  return NOW_MIN - min;
 }
 
 describe("StartBottleButton", () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(FIXED_NOW);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it("renders 'Start Bottle Now' label", () => {
     render(
       <StartBottleButton
@@ -48,7 +67,8 @@ describe("StartBottleButton", () => {
       hasPutdown: false,
     });
     expect(arg.lifecycle.state).toBe("completed");
-    expect(typeof arg.startTime).toBe("number");
+    // startTime is `currentLocalMinutes()` of the fake clock = 14:30 = 870.
+    expect(arg.startTime).toBe(NOW_MIN);
     expect(arg.id).toMatch(/^bottle_/);
   });
 
@@ -91,7 +111,7 @@ describe("StartBottleButton", () => {
         defaultAmountOz={5}
         dayId="d1"
         nextNumber={2}
-        lastBottleTime={nowMinusMinutes(120)}
+        lastBottleTime={timeMinMinusMinutes(120)}
         minIntervalMinutes={20}
         onLog={onLog}
       />,
@@ -107,7 +127,7 @@ describe("StartBottleButton", () => {
         defaultAmountOz={5}
         dayId="d1"
         nextNumber={2}
-        lastBottleTime={nowMinusMinutes(5)}
+        lastBottleTime={timeMinMinusMinutes(5)}
         minIntervalMinutes={20}
         onLog={onLog}
       />,
@@ -124,7 +144,7 @@ describe("StartBottleButton", () => {
         defaultAmountOz={5}
         dayId="d1"
         nextNumber={2}
-        lastBottleTime={nowMinusMinutes(5)}
+        lastBottleTime={timeMinMinusMinutes(5)}
         minIntervalMinutes={20}
         onLog={onLog}
       />,
@@ -142,7 +162,7 @@ describe("StartBottleButton", () => {
         defaultAmountOz={5}
         dayId="d1"
         nextNumber={2}
-        lastBottleTime={nowMinusMinutes(5)}
+        lastBottleTime={timeMinMinusMinutes(5)}
         minIntervalMinutes={20}
         onLog={onLog}
       />,
