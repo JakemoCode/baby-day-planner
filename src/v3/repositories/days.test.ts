@@ -177,4 +177,67 @@ describe("v3 days repository", () => {
     expect(got).not.toBeNull();
     expect("templateId" in (got as object)).toBe(false);
   });
+
+  // -------------------------------------------------------------------------
+  // Write→Watch seam (audit P0-2): `startNewDay` writes → `watchActiveDay`
+  // delivers the new day to the listener. The page's wake-gate failure
+  // mode shipped today was masked by this seam being untested — each
+  // half worked in isolation but the chain wasn't exercised end-to-end.
+  // -------------------------------------------------------------------------
+
+  describe("startNewDay → watchActiveDay seam", () => {
+    it("after startNewDay, the listener delivers the new day with full V3 shape (wakeTime, defaults applied)", async () => {
+      const database = db();
+      const deliveries: (Day | null)[] = [];
+      const unsub = watchActiveDay(database, "child-1", (d) => deliveries.push(d));
+      // Let the initial empty-state snapshot drain before writing.
+      await new Promise((r) => setTimeout(r, 100));
+
+      await startNewDay(database, "child-1", {
+        newDayId: "day-fresh",
+        newDate: "2026-05-12",
+        newWakeTime: 7 * 60 + 30,
+      });
+      // Wait for the snapshot to propagate.
+      await new Promise((r) => setTimeout(r, 200));
+      unsub();
+
+      // Final delivered state is the new active day, fully shaped.
+      const last = deliveries[deliveries.length - 1];
+      expect(last).not.toBeNull();
+      expect(last!.id).toBe("day-fresh");
+      expect(last!.status).toBe("active");
+      // The wake-gate bug today hinged on wakeTime being delivered: if the
+      // converter strips it or the writer omits it, the page's
+      // `day.wakeTime === undefined` check fires forever after Start Day.
+      expect(last!.wakeTime).toBe(7 * 60 + 30);
+      // Defaulter fields are present (engine relies on these).
+      expect(last!.suppressedRecurringIds).toEqual([]);
+      expect(last!.suppressedDaycareDay).toBe(false);
+    });
+
+    it("after startNewDay with a pre-existing active day, listener delivers ONLY the new day (old archived no longer matches)", async () => {
+      const database = db();
+      await createDay(database, day({ id: "day-yesterday", date: "2026-05-11" }));
+
+      const deliveries: (Day | null)[] = [];
+      const unsub = watchActiveDay(database, "child-1", (d) => deliveries.push(d));
+      // Initial delivery should be day-yesterday (the only active day).
+      await new Promise((r) => setTimeout(r, 100));
+      expect(deliveries[deliveries.length - 1]?.id).toBe("day-yesterday");
+
+      await startNewDay(database, "child-1", {
+        newDayId: "day-today",
+        newDate: "2026-05-12",
+        newWakeTime: 7 * 60,
+      });
+      await new Promise((r) => setTimeout(r, 200));
+      unsub();
+
+      // Final delivered state is the NEW day, not the now-archived old one.
+      const last = deliveries[deliveries.length - 1];
+      expect(last?.id).toBe("day-today");
+      expect(last?.status).toBe("active");
+    });
+  });
 });
