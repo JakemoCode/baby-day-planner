@@ -7,7 +7,7 @@ import { OwnersConfigEditor } from "@/v3/components/Settings/OwnersConfigEditor"
 import { withV3SettingsDefaults } from "@/v3/firestore/settingsDefaults";
 import { useV3Settings } from "@/v3/hooks/useV3Settings";
 import { saveSettings } from "@/v3/repositories/settings";
-import type { OwnerSlot, Settings, TimeMin } from "@/v3/schemas";
+import type { BottleIntervalRule, OwnerSlot, Settings, TimeMin } from "@/v3/schemas";
 import { formatHM24 } from "@/v3/ui/time";
 import styles from "./page.module.css";
 
@@ -141,6 +141,10 @@ export default function SettingsPage() {
           value={value.bottleChain.bufferAfterWakeMinutes}
           onChange={(v) => set("bottleChain", { ...value.bottleChain, bufferAfterWakeMinutes: v })}
           help="Delay before the first projected bottle when none has been recorded yet."
+        />
+        <BottleIntervalRulesRow
+          value={value.bottleIntervalRules}
+          onChange={(v) => set("bottleIntervalRules", v)}
         />
       </Section>
 
@@ -350,6 +354,85 @@ function PumpTimesRow({
         style={{ padding: "8px 12px", minHeight: 40, alignSelf: "flex-start" }}
       >
         + Add pump time
+      </button>
+    </div>
+  );
+}
+
+function BottleIntervalRulesRow({
+  value,
+  onChange,
+}: {
+  value: BottleIntervalRule[];
+  onChange: (next: BottleIntervalRule[]) => void;
+}) {
+  const update = (i: number, patch: Partial<BottleIntervalRule>) => {
+    const next = value.map((r, j) => (j === i ? { ...r, ...patch } : r));
+    onChange(next);
+  };
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      <label style={{ fontSize: 14 }}>Amount → interval rules</label>
+      <small style={{ color: "var(--color-muted)", fontSize: 12 }}>
+        After a bottle of N oz, expect the next bottle in M minutes. Most-specific (narrowest) range
+        wins on overlap. Falls back to default interval when no rule matches.
+      </small>
+      {value.map((rule, i) => (
+        <div key={i} style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+          <input
+            type="number"
+            step={0.5}
+            min={0}
+            value={rule.minOz}
+            onChange={(e) => update(i, { minOz: Number(e.target.value) })}
+            aria-label={`Rule ${i + 1} min oz`}
+            style={{ padding: 8, fontSize: 16, minHeight: 40, width: 72 }}
+          />
+          <span style={{ fontSize: 14 }}>–</span>
+          <input
+            type="number"
+            step={0.5}
+            min={0}
+            placeholder="∞"
+            value={rule.maxOz ?? ""}
+            onChange={(e) => {
+              const raw = e.target.value;
+              const merged: BottleIntervalRule =
+                raw === ""
+                  ? { minOz: rule.minOz, intervalMinutes: rule.intervalMinutes }
+                  : { ...rule, maxOz: Number(raw) };
+              onChange(value.map((r, j) => (j === i ? merged : r)));
+            }}
+            aria-label={`Rule ${i + 1} max oz`}
+            style={{ padding: 8, fontSize: 16, minHeight: 40, width: 80 }}
+          />
+          <span style={{ fontSize: 14 }}>oz →</span>
+          <input
+            type="number"
+            step={5}
+            min={1}
+            value={rule.intervalMinutes}
+            onChange={(e) => update(i, { intervalMinutes: Number(e.target.value) })}
+            aria-label={`Rule ${i + 1} interval minutes`}
+            style={{ padding: 8, fontSize: 16, minHeight: 40, width: 80 }}
+          />
+          <span style={{ fontSize: 14 }}>min</span>
+          <button
+            type="button"
+            onClick={() => onChange(value.filter((_, j) => j !== i))}
+            aria-label={`Remove rule ${i + 1}`}
+            style={{ padding: "8px 12px", minHeight: 40 }}
+          >
+            ×
+          </button>
+        </div>
+      ))}
+      <button
+        type="button"
+        onClick={() => onChange([...value, { minOz: 0, intervalMinutes: 180 }])}
+        style={{ padding: "8px 12px", minHeight: 40, alignSelf: "flex-start" }}
+      >
+        + Add rule
       </button>
     </div>
   );

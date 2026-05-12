@@ -405,3 +405,124 @@ describe("R5.6 — projected bottle inside a nap moves to the closer edge (with 
     }
   });
 });
+
+// ---------------------------------------------------------------------------
+// R5.x — Amount-conditional cascade interval (restored from V2)
+// ---------------------------------------------------------------------------
+
+describe("R5.1 — cascade interval honors bottleIntervalRules", () => {
+  it("a 4oz recording (within 0-5oz rule = 120m) projects next bottle 120m later, not the default 180m", () => {
+    const recorded = aRecordedBottle({
+      id: "actual_bottle_small",
+      eventKey: "bottle_1",
+      start: 8 * 60,
+      amountOz: 4,
+    });
+
+    const ctx = aContext({
+      day: aDay({ wakeTime: 7 * 60 }),
+      settings: aSettings({
+        bottleChain: { bottlesPerDay: 2, bufferAfterWakeMinutes: 10 },
+        defaultBottleIntervalMinutes: 180,
+        bottleIntervalRules: [
+          { minOz: 0, maxOz: 5, intervalMinutes: 120 },
+          { minOz: 5.1, intervalMinutes: 180 },
+        ],
+      }),
+      actuals: [recorded],
+    });
+
+    const out = projectDay(
+      {
+        day: ctx.day,
+        settings: ctx.settings,
+        actuals: ctx.actuals,
+        nowMinutes: ctx.nowMinutes,
+      },
+      { rules: ALL },
+    );
+
+    const bottles = out
+      .filter((e) => e.type === "bottle")
+      .sort((a, b) => a.startTime - b.startTime);
+
+    expect(bottles.map((b) => b.startTime)).toEqual([
+      8 * 60, // 8:00 recorded (4oz)
+      10 * 60, // 10:00 = 8:00 + 120m (matched 0-5oz rule)
+    ]);
+  });
+
+  it("a 6oz recording falls back to default when no rule matches", () => {
+    const recorded = aRecordedBottle({
+      id: "actual_bottle_big",
+      eventKey: "bottle_1",
+      start: 8 * 60,
+      amountOz: 6,
+    });
+
+    const ctx = aContext({
+      day: aDay({ wakeTime: 7 * 60 }),
+      settings: aSettings({
+        bottleChain: { bottlesPerDay: 2, bufferAfterWakeMinutes: 10 },
+        defaultBottleIntervalMinutes: 180,
+        bottleIntervalRules: [{ minOz: 0, maxOz: 5, intervalMinutes: 120 }],
+      }),
+      actuals: [recorded],
+    });
+
+    const out = projectDay(
+      {
+        day: ctx.day,
+        settings: ctx.settings,
+        actuals: ctx.actuals,
+        nowMinutes: ctx.nowMinutes,
+      },
+      { rules: ALL },
+    );
+
+    const bottles = out
+      .filter((e) => e.type === "bottle")
+      .sort((a, b) => a.startTime - b.startTime);
+
+    expect(bottles.map((b) => b.startTime)).toEqual([
+      8 * 60, // 8:00 recorded (6oz, no matching rule)
+      11 * 60, // 8:00 + default 180m
+    ]);
+  });
+
+  it("empty bottleIntervalRules → falls back to default for every step (unchanged behavior)", () => {
+    // Regression guard: existing tests use bottleIntervalRules: [] (via aSettings default)
+    // and must continue passing.
+    const recorded = aRecordedBottle({
+      id: "actual_bottle_1",
+      eventKey: "bottle_1",
+      start: 8 * 60 + 30,
+      amountOz: 5,
+    });
+
+    const ctx = aContext({
+      day: aDay({ wakeTime: 7 * 60 }),
+      settings: aSettings({
+        bottleChain: { bottlesPerDay: 2, bufferAfterWakeMinutes: 10 },
+        defaultBottleIntervalMinutes: 180,
+      }),
+      actuals: [recorded],
+    });
+
+    const out = projectDay(
+      {
+        day: ctx.day,
+        settings: ctx.settings,
+        actuals: ctx.actuals,
+        nowMinutes: ctx.nowMinutes,
+      },
+      { rules: ALL },
+    );
+
+    const bottles = out
+      .filter((e) => e.type === "bottle")
+      .sort((a, b) => a.startTime - b.startTime);
+
+    expect(bottles.map((b) => b.startTime)).toEqual([8 * 60 + 30, 11 * 60 + 30]);
+  });
+});
