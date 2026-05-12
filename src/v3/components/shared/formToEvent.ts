@@ -14,13 +14,12 @@
  *   - already-recorded source (started/completed):
  *       state stays; field edits apply.
  *
- * Predict-don't-prescribe carve-out (2026-05-12): naps and bedtime
- * preserve their "future intent" lifecycle through drawer time-edits.
- * Only the action buttons (Start Nap, End Nap) promote a nap to
- * started/completed. This preserves `hasPutdown` across reschedules —
- * the rule was the "changing nap time removes putdown" bug. Other event
- * types (extras, etc.) keep the V2-style "time-edit = lock in time"
- * semantic because they have no action-button start/end ceremony.
+ * Predict-don't-prescribe carve-out: naps and bedtime own their
+ * projected → started → completed transitions via the Start Nap /
+ * End Nap action buttons. The drawer is scheduling intent, not
+ * reality — so drawer time-edits stay in `overridden`, preserving
+ * `hasPutdown` across reschedules. Other event types fall through to
+ * the V2 "time-edit locks in time" semantic.
  *
  * `nowMinutes` carries the timestamp the lifecycle should record. The
  * caller (drawer) supplies it from the clock at save time so we don't
@@ -71,13 +70,25 @@ export function formToEvent(form: FormState, source: Event, nowMinutes: TimeMin)
 }
 
 /**
- * For naps and bedtime, drawer time-edits are scheduling intent — they
- * never promote to a recorded state. The action buttons (Start Nap,
- * End Nap) own the projected → started → completed lifecycle for these
- * event types. See the predict-don't-prescribe carve-out in the header.
+ * Event types for which drawer time-edits are scheduling intent, not
+ * recordings of reality. These types have no Start/End action-button
+ * ceremony, so the drawer is purely "this is when I plan to do this,"
+ * never "this is what happened."
+ *
+ * - `nap` / `bedtime`: Start Nap / End Nap action buttons own the
+ *   projected → started → completed flow. Drawer is scheduling.
+ * - `daily_recurring`: recurring entries (Cook Dinner, etc.) have no
+ *   action buttons at all. A drawer time-edit is a one-day reschedule,
+ *   not a recording — tomorrow still projects at the configured time.
+ *
+ * Caveat: not every `daily_recurring` is purely forecast. A medication
+ * dose configured as a daily_recurring is reality-shaped (the time it
+ * was taken matters as a recording, not a forecast). If that distinction
+ * becomes important, split the type or add a per-entry flag — for now
+ * the predict-don't-prescribe default wins.
  */
 function isSchedulingType(type: Event["type"]): boolean {
-  return type === "nap" || type === "bedtime";
+  return type === "nap" || type === "bedtime" || type === "daily_recurring";
 }
 
 function computeLifecycle(
