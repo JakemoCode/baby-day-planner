@@ -21,12 +21,17 @@ const isWakeWindow = hasType("wake_window");
 const RuleProjectNapChain: Rule = {
   id: "R3.1",
   description: "Project the day's base nap chain from settings.wakeWindowsMinutes",
-  // Fire as long as no PROJECTED wake_window exists yet. User-tapped
-  // overrides (lifecycle.state: 'overridden') sit in ctx.actuals as
-  // metadata carriers — they don't block the cascade. R4.2 merges them
-  // onto the projection R3.1 emits below.
+  // Fire as long as no PROJECTED or RECORDED wake_window exists yet.
+  // User-tapped overrides (lifecycle.state: 'overridden') sit in
+  // ctx.actuals as metadata carriers — they don't block the cascade;
+  // R4.2 merges them onto the projection R3.1 emits below. Recorded
+  // wake_windows (state: started/completed) are blocked defensively:
+  // schema intent is that wake_windows are always projected, but if a
+  // future code path ever produces one we don't want a duplicate
+  // eventKey emitted alongside it.
   matches: (events, ctx) =>
-    ctx.day.wakeTime !== undefined && !events.some((e) => isWakeWindow(e) && isProjected(e)),
+    ctx.day.wakeTime !== undefined &&
+    !events.some((e) => isWakeWindow(e) && (isProjected(e) || isRecordedEvent(e))),
   produces: (events, ctx) => projectBaseNapChain(ctx, events),
 };
 

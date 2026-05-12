@@ -41,7 +41,13 @@ function isWakeWindowOverride(e: Event): boolean {
 const RuleApplyWakeWindowOverrides: Rule = {
   id: "R4.2",
   description: "Merge wake_window owner/label overrides onto projections; drop the override docs",
-  dependsOn: ["R3.1"],
+  // R3.1 emits the cascade-derived projections we stamp.
+  // R12.3 stamps template owners; R4.2 must run AFTER it so override wins.
+  // The reverse order also produces the correct final state (R4.2 stamps
+  // unconditionally), but declaring the edge in the topo graph encodes the
+  // "override beats template" contract instead of relying on ALL_RULES
+  // array order — future refactors stay safe.
+  dependsOn: ["R3.1", "R12.3"],
   matches: (events) => events.some(isWakeWindowOverride),
   produces: (events) => {
     const overridesByKey = new Map<string, Event>();
