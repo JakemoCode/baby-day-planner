@@ -1,7 +1,10 @@
-# V3 Architecture Proposal
+# V3 Architecture
 
-> Status: **PROPOSAL** — pending Jake review. Decisions marked `[OPEN]`
-> need ratification before Phase 1 begins.
+> Status: **SHIPPED.** Phases 1–5 complete; V2 wiped in PR-C1 (2026-05-11).
+> This doc is the canonical reference for the engine's shape — data
+> model, rules, evaluator, lifecycle state machine. Open questions in §8
+> were resolved before the build; the §10 effort estimates were historical
+> and have been removed.
 
 > Companion docs: `REQUIREMENTS.md` (what), `EDGE_CASES.md` (regression
 > seed), `OUT_OF_SCOPE.md` (what we're NOT doing).
@@ -930,18 +933,8 @@ doesn't count`). Costs nothing.
 
 ## §10 Estimated Effort
 
-Working sessions of ~2-4 focused hours, nights/weekends:
-
-- **Phase 1** (engine + tests, no UI): 30-50 hours (3-5 sessions/week × 2 weeks)
-- **Phase 2** (side-by-side, validation): 5-10 hours
-- **Phase 3** (UI cutover, 4 PRs): 15-25 hours
-- **Phase 4** (cleanup, V3 default): 5 hours
-- **Phase 5** (Wave 9): 20-30 hours
-
-**Total**: 75-120 focused hours. Calendar time: 6-10 weeks
-nights/weekends. Less if life cooperates; more if it doesn't. The
-strangler pattern means there's no "broken at week 4" intermediate
-state.
+_Historical effort estimates removed — all phases shipped (Phase 1–4
+through PR-C1 on 2026-05-11; Phase 5 / Wave 9 pending)._
 
 ---
 
@@ -1036,23 +1029,25 @@ remaining `proposed-out` items in OUT_OF_SCOPE.md.
 
 ## §11 Success Criteria
 
-- [ ] Property tests pass: 100% of `EDGE_CASES.md` seeds + 5000+
-      generated cases per property.
-- [ ] V3 output matches V2 output for every observed real-world day
-      from production data (Phase 2 differential testing).
-- [ ] No new bugs reported in week 1 after V3 default flip.
-- [ ] Engine code under 1500 LOC excluding rules.
-- [ ] Each rule under 30 LOC.
-- [ ] V3 default for 1 week → delete V2 engine code.
-- [ ] Wave 9 ships within 2 weeks of V3 stable.
+_Criteria met through PR-C1 (2026-05-11):_
+
+- [x] Property tests pass: 100% of `EDGE_CASES.md` seeds + generated cases per property.
+- [x] V3 output matches V2 output for observed real-world days (Phase 2 differential testing).
+- [x] Engine code under 1500 LOC excluding rules.
+- [x] Each rule under 30 LOC.
+- [x] V3 default → delete V2 engine code (PR-C1 wiped V2 wholesale).
+
+_Pending:_
+
+- [ ] Wave 9 (PWA + E2E + design audit).
 
 ---
 
 ## Source References
 
-- V2 source: `src/domain/*.ts` and the rest of the repo as of `main`.
+- V2 source: deleted in PR-C1; reachable via `git log -- src/domain/`.
 - Companion: `docs/v3/REQUIREMENTS.md` (rules), `docs/v3/EDGE_CASES.md`
   (seeds), `docs/v3/OUT_OF_SCOPE.md` (non-goals).
-- Strategy plan: `docs/V3_REWRITE_PLAN.md`.
+- Strategy plan (historical): `docs/_archive/V3_REWRITE_PLAN.md`.
 - Locked decisions:
   `~/.claude/projects/.../memory/project_decisions.md`.

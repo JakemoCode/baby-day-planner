@@ -1911,11 +1911,10 @@ V3 reads V2 Firestore docs without migration. New writes use V3 schema.
 
 ## Source References
 
-- V2 source: `src/domain/*.ts`, `src/components/Timeline/*.tsx`,
-  `src/components/shared/EventEditDrawer.tsx`, `src/app/(authed)/*`.
+- V2 source: deleted in PR-C1 (2026-05-11); reachable via `git log -- src/domain/`.
 - Locked decisions:
   `~/.claude/projects/.../memory/project_decisions.md`.
-- Strategy plan: `docs/V3_REWRITE_PLAN.md`.
+- Strategy plan (historical): `docs/_archive/V3_REWRITE_PLAN.md`.
 - Edge cases derived from rules: `docs/v3/EDGE_CASES.md`.
 - Architecture proposal: `docs/v3/ARCHITECTURE_V3.md`.
 
