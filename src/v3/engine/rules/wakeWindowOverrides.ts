@@ -50,17 +50,16 @@ const RuleApplyWakeWindowOverrides: Rule = {
     }
     if (overridesByKey.size === 0) return events;
 
-    // Two-pass: stamp metadata, then filter overrides out.
-    const stamped = events.map((e) => {
-      if (!isWakeWindow(e) || !isProjected(e)) return e;
+    return events.flatMap((e) => {
+      if (isWakeWindowOverride(e)) return []; // drop override doc
+      if (!isWakeWindow(e) || !isProjected(e)) return [e];
       const override = overridesByKey.get(e.eventKey);
-      if (!override) return e;
+      if (!override) return [e];
       const next: Event = { ...e };
       if (override.owner !== undefined) next.owner = override.owner;
       if (override.label) next.label = override.label;
-      return next;
+      return [next];
     });
-    return stamped.filter((e) => !isWakeWindowOverride(e));
   },
 };
 

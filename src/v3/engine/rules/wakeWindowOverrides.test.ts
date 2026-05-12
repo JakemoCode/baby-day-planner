@@ -17,14 +17,24 @@
 
 import { describe, expect, it } from "vitest";
 import { PARENT1, PARENT2, aContext, aDay, aSettings, aTemplate } from "../../__tests__/factories";
-import type { Event } from "../../schemas";
-import type { Rule } from "../evaluator";
+import type { Context, Event, OwnerRef } from "../../schemas";
 import { projectDay } from "../projectDay";
 import { ALL_RULES } from "./index";
 
-const ALL: Rule[] = [...ALL_RULES];
+function run(ctx: Context): Event[] {
+  return projectDay(
+    {
+      day: ctx.day,
+      settings: ctx.settings,
+      actuals: ctx.actuals,
+      ...(ctx.template ? { template: ctx.template } : {}),
+      nowMinutes: ctx.nowMinutes,
+    },
+    { rules: ALL_RULES },
+  );
+}
 
-function wakeWindowOverride(eventKey: string, owner: typeof PARENT1, label?: string): Event {
+function wakeWindowOverride(eventKey: string, owner: OwnerRef, label?: string): Event {
   return {
     id: `override_${eventKey}`,
     dayId: "day_test",
@@ -48,15 +58,7 @@ describe("R4.2 — wake_window owner overrides survive recompute", () => {
       actuals: [wakeWindowOverride("wake_window_2", PARENT1)],
     });
 
-    const out = projectDay(
-      {
-        day: ctx.day,
-        settings: ctx.settings,
-        actuals: ctx.actuals,
-        nowMinutes: ctx.nowMinutes,
-      },
-      { rules: ALL },
-    );
+    const out = run(ctx);
 
     const ww2 = out.filter((e) => e.eventKey === "wake_window_2");
     // Exactly one wake_window_2 in output (override doc dropped, projection kept).
@@ -73,16 +75,7 @@ describe("R4.2 — wake_window owner overrides survive recompute", () => {
       actuals: [wakeWindowOverride("wake_window_2", PARENT1)],
     });
 
-    const out = projectDay(
-      {
-        day: ctx.day,
-        settings: ctx.settings,
-        actuals: ctx.actuals,
-        ...(ctx.template ? { template: ctx.template } : {}),
-        nowMinutes: ctx.nowMinutes,
-      },
-      { rules: ALL },
-    );
+    const out = run(ctx);
 
     const ww1 = out.find((e) => e.eventKey === "wake_window_1");
     const ww2 = out.find((e) => e.eventKey === "wake_window_2");
@@ -102,15 +95,7 @@ describe("R4.2 — wake_window owner overrides survive recompute", () => {
       actuals: [wakeWindowOverride("wake_window_1", PARENT1, "Pre-school walk")],
     });
 
-    const out = projectDay(
-      {
-        day: ctx.day,
-        settings: ctx.settings,
-        actuals: ctx.actuals,
-        nowMinutes: ctx.nowMinutes,
-      },
-      { rules: ALL },
-    );
+    const out = run(ctx);
 
     const ww1 = out.find((e) => e.eventKey === "wake_window_1");
     expect(ww1?.label).toBe("Pre-school walk");
@@ -125,15 +110,7 @@ describe("R4.2 — wake_window owner overrides survive recompute", () => {
       actuals: [wakeWindowOverride("wake_window_1", PARENT1)],
     });
 
-    const out = projectDay(
-      {
-        day: ctx.day,
-        settings: ctx.settings,
-        actuals: ctx.actuals,
-        nowMinutes: ctx.nowMinutes,
-      },
-      { rules: ALL },
-    );
+    const out = run(ctx);
 
     const ww1 = out.find((e) => e.eventKey === "wake_window_1");
     expect(ww1?.startTime).toBe(7 * 60); // anchored at wake, not 0
@@ -150,15 +127,7 @@ describe("R4.2 — wake_window owner overrides survive recompute", () => {
       actuals: [wakeWindowOverride("wake_window_99", PARENT1)],
     });
 
-    const out = projectDay(
-      {
-        day: ctx.day,
-        settings: ctx.settings,
-        actuals: ctx.actuals,
-        nowMinutes: ctx.nowMinutes,
-      },
-      { rules: ALL },
-    );
+    const out = run(ctx);
 
     const stray = out.find((e) => e.eventKey === "wake_window_99");
     expect(stray).toBeUndefined();
@@ -174,15 +143,7 @@ describe("R4.2 — wake_window owner overrides survive recompute", () => {
       actuals: [],
     });
 
-    const out = projectDay(
-      {
-        day: ctx.day,
-        settings: ctx.settings,
-        actuals: ctx.actuals,
-        nowMinutes: ctx.nowMinutes,
-      },
-      { rules: ALL },
-    );
+    const out = run(ctx);
 
     const wakeWindows = out.filter((e) => e.type === "wake_window");
     expect(wakeWindows).toHaveLength(2);
