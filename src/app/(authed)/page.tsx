@@ -21,7 +21,8 @@ import { useV3Templates } from "@/v3/hooks/useV3Templates";
 import { useV3Projection } from "@/v3/hooks/useV3Projection";
 import { PLACEHOLDER_DAY, PLACEHOLDER_SETTINGS } from "@/v3/hooks/projectionPlaceholders";
 import { startNewDay } from "@/v3/repositories/days";
-import { DEFAULT_WAKE_TIME } from "@/v3/firestore/settingsDefaults";
+import { saveSettings } from "@/v3/repositories/settings";
+import { DEFAULT_WAKE_TIME, withV3SettingsDefaults } from "@/v3/firestore/settingsDefaults";
 import { db } from "@/lib/firebase/client";
 import { LoadingState } from "@/components/shared/LoadingState";
 import { FAB } from "@/components/shared/FAB";
@@ -95,9 +96,18 @@ export default function DashboardPage() {
   // valid (midnight) and must NOT be treated as "no day yet".
   if (!day || !settings || day.wakeTime === undefined) {
     const handleStart = async () => {
-      // Anchor the new day at `settings.defaultWakeTime`, not wall-clock.
-      // Tapping Start at 2:30 PM should NOT rotate the whole projected day
-      // to start at 2:30 PM. Fallback to 7am only if settings hasn't loaded.
+      // First-time bootstrap: if the user has no Settings doc yet (fresh
+      // install, wiped emulator, etc.), seed defaults BEFORE creating
+      // the day. Without this, the dashboard renders past the day-write
+      // but the wake-gate fires again on `!settings`, indistinguishable
+      // from "nothing happened." Idempotent: when settings exist we skip.
+      if (!settings) {
+        const defaults = withV3SettingsDefaults({ childId: CHILD_ID })!;
+        await saveSettings(db, CHILD_ID, defaults);
+      }
+      // Anchor the new day at `settings.defaultWakeTime` (or the just-
+      // seeded default), not wall-clock. Tapping Start at 2:30 PM
+      // should NOT rotate the projected day to start at 2:30 PM.
       await startNewDay(db, CHILD_ID, {
         newDayId: `day-${Date.now()}`,
         newDate: todayDate(),
