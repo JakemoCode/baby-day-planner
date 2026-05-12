@@ -8,6 +8,7 @@
 
 import { describe, expect, it } from "vitest";
 import { aContext, aDay, aRecordedNap, aSettings } from "../../__tests__/factories";
+import type { Event } from "../../schemas";
 import { projectDay } from "../projectDay";
 import { RULES as NAP_RULES } from "./naps";
 
@@ -153,19 +154,65 @@ describe("R3.4 / R3.5 — wake window endTime tracks the next nap's start", () =
   });
 });
 
-describe("R3.3 / R3.8 — overridden nap doesn't anchor cascade times", () => {
-  it("with an overridden nap_1 at a NON-natural time, cascade computes WW endpoints from defaults", () => {
-    // Overridden = "user assigned an owner before the nap happened." Per R3.3,
-    // these annotations carry the owner forward but DON'T pin times. The
-    // cascade should compute ww_1 / ww_2 endpoints purely from
-    // wakeWindowsMinutes, ignoring the overridden's stored startTime / endTime.
-    //
-    // Settings: WW [120, 90], napLen 60, wake 7:00.
-    // Natural cascade:
-    //   ww_1 7:00-9:00, nap_1 9:00-10:00, ww_2 10:00-11:30, nap_2 11:30-12:30.
-    // The overridden nap_1 sits at 9:30-9:50 (NOT at the natural 9:00-10:00).
-    // Despite that, ww_1 must still end at 9:00 and ww_2 must still start
-    // at 10:00.
+describe("R3.4/R3.5 — wake_window(N).endTime always tracks nap(N).startTime", () => {
+  // Invariant (Jake 2026-05-12): the wake window before a nap ends
+  // where the nap starts. Period. Independent of how the nap got there
+  // — projected, started, completed, or overridden. The previous
+  // version of this file carved out an exception for `overridden`
+  // (treated as "owner-only annotation, don't pin time"), but that
+  // exception broke drawer time-edits after PR #117 made those edits
+  // produce `overridden`: WW2 stayed at its natural cascade tick and
+  // left a visible gap between WW2.end and the user-edited Nap 2.start.
+  // The simpler invariant beats the exception.
+
+  it("user-edited (overridden) nap_2 at a LATER time → ww_2 stretches to meet it", () => {
+    // Cascade defaults: WW [120, 150], napLen 90, wake 7:00.
+    //   ww_1 7:00-9:00, nap_1 9:00-10:30, ww_2 10:30-13:00, nap_2 13:00-14:30.
+    // User drawer-edits Nap 2 to 14:00-15:30. Under the invariant,
+    // ww_2 must stretch from 10:30 to 14:00 — no gap.
+    const overriddenNap2 = aRecordedNap({
+      id: "manual_nap_2",
+      eventKey: "nap_2",
+      start: 14 * 60,
+      end: 15 * 60 + 30,
+      lifecycle: { state: "overridden", annotatedAt: 13 * 60 },
+    });
+
+    const ctx = aContext({
+      day: aDay({ wakeTime: 7 * 60 }),
+      settings: aSettings({
+        wakeWindowsMinutes: [120, 150],
+        defaultNapLengthMinutes: 90,
+      }),
+      actuals: [overriddenNap2],
+    });
+
+    const out = projectDay(
+      {
+        day: ctx.day,
+        settings: ctx.settings,
+        actuals: ctx.actuals,
+        nowMinutes: ctx.nowMinutes,
+      },
+      { rules: NAP_RULES },
+    );
+
+    const ww1 = out.find((e) => e.eventKey === "wake_window_1");
+    expect(ww1?.startTime).toBe(7 * 60);
+    expect(ww1?.endTime).toBe(9 * 60); // ends at nap_1's projected start
+
+    const ww2 = out.find((e) => e.eventKey === "wake_window_2");
+    expect(ww2?.startTime).toBe(10 * 60 + 30); // starts at nap_1's end
+    expect(ww2?.endTime).toBe(14 * 60); // ENDS AT nap_2.start (overridden), NOT cascade default 13:00
+
+    const nap2 = out.find((e) => e.eventKey === "nap_2");
+    expect(nap2?.startTime).toBe(14 * 60); // preserved from override
+    expect(nap2?.lifecycle.state).toBe("overridden"); // not promoted
+  });
+
+  it("overridden nap_1 at a NON-natural time → ww_1 ends at the override, ww_2 starts at the override's end", () => {
+    // The companion case: overridden time EARLIER than cascade default.
+    // Same invariant: WW geometry follows the nap, not the wakeWindowsMinutes.
     const overriddenNap1 = aRecordedNap({
       id: "annotated_nap_1",
       eventKey: "nap_1",
@@ -197,11 +244,12 @@ describe("R3.3 / R3.8 — overridden nap doesn't anchor cascade times", () => {
 
     const ww1 = out.find((e) => e.eventKey === "wake_window_1");
     expect(ww1?.startTime).toBe(7 * 60);
-    expect(ww1?.endTime).toBe(9 * 60); // natural — NOT 9:30
+    expect(ww1?.endTime).toBe(9 * 60 + 30); // ends at the overridden nap_1's start
 
     const ww2 = out.find((e) => e.eventKey === "wake_window_2");
-    expect(ww2?.startTime).toBe(10 * 60); // natural — NOT 9:50
-    expect(ww2?.endTime).toBe(11 * 60 + 30);
+    expect(ww2?.startTime).toBe(9 * 60 + 50); // starts at the overridden nap_1's end
+    // ww_2 then runs its natural length until projected nap_2 starts.
+    expect(ww2!.endTime! - ww2!.startTime).toBe(90);
 
     // The overridden event itself is preserved in events (carries owner forward).
     const napOne = out.find((e) => e.id === overriddenNap1.id);
@@ -209,7 +257,7 @@ describe("R3.3 / R3.8 — overridden nap doesn't anchor cascade times", () => {
     expect(napOne!.lifecycle.state).toBe("overridden");
 
     // R3.8: overridden's apparent 20-min duration does NOT trigger
-    // short-nap-adjust on ww_2. Length still 90.
+    // short-nap-adjust on ww_2 (only RECORDED short naps do).
     expect(ww2!.endTime! - ww2!.startTime).toBe(90);
   });
 });
@@ -340,5 +388,137 @@ describe("R3.3 — recorded naps coexist with projected cascade", () => {
     const napTwo = out.find((e) => e.eventKey === "nap_2");
     expect(napTwo?.id).toBe(recordedNap2.id);
     expect(napTwo?.lifecycle.state).toBe("completed");
+  });
+});
+
+describe("Cascade invariant — wake_window/nap boundaries (Jake 2026-05-12)", () => {
+  // Invariant, asserted programmatically across multiple scenarios:
+  //   wake_window(N).startTime === nap(N-1).endTime    (Day.wakeTime for N=1)
+  //   wake_window(N).endTime   === nap(N).startTime
+  //
+  // Wake windows END because naps START; wake windows START because
+  // naps END. The cascade has NO special-casing on lifecycle state —
+  // the WW geometry follows whatever nap occupies the slot.
+
+  function assertInvariant(events: Event[], wakeTime: number) {
+    const wws = events
+      .filter((e) => e.type === "wake_window")
+      .sort((a, b) => {
+        const ai = Number(a.eventKey.split("_").pop());
+        const bi = Number(b.eventKey.split("_").pop());
+        return ai - bi;
+      });
+    for (const ww of wws) {
+      // wake_windows are always blocks with endTime; the optional type is
+      // a wire-compatibility artifact.
+      if (ww.endTime === undefined) throw new Error(`wake_window ${ww.eventKey} missing endTime`);
+      const n = Number(ww.eventKey.split("_").pop());
+      const napN = events.find((e) => e.eventKey === `nap_${n}`);
+      const napPrev = n === 1 ? undefined : events.find((e) => e.eventKey === `nap_${n - 1}`);
+
+      const expectedStart = napPrev?.endTime ?? wakeTime;
+      const expectedEnd = napN?.startTime ?? ww.endTime; // ww with no following nap is degenerate; skip
+      expect({ ww: ww.eventKey, startTime: ww.startTime }).toEqual({
+        ww: ww.eventKey,
+        startTime: Math.max(expectedStart, ww.startTime), // R3.6 inversion clamp at wwStart
+      });
+      expect({ ww: ww.eventKey, endTime: ww.endTime }).toEqual({
+        ww: ww.eventKey,
+        endTime: Math.max(ww.startTime, expectedEnd), // R3.6 inversion clamp
+      });
+    }
+  }
+
+  it("empty actuals: all-projected cascade preserves the invariant", () => {
+    const ctx = aContext({
+      day: aDay({ wakeTime: 7 * 60 }),
+      settings: aSettings({ wakeWindowsMinutes: [120, 150, 180], defaultNapLengthMinutes: 60 }),
+      actuals: [],
+    });
+    const out = projectDay(
+      {
+        day: ctx.day,
+        settings: ctx.settings,
+        actuals: ctx.actuals,
+        nowMinutes: ctx.nowMinutes,
+      },
+      { rules: NAP_RULES },
+    );
+    assertInvariant(out, 7 * 60);
+  });
+
+  it("overridden nap_2 later than default: ww_2 stretches; invariant holds", () => {
+    const overriddenNap2 = aRecordedNap({
+      eventKey: "nap_2",
+      start: 14 * 60,
+      end: 15 * 60 + 30,
+      lifecycle: { state: "overridden", annotatedAt: 13 * 60 },
+    });
+    const ctx = aContext({
+      day: aDay({ wakeTime: 7 * 60 }),
+      settings: aSettings({ wakeWindowsMinutes: [120, 150], defaultNapLengthMinutes: 90 }),
+      actuals: [overriddenNap2],
+    });
+    const out = projectDay(
+      {
+        day: ctx.day,
+        settings: ctx.settings,
+        actuals: ctx.actuals,
+        nowMinutes: ctx.nowMinutes,
+      },
+      { rules: NAP_RULES },
+    );
+    assertInvariant(out, 7 * 60);
+  });
+
+  it("recorded nap_1 earlier than default: ww_2 starts at the recorded end; invariant holds", () => {
+    const recordedNap1 = aRecordedNap({
+      eventKey: "nap_1",
+      start: 8 * 60 + 30,
+      end: 9 * 60 + 15,
+    });
+    const ctx = aContext({
+      day: aDay({ wakeTime: 7 * 60 }),
+      settings: aSettings({ wakeWindowsMinutes: [120, 90], defaultNapLengthMinutes: 60 }),
+      actuals: [recordedNap1],
+    });
+    const out = projectDay(
+      {
+        day: ctx.day,
+        settings: ctx.settings,
+        actuals: ctx.actuals,
+        nowMinutes: ctx.nowMinutes,
+      },
+      { rules: NAP_RULES },
+    );
+    assertInvariant(out, 7 * 60);
+  });
+
+  it("mix: recorded nap_1 + overridden nap_2 + projected nap_3 all chain correctly", () => {
+    const recordedNap1 = aRecordedNap({ eventKey: "nap_1", start: 9 * 60 + 5, end: 10 * 60 + 10 });
+    const overriddenNap2 = aRecordedNap({
+      eventKey: "nap_2",
+      start: 13 * 60 + 30,
+      end: 15 * 60,
+      lifecycle: { state: "overridden", annotatedAt: 12 * 60 },
+    });
+    const ctx = aContext({
+      day: aDay({ wakeTime: 7 * 60 }),
+      settings: aSettings({
+        wakeWindowsMinutes: [120, 150, 180],
+        defaultNapLengthMinutes: 60,
+      }),
+      actuals: [recordedNap1, overriddenNap2],
+    });
+    const out = projectDay(
+      {
+        day: ctx.day,
+        settings: ctx.settings,
+        actuals: ctx.actuals,
+        nowMinutes: ctx.nowMinutes,
+      },
+      { rules: NAP_RULES },
+    );
+    assertInvariant(out, 7 * 60);
   });
 });
