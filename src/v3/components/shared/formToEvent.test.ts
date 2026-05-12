@@ -56,12 +56,45 @@ const formFromEvent = (e: Event): FormState => ({
 });
 
 describe("formToEvent — lifecycle dispatch from projected", () => {
-  it("projected block + time changed + endTime present → completed", () => {
+  // Predict-don't-prescribe: editing a projected NAP or BEDTIME's time in the
+  // drawer is SCHEDULING INTENT, not a recording of reality. Only the action
+  // buttons (Start Nap, End Nap) promote a nap to started/completed. This
+  // preserves `hasPutdown` (which is gated to projected | overridden) across
+  // a drawer time-edit — fixing the "changing nap time removes putdown" bug.
+  it("projected NAP + time changed + endTime present → overridden (predict-don't-prescribe)", () => {
     const source = projectedNap();
     const form: FormState = { ...formFromEvent(source), startTime: 9 * 60 + 5 };
     const next = formToEvent(form, source, NOW);
-    expect(next.lifecycle).toEqual({ state: "completed", committedAt: NOW });
+    expect(next.lifecycle).toEqual({ state: "overridden", annotatedAt: NOW });
     expect(next.startTime).toBe(9 * 60 + 5);
+  });
+
+  it("projected BEDTIME + time changed + endTime present → overridden", () => {
+    const source = projectedNap({
+      eventKey: "bedtime",
+      type: "bedtime",
+      label: "Bedtime",
+      startTime: 19 * 60,
+      endTime: 30 * 60,
+    });
+    const form: FormState = { ...formFromEvent(source), startTime: 19 * 60 + 15 };
+    const next = formToEvent(form, source, NOW);
+    expect(next.lifecycle).toEqual({ state: "overridden", annotatedAt: NOW });
+  });
+
+  it("projected non-nap/bedtime block (e.g. extra) + time changed + endTime → completed (unchanged)", () => {
+    // Regression guard: the predict-don't-prescribe rule is targeted at nap
+    // and bedtime, NOT all block types. An "extra" event keeps the V2-style
+    // "time-edit = lock in time" semantic, because custom user events don't
+    // have action-button start/end ceremony.
+    const source = projectedNap({
+      eventKey: "extra_1",
+      type: "extra",
+      label: "Custom",
+    });
+    const form: FormState = { ...formFromEvent(source), startTime: 9 * 60 + 5 };
+    const next = formToEvent(form, source, NOW);
+    expect(next.lifecycle).toEqual({ state: "completed", committedAt: NOW });
   });
 
   it("projected block + time changed + endTime missing → started", () => {
@@ -126,13 +159,82 @@ describe("formToEvent — already-recorded sources stay in their state", () => {
     expect(next.lifecycle).toEqual({ state: "completed", committedAt: 10 * 60 });
   });
 
-  it("overridden event becomes recorded if user changes time", () => {
+  it("overridden NAP + time edit stays overridden (predict-don't-prescribe — re-scheduling is still scheduling)", () => {
+    // Same logic as the projected→overridden case above: drawer time-edits
+    // on naps are scheduling intent, never reality. The second time the
+    // user reschedules also doesn't lock anything in.
     const source = projectedNap({
       lifecycle: { state: "overridden", annotatedAt: 8 * 60 },
     });
     const form: FormState = { ...formFromEvent(source), startTime: 9 * 60 + 5 };
     const next = formToEvent(form, source, NOW);
+    expect(next.lifecycle).toEqual({ state: "overridden", annotatedAt: NOW });
+  });
+
+  it("overridden non-nap/bedtime + time edit promotes to completed (unchanged)", () => {
+    const source = projectedBottle({
+      lifecycle: { state: "overridden", annotatedAt: 7 * 60 },
+    });
+    const form: FormState = { ...formFromEvent(source), startTime: 7 * 60 + 45 };
+    const next = formToEvent(form, source, NOW);
     expect(next.lifecycle).toEqual({ state: "completed", committedAt: NOW });
+  });
+});
+
+describe("formToEvent — putdown survives a drawer time-edit (integration)", () => {
+  // This is the regression test for the "changing nap time removes putdown"
+  // bug. It exercises the full chain: formToEvent → engine projection →
+  // hasPutdown gate. Without the predict-don't-prescribe carve-out, the
+  // edited nap's lifecycle would flip to `completed`, deriveHasPutdown
+  // (which only accepts `projected` | `overridden`) would return false,
+  // and the renderer would drop the putdown.
+  it("nap time edit → engine still emits the nap with hasPutdown=true", async () => {
+    const { aContext, aDay, aSettings } = await import("../../__tests__/factories");
+    const { projectDay } = await import("../../engine/projectDay");
+
+    // Seed: user records yesterday's bedtime end (= today's wake at 7:00).
+    // The cascade emits a projected nap_1 around 9:00 with hasPutdown=true.
+    const ctx = aContext({
+      day: aDay({ wakeTime: 7 * 60 }),
+      settings: aSettings({
+        wakeWindowsMinutes: [120],
+        defaultNapLengthMinutes: 60,
+      }),
+      actuals: [],
+    });
+    const initial = projectDay({
+      day: ctx.day,
+      settings: ctx.settings,
+      actuals: ctx.actuals,
+      nowMinutes: ctx.nowMinutes,
+    });
+    const projectedNapEvent = initial.find((e) => e.eventKey === "nap_1");
+    expect(projectedNapEvent).toBeDefined();
+    expect(projectedNapEvent!.lifecycle.state).toBe("projected");
+    expect(projectedNapEvent!.hasPutdown).toBe(true);
+
+    // User opens the drawer, shifts the nap start +5 minutes, saves.
+    const form: FormState = {
+      startTime: projectedNapEvent!.startTime + 5,
+      endTime: projectedNapEvent!.endTime,
+      amountOz: projectedNapEvent!.amountOz,
+      owner: projectedNapEvent!.owner,
+      label: projectedNapEvent!.label,
+    };
+    const persisted = formToEvent(form, projectedNapEvent!, NOW);
+    expect(persisted.lifecycle.state).toBe("overridden");
+
+    // The persisted override flows back into ctx.actuals on next read; the
+    // engine projects again with this override seeded.
+    const reprojected = projectDay({
+      day: ctx.day,
+      settings: ctx.settings,
+      actuals: [persisted],
+      nowMinutes: ctx.nowMinutes,
+    });
+    const nap = reprojected.find((e) => e.eventKey === "nap_1");
+    expect(nap).toBeDefined();
+    expect(nap!.hasPutdown).toBe(true); // ← the fix.
   });
 });
 
