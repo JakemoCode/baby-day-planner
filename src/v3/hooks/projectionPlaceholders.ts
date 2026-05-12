@@ -71,6 +71,6 @@ export const PLACEHOLDER_SETTINGS: Settings = {
     other: [],
   },
   timelineColorMode: "type",
-  timelinePxPerHour: 80,
+  timelinePxPerHour: 120,
   timelineDimPast: true,
 };

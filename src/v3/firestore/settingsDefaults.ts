@@ -107,7 +107,7 @@ const DEFAULTS: Omit<Settings, "childId"> = {
  * Mirrors the `migrateOwnerSlot` pattern below. Removable once no docs
  * carry the 80 value.
  */
-const LEGACY_PX_PER_HOUR_STUB = 80;
+const LEGACY_PLACEHOLDER_PX_PER_HOUR = 80;
 
 /**
  * One-time migration: rewrite the cutover-era bright placeholder colors
@@ -177,8 +177,14 @@ export function withV3SettingsDefaults(input: Partial<Settings> | null): Setting
   }));
 
   // One-time migration: rewrite the cutover-era 80 px/hour stub to V2's
-  // intended 120. See LEGACY_PX_PER_HOUR_STUB above.
-  if (merged.timelinePxPerHour === LEGACY_PX_PER_HOUR_STUB) {
+  // intended 120. Gated on `input.timelineColorMode == null` (the new
+  // field added in this same PR) so we don't clobber a user who later
+  // chooses 80 intentionally — any doc with 80 AND the new colorMode
+  // field set must be a deliberate choice, not the legacy stub.
+  if (
+    merged.timelinePxPerHour === LEGACY_PLACEHOLDER_PX_PER_HOUR &&
+    input.timelineColorMode == null
+  ) {
     merged.timelinePxPerHour = DEFAULTS.timelinePxPerHour;
   }
 

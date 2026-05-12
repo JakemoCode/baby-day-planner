@@ -33,7 +33,7 @@ const LEADER_LINE_W = 8;
 const VIEWPORT_PADDING_MIN = 30;
 const DEFAULT_VIEWPORT = { start: 7 * 60, end: 21 * 60 };
 const SCROLL_TOP_PADDING_PX = 80;
-const DEFAULT_PX_PER_HOUR = 80;
+const DEFAULT_PX_PER_HOUR = 120;
 
 function formatHourLabel(hour24: number): string {
   const h = ((hour24 % 24) + 24) % 24;
