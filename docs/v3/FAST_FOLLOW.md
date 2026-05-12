@@ -147,7 +147,7 @@ swatch set is the refreshed palette, not the legacy one.
 
 **Pixel-level alignment punchlist (deferred from PR #108 audit)**:
 - Jake's owner pill is ~5-blue warmer than V2 (cream-toned `--color-bg`
-  bleeds through the 20% mix). Math in `docs/v3/V2_CSS_DRIFT_AUDIT.md`.
+  bleeds through the 20% mix). Math in `docs/_archive/v3/V2_CSS_DRIFT_AUDIT.md`.
   Possible fixes: bump mix to 25%, use `--color-surface` instead of
   `--color-bg`, or revert to per-owner pre-mixed `--owner-color-tint`
   tokens (loses owner-agnostic affordance).
@@ -230,13 +230,6 @@ in `src/v3/components/shared/`, then call sites swap in.
 
 ---
 
-## §F7 — Delete the V2 ← V3 back-compat shim — `done` (PR-C1)
-
-The shim, the V2 hooks, the V2 components, the V2 repos, `@/domain/`, and
-`src/lib/firestore/converters.ts` all deleted in PR-C1 (2026-05-11).
-
----
-
 ## §F8 — Dashboard UX polish pass
 
 **Source**: Jake, 2026-05-10 click-test feedback.
@@ -256,18 +249,6 @@ The shim, the V2 hooks, the V2 components, the V2 repos, `@/domain/`, and
 **Why fast-follow**: UX polish on a working dashboard; engine-orthogonal.
 
 **Estimated effort**: split into 3-5 small PRs. ~1-2 days total.
-
----
-
-## §F9 — Audit Timeline V2 test coverage
-
-**Source**: Jake, 2026-05-10.
-
-**Status**: `pending`
-
-**What**: before V2 deletion in PR-C1, audit Timeline V2 test coverage so any V2-only behaviors that haven't been re-asserted in V3 are caught and either ported or explicitly waived. Goal: zero silent regressions through cutover.
-
-**Why fast-follow**: must run BEFORE PR-C1 (the V2 wipe) — block the wipe on this audit.
 
 ---
 
@@ -437,6 +418,44 @@ The whole file violates the standard, not just the two new helpers added in PR #
 - Opening the app on a new calendar date shows today's timeline anchored at `defaultWakeTime` with zero taps.
 - Recording the first event of the day Just Works without any "you need to start the day first" gating.
 - Click-time NEVER influences `Day.wakeTime`.
+
+---
+
+## §F18 — Retroactive edit of the day's wake time
+
+**Source**: Jake, 2026-05-12 click-test.
+
+**Status**: `pending`
+
+**What**: there's currently no UI to change `Day.wakeTime` once the day exists. If the user discovers they need to correct the wake time (e.g. baby actually woke at 6:45 not 7:00), the cascade is stuck. Add an editable wake-time control on the timeline or dashboard, probably on the wake event itself (or wherever the day's start is visually rooted).
+
+**Why fast-follow**: data correctness affordance; engine already supports any `wakeTime` value, just missing the UI write path.
+
+**Related**: §F17 (auto-anchor at `defaultWakeTime`) — once §F17 lands, this edit affordance is still needed for cases where the actual wake-up diverges from the default.
+
+---
+
+## §F19 — Bottle owner picker: support "other" owners (named extras)
+
+**Source**: Jake, 2026-05-12 click-test.
+
+**Status**: `pending`
+
+**What**: bottle owner picker should let the user select an `other:<id>` owner (Grandma, Daycare, Babysitter, etc.) — not just `parent1` / `parent2`. The schema (`OwnersConfig.other: Array<{id, displayName, color}>`) already supports this; the picker just needs to render the configured `other[]` entries alongside the parents, with affordance to add a new named owner inline.
+
+**Why fast-follow**: engine + schema already there; pure UI gap. Affects bottle assignment realism for families using daycare or alloparents.
+
+---
+
+## §F20 — Changing nap time removes putdown
+
+**Source**: Jake, 2026-05-12 click-test.
+
+**Status**: `pending`
+
+**What**: when the user edits a nap's start time, the putdown block that was displayed before the edit disappears. Putdown is render-only (`expandPutdown.ts`) and should re-derive from the edited nap. Investigate whether the override creates a state that fails the `deriveHasPutdown` gate (lifecycle `projected` | `overridden` only) — the edited nap may be persisting as `completed` and losing its putdown affordance.
+
+**Why fast-follow**: visual regression; cascade math itself is correct.
 
 ---
 
