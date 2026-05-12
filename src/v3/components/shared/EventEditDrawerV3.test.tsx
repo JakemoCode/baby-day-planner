@@ -116,7 +116,7 @@ describe("EventEditDrawerV3", () => {
     expect(next.lifecycle).toEqual({ state: "overridden", annotatedAt: NOW });
   });
 
-  it("saves nap time edit as overridden lifecycle (predict-don't-prescribe: drawer is scheduling intent, not reality)", async () => {
+  it("saves time edit as completed lifecycle (block with endTime)", async () => {
     const onSave = vi.fn();
     render(
       <EventEditDrawerV3
@@ -135,7 +135,7 @@ describe("EventEditDrawerV3", () => {
     await userEvent.click(screen.getByRole("button", { name: "Save" }));
     const next: Event = onSave.mock.calls[0]![0];
     expect(next.startTime).toBe(9 * 60 + 5);
-    expect(next.lifecycle).toEqual({ state: "overridden", annotatedAt: NOW });
+    expect(next.lifecycle).toEqual({ state: "completed", committedAt: NOW });
   });
 
   it("blocks save when end time is not after start time", async () => {
