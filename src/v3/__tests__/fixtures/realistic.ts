@@ -37,6 +37,7 @@ export const v2SettingsDoc: Record<string, unknown> = {
     { minOz: 0, maxOz: 5.5, intervalMinutes: 150 },
     { minOz: 5.6, intervalMinutes: 180 },
   ],
+  bottleIntervalRules: [],
   // V2 nested dreamFeed — V3 flattens these
   dreamFeed: {
     enabled: true,
@@ -62,6 +63,7 @@ export const v3SettingsDoc: Record<string, unknown> = {
   defaultBottleAmountOz: 5,
   defaultBottleIntervalMinutes: 180,
   bottleRules: [],
+  bottleIntervalRules: [],
   bottleChain: { bottlesPerDay: 5, bufferAfterWakeMinutes: 10 },
   minBottleIntervalMinutes: 90,
   putdownLeadMinutes: 15,

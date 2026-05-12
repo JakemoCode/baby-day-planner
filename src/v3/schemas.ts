@@ -218,6 +218,22 @@ export type BottleChainConfig = {
 
 export type BottleAmountRule = { minWeeks: number; amountOz: number };
 
+/**
+ * Amount-conditional interval rule. Ported from V2 (`src/domain/bottleRules.ts`
+ * pre-cutover) — the V3 rewrite silently dropped this; restoring per
+ * 2026-05-11 user feedback.
+ *
+ * Semantics: when the most-recent bottle's `amountOz` falls in `[minOz, maxOz]`
+ * (or `[minOz, ∞)` when `maxOz` is undefined), the next bottle is projected
+ * `intervalMinutes` later. Most-specific (narrowest range) wins on overlap.
+ * When no rule matches, the engine falls back to `defaultBottleIntervalMinutes`.
+ */
+export type BottleIntervalRule = {
+  minOz: number;
+  maxOz?: number;
+  intervalMinutes: number;
+};
+
 export type Settings = {
   childId: string;
 
@@ -243,6 +259,8 @@ export type Settings = {
   defaultBottleAmountOz: number;
   defaultBottleIntervalMinutes: number;
   bottleRules: BottleAmountRule[];
+  /** Amount-conditional next-bottle interval. See `BottleIntervalRule`. */
+  bottleIntervalRules: BottleIntervalRule[];
   bottleChain: BottleChainConfig;
   minBottleIntervalMinutes: number;
 

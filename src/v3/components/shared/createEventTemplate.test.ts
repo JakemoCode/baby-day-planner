@@ -28,6 +28,7 @@ const settings = (overrides: Partial<Settings> = {}): Settings =>
     defaultBottleAmountOz: 5,
     defaultBottleIntervalMinutes: 180,
     bottleRules: [],
+    bottleIntervalRules: [],
     bottleChain: { bottlesPerDay: 5, bufferAfterWakeMinutes: 10 },
     minBottleIntervalMinutes: 90,
     putdownLeadMinutes: 15,

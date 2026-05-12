@@ -72,6 +72,7 @@ const baseSettings: Settings = {
   defaultBottleAmountOz: 5,
   defaultBottleIntervalMinutes: 180,
   bottleRules: [],
+  bottleIntervalRules: [],
   bottleChain: { bottlesPerDay: 4, bufferAfterWakeMinutes: 10 },
   minBottleIntervalMinutes: 90,
   putdownLeadMinutes: 15,

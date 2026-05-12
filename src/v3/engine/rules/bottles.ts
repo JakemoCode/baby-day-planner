@@ -6,6 +6,7 @@
 
 import type { Context, Event } from "../../schemas";
 import type { Rule } from "../evaluator";
+import { intervalForAmount } from "../bottleIntervalRules";
 import { hasType, isProjected, isRecordedEvent, projectedEvent } from "../helpers";
 
 // ---------------------------------------------------------------------------
@@ -70,7 +71,13 @@ function projectPlaceholders(ctx: Context, existing: Event[]): Event[] {
   if (wakeTime === undefined) return existing;
 
   const { bottlesPerDay, bufferAfterWakeMinutes } = ctx.settings.bottleChain;
-  const interval = ctx.settings.defaultBottleIntervalMinutes;
+  // No prior recording yet; all placeholders carry defaultBottleAmountOz,
+  // so every step's interval looks up the rule for that default amount.
+  const interval = intervalForAmount(
+    ctx.settings.bottleIntervalRules,
+    ctx.settings.defaultBottleAmountOz,
+    ctx.settings.defaultBottleIntervalMinutes,
+  );
   const firstStart = wakeTime + bufferAfterWakeMinutes;
 
   const placeholders: Event[] = [];
@@ -129,17 +136,29 @@ function cascadeFromLatest(ctx: Context, existing: Event[]): Event[] {
     return Math.max(m, parseInt(match[1]!, 10));
   }, 0);
 
-  const interval = ctx.settings.defaultBottleIntervalMinutes;
+  const defaultInterval = ctx.settings.defaultBottleIntervalMinutes;
   // R5.8: cascade stops when the next projected start would land at or
   // after tomorrow's defaultWakeTime. After that point, the bottle
   // belongs to tomorrow, not today.
   const tomorrowWake = ctx.settings.defaultWakeTime + 24 * 60;
 
+  // Each step's interval depends on the PREVIOUS bottle's amountOz via
+  // `bottleIntervalRules` (V2-restored amount-conditional rule). After the
+  // first projection, subsequent bottles all carry `defaultBottleAmountOz`,
+  // so steps 2..N typically converge on the default-amount rule's interval.
   const projections: Event[] = [];
+  let prev = latest;
   for (let i = 1; i <= needed; i++) {
-    const start = latest.startTime + i * interval;
+    const interval = intervalForAmount(
+      ctx.settings.bottleIntervalRules,
+      prev.amountOz,
+      defaultInterval,
+    );
+    const start = prev.startTime + interval;
     if (start >= tomorrowWake) break; // R5.8
-    projections.push(buildProjectedBottle(ctx, maxIndex + i, start));
+    const projection = buildProjectedBottle(ctx, maxIndex + i, start);
+    projections.push(projection);
+    prev = projection;
   }
 
   return [...existing, ...projections];
@@ -242,11 +261,7 @@ function findFirstOverlap(events: Event[], putdownLead: number): Overlap | null 
   return null;
 }
 
-function predictedNextStart(
-  events: Event[],
-  bottle: Event,
-  ctx: { settings: { defaultBottleIntervalMinutes: number } },
-): number {
+function predictedNextStart(events: Event[], bottle: Event, ctx: Context): number {
   // The "previous" bottle is the chronologically-closest bottle whose
   // startTime is < this bottle's CURRENT startTime. If none exists,
   // there's no cadence to honor — fall back to current startTime so the
@@ -255,7 +270,12 @@ function predictedNextStart(
     .filter((e) => isBottle(e) && e.id !== bottle.id && e.startTime < bottle.startTime)
     .sort((a, b) => b.startTime - a.startTime)[0];
   if (!earlier) return bottle.startTime;
-  return earlier.startTime + ctx.settings.defaultBottleIntervalMinutes;
+  const interval = intervalForAmount(
+    ctx.settings.bottleIntervalRules,
+    earlier.amountOz,
+    ctx.settings.defaultBottleIntervalMinutes,
+  );
+  return earlier.startTime + interval;
 }
 
 // ---------------------------------------------------------------------------
