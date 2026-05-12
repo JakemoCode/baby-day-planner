@@ -68,7 +68,7 @@
    * differing font-sizes (12 / 11) baseline alignment made the time
    * sit visually lower than the label. */
   align-items: center;
-  gap: 4px;
+  gap: 6px;
 }
 
 .label {
