@@ -69,19 +69,19 @@ function projectBaseNapChain(ctx: Context, existing: Event[]): Event[] {
     const n = i + 1;
     const napKey = `nap_${n}`;
     const existingNap = existingByKey.get(napKey);
-    // R3.3: recorded actuals (started/completed) pin times; the cascade
-    // anchors to them. Overridden / projected naps don't pin — they let
-    // the cascade compute times. The cascade still skips emitting a
-    // duplicate projected nap when ANY existing nap occupies the slot.
-    const anchor = existingNap && isRecordedEvent(existingNap) ? existingNap : undefined;
 
-    // R3.4/R3.5: WW endTime tracks the next nap's start. When a recorded
-    // nap is present, the WW stretches or shrinks to meet it. Otherwise
-    // the projected nap starts at the natural cascade tick (wwStart + wwMinutes).
-    // R3.6: if the recorded nap's start is BEFORE wwStart (user-edited
-    // inversion), clamp wwEnd to wwStart so the WW renders zero-length
+    // Cascade invariant (Jake, 2026-05-12):
+    //   wake_window(N).startTime === nap(N-1).endTime    (Day.wakeTime for N=1)
+    //   wake_window(N).endTime   === nap(N).startTime
+    // Wake windows END because naps START; wake windows START because
+    // naps END. No special-casing on lifecycle state — the WW geometry
+    // follows whatever nap occupies the slot, projected or otherwise.
+    //
+    // R3.6 (inversion guard): if a user-edited nap.startTime lands
+    // before wwStart (e.g. they shifted it earlier than the previous
+    // nap ended), clamp wwEnd to wwStart so the WW renders zero-length
     // rather than negative.
-    const wwEnd = anchor ? Math.max(wwStart, anchor.startTime) : wwStart + wwMinutes;
+    const wwEnd = existingNap ? Math.max(wwStart, existingNap.startTime) : wwStart + wwMinutes;
 
     projected.push(
       projectedEvent({
@@ -112,15 +112,10 @@ function projectBaseNapChain(ctx: Context, existing: Event[]): Event[] {
         }),
       );
       cursor = napEnd;
-    } else if (anchor) {
-      // Recorded actual: cascade continues from its end (or, if started
-      // but not ended, from start + default duration).
-      cursor = anchor.endTime ?? anchor.startTime + napLen;
     } else {
-      // Existing nap is overridden / projected — slot is occupied so we
-      // don't emit a duplicate, but per R3.3 the cascade computes natural
-      // times. Cursor advances by the natural projection.
-      cursor = wwEnd + napLen;
+      // Existing nap (recorded, overridden, or otherwise) — skip emitting
+      // a duplicate, advance cursor from the nap's actual end.
+      cursor = existingNap.endTime ?? existingNap.startTime + napLen;
     }
   }
 
