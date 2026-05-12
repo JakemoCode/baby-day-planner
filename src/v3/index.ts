@@ -9,6 +9,7 @@ export type {
   AllowlistDoc,
   BottleAmountRule,
   BottleChainConfig,
+  BottleIntervalRule,
   Context,
   DailyRecurring,
   Day,

@@ -490,6 +490,56 @@ describe("R5.1 — cascade interval honors bottleIntervalRules", () => {
     ]);
   });
 
+  it("step 1 uses LAST RECORDED amount; steps 2..N use defaultBottleAmountOz (predict-don't-prescribe)", () => {
+    // Locked architectural decision (2026-05-11): only the immediately-next
+    // projection inherits the most recent recording's amount. Subsequent
+    // projections use `defaultBottleAmountOz` because that field IS the
+    // best-guess for future bottle size — adapting *every* projection to
+    // match the last recorded would be prescribing what the baby will eat,
+    // not predicting.
+    const recorded = aRecordedBottle({
+      id: "actual_bottle_big",
+      eventKey: "bottle_1",
+      start: 7 * 60,
+      amountOz: 7, // matches the 6+oz rule below → 240m for ONE step
+    });
+
+    const ctx = aContext({
+      day: aDay({ wakeTime: 7 * 60 }),
+      settings: aSettings({
+        bottleChain: { bottlesPerDay: 4, bufferAfterWakeMinutes: 10 },
+        defaultBottleAmountOz: 5,
+        defaultBottleIntervalMinutes: 999, // never used; would fail loudly
+        bottleIntervalRules: [
+          { minOz: 0, maxOz: 5, intervalMinutes: 120 }, // 5oz default → 120m
+          { minOz: 6, intervalMinutes: 240 }, // 7oz recorded → 240m
+        ],
+      }),
+      actuals: [recorded],
+    });
+
+    const out = projectDay(
+      {
+        day: ctx.day,
+        settings: ctx.settings,
+        actuals: ctx.actuals,
+        nowMinutes: ctx.nowMinutes,
+      },
+      { rules: ALL },
+    );
+
+    const bottles = out
+      .filter((e) => e.type === "bottle")
+      .sort((a, b) => a.startTime - b.startTime);
+
+    expect(bottles.map((b) => b.startTime)).toEqual([
+      7 * 60, // 7:00 recorded (7oz)
+      11 * 60, // 7:00 + 240m (7oz rule applies — last recorded)
+      13 * 60, // 11:00 + 120m (5oz default — projection carries default)
+      15 * 60, // 13:00 + 120m (5oz default continues)
+    ]);
+  });
+
   it("empty bottleIntervalRules → falls back to default for every step (unchanged behavior)", () => {
     // Regression guard: existing tests use bottleIntervalRules: [] (via aSettings default)
     // and must continue passing.
