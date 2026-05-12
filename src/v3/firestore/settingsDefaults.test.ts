@@ -9,6 +9,7 @@
  */
 
 import { describe, expect, it } from "vitest";
+import type { Settings } from "../schemas";
 import { withV3SettingsDefaults } from "./settingsDefaults";
 
 describe("withV3SettingsDefaults", () => {
@@ -137,6 +138,53 @@ describe("withV3SettingsDefaults", () => {
       expect(out.pumpTimes).toEqual([0]);
       expect(out.bedtimeThreshold).toBe(0);
       expect(Number.isFinite(out.bedtimeThreshold)).toBe(true);
+    });
+  });
+
+  describe("V2 bottle interval rule migration", () => {
+    it("V2-shaped bottleRules move into bottleIntervalRules; bottleRules cleared", () => {
+      const v2Doc = {
+        childId: "c1",
+        bottleRules: [
+          { minOz: 0, maxOz: 5.5, intervalMinutes: 150 },
+          { minOz: 5.6, intervalMinutes: 180 },
+        ],
+      } as unknown as Partial<Settings>;
+      const out = withV3SettingsDefaults(v2Doc)!;
+      expect(out.bottleIntervalRules).toEqual([
+        { minOz: 0, maxOz: 5.5, intervalMinutes: 150 },
+        { minOz: 5.6, intervalMinutes: 180 },
+      ]);
+      expect(out.bottleRules).toEqual([]);
+    });
+
+    it("already-migrated docs (bottleIntervalRules populated) are left alone", () => {
+      const v3Doc: Partial<Settings> = {
+        childId: "c1",
+        bottleRules: [],
+        bottleIntervalRules: [{ minOz: 0, intervalMinutes: 120 }],
+      };
+      const out = withV3SettingsDefaults(v3Doc)!;
+      expect(out.bottleIntervalRules).toEqual([{ minOz: 0, intervalMinutes: 120 }]);
+      expect(out.bottleRules).toEqual([]);
+    });
+
+    it("V3-shape bottleRules (age-based {minWeeks, amountOz}) are NOT migrated", () => {
+      const v3Doc = {
+        childId: "c1",
+        bottleRules: [{ minWeeks: 0, amountOz: 5 }],
+      } as unknown as Partial<Settings>;
+      const out = withV3SettingsDefaults(v3Doc)!;
+      expect(out.bottleIntervalRules).toEqual([]);
+      expect(out.bottleRules).toEqual([{ minWeeks: 0, amountOz: 5 }]);
+    });
+
+    it("empty bottleRules does not produce false-positive migration", () => {
+      const out = withV3SettingsDefaults({
+        childId: "c1",
+        bottleRules: [],
+      })!;
+      expect(out.bottleIntervalRules).toEqual([]);
     });
   });
 });

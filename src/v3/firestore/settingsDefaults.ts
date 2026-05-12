@@ -15,7 +15,7 @@
  * displayNames so the UI prompts the user to set them.
  */
 
-import type { Settings, TimeMin } from "../schemas";
+import type { BottleIntervalRule, Settings, TimeMin } from "../schemas";
 
 /**
  * Parse "HH:MM" → TimeMin (minutes since midnight). If already a number,
@@ -133,6 +133,30 @@ function migrateOwnerSlot(
   return slot;
 }
 
+/**
+ * One-time migration: V2 stored amount-conditional bottle interval rules
+ * under the field name `bottleRules` with shape
+ * `{ minOz, maxOz?, intervalMinutes }`. The V3 schema reused the same name
+ * for an unrelated age-based rule (`{ minWeeks, amountOz }`) and added a
+ * new `bottleIntervalRules` field for the V2 shape.
+ *
+ * Without migration, all existing user data (`bottleRules: [...]` in
+ * Firestore) sits inert — the feature is silently dead for everyone who
+ * configured rules under V2.
+ *
+ * Detection: input has a non-empty `bottleRules` array AND the first
+ * element looks like a V2 interval rule (has `minOz`). Move those entries
+ * into `bottleIntervalRules` and clear `bottleRules` (which V3 doesn't
+ * consume anyway).
+ *
+ * Safe to remove once no docs carry V2-shape `bottleRules`. The reverse
+ * direction (V3-native age rules in `bottleRules`) is preserved by
+ * shape-sniffing only.
+ */
+function isV2BottleRuleShape(entry: unknown): entry is BottleIntervalRule {
+  return typeof entry === "object" && entry !== null && "minOz" in entry;
+}
+
 export function withV3SettingsDefaults(input: Partial<Settings> | null): Settings | null {
   if (input === null) return null;
   const merged: Settings = {
@@ -176,6 +200,23 @@ export function withV3SettingsDefaults(input: Partial<Settings> | null): Setting
     ...entry,
     time: parseTimeStringOrNumber(entry.time as unknown as string | number),
   }));
+
+  // V2 → V3 bottle interval rule migration. V2 wrote interval rules into
+  // `bottleRules`; V3 reused that field name for an unrelated shape and
+  // added `bottleIntervalRules` for the V2 data. Sniff shape: if input's
+  // `bottleRules` carries V2-shaped entries AND `bottleIntervalRules` is
+  // empty, move them over. Already-migrated docs (V3-shape bottleRules,
+  // or non-empty bottleIntervalRules) are left alone.
+  const rawBottleRules = input.bottleRules as unknown;
+  if (
+    Array.isArray(rawBottleRules) &&
+    rawBottleRules.length > 0 &&
+    isV2BottleRuleShape(rawBottleRules[0]) &&
+    merged.bottleIntervalRules.length === 0
+  ) {
+    merged.bottleIntervalRules = rawBottleRules.filter(isV2BottleRuleShape);
+    merged.bottleRules = [];
+  }
 
   // One-time migration: rewrite the cutover-era 80 px/hour stub to V2's
   // intended 120. Gated on `input.timelineColorMode == null` (the new

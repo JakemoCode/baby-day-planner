@@ -384,7 +384,7 @@ function BottleIntervalRulesRow({
             step={0.5}
             min={0}
             value={rule.minOz}
-            onChange={(e) => update(i, { minOz: Number(e.target.value) })}
+            onChange={(e) => update(i, { minOz: Math.max(0, Number(e.target.value)) })}
             aria-label={`Rule ${i + 1} min oz`}
             style={{ padding: 8, fontSize: 16, minHeight: 40, width: 72 }}
           />
@@ -397,11 +397,18 @@ function BottleIntervalRulesRow({
             value={rule.maxOz ?? ""}
             onChange={(e) => {
               const raw = e.target.value;
-              const merged: BottleIntervalRule =
-                raw === ""
-                  ? { minOz: rule.minOz, intervalMinutes: rule.intervalMinutes }
-                  : { ...rule, maxOz: Number(raw) };
-              onChange(value.map((r, j) => (j === i ? merged : r)));
+              if (raw === "") {
+                onChange(
+                  value.map((r, j) =>
+                    j === i ? { minOz: rule.minOz, intervalMinutes: rule.intervalMinutes } : r,
+                  ),
+                );
+                return;
+              }
+              // Clamp maxOz to be ≥ minOz so inverted-range rules (which
+              // could never match anything) can't be created via the UI.
+              const next = Math.max(rule.minOz, Number(raw));
+              onChange(value.map((r, j) => (j === i ? { ...rule, maxOz: next } : r)));
             }}
             aria-label={`Rule ${i + 1} max oz`}
             style={{ padding: 8, fontSize: 16, minHeight: 40, width: 80 }}
@@ -412,7 +419,8 @@ function BottleIntervalRulesRow({
             step={5}
             min={1}
             value={rule.intervalMinutes}
-            onChange={(e) => update(i, { intervalMinutes: Number(e.target.value) })}
+            // Engine math would loop tight or cascade backwards on ≤0.
+            onChange={(e) => update(i, { intervalMinutes: Math.max(1, Number(e.target.value)) })}
             aria-label={`Rule ${i + 1} interval minutes`}
             style={{ padding: 8, fontSize: 16, minHeight: 40, width: 80 }}
           />
