@@ -1,20 +1,12 @@
 /**
  * Form → V3 Event transform: the lifecycle dispatch heart of the drawer.
  *
- * V2 mapped status="projected" → completed/overridden via a `recorded`
- * boolean + a status string. V3 collapses that into the discriminated
- * `lifecycle` union, with one extra state (`started`) for blocks the
- * user has started but not ended yet.
- *
- * The rules:
- *   projected + time-changed + endTime present → completed
- *   projected + time-changed + no endTime (block) → started
- *   projected + time-changed + no endTime (instant) → completed
- *   projected + only owner/amount/label changed → overridden
- *   already started/completed/overridden → state stays, fields patch
+ * See `formToEvent.ts` for the authoritative lifecycle dispatch rules.
  */
 
 import { describe, expect, it } from "vitest";
+import { aContext, aDay, aSettings } from "../../__tests__/factories";
+import { projectDay } from "../../engine/projectDay";
 import type { Event } from "../../schemas";
 import { formToEvent, type FormState } from "./formToEvent";
 
@@ -78,6 +70,23 @@ describe("formToEvent — lifecycle dispatch from projected", () => {
       endTime: 30 * 60,
     });
     const form: FormState = { ...formFromEvent(source), startTime: 19 * 60 + 15 };
+    const next = formToEvent(form, source, NOW);
+    expect(next.lifecycle).toEqual({ state: "overridden", annotatedAt: NOW });
+  });
+
+  it("projected DAILY_RECURRING block + time changed → overridden (no action buttons, drawer is scheduling)", () => {
+    // Recurring entries (Cook Dinner, etc.) project from settings every
+    // day. Editing today's time is a one-day reschedule; tomorrow still
+    // projects at the configured Settings time. See `isSchedulingType`
+    // caveat: not every daily_recurring is forecast — but the default is.
+    const source = projectedNap({
+      eventKey: "cook_dinner",
+      type: "daily_recurring",
+      label: "Cook dinner",
+      startTime: 17 * 60,
+      endTime: 17 * 60 + 45,
+    });
+    const form: FormState = { ...formFromEvent(source), startTime: 18 * 60 };
     const next = formToEvent(form, source, NOW);
     expect(next.lifecycle).toEqual({ state: "overridden", annotatedAt: NOW });
   });
@@ -188,10 +197,7 @@ describe("formToEvent — putdown survives a drawer time-edit (integration)", ()
   // edited nap's lifecycle would flip to `completed`, deriveHasPutdown
   // (which only accepts `projected` | `overridden`) would return false,
   // and the renderer would drop the putdown.
-  it("nap time edit → engine still emits the nap with hasPutdown=true", async () => {
-    const { aContext, aDay, aSettings } = await import("../../__tests__/factories");
-    const { projectDay } = await import("../../engine/projectDay");
-
+  it("nap time edit → engine still emits the nap with hasPutdown=true", () => {
     // Seed: user records yesterday's bedtime end (= today's wake at 7:00).
     // The cascade emits a projected nap_1 around 9:00 with hasPutdown=true.
     const ctx = aContext({
