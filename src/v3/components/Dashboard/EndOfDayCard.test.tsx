@@ -21,7 +21,13 @@ describe("EndOfDayCard", () => {
     expect(screen.getByRole("button", { name: /start day from plan/i })).toBeVisible();
   });
 
-  it("calls onStart (no args) when StartDayButton confirms", async () => {
+  it("calls onStart with NO args when StartDayButton confirms (load-bearing — the card strips StartDayButton's { useTomorrowPlan } arg)", async () => {
+    // `StartDayButton` forwards `{ useTomorrowPlan: boolean }` to its
+    // `onStart` prop. `EndOfDayCard` wraps that prop with
+    // `async () => onStart()` to drop the arg before calling the
+    // outer `onStart`. The `toHaveBeenCalledWith()` (zero args) below
+    // proves that arg-stripping is in place — if it ever regresses,
+    // the page's `handleStart` signature wouldn't match.
     const onStart = vi.fn().mockResolvedValue(undefined);
     render(<EndOfDayCard afterMidnight={true} hasTomorrowPlan={false} onStart={onStart} />);
     await userEvent.click(screen.getByRole("button", { name: /start new day/i }));

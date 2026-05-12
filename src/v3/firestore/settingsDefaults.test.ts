@@ -16,9 +16,16 @@ describe("withV3SettingsDefaults", () => {
   it("returns a fully-shaped Settings even from an empty input", () => {
     const out = withV3SettingsDefaults({ childId: "child-1" })!;
     expect(out.bottleChain).toEqual({ bottlesPerDay: 5, bufferAfterWakeMinutes: 10 });
-    expect(out.owners.parent1.displayName).toBeDefined();
-    expect(out.daycare.weekdays.mon).toBeDefined();
-    expect(out.wakeWindowsMinutes).toBeInstanceOf(Array);
+    // The defaulter populates `displayName` with an empty string so the
+    // Settings form has something to bind to. Anything else (undefined,
+    // a leaked default name) is a real regression.
+    expect(out.owners.parent1.displayName).toBe("");
+    // Weekday flags default to false so daycare doesn't auto-apply
+    // without explicit opt-in. Asserting the value, not its presence —
+    // `false` is "defined" so the old `toBeDefined()` passed trivially.
+    expect(out.daycare.weekdays.mon).toBe(false);
+    // Default chain has six entries; the exact shape is the contract.
+    expect(out.wakeWindowsMinutes).toEqual([120, 150, 180, 180, 180, 180]);
   });
 
   it("preserves caller-supplied values over defaults", () => {
@@ -44,9 +51,20 @@ describe("withV3SettingsDefaults", () => {
         other: [],
       },
     })!;
-    expect(out.daycare).toBeDefined();
+    // Daycare defaulter populates the full nested shape: disabled, with
+    // all weekday flags false and empty ownerId.
     expect(out.daycare.enabled).toBe(false);
-    expect(out.bottleChain).toBeDefined();
+    expect(out.daycare.ownerId).toBe("");
+    expect(out.daycare.weekdays).toEqual({
+      mon: false,
+      tue: false,
+      wed: false,
+      thu: false,
+      fri: false,
+      sat: false,
+      sun: false,
+    });
+    expect(out.bottleChain).toEqual({ bottlesPerDay: 5, bufferAfterWakeMinutes: 10 });
   });
 
   it("returns null when the input itself is null (lets the hook stay loading)", () => {

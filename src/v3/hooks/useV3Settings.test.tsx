@@ -23,10 +23,15 @@ describe("useV3Settings", () => {
     cb!(sampleSettings);
     await waitFor(() => {
       expect(result.current.loading).toBe(false);
-      // The hook now flows partial docs through withV3SettingsDefaults,
-      // so caller-supplied fields stay but missing ones backfill.
+      // The hook flows partial docs through withV3SettingsDefaults, so
+      // caller-supplied fields stay but missing ones backfill. Asserting
+      // the backfill SHAPE (not just "defined") catches defaulter
+      // regressions like an empty object or a stale partial.
       expect(result.current.settings?.defaultWakeTime).toBe(7 * 60);
-      expect(result.current.settings?.bottleChain).toBeDefined();
+      expect(result.current.settings?.bottleChain).toEqual({
+        bottlesPerDay: 5,
+        bufferAfterWakeMinutes: 10,
+      });
     });
   });
 });
