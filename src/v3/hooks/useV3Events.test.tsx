@@ -94,7 +94,11 @@ describe("useV3Events", () => {
       await result.current.createOptimistic(newEvent);
     });
     expect(createEventMock).toHaveBeenCalledWith({}, "child-1", newEvent);
-    expect(result.current.events.find((e) => e.id === "e-new")).toBeDefined();
+    // Optimistic state must contain the exact event we inserted, not
+    // just "something with that id." A bug that wrote a partial copy
+    // (e.g. stripping lifecycle on insert) would have passed the
+    // previous .toBeDefined() check.
+    expect(result.current.events.find((e) => e.id === "e-new")).toEqual(newEvent);
   });
 
   it("createOptimistic keeps events sorted by TimeMin numerically", async () => {

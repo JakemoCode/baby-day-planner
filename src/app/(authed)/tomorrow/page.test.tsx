@@ -159,7 +159,8 @@ describe("TomorrowPage (V3)", () => {
     await userEvent.click(screen.getByRole("button", { name: /promote to today/i }));
     expect(startNewDay).toHaveBeenCalledTimes(1);
     const args = vi.mocked(startNewDay).mock.calls[0]?.[2];
-    expect(args).toBeDefined();
+    // The next assertion already proves `args` is defined (would throw
+    // on optional-chain undefined). Removing the redundant guard.
     expect(args?.newWakeTime).toBe(7 * 60);
     expect(replace).toHaveBeenCalledWith("/");
   });
@@ -178,7 +179,11 @@ describe("TomorrowPage (V3)", () => {
     // the new day's id (the same id passed to startNewDay).
     const promoteArgs = vi.mocked(startNewDay).mock.calls[0]?.[2];
     const newDayId = promoteArgs?.newDayId;
-    expect(newDayId).toBeDefined();
+    // newDayId is the UUID-shaped string from newDayId() — assert the
+    // shape, not just "defined" (a non-empty string is more meaningful
+    // and the per-call dayId assertion below would have a misleading
+    // error if newDayId were `undefined`).
+    expect(newDayId).toMatch(/^day_[0-9a-f]{8}-/);
     expect(createEvent).toHaveBeenCalledTimes(2);
     for (const call of vi.mocked(createEvent).mock.calls) {
       expect(call[2].dayId).toBe(newDayId);

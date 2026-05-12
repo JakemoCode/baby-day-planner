@@ -30,18 +30,22 @@ describe("withV3SettingsDefaults — realistic data", () => {
     // Doc lacks bottleChain, owners, daycare, dailyRecurring, dreamFeed*.
     const out = withV3SettingsDefaults(fixtures.settings.v2 as Partial<Settings>);
     expect(out).not.toBeNull();
-    expect(out!.bottleChain).toBeDefined();
-    expect(out!.bottleChain.bottlesPerDay).toBe(5);
-    expect(out!.owners.parent1).toBeDefined();
-    expect(out!.daycare.weekdays).toBeDefined();
+    expect(out!.bottleChain).toEqual({ bottlesPerDay: 5, bufferAfterWakeMinutes: 10 });
+    // V2 fixture has no `owners` field — defaulter fills it with empty
+    // displayNames so the Settings form has something to bind to.
+    expect(out!.owners.parent1.displayName).toBe("");
+    expect(out!.owners.parent2.displayName).toBe("");
+    expect(out!.daycare.weekdays.mon).toBe(false);
+    expect(out!.daycare.weekdays.sun).toBe(false);
   });
 
   it("a partial V3 doc (missing critical fields) gets defaults filled", () => {
     const out = withV3SettingsDefaults(fixtures.settings.partialV3 as Partial<Settings>);
     expect(out).not.toBeNull();
-    expect(out!.bottleChain).toBeDefined();
-    expect(out!.owners).toBeDefined();
-    expect(out!.daycare).toBeDefined();
+    expect(out!.bottleChain).toEqual({ bottlesPerDay: 5, bufferAfterWakeMinutes: 10 });
+    expect(out!.owners.parent1.displayName).toBe("");
+    expect(out!.owners.parent2.displayName).toBe("");
+    expect(out!.daycare.enabled).toBe(false);
   });
 
   it("a partially-filled doc preserves explicit fields and fills missing", () => {
