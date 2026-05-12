@@ -21,9 +21,11 @@ import { RULES as NAP_RULES } from "./naps";
 import { RULES as OWNER_RULES } from "./owners";
 import { RULES as PUMP_RULES } from "./pumps";
 import { RULES as PUTDOWN_RULES } from "./putdown";
+import { RULES as WW_OVERRIDE_RULES } from "./wakeWindowOverrides";
 
 export const ALL_RULES: Rule[] = [
   ...NAP_RULES,
+  ...WW_OVERRIDE_RULES,
   ...BEDTIME_RULES,
   ...BOTTLE_RULES,
   ...OWNER_RULES,

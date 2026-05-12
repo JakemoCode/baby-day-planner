@@ -6,7 +6,7 @@
 
 import type { Context, Event } from "../../schemas";
 import type { Rule } from "../evaluator";
-import { hasType, isRecordedEvent, projectedEvent } from "../helpers";
+import { hasType, isProjected, isRecordedEvent, projectedEvent } from "../helpers";
 
 const isNap = hasType("nap");
 const isWakeWindow = hasType("wake_window");
@@ -21,7 +21,12 @@ const isWakeWindow = hasType("wake_window");
 const RuleProjectNapChain: Rule = {
   id: "R3.1",
   description: "Project the day's base nap chain from settings.wakeWindowsMinutes",
-  matches: (events, ctx) => ctx.day.wakeTime !== undefined && !events.some(isWakeWindow),
+  // Fire as long as no PROJECTED wake_window exists yet. User-tapped
+  // overrides (lifecycle.state: 'overridden') sit in ctx.actuals as
+  // metadata carriers — they don't block the cascade. R4.2 merges them
+  // onto the projection R3.1 emits below.
+  matches: (events, ctx) =>
+    ctx.day.wakeTime !== undefined && !events.some((e) => isWakeWindow(e) && isProjected(e)),
   produces: (events, ctx) => projectBaseNapChain(ctx, events),
 };
 
