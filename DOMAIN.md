@@ -90,7 +90,7 @@ Practically:
 - Today's bottles = bottles with `startTime ∈ [00:00, 23:59]`
   of today's calendar date.
 - Overnight bottles count toward the calendar day they fall
-  in (tallied against `bottlesPerDay` for that day).
+  in (tallied against the day's bottle list).
 - Overnight bottles do **NOT anchor the day's cascade.** The
   morning rhythm is driven by wake-up, not a mid-night feed.
   The cascade still anchors at `wakeTime + buffer` regardless
@@ -98,6 +98,15 @@ Practically:
 - The bottle cascade stops at midnight (`1440`), not
   tomorrow's wake time. Anything past midnight belongs to
   tomorrow.
+
+**`bottlesPerDay` is a cold-start target, NOT a hard cap.** If
+no recordings exist yet, the engine projects exactly that many
+placeholders starting at `wake + buffer` (a useful seed for the
+parent). The moment a real recording exists, the cascade
+follows cadence to midnight — predicting the rest of the day
+regardless of count. Sick days, growth spurts, and other
+high-feed-count days don't suddenly leave the afternoon
+unpredicted just because the cap was reached by noon.
 
 ---
 
