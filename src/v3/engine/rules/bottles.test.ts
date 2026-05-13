@@ -643,4 +643,101 @@ describe("R5.1 — overridden bottles anchor the cascade", () => {
     expect(bottles[0]?.lifecycle.state).toBe("overridden");
     expect(bottles.slice(1).every((b) => b.lifecycle.state === "projected")).toBe(true);
   });
+
+  it("R5.8 still caps the cascade with an overridden anchor near tomorrow's wake", () => {
+    // Mirrors Jake's 2026-05-12 screenshot: overridden bottle at 19:10
+    // (post-bedtime threshold), bottlesPerDay=5, defaultWakeTime=7:00.
+    // tomorrowWake = 31:00 = 1860; from 1150 at interval=180, next slots
+    // would be 22:10 (1330), 25:10 (1510), 28:10 (1690), 31:10 (1870).
+    // The 4th projection lands at 1870 ≥ 1860 → R5.8 breaks. Result:
+    // 1 overridden + 3 projected = 4 bottles. Verifies the cascade does
+    // NOT stack all five at the same minute (the visible symptom).
+    const overridden: Event = aProjectedBottle({
+      id: "manual_bottle_1",
+      eventKey: "bottle_1",
+      start: 19 * 60 + 10,
+      lifecycle: { state: "overridden", annotatedAt: 19 * 60 + 10 },
+    });
+
+    const ctx = aContext({
+      day: aDay({ wakeTime: 7 * 60 }),
+      settings: aSettings({
+        bottleChain: { bottlesPerDay: 5, bufferAfterWakeMinutes: 10 },
+        defaultBottleIntervalMinutes: 180,
+        defaultWakeTime: 7 * 60,
+      }),
+      actuals: [overridden],
+    });
+
+    const out = projectDay(
+      {
+        day: ctx.day,
+        settings: ctx.settings,
+        actuals: ctx.actuals,
+        nowMinutes: ctx.nowMinutes,
+      },
+      { rules: ALL },
+    );
+
+    const bottles = out
+      .filter((e) => e.type === "bottle")
+      .sort((a, b) => a.startTime - b.startTime);
+
+    expect(bottles.map((b) => b.startTime)).toEqual([
+      19 * 60 + 10,
+      22 * 60 + 10,
+      25 * 60 + 10,
+      28 * 60 + 10,
+    ]);
+    // Each slot is distinct — the screenshot symptom (3 bottles at 19:10)
+    // would fail this assertion.
+    const uniqueStarts = new Set(bottles.map((b) => b.startTime));
+    expect(uniqueStarts.size).toBe(bottles.length);
+  });
+
+  it("with both an overridden AND a recorded bottle, cascade anchors from the LATER one", () => {
+    // Reality-wins still applies: the latest non-projected bottle (by
+    // startTime) is the anchor, regardless of which lifecycle state it's
+    // in. A recorded bottle at 10:00 and an overridden bottle at 13:00
+    // → cascade resumes from 13:00.
+    const recorded = aRecordedBottle({
+      id: "actual_bottle_1",
+      eventKey: "bottle_1",
+      start: 10 * 60,
+      amountOz: 5,
+    });
+    const overridden: Event = aProjectedBottle({
+      id: "manual_bottle_2",
+      eventKey: "bottle_2",
+      start: 13 * 60,
+      lifecycle: { state: "overridden", annotatedAt: 13 * 60 },
+    });
+
+    const ctx = aContext({
+      day: aDay({ wakeTime: 7 * 60 }),
+      settings: aSettings({
+        bottleChain: { bottlesPerDay: 4, bufferAfterWakeMinutes: 10 },
+        defaultBottleIntervalMinutes: 180,
+      }),
+      actuals: [recorded, overridden],
+    });
+
+    const out = projectDay(
+      {
+        day: ctx.day,
+        settings: ctx.settings,
+        actuals: ctx.actuals,
+        nowMinutes: ctx.nowMinutes,
+      },
+      { rules: ALL },
+    );
+
+    const bottles = out
+      .filter((e) => e.type === "bottle")
+      .sort((a, b) => a.startTime - b.startTime);
+
+    // 10:00 (recorded), 13:00 (overridden), then 16:00, 19:00 (projected)
+    // cascading from 13:00 + 180.
+    expect(bottles.map((b) => b.startTime)).toEqual([10 * 60, 13 * 60, 16 * 60, 19 * 60]);
+  });
 });
