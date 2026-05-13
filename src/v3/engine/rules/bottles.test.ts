@@ -5,9 +5,11 @@
  */
 
 import { describe, expect, it } from "vitest";
+import type { Event } from "../../schemas";
 import {
   aContext,
   aDay,
+  aProjectedBottle,
   aRecordedBottle,
   aRecordedNap,
   aSettings,
@@ -574,5 +576,71 @@ describe("R5.1 — cascade interval honors bottleIntervalRules", () => {
       .sort((a, b) => a.startTime - b.startTime);
 
     expect(bottles.map((b) => b.startTime)).toEqual([8 * 60 + 30, 11 * 60 + 30]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// R5.1 / R5.11 — overridden bottles anchor the cascade
+// ---------------------------------------------------------------------------
+//
+// Click-test bug (Jake, 2026-05-12): tapping a projected bottle in the
+// drawer and assigning an "other" owner produces an `overridden` doc
+// (formToEvent: projected + no time change → overridden, preserving the
+// predicted slot as scheduling intent). The engine then stopped cascading:
+//   - R5.11 saw the overridden bottle exist → did NOT fire (gated on
+//     `!events.some(isBottle)`).
+//   - R5.1 saw the overridden bottle but it isn't `isRecordedEvent` →
+//     did NOT fire (gated on `bottles.some(isRecordedEvent)`).
+// Result: the engine output only the single overridden bottle, no
+// downstream projections.
+//
+// Predict-don't-prescribe: the user's owner assignment IS a commitment
+// to that slot — the engine should treat overridden bottles like other
+// non-projected bottles for cascade-anchoring purposes (same as
+// recorded). Only `projected` is "the engine made this up."
+describe("R5.1 — overridden bottles anchor the cascade", () => {
+  it("with one overridden bottle at 8:30, projects the remaining bottles_per_day at interval", () => {
+    const overridden: Event = aProjectedBottle({
+      id: "manual_bottle_1",
+      eventKey: "bottle_1",
+      start: 8 * 60 + 30,
+      lifecycle: { state: "overridden", annotatedAt: 8 * 60 + 30 },
+    });
+
+    const ctx = aContext({
+      day: aDay({ wakeTime: 7 * 60 }),
+      settings: aSettings({
+        bottleChain: { bottlesPerDay: 4, bufferAfterWakeMinutes: 10 },
+        defaultBottleIntervalMinutes: 180,
+      }),
+      actuals: [overridden],
+    });
+
+    const out = projectDay(
+      {
+        day: ctx.day,
+        settings: ctx.settings,
+        actuals: ctx.actuals,
+        nowMinutes: ctx.nowMinutes,
+      },
+      { rules: ALL },
+    );
+
+    const bottles = out
+      .filter((e) => e.type === "bottle")
+      .sort((a, b) => a.startTime - b.startTime);
+
+    // Same cascade as the recorded case: 4 bottles total.
+    expect(bottles.map((b) => b.startTime)).toEqual([
+      8 * 60 + 30,
+      11 * 60 + 30,
+      14 * 60 + 30,
+      17 * 60 + 30,
+    ]);
+    // Overridden anchor preserved (§0 reality-wins extended to user
+    // commitment).
+    expect(bottles[0]?.id).toBe(overridden.id);
+    expect(bottles[0]?.lifecycle.state).toBe("overridden");
+    expect(bottles.slice(1).every((b) => b.lifecycle.state === "projected")).toBe(true);
   });
 });
