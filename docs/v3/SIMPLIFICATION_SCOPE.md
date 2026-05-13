@@ -43,7 +43,7 @@ After simplification, the engine should have approximately:
 | Rule | Replaces | What it does |
 |---|---|---|
 | **Sleep cascade** | R3.1, R3.5, R3.6, R3.7-3.8, R4.3-R4.4, parts of R7 | One sequential rule: `nap_N.start = prev_event.end + wakeWindowsMinutes[N-1]`. Short-nap adjustment is one branch. If a projected nap's start ≥ `bedtimeThreshold`, it's relabeled as bedtime instead. Reality wins — anchors read previous event's actual rendered time. |
-| **Bottle cascade** | R5.1, R5.6, R5.7, R5.11 | Sequential, anchored at `wake + buffer` (no prior bottles) OR earliest non-projected bottle. Each step `= prev.startTime + intervalForAmount(prev.amountOz)`. If the proposed time lands inside `[nap.start - putdownLead, nap.end]`, snap to nearest edge with the "nowMinutes" fallback. Stops at `tomorrowWake` (R5.8). |
+| **Bottle cascade** | R5.1, R5.6, R5.7, R5.11 | Sequential, anchored at `wake + buffer` (no prior bottles) OR earliest non-projected bottle **with `startTime >= wakeTime`** (overnight bottles don't anchor — see midnight rule below). Each step `= prev.startTime + intervalForAmount(prev.amountOz)`. If the proposed time lands inside `[nap.start, nap.end]`, snap to nearest edge with the "nowMinutes" fallback. **The no-feed region is the nap itself only — NOT extended backward through putdown** (wind-down is render-only; a bottle can BE the wind-down). **Stops at midnight (`1440`), not `tomorrowWake` — bottles past midnight belong to the next calendar day's chain.** |
 | **Bottle bidirectional backfill** | (no current equivalent — bug §F19/§F21) | Same cascade, applied backwards from earliest non-projected anchor. Fills slots before the anchor while remaining `≥ wake + buffer`. |
 | **Scheduled recurring events** | R8 (dream feed), R9 (pumps), R11 (daily recurring), R21 (daycare) | One rule family for "events at a fixed time per day (or per weekday)." Each entry has `time`, optional `weekdays` filter, opt-in flag, optional `minGapAfterLastBottle` heuristic for dream-feed fallback (see §3). |
 
@@ -60,6 +60,7 @@ After simplification, the engine should have approximately:
 - **User commitment wins**: any `overridden` event anchors cascades just like a recorded one (predict-don't-prescribe).
 - **Owners are scheduling-inert**: assigning an owner to an event never changes when it happens. Owner default lives in templates/settings, never engine.
 - **R5.4 (chronological renumbering)** stays — it's display-only but engine-side; trivial.
+- **The midnight rule**: bottles belong to the calendar day they happen on (`startTime ∈ [0, 1440)`). Overnight bottles count toward their calendar day's `bottlesPerDay` total but do NOT anchor the day's cascade. The drawer's save path must route bottles to the correct day doc based on their calendar day, not the currently-active day.
 
 ### §2.4 Total
 
@@ -67,49 +68,40 @@ After simplification, the engine should have approximately:
 
 ---
 
-## §3 Dream feed — collapsed spec
+## §3 Dream feed — render-only label
 
-Today: 10 rules (R8.0-R8.9). The proposal collapses dream feed into the **scheduled recurring events** rule family with one extra heuristic.
+Today: 10 rules (R8.0-R8.9). **Per Jake 2026-05-13: dream feed has zero engine logic. It is purely a render-time label.**
 
-### §3.1 The simple case (stable baby)
+### §3.1 The mechanic
 
-Once baby's schedule is stable, dream feed is just a daily recurring event at a fixed time (e.g. 8:30 PM or 9 PM). Configured per-family in settings:
+Settings carries an opt-in flag:
 
 ```ts
 dreamFeed: {
-  enabled: boolean;           // opt-in
-  time: TimeMin;              // e.g. 8:30 PM = 1230
-  ownerSlot?: OwnerSlot;      // optional default owner; templates/settings own this
+  enabled: boolean;
+  // Optional UX hint for the configured time (e.g., 8:30 PM). Render
+  // and Settings may use this; engine does NOT.
+  time?: TimeMin;
 }
 ```
 
-If `enabled === true`, the scheduled-recurring rule emits a `bottle`-kind event (or its own `dream_feed` type if we want the render to differ) at the configured `time` each day.
+At render time, when `dreamFeed.enabled === true`:
 
-### §3.2 The smart-gap fallback (early days)
+> The **first bottle whose `startTime > bedtime.startTime`** gets labeled "Dream Feed" instead of "Bottle N."
 
-If `dreamFeed.useSmartGap === true` (or `time === null`), the dream feed time is computed instead of fixed:
+That's it. The bottle itself is just a regular bottle — either projected by the bottle cascade (which already continues past bedtime up to `tomorrowWake` per R5.8) or recorded manually by the user. There is no `dream_feed` event type, no separate anchor math, no smart-gap fallback, no engine awareness of dream feed at all.
 
-```
-startTime = max(
-  lastBottle.startTime + minGapAfterLastBottle,
-  bedtime.startTime + offsetAfterBedtime
-)
-```
+### §3.2 What's gone vs the previous draft
 
-With defaults `minGapAfterLastBottle = 120` and `offsetAfterBedtime = 90` (configurable). This is the only case where dream feed depends on the bottle cascade output — and even then, it's a single read of `lastBottle`, not membership in the cascade.
+The earlier proposal had a smart-gap fallback (`max(lastBottle + minGap, bedtime + offset)`) and a separate event type discussion. **Both deleted.** Predict-don't-prescribe: if the cascade lands a bottle after bedtime, label the first one; if it doesn't, no label. The user can record a bottle whenever they actually give one — it gets labeled if it qualifies.
 
 ### §3.3 Owners
 
-Per Jake (2026-05-12): no engine-side default owner inheritance. R8.8 ("opposite of bedtime owner") is **dropped entirely**. Owner default for dream feed comes from settings or template — same as any other event.
+No engine-side default owner inheritance anywhere. R8.8 ("opposite of bedtime owner") is **dropped**. Owner default for any bottle (dream feed included) comes from settings or template, never engine.
 
 ### §3.4 Overnight bottles
 
-Dream feed is opt-in and one-per-day. Other overnight bottles can still happen (baby wakes hungry at 2 AM). Those are handled by:
-
-- The bottle cascade continues past bedtime up to `tomorrowWake` (current R5.8 behavior — preserved).
-- Recorded overnight feeds are just bottles with `startTime > bedtime.startTime`. Nothing special.
-
-Dream feed is distinct because it's *scheduled* (proactive), not *predicted* (cascade-driven). That's the only reason it has its own rule path.
+Other overnight bottles can happen (baby wakes hungry at 2 AM). Those are just regular bottles cascading past bedtime, no special handling. Only the FIRST post-bedtime bottle gets the dream-feed label; subsequent overnight bottles are labeled normally.
 
 ---
 
@@ -159,12 +151,12 @@ No changes here. The simplification is about *scheduling rule* count, not the un
 
 ---
 
-## §7 Open questions (resolve during #132)
+## §7 Open questions — resolved 2026-05-13
 
-1. **Dream feed event type**: stays as `dream_feed`, or becomes `bottle` with a flag? Pro of separate type: render can differ. Pro of `bottle`: simpler. Decide when implementing.
-2. **Backfill collision with R5.6 (now inline)**: when backfill walks backward and a slot lands in a nap region, does the snap go to the EARLIER edge (away from anchor) or LATER edge (toward anchor)? Test both, pick the one that produces saner visual cadence.
-3. **Short-nap adjustment direction**: currently shortens the FOLLOWING wake window. With sequential cascade, this still works the same — verify in #132's sibling work.
-4. **R5.13 (confirm if too soon)**: keep in engine as a warning flag on the event, or move to drawer UX? Leans UX, but the engine knows the interval — it could emit a flag.
+1. **Dream feed event type**: ✅ **Resolved — `bottle` with no separate type at all.** Dream feed is purely a render-time label on the first bottle that lands after actual bedtime. Settings carries `dreamFeed.enabled` (and optional `time` as a UX hint). No engine logic. See §3.
+2. **Backfill collision with the inline nap snap**: ✅ **Resolved — same snap-to-closest-edge rule applies in both directions.** Direction of cascade walk doesn't matter; the per-step "where does the proposed `T` actually land?" logic is identical whether `T = prev + interval` (forward) or `T = next - interval` (backward). Also: **no-feed region is the nap itself only — NOT `[nap.start - putdownLead, nap.end]`.** A bottle can land during wind-down; wind-down is render-only synthetic. See §2 bottle cascade row + DOMAIN.md §4.
+3. **Short-nap adjustment direction**: ✅ **Resolved — shorten ONLY the wake window immediately following the short nap; cascade handles the rest naturally.** The current behavior (R3.7-3.8) is correct in shape; preserve it in the new sequential cascade. Definition: a short nap is one where baby wakes BEFORE completing a sleep cycle — NOT "one cycle" (one full cycle IS a complete nap). DOMAIN.md §8.2 corrected to match.
+4. **R5.13 confirm-if-too-soon**: ✅ **Resolved — DELETE from engine entirely.** Predict-don't-prescribe. The drawer's existing 15-min "accidental duplicate" guard is the only thing needed at record-time; that's a UX-layer concern. Engine does NOT emit a flag or warning for "too-soon" bottles. Smaller bottles legitimately produce shorter intervals (DOMAIN.md §2); the engine has no business calling that anomalous.
 
 ---
 
@@ -172,15 +164,15 @@ No changes here. The simplification is about *scheduling rule* count, not the un
 
 | Step | Scope | Status |
 |---|---|---|
-| **Scope doc (this doc)** | Blueprint without code | In review |
-| **the bottle-cascade PR**: sequential bottle cascade | Replace R5.1 + R5.6 + R5.7 + R5.11 with one rule. Add backfill rule (§F19b / §F21 from FAST_FOLLOW). | Next |
-| **Bottle-cascade PR**: sequential bottle cascade | Replace R5.1 + R5.6 + R5.7 + R5.11 with one rule. Add backfill rule (§F19b / §F21 from FAST_FOLLOW). | Next |
+| **Scope doc (this doc)** | Blueprint without code | ✅ Merged (PR #132) |
+| **DOMAIN.md** | Plain-English model of baby behavior as first-class artifact | In review (PR #133) |
+| **Bottle-cascade PR**: sequential bottle cascade | Replace R5.1 + R5.6 + R5.7 + R5.11 with one rule. Delete R5.13 (engine flag). Add backfill rule (§F19b / §F21 from FAST_FOLLOW). | Next |
 | **Nap-cascade PR**: sequential nap cascade | Same shape applied to R3.* | After bottle cascade lands and proves the pattern |
-| **Scheduled-recurring PR**: collapse | Unify R8 (dream feed) + R9 (pumps) + R11 (daily recurring) + R21 (daycare) into one rule with weekday/offset/fixed-time variants | After nap cascade |
+| **Scheduled-recurring PR**: collapse | Unify R8 (dream feed → render-only label; no engine code) + R9 (pumps) + R11 (daily recurring) + R21 (daycare) into one rule with weekday/offset/fixed-time variants | After nap cascade |
 | **Docs reorg PR**: REQUIREMENTS reorg | Split render/UX into `RENDER_SPEC.md`. Renumber engine-only rules. Archive `REQUIREMENTS.md` as `REQUIREMENTS_v3_legacy.md`. | After scheduled-recurring |
 | **Stop** | Engine matches scope; doc matches engine. | — |
 
-Pause points: after each PR. If #132 doesn't produce the predicted gap-reduction + complexity-reduction, we re-evaluate before #133.
+Pause points: after each PR. If the bottle-cascade PR doesn't produce the predicted gap-reduction + complexity-reduction, we re-evaluate before the nap cascade.
 
 ---
 
@@ -190,7 +182,7 @@ Pause points: after each PR. If #132 doesn't produce the predicted gap-reduction
 - Not a lifecycle redesign.
 - Not a render rewrite (split-out only).
 - Not a Firestore migration (data model unchanged).
-- Not a settings UX rewrite (settings shape may grow one field for `dreamFeed.useSmartGap`).
+- Not a settings UX rewrite (settings shape stays as-is; `dreamFeed.enabled` already exists).
 - Not a big-bang rewrite. **Every step is independently mergeable.**
 
 ---
@@ -198,7 +190,12 @@ Pause points: after each PR. If #132 doesn't produce the predicted gap-reduction
 ## §10 Decision log
 
 - 2026-05-12 — Jake: "I really, really hate to do another massive engine rewrite" → confirmed incremental path, NOT a v4 rewrite.
-- 2026-05-12 — Jake: "Dream feed timing is... maybe just a per-day setting?" → confirmed dream feed as scheduled recurring event with optional smart-gap fallback.
+- 2026-05-12 — Jake: "Dream feed timing is... maybe just a per-day setting?" → initial direction.
 - 2026-05-12 — Jake: "Nothing needs default owners. That's what templates and settings are for" → confirmed R8.8 (engine-side owner default) is dropped, no engine-side owner inheritance anywhere.
 - 2026-05-12 — Jake: "Short-nap adjustments = yes, that's just physiology" → kept in engine.
 - 2026-05-12 — Jake: bedtime confirmation prompt → UX layer, not engine.
+- 2026-05-13 — Jake (Q1 resolution): Dream feed is `bottle` + flag, "simple logic, first bottle after actual bedtime gets labeled 'Dream Feed.' Can even be handled in UX" → simplified §3: engine has NO dream-feed code, label is render-only.
+- 2026-05-13 — Jake (Q2 resolution): "A bottle can, however, be the entirety of wind-down... 'Closest edge' should maybe only apply to nap, not nap+wind-down (since wind-down is a pure synthetic)" → bottle cascade no-feed region is `[nap.start, nap.end]` only; putdown is render-only. DOMAIN.md §4 updated.
+- 2026-05-13 — Jake (Q3 resolution): "A short nap is a nap where the baby wakes before a complete sleep cycle. One full sleep cycle is a successful/complete nap. That said, only the wake window following the short nap should be adjusted, and all following nap times are thusly recalculated." → DOMAIN.md §8.2 corrected; current adjustment direction is right.
+- 2026-05-13 — Jake (Q4 resolution): "No - don't do this at all. Retain the UX-side 15-min 'accidental duplicate' guard. PREDICT not PRESCRIBE" → R5.13 fully dropped from engine; no UX-layer reimplementation needed beyond the existing 15-min duplicate guard.
+- 2026-05-13 — Jake ("midnight rule"): "bottles for a given day are the bottles that fall between 12:00 AM and 11:59 PM of that day." Overnight bottles attach to the calendar day they fall in, but do NOT anchor the cascade — cascade still anchors at wake+buffer regardless. Engine: bottle cascade stops at midnight (1440), not tomorrowWake. Persistence: drawer save-path routes by calendar day, not active-day-id. Migration: wipe + start fresh, dev-only (no production data yet). DOMAIN.md §2 updated.
