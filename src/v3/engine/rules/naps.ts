@@ -1,104 +1,128 @@
 /**
- * R3.x — Nap rules.
+ * R3.1 — The sleep cascade.
  *
- * Source: docs/v3/REQUIREMENTS.md §3.
+ * One sequential rule that walks `settings.wakeWindowsMinutes` from
+ * `Day.wakeTime`, alternating wake_window → nap. Subsumes:
+ *   - R3.5 / R3.6  (WW geometry follows whichever nap occupies the slot)
+ *   - R3.7 / R3.8  (short-recorded-nap shortens the FOLLOWING WW)
+ *   - R7.5 / R7.6 / R7.11  (a projected nap at/crossing `bedtimeThreshold`
+ *                            becomes bedtime, taking that nap's start)
+ *   - R7.4 / R7.4b (no naps or wake_windows past bedtime — we simply stop
+ *                   emitting once bedtime lands)
+ *
+ * Cascade invariant (Jake 2026-05-12):
+ *   wake_window(N).startTime === nap(N-1).endTime   (Day.wakeTime for N=1)
+ *   wake_window(N).endTime   === nap(N).startTime
+ *
+ * Reality wins:
+ *   - recorded/overridden naps anchor their slot (their startTime/endTime
+ *     drive the cascade past them)
+ *   - a recorded/overridden bedtime in `actuals` short-circuits the
+ *     cascade at its startTime (no further nap/WW emitted past it)
+ *
+ * Source: docs/v3/REQUIREMENTS.md §3 (nap rules) + §7 (bedtime rules).
  */
 
-import type { Context, Event } from "../../schemas";
+import type { Context, Event, Settings } from "../../schemas";
 import type { Rule } from "../evaluator";
 import { hasType, isProjected, isRecordedEvent, projectedEvent } from "../helpers";
 
 const isNap = hasType("nap");
 const isWakeWindow = hasType("wake_window");
+const isBedtime = hasType("bedtime");
 
-/**
- * R3.1 — Project the day's base nap chain from settings.wakeWindowsMinutes.
- *
- * From Day.wakeTime, alternate wake_window → nap. The Nth wake window lasts
- * settings.wakeWindowsMinutes[N-1]; each nap defaults to
- * settings.defaultNapLengthMinutes.
- */
-const RuleProjectNapChain: Rule = {
+const RuleSleepCascade: Rule = {
   id: "R3.1",
-  description: "Project the day's base nap chain from settings.wakeWindowsMinutes",
+  description: "Sleep cascade: alternate wake_window/nap, substitute bedtime at threshold",
   // Fire as long as no PROJECTED or RECORDED wake_window exists yet.
   // User-tapped overrides (lifecycle.state: 'overridden') sit in
   // ctx.actuals as metadata carriers — they don't block the cascade;
-  // R4.2 merges them onto the projection R3.1 emits below. Recorded
-  // wake_windows (state: started/completed) are blocked defensively:
-  // schema intent is that wake_windows are always projected, but if a
-  // future code path ever produces one we don't want a duplicate
-  // eventKey emitted alongside it.
+  // R4.2 merges them onto the projection emitted below.
   matches: (events, ctx) =>
     ctx.day.wakeTime !== undefined &&
     !events.some((e) => isWakeWindow(e) && (isProjected(e) || isRecordedEvent(e))),
-  produces: (events, ctx) => projectBaseNapChain(ctx, events),
+  produces: (events, ctx) => projectSleepCascade(ctx, events),
 };
 
-function projectBaseNapChain(ctx: Context, existing: Event[]): Event[] {
+function projectSleepCascade(ctx: Context, existing: Event[]): Event[] {
   const wakeTime = ctx.day.wakeTime;
   if (wakeTime === undefined) return existing;
 
   const wws = ctx.settings.wakeWindowsMinutes;
   const napLen = ctx.settings.defaultNapLengthMinutes;
+  const threshold = ctx.settings.bedtimeThreshold;
 
-  // Index existing nap events by eventKey so we don't emit duplicates.
-  // Recorded naps stay (reality wins, R3.3); projected naps would only be
-  // present if another rule had emitted them earlier — for R3.1 that's
-  // never the case yet.
-  const existingByKey = new Map<string, Event>();
+  // Index existing naps so we don't emit duplicates and so the cascade
+  // can defer to reality at each slot.
+  const existingNapByKey = new Map<string, Event>();
   for (const e of existing) {
-    if (isNap(e)) existingByKey.set(e.eventKey, e);
+    if (isNap(e)) existingNapByKey.set(e.eventKey, e);
   }
+
+  // A manual bedtime (recorded/overridden) in actuals is authoritative.
+  // It pins the cascade's terminator at its startTime — no projected
+  // bedtime is emitted, and nothing is emitted past it.
+  const manualBedtime = existing.find((e) => isBedtime(e) && !isProjected(e));
 
   const projected: Event[] = [];
   let cursor = wakeTime;
 
   for (let i = 0; i < wws.length; i++) {
     const baseWw = wws[i]!;
-    // R3.7/R3.8: if the previous nap is recorded and shorter than the
-    // shortNapThresholdMinutes, shorten THIS wake window by
-    // shortNapAdjustmentMinutes. Only applies for i >= 1 (there's a
-    // previous nap to compare). Unrecorded annotations don't trigger it.
-    const prevRecordedShort = i > 0 && isShortRecordedNap(existingByKey.get(`nap_${i}`), ctx);
+    // Short-nap adjustment: if the previous nap is RECORDED (lifecycle
+    // 'completed') and shorter than shortNapThresholdMinutes, shrink THIS
+    // wake window by shortNapAdjustmentMinutes. Annotations (overridden)
+    // carry intent, not measurement, and don't trigger the adjustment.
+    const prevRecordedShort = i > 0 && isShortRecordedNap(existingNapByKey.get(`nap_${i}`), ctx);
     const wwMinutes = prevRecordedShort
       ? Math.max(0, baseWw - ctx.settings.shortNapAdjustmentMinutes)
       : baseWw;
 
     const wwStart = cursor;
+
+    // Manual bedtime short-circuit: if wwStart is at/after the manual
+    // bedtime, stop entirely. (R7.4 / R7.4b — no orphan WWs or naps
+    // beyond the authoritative bedtime.)
+    if (manualBedtime && wwStart >= manualBedtime.startTime) break;
+
     const n = i + 1;
     const napKey = `nap_${n}`;
-    const existingNap = existingByKey.get(napKey);
+    const existingNap = existingNapByKey.get(napKey);
 
-    // Cascade invariant (Jake, 2026-05-12):
-    //   wake_window(N).startTime === nap(N-1).endTime    (Day.wakeTime for N=1)
-    //   wake_window(N).endTime   === nap(N).startTime
-    // Wake windows END because naps START; wake windows START because
-    // naps END. No special-casing on lifecycle state — the WW geometry
-    // follows whatever nap occupies the slot, projected or otherwise.
+    // The nap's startTime is whichever the cascade lands on: reality
+    // wins (recorded/overridden) over projection.
     //
-    // R3.6 (inversion guard): if a user-edited nap.startTime lands
-    // before wwStart (e.g. they shifted it earlier than the previous
-    // nap ended), clamp wwEnd to wwStart so the WW renders zero-length
-    // rather than negative.
-    const wwEnd = existingNap ? Math.max(wwStart, existingNap.startTime) : wwStart + wwMinutes;
+    // R3.6 inversion guard: an overridden start earlier than wwStart
+    // (e.g. user shifted it before the previous nap ended) clamps to
+    // wwStart so the WW renders zero-length rather than negative.
+    const napStart = existingNap ? Math.max(wwStart, existingNap.startTime) : wwStart + wwMinutes;
 
-    projected.push(
-      projectedEvent({
-        ctx,
-        id: `proj_wake_window_${n}`,
-        eventKey: `wake_window_${n}`,
-        type: "wake_window",
-        kind: "block",
-        startTime: wwStart,
-        endTime: wwEnd,
-        label: `Wake window ${n}`,
-      }),
-    );
+    // Bedtime substitution (R7.5 / R7.6 / R7.11): if no manual bedtime
+    // exists AND this slot's PROJECTED nap would reach the threshold
+    // (start ≥ threshold OR its interval crosses it), emit bedtime at
+    // napStart and stop the cascade. Reality wins: a recorded/overridden
+    // nap at this slot is NOT substituted — it stays as a nap.
+    const wouldCrossThreshold = napStart >= threshold || napStart + napLen > threshold;
+    if (!manualBedtime && !existingNap && wouldCrossThreshold) {
+      projected.push(buildWakeWindow(ctx, n, wwStart, napStart));
+      projected.push(buildProjectedBedtime(ctx, napStart, ctx.settings));
+      break;
+    }
 
-    if (!existingNap) {
-      // No nap occupies this slot — emit a fresh projected one.
-      const napEnd = wwEnd + napLen;
+    // If a manual bedtime sits between wwStart and the would-be napStart,
+    // truncate the WW at bedtime and stop — no nap_n emitted.
+    if (manualBedtime && napStart >= manualBedtime.startTime) {
+      projected.push(buildWakeWindow(ctx, n, wwStart, manualBedtime.startTime));
+      break;
+    }
+
+    projected.push(buildWakeWindow(ctx, n, wwStart, napStart));
+
+    if (existingNap) {
+      // Cursor advances from reality's endTime.
+      cursor = existingNap.endTime ?? existingNap.startTime + napLen;
+    } else {
+      const napEnd = napStart + napLen;
       projected.push(
         projectedEvent({
           ctx,
@@ -106,29 +130,46 @@ function projectBaseNapChain(ctx: Context, existing: Event[]): Event[] {
           eventKey: napKey,
           type: "nap",
           kind: "block",
-          startTime: wwEnd,
+          startTime: napStart,
           endTime: napEnd,
           label: `Nap ${n}`,
         }),
       );
       cursor = napEnd;
-    } else {
-      // Existing nap (recorded, overridden, or otherwise) — skip emitting
-      // a duplicate, advance cursor from the nap's actual end.
-      cursor = existingNap.endTime ?? existingNap.startTime + napLen;
     }
   }
 
-  // Preserve any pre-existing events the caller passed in (recorded naps
-  // and anything else). The reality-wins guard in the evaluator enforces
-  // this; we simply concat.
   return [...existing, ...projected];
 }
 
-/**
- * R3.8: only RECORDED naps drive the short-nap adjustment. Unrecorded
- * annotations (overridden, projected) carry intent, not measurement.
- */
+function buildWakeWindow(ctx: Context, n: number, start: number, end: number): Event {
+  return projectedEvent({
+    ctx,
+    id: `proj_wake_window_${n}`,
+    eventKey: `wake_window_${n}`,
+    type: "wake_window",
+    kind: "block",
+    startTime: start,
+    endTime: end,
+    label: `Wake window ${n}`,
+  });
+}
+
+function buildProjectedBedtime(ctx: Context, start: number, settings: Settings): Event {
+  // R7.1: bedtime's endTime defaults to next morning's defaultWakeTime
+  // (24h ahead in cross-day notation).
+  return projectedEvent({
+    ctx,
+    id: "proj_bedtime",
+    eventKey: "bedtime",
+    type: "bedtime",
+    kind: "block",
+    startTime: start,
+    endTime: settings.defaultWakeTime + 24 * 60,
+    label: "Bedtime",
+  });
+}
+
 function isShortRecordedNap(nap: Event | undefined, ctx: Context): boolean {
   if (!nap) return false;
   if (nap.lifecycle.state !== "completed") return false;
@@ -137,4 +178,4 @@ function isShortRecordedNap(nap: Event | undefined, ctx: Context): boolean {
   return duration < ctx.settings.shortNapThresholdMinutes;
 }
 
-export const RULES: Rule[] = [RuleProjectNapChain];
+export const RULES: Rule[] = [RuleSleepCascade];

@@ -18,11 +18,13 @@ import type { Rule } from "../evaluator";
 import { projectDay } from "../projectDay";
 import { RULES as NAP_RULES } from "./naps";
 import { RULES as BOTTLE_RULES } from "./bottles";
-import { RULES as BEDTIME_RULES } from "./bedtime";
 
 const ALL: Rule[] = [...BOTTLE_RULES];
 const ALL_WITH_NAPS: Rule[] = [...NAP_RULES, ...BOTTLE_RULES];
-const ALL_WITH_BEDTIME: Rule[] = [...NAP_RULES, ...BEDTIME_RULES, ...BOTTLE_RULES];
+// NAP_RULES now emits bedtime inline (formerly bedtime.ts). Kept as a
+// distinct alias for test readability — bottle tests that depend on the
+// sleep cascade's bedtime emission use this set.
+const ALL_WITH_BEDTIME: Rule[] = [...NAP_RULES, ...BOTTLE_RULES];
 
 describe("R5.11 — placeholder projection when no bottle has been recorded", () => {
   it("projects bottlesPerDay placeholders, anchored at wake + buffer, spaced by interval", () => {

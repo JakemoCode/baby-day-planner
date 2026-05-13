@@ -13,11 +13,10 @@ import { describe, expect, it } from "vitest";
 import { aContext, aDay, aSettings } from "../../__tests__/factories";
 import type { Rule } from "../evaluator";
 import { projectDay } from "../projectDay";
-import { RULES as BEDTIME_RULES } from "./bedtime";
 import { RULES as NAP_RULES } from "./naps";
 import { RULES as PUTDOWN_RULES } from "./putdown";
 
-const ALL: Rule[] = [...NAP_RULES, ...BEDTIME_RULES, ...PUTDOWN_RULES];
+const ALL: Rule[] = [...NAP_RULES, ...PUTDOWN_RULES];
 
 describe("R6 — hasPutdown flag on projected naps and bedtime", () => {
   it("future projected nap gets hasPutdown=true", () => {

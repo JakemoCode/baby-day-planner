@@ -60,11 +60,11 @@ const MIDNIGHT = 24 * 60;
  * if present, falling back to midnight (the "midnight rule" boundary)
  * if no bedtime has been projected yet.
  *
- * Idempotency: bedtime might not be projected on the first evaluator
- * pass (R7.6 depends on R3.1). On pass 1 the cascade uses MIDNIGHT;
- * pass 2 sees bedtime, trims its own past-bedtime projections, and
- * stops cascading at bedtime. The trim step is what prevents the
- * stale midnight projections from persisting.
+ * Idempotency: bedtime is emitted by R3.1 (the sleep cascade) in the
+ * same pass, so the bottle cascade sees it as soon as the sleep
+ * cascade fires. Fallback to MIDNIGHT remains for the no-bedtime
+ * case (e.g. wakeWindowsMinutes doesn't extend far enough to trigger
+ * threshold substitution).
  */
 function forwardCapFor(events: Event[]): number {
   const bedtime = events.find(isBedtime);

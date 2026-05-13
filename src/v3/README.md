@@ -21,11 +21,10 @@ src/v3/
 │  ├─ projectDay.ts      ← public API mirror of V2's projectDay
 │  └─ rules/
 │     ├─ index.ts        ← ALL_RULES export
-│     ├─ naps.ts         ← R3.x  (TBD)
+│     ├─ naps.ts         ← R3.x + R7.x (sleep cascade — naps + bedtime)
 │     ├─ wakeWindows.ts  ← R4.x  (TBD)
 │     ├─ bottles.ts      ← R5.x  (TBD)
 │     ├─ putdown.ts      ← R6.x  (TBD)
-│     ├─ bedtime.ts      ← R7.x  (TBD)
 │     ├─ dreamFeed.ts    ← R8.x  (TBD)
 │     ├─ pumps.ts        ← R9.x  (TBD)
 │     ├─ extras.ts       ← R10.x (TBD)

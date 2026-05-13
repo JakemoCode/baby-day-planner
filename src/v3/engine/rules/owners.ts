@@ -122,7 +122,7 @@ const RuleApplyTemplateBottleOwners = templateOwnerByIndexRule({
 const RuleApplyTemplateBedtimeOwner: Rule = {
   id: "R12.5",
   description: "Stamp template.bedtimeOwner onto a projected bedtime that has no owner",
-  dependsOn: ["R7.6"],
+  dependsOn: ["R3.1"],
   matches: (events, ctx) => {
     if (!ctx.template?.bedtimeOwner) return false;
     return events.some((e) => isBedtime(e) && isProjected(e) && e.owner === undefined);
