@@ -6,7 +6,7 @@ concerns. Intentionally not a rewrite of `REQUIREMENTS.md` — that
 follows once the engine actually matches this scope.
 
 This doc is the spec for the incremental simplification work
-(PR #132 onward). If we discover during implementation that the
+(the bottle-cascade PR onward). If we discover during implementation that the
 scope is wrong, we update this doc, not the code-to-be-written.
 
 ---
@@ -173,10 +173,11 @@ No changes here. The simplification is about *scheduling rule* count, not the un
 | Step | Scope | Status |
 |---|---|---|
 | **Scope doc (this doc)** | Blueprint without code | In review |
-| **PR #132**: sequential bottle cascade | Replace R5.1 + R5.6 + R5.7 + R5.11 with one rule. Add backfill rule (§F19b / §F21 from FAST_FOLLOW). | Next |
-| **PR #133**: sequential nap cascade | Same shape applied to R3.* | After #132 lands and proves the pattern |
-| **PR #134**: scheduled recurring collapse | Unify R8 (dream feed) + R9 (pumps) + R11 (daily recurring) + R21 (daycare) into one rule with weekday/offset/fixed-time variants | After #133 |
-| **PR #135**: REQUIREMENTS reorg | Split render/UX into `RENDER_SPEC.md`. Renumber engine-only rules. Archive `REQUIREMENTS.md` as `REQUIREMENTS_v3_legacy.md`. | After #134 |
+| **the bottle-cascade PR**: sequential bottle cascade | Replace R5.1 + R5.6 + R5.7 + R5.11 with one rule. Add backfill rule (§F19b / §F21 from FAST_FOLLOW). | Next |
+| **Bottle-cascade PR**: sequential bottle cascade | Replace R5.1 + R5.6 + R5.7 + R5.11 with one rule. Add backfill rule (§F19b / §F21 from FAST_FOLLOW). | Next |
+| **Nap-cascade PR**: sequential nap cascade | Same shape applied to R3.* | After bottle cascade lands and proves the pattern |
+| **Scheduled-recurring PR**: collapse | Unify R8 (dream feed) + R9 (pumps) + R11 (daily recurring) + R21 (daycare) into one rule with weekday/offset/fixed-time variants | After nap cascade |
+| **Docs reorg PR**: REQUIREMENTS reorg | Split render/UX into `RENDER_SPEC.md`. Renumber engine-only rules. Archive `REQUIREMENTS.md` as `REQUIREMENTS_v3_legacy.md`. | After scheduled-recurring |
 | **Stop** | Engine matches scope; doc matches engine. | — |
 
 Pause points: after each PR. If #132 doesn't produce the predicted gap-reduction + complexity-reduction, we re-evaluate before #133.
