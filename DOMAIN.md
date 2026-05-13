@@ -128,11 +128,24 @@ extremely irritable, frustrated they aren't asleep, but
 overloaded with cortisol which actively prevents them from
 sleeping. A dreadful state for everyone.
 
-For the engine, wind-down (the app calls it "putdown") is a
-brief region just before each projected nap or bedtime. The
-no-eating-during-naps constraint extends backwards through
-this region — you don't want to give baby a bottle in the
-middle of the wind-down because it defeats the purpose.
+For the engine, wind-down (the app calls it "putdown") is
+**purely a render-time concept** — a brief synthetic region
+just before each projected nap or bedtime, useful for parents
+to see the upcoming sleep window.
+
+A bottle CAN land at the start of or as the entire wind-down
+— in fact this happens frequently: baby drinks the bottle,
+becomes drowsy, then sleeps. What you want to avoid is a
+bottle landing in the *body* of an already-in-progress
+wind-down (interrupting a parent who's already rocking baby
+to sleep). But this is a behavioral preference, not an engine
+constraint.
+
+The engine's no-feed constraint applies **only to the nap
+itself** (`[nap.start, nap.end]`), not the wind-down. A
+projected bottle whose time lands at nap.start (or earlier,
+during wind-down) is fine. Only a bottle inside the actual
+sleep gets snapped to the nearest nap edge.
 
 ---
 
@@ -145,24 +158,25 @@ household. The goal is to pre-load baby's stomach so the
 longest overnight stretch aligns with the parents' own
 sleep window.
 
-Dream feed is **opt-in**. Some parents feel baby is getting
-enough calories without it; others use it to maximize
-overnight sleep and total daily intake.
+Dream feed is **opt-in** via a settings flag. Some parents
+feel baby is getting enough calories without it; others use
+it to maximize overnight sleep and total daily intake.
 
-Dream feed timing is its own thing — it's not subject to the
-normal bottle interval cascade. Typically:
+**For the engine and UX, dream feed is just a bottle with a
+label** — nothing more. There is no `dream_feed` event type,
+no special anchor math, no separate scheduling logic. When
+the dream-feed setting is enabled, the **first bottle that
+lands after the actual bedtime gets labeled "Dream Feed" at
+render time.** That's the entire mechanic.
 
-- **No earlier than ~2 hours after the last evening bottle**
-  (so the stomach has cleared enough that a top-off is
-  effective).
-- **Often ~1.5 hours after bedtime starts** (so baby has
-  entered deep sleep and the feed doesn't disturb them).
-- Once a household's schedule is stable, dream feed becomes
-  basically a fixed clock time (8:30 PM, 9 PM).
+The bottle itself comes from the regular cascade or from a
+user recording it manually. If a parent disables the dream-
+feed setting, the label disappears — no other changes.
 
-For the engine: dream feed is its own thing in the bottle
-projection family, with its own anchor rules. Not a member
-of the regular cascade.
+(Other overnight bottles can and will happen; they're just
+regular bottles the cascade has projected past bedtime and
+up to `tomorrowWake`. Only the FIRST one gets the dream-feed
+label.)
 
 ---
 
@@ -240,11 +254,15 @@ Nap count descends 4 → 3 → 2 → 1 across the first year:
 | **5–8 months** | 3, transitioning to 2 |
 | 8–15 months | 2, then 1 |
 
-Infant sleep cycles are ~30–50 min. A "short nap" is one
-cycle (baby wakes at the boundary and doesn't re-link). A
-full restorative nap crosses ≥2 cycles (~60–90+ min). The
-4-month mark is the first major sleep disruption point —
-see §8.7.
+Infant sleep cycles are ~30–50 min. A **"short nap" is a
+nap where baby wakes BEFORE completing a sleep cycle** —
+they fragment partway through. **One full sleep cycle is a
+successful / complete nap.** After a short nap, baby is more
+tired sooner; the engine shortens the wake window *following*
+the short nap by a configured amount (and ONLY that one —
+naps after the adjusted one cascade naturally from the
+shifted timeline). The 4-month mark is the first major sleep
+disruption point — see §8.7.
 
 ### §8.3 Bottle cadence by age (formula or pumped milk)
 
