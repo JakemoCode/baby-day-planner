@@ -447,6 +447,25 @@ The whole file violates the standard, not just the two new helpers added in PR #
 
 ---
 
+## §F22 — Drawer save-path: route bottles to the correct calendar day
+
+**Source**: Jake, 2026-05-13 ("midnight rule"). Engine implication of `DOMAIN.md` §2 captured during the bottle-cascade refactor.
+
+**Status**: `pending`
+
+**What**: when the user records a bottle at 2 AM Wednesday, the bottle's day doc should be Wednesday's, NOT the currently-active Tuesday-PM day doc. Today the drawer's save handler routes writes to `useV3Events`'s configured `dayId`, which is the active day at click-time — meaning a 2 AM feed gets attached to the wrong calendar day.
+
+Implementation sketch:
+- Determine the bottle's calendar date from its `startTime` (or from `currentLocalMinutes()` if recording "now")
+- Look up the day doc for that calendar date; create it if missing (anchoring at `defaultWakeTime` per `DOMAIN.md` §2 for any auto-created day)
+- Route `createOptimistic` / `updateOptimistic` to that day's events sub-collection
+
+**Why fast-follow, not in the bottle-cascade PR**: engine already handles overnight bottles correctly (`startTime < wakeTime` doesn't anchor; midnight cap stops cascade at 1440). The save-path fix is a separate write-path concern with its own day-doc lifecycle implications. Worth its own PR with deliberate test coverage.
+
+**No data migration needed**: Jake confirmed dev-only with no production users yet. Wipe + start fresh.
+
+---
+
 ## How items land here
 
 Two paths:

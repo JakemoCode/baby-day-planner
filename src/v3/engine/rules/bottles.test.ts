@@ -58,19 +58,18 @@ describe("R5.11 — placeholder projection when no bottle has been recorded", ()
   });
 });
 
-describe("R5.8 — cascade stops when the next projected start would cross tomorrow's wake", () => {
-  it("bottlesPerDay=20 caps at the last slot before defaultWakeTime + 24h", () => {
+describe("R5.8 — cascade stops at midnight (the 'midnight rule', DOMAIN.md §2)", () => {
+  it("bottlesPerDay=20 caps at the last slot before midnight (1440)", () => {
     // Recorded bottle_1 at 7:30; interval 180; defaultWakeTime 7:00.
-    // Cascade slots:
+    // Cascade slots (within today's calendar day):
     //   1 (rec) 7:30 = 450
     //   2 10:30 = 630
     //   3 13:30 = 810
     //   4 16:30 = 990
     //   5 19:30 = 1170
     //   6 22:30 = 1350
-    //   7 01:30 next day = 1530
-    //   8 04:30 = 1710
-    //   9 07:30 = 1890  ← ≥ tomorrow's wake (1860). STOP before this.
+    //   7 01:30 next day = 1530  ← ≥ midnight (1440). STOP before this.
+    // Total: 6 bottles within today; bottle #7 belongs to tomorrow.
     const recorded = aRecordedBottle({
       id: "actual_bottle_first",
       eventKey: "bottle_1",
@@ -101,8 +100,10 @@ describe("R5.8 — cascade stops when the next projected start would cross tomor
       .filter((e) => e.type === "bottle")
       .sort((a, b) => a.startTime - b.startTime);
 
-    expect(bottles).toHaveLength(8);
-    expect(bottles[bottles.length - 1]!.startTime).toBe(28 * 60 + 30); // 04:30 next day
+    expect(bottles).toHaveLength(6);
+    expect(bottles[bottles.length - 1]!.startTime).toBe(22 * 60 + 30); // 22:30
+    // No bottle in today's chain past midnight.
+    expect(bottles.every((b) => b.startTime < 24 * 60)).toBe(true);
   });
 });
 
@@ -206,12 +207,24 @@ describe("R5.1 — cascade resumes from the latest recorded bottle", () => {
   });
 });
 
-describe("R5.6 — projected bottle in the putdown wind-down moves to BEFORE the wind-down", () => {
-  it("a projected bottle landing 5 min before nap.start (inside the putdown lead) is pushed to nap.start - putdownLead", () => {
-    // putdownLeadMinutes = 15 (default). nap_1 starts at 10:00, so the
-    // wind-down region is [9:45, 10:00]. A projected bottle at 9:55
-    // sits inside the wind-down: it should move to 9:45, not stay at
-    // 9:55, and not snap to 10:00 (which is the nap's actual start).
+describe("Sequential cascade — bottle landing in nap snaps to nap.start (wind-down allowed)", () => {
+  it("a projected bottle landing inside nap_1 snaps to nap.start, NOT to nap.start - putdownLead", () => {
+    // Per DOMAIN.md §4 / SIMPLIFICATION_SCOPE.md §2.1, the no-feed
+    // region is `[nap.start, nap.end]` only. Wind-down (putdown) is
+    // render-only synthetic; a bottle CAN land during it (often IS
+    // the wind-down: baby drinks → drowsy → sleep).
+    //
+    // Setup: wake 7:05, buffer 10 → bottle_1 at 7:15. Interval 180 →
+    // bottle_2 proposed at 10:15. Recorded nap_1 at [10:00, 11:00].
+    //   - 10:15 is strictly inside (10:00, 11:00). Snap.
+    //   - distBefore (10:15 → 10:00) = 15
+    //   - distAfter (11:00 → 10:15) = 45
+    //   - closer = 10:00. nowMinutes 8:00 < 10:00, so no past-fallback.
+    //   - bottle_2 = 10:00 (= nap.start; wind-down allowed).
+    //
+    // Old rule snapped to 9:45 (= nap.start - putdownLead). The
+    // current behavior intentionally drops that — bottle right into
+    // naptime is a real, common pattern.
     const recordedNap1 = aRecordedNap({
       id: "actual_nap_putdown",
       eventKey: "nap_1",
@@ -222,10 +235,6 @@ describe("R5.6 — projected bottle in the putdown wind-down moves to BEFORE the
     const ctx = aContext({
       day: aDay({ wakeTime: 7 * 60 + 5 }),
       settings: aSettings({
-        // bottlesPerDay=2 with first at 7:15, second predicted 10:15.
-        // 10:15 lands inside recorded nap_1 [10:00, 11:00] → R5.6 fires.
-        // With putdown buffer the "no-go" region is [9:45, 11:00];
-        // predicted 10:15 closer to 11:00 (45) vs 9:45 (30) → 9:45 wins.
         bottleChain: { bottlesPerDay: 2, bufferAfterWakeMinutes: 10 },
         defaultBottleIntervalMinutes: 180,
         wakeWindowsMinutes: [],
@@ -248,9 +257,8 @@ describe("R5.6 — projected bottle in the putdown wind-down moves to BEFORE the
     const bottles = out
       .filter((e) => e.type === "bottle" && e.lifecycle.state === "projected")
       .sort((a, b) => a.startTime - b.startTime);
-    // Second projected bottle should land at the START of the putdown
-    // wind-down (9:45), not at nap.start (10:00) and not staying at 10:15.
-    expect(bottles[bottles.length - 1]!.startTime).toBe(9 * 60 + 45);
+    // Snap to nap.start (10:00), not nap.start - putdownLead (9:45).
+    expect(bottles[bottles.length - 1]!.startTime).toBe(10 * 60);
   });
 });
 
@@ -334,27 +342,28 @@ describe("R5.6 — convergence regression (mirrors property-test failure)", () =
   });
 });
 
-describe("R5.6 — projected bottle inside a nap moves to the closer edge (with putdown buffer)", () => {
-  it("placeholder bottle landing in nap_1 moves to whichever edge of the [putdown..nap.end] region is closer", () => {
+describe("Sequential cascade — bottle inside nap snaps to closer edge (no putdown extension)", () => {
+  it("placeholder bottle landing in nap_1 snaps to whichever nap edge is closer; chain follows", () => {
     // Setup:
     //   wake 7:00, buffer 10, interval 180, bottlesPerDay 4, now 8:00
-    //   recorded nap_1 from 9:30-11:00, putdownLead 15 (default)
+    //   recorded nap_1 from 9:30-11:00.
     //
-    // R5.6 treats each nap's "no-go" region as
-    //   [nap.start - putdownLead, nap.end]
-    // because the putdown wind-down is also no-bottle territory. So
-    // nap_1's region is [9:15, 11:00], not [9:30, 11:00].
+    // The no-feed region is `[nap.start, nap.end]` ONLY — putdownLead
+    // does NOT extend it (DOMAIN.md §4). Region = [9:30, 11:00].
     //
-    // R5.11 places placeholders at 7:10, 10:10, 13:10, 16:10.
-    // bottle_2 at 10:10 is inside [9:15, 11:00].
-    //   predicted (prev 7:10 + 180) = 10:10
-    //   region.start = 9:15, distance |10:10 - 9:15| = 55
-    //   region.end   = 11:00, distance |11:00 - 10:10| = 50
-    //   → move to 11:00 (after-edge closer once the wind-down extends the region).
-    //
-    // Cascade then projects nap_2 at [12:30, 13:30]; with putdown the
-    // region is [12:15, 13:30]. bottle_3 at 13:10 is inside; predicted
-    // from new bottle_2 (11:00) + 180 = 14:00, after-edge wins → 13:30.
+    // Sequential cascade:
+    //   bottle_1 = 7:10 (wake+buffer anchor)
+    //   bottle_2 proposed = 7:10 + 180 = 10:10. Inside (9:30, 11:00).
+    //     distBefore (10:10 → 9:30) = 40
+    //     distAfter (11:00 → 10:10) = 50
+    //     → snap to 9:30. nowMinutes 8:00 < 9:30, no past-fallback.
+    //   bottle_3 proposed = 9:30 + 180 = 12:30. Projected nap_2 at
+    //     [12:30, 13:30] (wakeWindowsMinutes[1]=90 after nap_1.end 11:00,
+    //     default napLen 60). 12:30 == nap.start, NOT strictly inside.
+    //     bottle_3 stays at 12:30.
+    //   bottle_4 proposed = 12:30 + 180 = 15:30. Projected nap_3 at
+    //     [15:00, 16:00]. 15:30 strictly inside. dist tie (30/30) →
+    //     snap to start (15:00). nowMinutes 8:00 < 15:00, no fallback.
     const recordedNap1 = aRecordedNap({
       id: "actual_nap_1",
       eventKey: "nap_1",
@@ -387,14 +396,11 @@ describe("R5.6 — projected bottle inside a nap moves to the closer edge (with 
       .filter((e) => e.type === "bottle")
       .sort((a, b) => a.startTime - b.startTime);
 
-    // With putdown-buffered regions, bottle_2 → 11:00 (nap_1 after-edge),
-    // bottle_3 → 13:30 (nap_2 after-edge), bottle_4 stays at 16:10
-    // (outside nap_3's [14:45, 16:00] region).
     expect(bottles.map((b) => b.startTime)).toEqual([
-      7 * 60 + 10, // 7:10
-      11 * 60, // 11:00 (after recorded nap_1)
-      13 * 60 + 30, // 13:30 (after projected nap_2)
-      16 * 60 + 10, // 16:10
+      7 * 60 + 10, // 7:10 (anchor)
+      9 * 60 + 30, // 9:30 (snapped to nap_1.start)
+      12 * 60 + 30, // 12:30 (== nap_2.start, NOT strictly inside)
+      15 * 60, // 15:00 (snapped to nap_3.start)
     ]);
 
     // No bottle's startTime falls strictly inside any nap.
@@ -644,14 +650,26 @@ describe("R5.1 — overridden bottles anchor the cascade", () => {
     expect(bottles.slice(1).every((b) => b.lifecycle.state === "projected")).toBe(true);
   });
 
-  it("R5.8 still caps the cascade with an overridden anchor near tomorrow's wake", () => {
+  it("R5.8 + backfill together fill the morning when overridden anchor is late-day", () => {
     // Mirrors Jake's 2026-05-12 screenshot: overridden bottle at 19:10
     // (post-bedtime threshold), bottlesPerDay=5, defaultWakeTime=7:00.
-    // tomorrowWake = 31:00 = 1860; from 1150 at interval=180, next slots
-    // would be 22:10 (1330), 25:10 (1510), 28:10 (1690), 31:10 (1870).
-    // The 4th projection lands at 1870 ≥ 1860 → R5.8 breaks. Result:
-    // 1 overridden + 3 projected = 4 bottles. Verifies the cascade does
-    // NOT stack all five at the same minute (the visible symptom).
+    //
+    // With bidirectional sequential cascade + midnight rule (R5.8 caps
+    // at 1440, not tomorrowWake), the algorithm is:
+    //
+    //   Backfill from 19:10 (anchor):
+    //     19:10 - 180 = 16:10 ✓ → push
+    //     16:10 - 180 = 13:10 ✓ → push
+    //     13:10 - 180 = 10:10 ✓ → push
+    //     10:10 - 180 = 7:10 (== wake+buffer 7:10) ✓ → push
+    //     Backfill complete: totalCount = 5 = target. Stop.
+    //   Forward from 19:10: target reached, no slots needed.
+    //   Forward past midnight (22:10) is permitted only if target not
+    //     yet reached — not the case here.
+    //
+    // Result: a complete day chain [7:10, 10:10, 13:10, 16:10, 19:10].
+    // The bidirectional cascade fills the morning that the original
+    // forward-only cascade couldn't reach.
     const overridden: Event = aProjectedBottle({
       id: "manual_bottle_1",
       eventKey: "bottle_1",
@@ -684,15 +702,19 @@ describe("R5.1 — overridden bottles anchor the cascade", () => {
       .sort((a, b) => a.startTime - b.startTime);
 
     expect(bottles.map((b) => b.startTime)).toEqual([
+      7 * 60 + 10,
+      10 * 60 + 10,
+      13 * 60 + 10,
+      16 * 60 + 10,
       19 * 60 + 10,
-      22 * 60 + 10,
-      25 * 60 + 10,
-      28 * 60 + 10,
     ]);
     // Each slot is distinct — the screenshot symptom (3 bottles at 19:10)
     // would fail this assertion.
     const uniqueStarts = new Set(bottles.map((b) => b.startTime));
     expect(uniqueStarts.size).toBe(bottles.length);
+    // Anchor preserved.
+    const anchor = bottles.find((b) => b.id === overridden.id);
+    expect(anchor?.lifecycle.state).toBe("overridden");
   });
 
   it("with both an overridden AND a recorded bottle, cascade anchors from the LATER one", () => {
@@ -739,5 +761,272 @@ describe("R5.1 — overridden bottles anchor the cascade", () => {
     // 10:00 (recorded), 13:00 (overridden), then 16:00, 19:00 (projected)
     // cascading from 13:00 + 180.
     expect(bottles.map((b) => b.startTime)).toEqual([10 * 60, 13 * 60, 16 * 60, 19 * 60]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Sequential bottle cascade (replaces R5.1 + R5.6 + R5.7 + R5.11)
+// ---------------------------------------------------------------------------
+//
+// Predict-don't-prescribe (DOMAIN.md §2 + §7): each bottle's time is
+// computed from the PREVIOUS bottle's actual rendered time, not from a
+// grid-then-nudge two-pass system. The chain stays coherent through
+// nap-overlap snaps.
+//
+// Also per DOMAIN.md §4 / SIMPLIFICATION_SCOPE.md §2.1:
+//   - No-feed region is `[nap.start, nap.end]` only — wind-down (putdown)
+//     is render-only synthetic. A bottle CAN land during wind-down.
+//   - Cascade stops at midnight (1440), not tomorrowWake (the "midnight
+//     rule" — DOMAIN.md §2).
+//   - Overnight bottles (startTime < wakeTime) do NOT anchor the cascade;
+//     they tally toward bottlesPerDay but the cascade still anchors at
+//     wake+buffer.
+
+describe("Sequential bottle cascade — chain coherence", () => {
+  it("bottle_3's time is computed from bottle_2's SNAPPED time, not from a grid", () => {
+    // Setup: wake 7:00, buffer 10, interval 180, bottlesPerDay 5.
+    // Recorded nap_1 9:30-11:00 (gives R5.6-style snap a target).
+    // Long wakeWindowsMinutes so projected naps land after the chain
+    // (keeps the test focused on the bottle cascade).
+    //
+    // OLD behavior (grid-then-nudge):
+    //   R5.11 places: 7:10, 10:10, 13:10, 16:10, 19:10
+    //   R5.6 (with putdownLead 15) sees bottle_2 (10:10) in
+    //     [9:15, 11:00]. Snap to 11:00 (closer once putdown extends
+    //     region). bottle_3 at 13:10 is outside any region → stays.
+    //   Result: [7:10, 11:00, 13:10, 16:10, 19:10]
+    //
+    // NEW behavior (sequential cascade, snap region = [nap.start, nap.end]):
+    //   bottle_1 = 7:10 (anchor at wake+buffer)
+    //   bottle_2 proposed = 7:10 + 180 = 10:10. Inside [9:30, 11:00].
+    //     |10:10 - 9:30| = 40, |11:00 - 10:10| = 50 → snap to 9:30.
+    //     (Wind-down at 9:15-9:30 is allowed; only the nap proper blocks.)
+    //   bottle_3 proposed = 9:30 + 180 = 12:30  ← CHAIN COHERENCE
+    //   bottle_4 proposed = 12:30 + 180 = 15:30
+    //   bottle_5 proposed = 15:30 + 180 = 18:30
+    //   Result: [7:10, 9:30, 12:30, 15:30, 18:30]
+    const recordedNap1 = aRecordedNap({
+      id: "actual_nap_1",
+      eventKey: "nap_1",
+      start: 9 * 60 + 30,
+      end: 11 * 60,
+    });
+
+    const ctx = aContext({
+      day: aDay({ wakeTime: 7 * 60 }),
+      settings: aSettings({
+        bottleChain: { bottlesPerDay: 5, bufferAfterWakeMinutes: 10 },
+        defaultBottleIntervalMinutes: 180,
+        // Long wake windows: nap_2 from R3.1 projection won't interfere.
+        wakeWindowsMinutes: [120, 600, 600, 600],
+      }),
+      actuals: [recordedNap1],
+      // Set nowMinutes before 9:30 so the past-edge fallback doesn't
+      // flip the snap to nap.end.
+      nowMinutes: 7 * 60 + 30,
+    });
+
+    const out = projectDay(
+      {
+        day: ctx.day,
+        settings: ctx.settings,
+        actuals: ctx.actuals,
+        nowMinutes: ctx.nowMinutes,
+      },
+      { rules: ALL },
+    );
+
+    const bottles = out
+      .filter((e) => e.type === "bottle")
+      .sort((a, b) => a.startTime - b.startTime);
+
+    expect(bottles.map((b) => b.startTime)).toEqual([
+      7 * 60 + 10, // 7:10 (anchor)
+      9 * 60 + 30, // 9:30 (snapped to nap.start — wind-down allowed)
+      12 * 60 + 30, // 12:30 (cascade from 9:30, NOT 10:10)
+      15 * 60 + 30, // 15:30
+      18 * 60 + 30, // 18:30
+    ]);
+  });
+
+  it("bottle landing exactly at nap.start is allowed (bottle IS the wind-down)", () => {
+    // Configure so the grid would place a bottle exactly at nap.start.
+    // wake 7:00, buffer 0, interval 60. bottlesPerDay 3.
+    // Recorded nap_1 8:00-9:00. Grid: 7:00, 8:00, 9:00.
+    //   bottle_2 proposed = 8:00 = nap.start exactly. Old rule treats
+    //   this as STRICTLY inside via "> nap.start && < nap.end"; not
+    //   inside. New rule: same — > start, < end. So 8:00 stays as-is.
+    const recordedNap1 = aRecordedNap({
+      id: "actual_nap_1",
+      eventKey: "nap_1",
+      start: 8 * 60,
+      end: 9 * 60,
+    });
+    const ctx = aContext({
+      day: aDay({ wakeTime: 7 * 60 }),
+      settings: aSettings({
+        bottleChain: { bottlesPerDay: 3, bufferAfterWakeMinutes: 0 },
+        defaultBottleIntervalMinutes: 60,
+        wakeWindowsMinutes: [600, 600, 600, 600],
+      }),
+      actuals: [recordedNap1],
+    });
+    const out = projectDay(
+      {
+        day: ctx.day,
+        settings: ctx.settings,
+        actuals: ctx.actuals,
+        nowMinutes: ctx.nowMinutes,
+      },
+      { rules: ALL },
+    );
+    const bottles = out
+      .filter((e) => e.type === "bottle")
+      .sort((a, b) => a.startTime - b.startTime);
+    // bottle at exact nap.start (8:00) is NOT inside (start, end) — kept.
+    // bottle_3 = 8:00 + 60 = 9:00 = nap.end — also boundary, kept.
+    expect(bottles.map((b) => b.startTime)).toEqual([7 * 60, 8 * 60, 9 * 60]);
+  });
+});
+
+describe("Sequential bottle cascade — midnight rule (DOMAIN.md §2)", () => {
+  it("cascade stops at midnight (1440), not at tomorrowWake", () => {
+    // bottlesPerDay 10 with intervals of 180 from wake 7:00:
+    // grid would be 7:10, 10:10, 13:10, 16:10, 19:10, 22:10, 1:10, ...
+    // Old rule capped at tomorrowWake (= 31:00 = 1860); would emit 8.
+    // New rule caps at midnight (1440); emits 6 (last at 22:10 = 1330,
+    // next would be 25:10 = 1510 >= 1440 → stop).
+    const ctx = aContext({
+      day: aDay({ wakeTime: 7 * 60 }),
+      settings: aSettings({
+        bottleChain: { bottlesPerDay: 10, bufferAfterWakeMinutes: 10 },
+        defaultBottleIntervalMinutes: 180,
+        defaultWakeTime: 7 * 60,
+        wakeWindowsMinutes: [600, 600, 600, 600],
+      }),
+      actuals: [],
+    });
+    const out = projectDay(
+      {
+        day: ctx.day,
+        settings: ctx.settings,
+        actuals: ctx.actuals,
+        nowMinutes: ctx.nowMinutes,
+      },
+      { rules: ALL },
+    );
+    const bottles = out
+      .filter((e) => e.type === "bottle")
+      .sort((a, b) => a.startTime - b.startTime);
+    expect(bottles.map((b) => b.startTime)).toEqual([
+      7 * 60 + 10,
+      10 * 60 + 10,
+      13 * 60 + 10,
+      16 * 60 + 10,
+      19 * 60 + 10,
+      22 * 60 + 10,
+    ]);
+    // Last is well under midnight; next would be 25:10 = 1510 >= 1440.
+    expect(bottles[bottles.length - 1]!.startTime).toBeLessThan(24 * 60);
+  });
+
+  it("overnight bottle (startTime < wakeTime) does NOT anchor the cascade", () => {
+    // A recorded bottle at 2 AM (TimeMin=120, less than wakeTime 7:00=420).
+    // Per midnight rule: this bottle is part of today's day but does
+    // NOT anchor the cascade. Morning cascade still anchors at
+    // wake+buffer = 7:10.
+    const overnight = aRecordedBottle({
+      id: "actual_bottle_overnight",
+      eventKey: "bottle_overnight",
+      start: 2 * 60,
+      amountOz: 4,
+    });
+    const ctx = aContext({
+      day: aDay({ wakeTime: 7 * 60 }),
+      settings: aSettings({
+        bottleChain: { bottlesPerDay: 5, bufferAfterWakeMinutes: 10 },
+        defaultBottleIntervalMinutes: 180,
+        wakeWindowsMinutes: [600, 600, 600, 600],
+      }),
+      actuals: [overnight],
+    });
+    const out = projectDay(
+      {
+        day: ctx.day,
+        settings: ctx.settings,
+        actuals: ctx.actuals,
+        nowMinutes: ctx.nowMinutes,
+      },
+      { rules: ALL },
+    );
+    const bottles = out
+      .filter((e) => e.type === "bottle")
+      .sort((a, b) => a.startTime - b.startTime);
+    // Overnight bottle present, but morning cascade starts at 7:10 anyway.
+    // 5 bottles total (overnight counts toward bottlesPerDay):
+    //   2:00 (overnight, recorded)
+    //   7:10 (wake+buffer anchor)
+    //   10:10, 13:10, 16:10 (cascade — 4 more to reach 5 total)
+    expect(bottles.map((b) => b.startTime)).toEqual([
+      2 * 60,
+      7 * 60 + 10,
+      10 * 60 + 10,
+      13 * 60 + 10,
+      16 * 60 + 10,
+    ]);
+    // The overnight bottle is preserved as-recorded.
+    expect(bottles[0]?.id).toBe(overnight.id);
+  });
+});
+
+describe("Sequential bottle cascade — backward backfill (§F19b / §F21)", () => {
+  it("when the only non-projected bottle is mid-day, backfill morning slots", () => {
+    // User recorded bottle_X at 13:00 (mid-day). bottlesPerDay 4.
+    // Wake 7:00, buffer 10, interval 180.
+    //
+    // Backfill from 13:00 (walks backward):
+    //   bottle_(-1) = 13:00 - 180 = 10:00 (≥ wake+buffer 7:10 ✓) → push
+    //   bottle_(-2) = 10:00 - 180 = 7:00 (< 7:10) → stop
+    // Forward from 13:00 (target=4, so 2 more needed):
+    //   bottle_(+1) = 13:00 + 180 = 16:00 → push
+    //   bottle_(+2) = 16:00 + 180 = 19:00 → push
+    //
+    // Total: [10:00, 13:00 (anchor), 16:00, 19:00] — 4 bottles.
+    const recorded = aRecordedBottle({
+      id: "actual_bottle_midday",
+      eventKey: "bottle_midday",
+      start: 13 * 60,
+      amountOz: 5,
+    });
+    const ctx = aContext({
+      day: aDay({ wakeTime: 7 * 60 }),
+      settings: aSettings({
+        bottleChain: { bottlesPerDay: 4, bufferAfterWakeMinutes: 10 },
+        defaultBottleIntervalMinutes: 180,
+        wakeWindowsMinutes: [600, 600, 600, 600],
+      }),
+      actuals: [recorded],
+    });
+    const out = projectDay(
+      {
+        day: ctx.day,
+        settings: ctx.settings,
+        actuals: ctx.actuals,
+        nowMinutes: ctx.nowMinutes,
+      },
+      { rules: ALL },
+    );
+    const bottles = out
+      .filter((e) => e.type === "bottle")
+      .sort((a, b) => a.startTime - b.startTime);
+    expect(bottles.map((b) => b.startTime)).toEqual([
+      10 * 60, // backfill
+      13 * 60, // anchor
+      16 * 60, // forward
+      19 * 60, // forward
+    ]);
+    // The recorded anchor is preserved.
+    const recordedOut = bottles.find((b) => b.id === recorded.id);
+    expect(recordedOut?.lifecycle.state).toBe("completed");
   });
 });

@@ -75,7 +75,7 @@ export type EventKind = "block" | "instant";
  *   overridden  — user assigned an owner on a still-future projection
  *
  * Only block-kind events (nap, bedtime, durational extras) reach `started`.
- * Instant events transition `projected → completed` in one step (R5.13 etc).
+ * Instant events transition `projected → completed` in one step.
  */
 export type Lifecycle =
   | { state: "projected" }
