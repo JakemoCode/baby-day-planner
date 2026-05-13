@@ -125,11 +125,58 @@ const RuleSequentialBottleCascade: Rule = {
   // without the nap rules and expect placeholders regardless.
   matches: (events, ctx) => {
     if (ctx.day.wakeTime === undefined) return false;
-    const bottles = events.filter(isBottle);
-    return bottles.length < ctx.settings.bottleChain.bottlesPerDay;
+    return canCascade(events, ctx);
   },
   produces: (events, ctx) => projectBottleChain(events, ctx),
 };
+
+/**
+ * Match-time predicate: is there any way this cascade could add more
+ * bottles? Two cases:
+ *
+ *   1. Cold-start (no non-projected morning bottles): gate on
+ *      `bottles.length < bottlesPerDay`. The setting defines how many
+ *      placeholders to draw when there's no real data to cascade
+ *      from.
+ *
+ *   2. Anchored (at least one non-projected morning bottle): no
+ *      total-count cap. Predict-don't-prescribe (DOMAIN.md §2):
+ *      forward cascade always extends to midnight; backfill always
+ *      walks to wake+buffer; `bottlesPerDay` is the *cold-start
+ *      target*, not a hard upper bound on the day's predictions.
+ *      Match returns true if the cascade could add forward OR
+ *      backward, false once both directions are saturated.
+ *
+ * Idempotency: once `produces` has filled all addable slots, this
+ * predicate returns false and the evaluator stops re-firing.
+ */
+function canCascade(events: Event[], ctx: Context): boolean {
+  const wakeTime = ctx.day.wakeTime;
+  if (wakeTime === undefined) return false;
+  const bottles = events.filter(isBottle);
+  const morningBottles = bottles
+    .filter((b) => b.startTime >= wakeTime)
+    .sort((a, b) => a.startTime - b.startTime);
+  const anchors = morningBottles.filter((b) => !isProjected(b));
+  const target = ctx.settings.bottleChain.bottlesPerDay;
+
+  if (anchors.length === 0) {
+    // Cold-start case: gated on count.
+    return bottles.length < target;
+  }
+
+  // Anchored case: check if cascade could extend in either direction.
+  const wakeBuffer = wakeTime + ctx.settings.bottleChain.bufferAfterWakeMinutes;
+  const defaultInterval = ctx.settings.defaultBottleIntervalMinutes;
+  const rules = ctx.settings.bottleIntervalRules;
+  const latest = morningBottles[morningBottles.length - 1]!;
+  const earliest = morningBottles[0]!;
+  const forwardInterval = intervalForAmount(rules, latest.amountOz, defaultInterval);
+  const canExtendForward = latest.startTime + forwardInterval < MIDNIGHT;
+  const backwardInterval = intervalForAmount(rules, earliest.amountOz, defaultInterval);
+  const canExtendBackward = earliest.startTime - backwardInterval >= wakeBuffer;
+  return canExtendForward || canExtendBackward;
+}
 
 function projectBottleChain(events: Event[], ctx: Context): Event[] {
   const wakeTime = ctx.day.wakeTime;
@@ -137,8 +184,6 @@ function projectBottleChain(events: Event[], ctx: Context): Event[] {
 
   const target = ctx.settings.bottleChain.bottlesPerDay;
   const bottles = events.filter(isBottle);
-  if (bottles.length >= target) return events;
-
   const regions = napRegions(events);
   const wakeBuffer = wakeTime + ctx.settings.bottleChain.bufferAfterWakeMinutes;
   const defaultInterval = ctx.settings.defaultBottleIntervalMinutes;
@@ -153,6 +198,7 @@ function projectBottleChain(events: Event[], ctx: Context): Event[] {
     .filter((b) => b.startTime >= wakeTime)
     .sort((a, b) => a.startTime - b.startTime);
   const anchors = morningBottles.filter((b) => !isProjected(b));
+  const isAnchored = anchors.length > 0;
 
   // Highest bottle eventKey index for new keys (R5.4 renumbers anyway,
   // but stable keys per pass keep the fixed-point check from looping).
@@ -167,6 +213,15 @@ function projectBottleChain(events: Event[], ctx: Context): Event[] {
 
   const snap = (proposed: number) => snapOutOfNap(proposed, regions, ctx.nowMinutes);
 
+  // The cold-start count cap (bottlesPerDay placeholders) ONLY applies
+  // when there are no non-projected morning anchors. Once a real
+  // recording exists, the cascade follows cadence to midnight — the
+  // setting is a TARGET for cold-start, not a HARD CAP on the day's
+  // predictions. Predict-don't-prescribe (DOMAIN.md §2): if baby has
+  // already had bottlesPerDay+ feeds (e.g., on a sick day), the engine
+  // should still predict the rest of the afternoon.
+  const reachedColdStartCap = () => !isAnchored && totalCount >= target;
+
   // === Backward backfill ===
   // Walks from the EARLIEST morning bottle backward at -interval steps,
   // gated on:
@@ -177,14 +232,24 @@ function projectBottleChain(events: Event[], ctx: Context): Event[] {
   //   - Uses the earliest CURRENT morning bottle as the walker's `prev`
   //     so subsequent evaluator passes extend from prior projections
   //     instead of re-emitting them (idempotency).
-  if (anchors.length > 0 && morningBottles.length > 0) {
+  if (isAnchored && morningBottles.length > 0) {
     let prev = morningBottles[0]!;
-    while (totalCount < target) {
+    // No total-count cap here: backfill only fires in the anchored
+    // case, which has no cap (see reachedColdStartCap()).
+    while (true) {
+      // Defensive: an interval ≤ 0 from malformed rules / fixtures
+      // would cause an infinite loop. Treat as "no further cascade
+      // possible in this direction."
       const interval = intervalForAmount(rules, prev.amountOz, defaultInterval);
+      if (interval <= 0) break;
       const proposed = prev.startTime - interval;
       if (proposed < wakeBuffer) break;
       const placed = snap(proposed);
       if (placed < wakeBuffer) break;
+      // Snap can land at a region edge that equals (or is past) the
+      // previous prev.startTime, which would loop. Strict-monotonic
+      // guard:
+      if (placed >= prev.startTime) break;
       const projection = buildProjectedBottle(ctx, nextIndex++, placed);
       projections.push(projection);
       totalCount++;
@@ -202,6 +267,7 @@ function projectBottleChain(events: Event[], ctx: Context): Event[] {
   } else {
     // Cold start: seed the first bottle at wake+buffer.
     // (Overnight bottles, if any, count toward total but don't anchor.)
+    if (reachedColdStartCap()) return [...events, ...projections];
     const seed = snap(wakeBuffer);
     if (seed >= MIDNIGHT) return [...events, ...projections];
     const firstProj = buildProjectedBottle(ctx, nextIndex++, seed);
@@ -210,12 +276,19 @@ function projectBottleChain(events: Event[], ctx: Context): Event[] {
     prev = firstProj;
   }
 
-  while (totalCount < target) {
+  while (true) {
+    if (reachedColdStartCap()) break; // cold-start: stop at bottlesPerDay
+    // Defensive: an interval ≤ 0 from malformed rules / fixtures would
+    // cause an infinite loop. Treat as "cascade exhausted."
     const interval = intervalForAmount(rules, prev.amountOz, defaultInterval);
+    if (interval <= 0) break;
     const proposed = prev.startTime + interval;
     if (proposed >= MIDNIGHT) break; // midnight rule (DOMAIN.md §2)
     const placed = snap(proposed);
     if (placed >= MIDNIGHT) break;
+    // Strict-monotonic guard: snap to a nap edge could in pathological
+    // cases land at or before prev.startTime, looping.
+    if (placed <= prev.startTime) break;
     const projection = buildProjectedBottle(ctx, nextIndex++, placed);
     projections.push(projection);
     totalCount++;

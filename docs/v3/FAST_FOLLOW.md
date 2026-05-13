@@ -466,6 +466,41 @@ Implementation sketch:
 
 ---
 
+## §F24 — Start Nap action creates duplicate nap instead of promoting the projection
+
+**Source**: Jake, 2026-05-13 click-test.
+
+**Status**: `pending`
+
+**What**: tapping "Start Nap" on the dashboard creates a brand-new nap event at `nowMinutes`, butted up against the projected upcoming nap. The new nap renders as a tiny chip (24px tall) just above the projected one (visible in inspector as `button.Block-module__AWIW3G__block`, labeled "Nap 1" — the un-renumbered fresh eventKey from `createEventTemplate`).
+
+This is the same write-path flavor as the original §F19 bug: the action button routes through `createOptimistic` because the next nap is a projection (id starts with `proj_`), so `isPersistedActual` returns false → create-new path. The user's intent — "I'm starting THAT nap now" — is to promote the projection from `projected` → `started`, not to create a sibling.
+
+**Fix sketch**:
+- When the action button (NapActionButton on dashboard) fires "Start Nap," find the next-upcoming projected nap from the engine output.
+- Persist a real doc with that nap's `eventKey` (so renumbering aligns), `startTime: nowMinutes`, `lifecycle: { state: "started", committedAt: nowMinutes }`, no endTime yet.
+- Don't go through the generic `createOptimistic({ ...projectedTemplate, id: newEventId(...) })` path — that's drawer-edit semantics, not action-button semantics.
+
+The same pattern likely affects "Start Bedtime" and any other "Start \<event\>" action button. Audit and fix together if scoped together.
+
+**Why fast-follow**: real bug but no data corruption beyond the visible duplicate. Engine handles the duplicate naps reasonably (chain still cascades). The user-facing fix is in the dashboard action button save path, not in the engine.
+
+---
+
+## §F23 — Edit drawer title should include event number when present
+
+**Source**: Jake, 2026-05-13 click-test.
+
+**Status**: `pending`
+
+**What**: today the drawer title is "Edit bottle" / "Edit nap" / etc. Should include the event's number when applicable: "Edit Bottle 3", "Edit Nap 2". The number comes from the existing `Bottle N` / `Nap N` label that R5.4 chronological renumbering produces.
+
+Mechanics: in `EventEditDrawerV3.tsx`, the `EDIT_TITLE_BY_TYPE` constant is a flat map of `type → string`. Replace with logic that derives the title from `event.label` (which already has the number for bottles/naps) or builds it from `type + extracted number from eventKey`.
+
+**Why fast-follow**: tiny UI change, engine-orthogonal. Couple-line patch.
+
+---
+
 ## How items land here
 
 Two paths:
