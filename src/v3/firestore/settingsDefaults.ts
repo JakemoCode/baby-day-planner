@@ -71,9 +71,6 @@ const DEFAULTS: Omit<Settings, "childId"> = {
   pumpTimes: [],
   pumpOwnerSlot: "parent2",
   dreamFeedEnabled: false,
-  dreamFeedStart: 22 * 60,
-  dreamFeedEnd: 23 * 60,
-  dreamFeedOffsetAfterBedtimeMinutes: 180,
   dailyRecurring: [],
   daycare: {
     enabled: false,
@@ -192,10 +189,6 @@ export function withV3SettingsDefaults(input: Partial<Settings> | null): Setting
   merged.defaultWakeTime = parseTimeStringOrNumber(
     merged.defaultWakeTime as unknown as string | number,
   );
-  merged.dreamFeedStart = parseTimeStringOrNumber(
-    merged.dreamFeedStart as unknown as string | number,
-  );
-  merged.dreamFeedEnd = parseTimeStringOrNumber(merged.dreamFeedEnd as unknown as string | number);
   merged.dailyRecurring = merged.dailyRecurring.map((entry) => ({
     ...entry,
     time: parseTimeStringOrNumber(entry.time as unknown as string | number),

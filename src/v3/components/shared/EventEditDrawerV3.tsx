@@ -73,7 +73,6 @@ const EDIT_TITLE_BY_TYPE: Record<EventType, string> = {
   bottle: "Edit bottle",
   pump: "Edit pump",
   bedtime: "Edit bedtime",
-  dream_feed: "Edit dream feed",
   extra: "Edit event",
   daily_recurring: "Edit recurring event",
   daycare_dropoff: "Edit daycare dropoff",
@@ -149,14 +148,13 @@ export function EventEditDrawerV3({
 
   const showStartTime = type !== "wake_window";
   const showEndTime = type === "nap" || type === "extra";
-  const showAmount = type === "bottle" || type === "dream_feed";
+  const showAmount = type === "bottle";
   const showOwner =
     type === "nap" ||
     type === "wake_window" ||
     type === "bottle" ||
     type === "extra" ||
-    type === "bedtime" ||
-    type === "dream_feed";
+    type === "bedtime";
   const showLabel = type === "extra";
 
   const errors = validateForm(type, form.startTime, form.endTime, sourceEvent.id, existingEvents);

@@ -163,15 +163,12 @@ export default function DashboardPage() {
   const lastBottle = lastEventOfType(actuals, "bottle");
   const lastNap = lastEventOfType(actuals, "nap");
   const lastBottleTime = lastBottle?.startTime;
-  const upcomingDreamFeed = projected.find(
-    (e) => e.type === "dream_feed" && e.startTime >= nowMinutes,
-  );
   const bedtime = projectedBedtime(projected);
 
   // Smart suppression: when NextEventCard already announces the same fact a
   // preview card would, hide the preview to avoid redundancy.
   const nextType = next?.type;
-  const hideBottlePreview = nextType === "bottle" || nextType === "dream_feed";
+  const hideBottlePreview = nextType === "bottle";
   // V3 has no top-level "putdown" EventType; putdowns are render-only,
   // injected by `expandPutdown` in TimelineV3 and never surface through
   // `nextEvent(projected, ...)`. So nap + bedtime cover the suppression.
@@ -213,7 +210,6 @@ export default function DashboardPage() {
           bottle1Pending={bottle1Pending}
           owners={settings.owners}
           {...(lastBottle ? { lastBottle } : {})}
-          {...(upcomingDreamFeed ? { dreamFeed: upcomingDreamFeed } : {})}
         />
       )}
       {!hideNapPreview && (

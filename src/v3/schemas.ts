@@ -53,7 +53,6 @@ export type EventType =
   | "wake_window"
   | "bottle"
   | "bedtime"
-  | "dream_feed"
   | "pump"
   | "extra"
   | "daily_recurring"
@@ -114,7 +113,7 @@ export type Event = {
 
   label: string;
   owner?: OwnerRef;
-  /** bottle / dream_feed only. */
+  /** bottle only. */
   amountOz?: number;
 
   /**
@@ -271,11 +270,11 @@ export type Settings = {
   pumpTimes: TimeMin[];
   pumpOwnerSlot: OwnerSlot;
 
-  // Dream feed
+  // Dream feed — render-only label. When enabled, the first projected
+  // bottle whose startTime > bedtime.startTime is rendered with the label
+  // "Dream Feed" instead of "Bottle N". No engine logic; see
+  // docs/v3/SIMPLIFICATION_SCOPE.md §3.
   dreamFeedEnabled: boolean;
-  dreamFeedStart: TimeMin;
-  dreamFeedEnd: TimeMin;
-  dreamFeedOffsetAfterBedtimeMinutes: number;
 
   // Daily recurring
   dailyRecurring: DailyRecurring[];

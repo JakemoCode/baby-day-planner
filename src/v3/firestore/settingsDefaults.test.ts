@@ -116,22 +116,6 @@ describe("withV3SettingsDefaults", () => {
       expect(out.defaultWakeTime).toBe(7 * 60 + 30);
     });
 
-    it("coerces dreamFeedStart string to TimeMin", () => {
-      const out = withV3SettingsDefaults({
-        childId: "c1",
-        dreamFeedStart: "22:00" as unknown as number,
-      })!;
-      expect(out.dreamFeedStart).toBe(22 * 60);
-    });
-
-    it("coerces dreamFeedEnd string to TimeMin", () => {
-      const out = withV3SettingsDefaults({
-        childId: "c1",
-        dreamFeedEnd: "23:30" as unknown as number,
-      })!;
-      expect(out.dreamFeedEnd).toBe(23 * 60 + 30);
-    });
-
     it("coerces dailyRecurring[].time string to TimeMin", () => {
       const out = withV3SettingsDefaults({
         childId: "c1",

@@ -19,7 +19,7 @@
  *           layer reads it from the parent (hasPutdown flag, R6).
  *   R12.7 — drawer "no owner" omits field: UI / Phase 3.
  *   R12.8 — pump owner = pumpOwnerSlot: handled in pumps.ts (R9).
- *           Dream feed = opposite of bedtime owner: handled in dreamFeed.ts (R8).
+ *           Dream feed is render-only label now — no owner inheritance.
  *   R12.9 — extras / dailyRecurring carry their own defaults; not template-driven.
  */
 

@@ -76,38 +76,11 @@ describe("NextBottlePreview", () => {
     expect(screen.getByText("Last: 1:45 PM · 5 oz")).toBeVisible();
   });
 
-  it("shows dream feed in place of empty state when no next bottle", () => {
-    const dream = bottle({
-      id: "df1",
-      eventKey: "dream_feed",
-      type: "dream_feed",
-      label: "Dream feed",
-      startTime: 20 * 60 + 45,
-    });
-    render(
-      <NextBottlePreview
-        bottle={undefined}
-        bottle1Pending={false}
-        owners={owners}
-        dreamFeed={dream}
-      />,
-    );
-    expect(screen.getByText("Dream feed at 8:45 PM")).toBeVisible();
-    expect(screen.queryByText(/no more bottles today/i)).toBeNull();
-  });
-
-  it("falls back to empty state when bottle1Pending even if dreamFeed exists", () => {
-    const dream = bottle({
-      id: "df1",
-      type: "dream_feed",
-      label: "Dream feed",
-      startTime: 20 * 60 + 45,
-    });
-    render(
-      <NextBottlePreview bottle={undefined} bottle1Pending owners={owners} dreamFeed={dream} />,
-    );
-    expect(screen.getByText(/start first bottle for schedule/i)).toBeVisible();
-  });
+  // In the render-only-label model, a "dream feed" is a regular bottle
+  // whose label is set to "Dream Feed" by applyDreamFeedLabel() before
+  // events reach this component. So the previous "show dream feed in
+  // place of empty state" / "fallback when bottle1Pending" cases dissolve:
+  // a dream-feed-labeled bottle is just `bottle`, not a separate prop.
 
   // §F9 PORT — oz formatting contract previously asserted in V2.
 

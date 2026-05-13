@@ -47,9 +47,6 @@ export const PLACEHOLDER_SETTINGS: Settings = {
   pumpTimes: [],
   pumpOwnerSlot: "parent2",
   dreamFeedEnabled: false,
-  dreamFeedStart: 22 * 60,
-  dreamFeedEnd: 23 * 60,
-  dreamFeedOffsetAfterBedtimeMinutes: 180,
   dailyRecurring: [],
   daycare: {
     enabled: false,
