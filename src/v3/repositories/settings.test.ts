@@ -10,50 +10,23 @@ import type { RulesTestEnvironment } from "@firebase/rules-unit-testing";
 import type { Firestore } from "firebase/firestore";
 import { ALLOWED_USER, startTestEnv } from "../../../tests/integration/firestore-test-utils";
 import type { Settings } from "../schemas";
+import { aSettings } from "../__tests__/factories";
 import { getSettings, saveSettings, watchSettings } from "./settings";
 
-const settings = (overrides: Partial<Settings>): Settings =>
-  ({
+// Test-specific overrides on top of the shared factory: child-1 id,
+// named owners (Jake/Sam), and bottleChain.bottlesPerDay=5 to anchor
+// the assertions below.
+const settings = (overrides: Partial<Settings> = {}): Settings =>
+  aSettings({
     childId: "child-1",
-    defaultWakeTime: 7 * 60,
-    bedtimeThreshold: 19 * 60,
-    defaultNapLengthMinutes: 90,
-    shortNapThresholdMinutes: 45,
-    shortNapAdjustmentMinutes: 30,
-    wakeWindowsMinutes: [120, 150, 180],
-    napDurationMin: 30,
-    napDurationMax: 180,
-    defaultBottleAmountOz: 5,
-    defaultBottleIntervalMinutes: 180,
-    bottleRules: [],
-    bottleIntervalRules: [],
     bottleChain: { bottlesPerDay: 5, bufferAfterWakeMinutes: 10 },
-    minBottleIntervalMinutes: 90,
-    putdownLeadMinutes: 15,
-    pumpTimes: [],
-    pumpOwnerSlot: "parent2",
-    dreamFeedEnabled: false,
-    dreamFeedStart: 22 * 60,
-    dreamFeedEnd: 23 * 60,
-    dreamFeedOffsetAfterBedtimeMinutes: 180,
-    dailyRecurring: [],
-    daycare: {
-      enabled: false,
-      dropoffTime: 8 * 60,
-      pickupTime: 17 * 60,
-      ownerId: "daycare",
-      weekdays: { mon: true, tue: true, wed: true, thu: true, fri: true, sat: false, sun: false },
-    },
     owners: {
       parent1: { displayName: "Jake", color: "#0af" },
       parent2: { displayName: "Sam", color: "#f0a" },
       other: [],
     },
-    timelineColorMode: "type",
-    timelinePxPerHour: 80,
-    timelineDimPast: true,
     ...overrides,
-  }) satisfies Settings;
+  });
 
 describe("v3 settings repository", () => {
   let env: RulesTestEnvironment;

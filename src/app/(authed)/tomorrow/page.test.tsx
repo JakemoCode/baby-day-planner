@@ -14,7 +14,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { OwnersConfig, OwnershipTemplate, Settings } from "@/v3/schemas";
+import type { OwnersConfig, OwnershipTemplate } from "@/v3/schemas";
+import { aSettings } from "@/v3/__tests__/factories";
 import { useV3Settings } from "@/v3/hooks/useV3Settings";
 import { useV3Templates } from "@/v3/hooks/useV3Templates";
 import { startNewDay } from "@/v3/repositories/days";
@@ -56,50 +57,7 @@ const owners: OwnersConfig = {
   other: [],
 };
 
-const settings: Settings = {
-  childId: "child-1",
-  defaultWakeTime: 7 * 60,
-  bedtimeThreshold: 19 * 60,
-  defaultNapLengthMinutes: 60,
-  shortNapThresholdMinutes: 35,
-  shortNapAdjustmentMinutes: 10,
-  wakeWindowsMinutes: [120, 135, 135, 150],
-  napDurationMin: 30,
-  napDurationMax: 180,
-  defaultBottleAmountOz: 5,
-  defaultBottleIntervalMinutes: 180,
-  bottleRules: [],
-  bottleIntervalRules: [],
-  bottleChain: { bottlesPerDay: 5, bufferAfterWakeMinutes: 10 },
-  minBottleIntervalMinutes: 90,
-  putdownLeadMinutes: 15,
-  pumpTimes: [],
-  pumpOwnerSlot: "parent2",
-  dreamFeedEnabled: false,
-  dreamFeedStart: 22 * 60,
-  dreamFeedEnd: 23 * 60,
-  dreamFeedOffsetAfterBedtimeMinutes: 180,
-  dailyRecurring: [],
-  daycare: {
-    enabled: false,
-    dropoffTime: 8 * 60,
-    pickupTime: 17 * 60,
-    ownerId: "",
-    weekdays: {
-      mon: false,
-      tue: false,
-      wed: false,
-      thu: false,
-      fri: false,
-      sat: false,
-      sun: false,
-    },
-  },
-  owners,
-  timelineColorMode: "type",
-  timelinePxPerHour: 80,
-  timelineDimPast: false,
-};
+const settings = aSettings({ childId: "child-1", owners });
 
 const templates: OwnershipTemplate[] = [
   {

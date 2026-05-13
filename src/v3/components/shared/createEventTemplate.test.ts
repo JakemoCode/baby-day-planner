@@ -10,52 +10,13 @@
 
 import { describe, expect, it } from "vitest";
 import type { Event, Settings } from "../../schemas";
+import { aSettings } from "../../__tests__/factories";
 import { buildCreateTemplate } from "./createEventTemplate";
 
 const NOW = 7 * 60 + 30;
 
 const settings = (overrides: Partial<Settings> = {}): Settings =>
-  ({
-    childId: "child-1",
-    defaultWakeTime: 7 * 60,
-    bedtimeThreshold: 19 * 60,
-    defaultNapLengthMinutes: 90,
-    shortNapThresholdMinutes: 45,
-    shortNapAdjustmentMinutes: 30,
-    wakeWindowsMinutes: [120, 150, 180],
-    napDurationMin: 30,
-    napDurationMax: 180,
-    defaultBottleAmountOz: 5,
-    defaultBottleIntervalMinutes: 180,
-    bottleRules: [],
-    bottleIntervalRules: [],
-    bottleChain: { bottlesPerDay: 5, bufferAfterWakeMinutes: 10 },
-    minBottleIntervalMinutes: 90,
-    putdownLeadMinutes: 15,
-    pumpTimes: [],
-    pumpOwnerSlot: "parent2",
-    dreamFeedEnabled: false,
-    dreamFeedStart: 22 * 60,
-    dreamFeedEnd: 23 * 60,
-    dreamFeedOffsetAfterBedtimeMinutes: 180,
-    dailyRecurring: [],
-    daycare: {
-      enabled: false,
-      dropoffTime: 8 * 60,
-      pickupTime: 17 * 60,
-      ownerId: "daycare",
-      weekdays: { mon: true, tue: true, wed: true, thu: true, fri: true, sat: false, sun: false },
-    },
-    owners: {
-      parent1: { displayName: "Jake", color: "#0af" },
-      parent2: { displayName: "Sam", color: "#f0a" },
-      other: [],
-    },
-    timelineColorMode: "type",
-    timelinePxPerHour: 80,
-    timelineDimPast: true,
-    ...overrides,
-  }) satisfies Settings;
+  aSettings({ childId: "child-1", ...overrides });
 
 const recordedBottle = (n: number, startTime: number): Event => ({
   id: `bottle-${n}`,
