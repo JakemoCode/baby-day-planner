@@ -12,7 +12,6 @@
  */
 
 import type { Rule } from "../evaluator";
-import { RULES as BEDTIME_RULES } from "./bedtime";
 import { RULES as BOTTLE_RULES } from "./bottles";
 import { RULES as DR_RULES } from "./dailyRecurring";
 import { RULES as DAYCARE_RULES } from "./daycare";
@@ -26,7 +25,6 @@ import { RULES as WW_OVERRIDE_RULES } from "./wakeWindowOverrides";
 export const ALL_RULES: Rule[] = [
   ...NAP_RULES,
   ...WW_OVERRIDE_RULES,
-  ...BEDTIME_RULES,
   ...BOTTLE_RULES,
   ...OWNER_RULES,
   ...DAYCARE_RULES,

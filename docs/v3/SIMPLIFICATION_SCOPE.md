@@ -167,7 +167,7 @@ No changes here. The simplification is about *scheduling rule* count, not the un
 | **Scope doc (this doc)** | Blueprint without code | ✅ Merged (PR #132) |
 | **DOMAIN.md** | Plain-English model of baby behavior as first-class artifact | In review (PR #133) |
 | **Bottle-cascade PR**: sequential bottle cascade | Replace R5.1 + R5.6 + R5.7 + R5.11 with one rule. Delete R5.13 (engine flag). Add backfill rule (§F19b / §F21 from FAST_FOLLOW). | Next |
-| **Nap-cascade PR**: sequential nap cascade | Same shape applied to R3.* | After bottle cascade lands and proves the pattern |
+| **Nap-cascade PR**: sequential nap cascade | Inline R7.5/R7.6/R7.11 (bedtime substitution) + R7.4/R7.4b (drop past-bedtime projections) into R3.1. Delete `bedtime.ts`. | This PR |
 | **Scheduled-recurring PR**: collapse | Unify R8 (dream feed → render-only label; no engine code) + R9 (pumps) + R11 (daily recurring) + R21 (daycare) into one rule with weekday/offset/fixed-time variants | After nap cascade |
 | **Docs reorg PR**: REQUIREMENTS reorg | Split render/UX into `RENDER_SPEC.md`. Renumber engine-only rules. Archive `REQUIREMENTS.md` as `REQUIREMENTS_v3_legacy.md`. | After scheduled-recurring |
 | **Stop** | Engine matches scope; doc matches engine. | — |

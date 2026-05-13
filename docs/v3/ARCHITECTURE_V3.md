@@ -503,11 +503,10 @@ code: ~1500 lines including helpers, vs. V2's ~2000 across 12 files.
 ### 2.4 Rules organization
 
 `src/v3/engine/rules/` — one file per domain area:
-- `naps.ts` (R3.x)
+- `naps.ts` (R3.x + R7.x — the sleep cascade emits bedtime inline at threshold)
 - `wakeWindows.ts` (R4.x)
 - `bottles.ts` (R5.x)
 - `putdown.ts` (R6.x)
-- `bedtime.ts` (R7.x)
 - `dreamFeed.ts` (R8.x)
 - `pumps.ts` (R9.x)
 - `extras.ts` (R10.x)
