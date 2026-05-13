@@ -1,7 +1,34 @@
 /**
  * R5.x — Bottle rules.
  *
- * Source: docs/v3/REQUIREMENTS.md §5.
+ * One sequential cascade rule + chronological renumber. See
+ * `docs/v3/SIMPLIFICATION_SCOPE.md` for the design and
+ * `DOMAIN.md` §2 for the user-facing domain model.
+ *
+ * Replaces the previous four-rule system (R5.1 cascade from latest
+ * recorded, R5.6 move-out-of-nap, R5.7 fixed-point convergence,
+ * R5.11 placeholder projection) with one unified rule. Each step
+ * of the cascade computes its time from the PREVIOUS bottle's
+ * actual rendered time (post-snap), so the chain stays coherent
+ * regardless of which steps got snapped out of naps.
+ *
+ * Key behaviors (per DOMAIN.md + SIMPLIFICATION_SCOPE.md):
+ *   - Anchor: latest non-projected bottle with `startTime >= wakeTime`,
+ *     OR `wakeTime + bufferAfterWakeMinutes` when no anchor exists.
+ *     Overnight bottles (startTime < wakeTime) tally toward
+ *     `bottlesPerDay` but do NOT anchor the cascade — the "midnight
+ *     rule": morning rhythm is driven by wake-up, not by mid-night
+ *     feeds.
+ *   - Forward cascade walks from the anchor at
+ *     `intervalForAmount(prev.amountOz, ...)`. Stops at midnight
+ *     (1440) — past-midnight bottles belong to tomorrow's chain.
+ *   - Backward backfill walks from the EARLIEST non-projected anchor
+ *     downward at the same interval, stopping at `wakeTime + buffer`.
+ *   - No-feed region is the nap itself only — `[nap.start, nap.end]`,
+ *     NOT extended through putdown. Wind-down is render-only; a
+ *     bottle can land at or during the wind-down. A bottle landing
+ *     STRICTLY inside `(nap.start, nap.end)` snaps to the nearest
+ *     edge (with the "if-past-fallback" mirror).
  */
 
 import type { Context, Event } from "../../schemas";
@@ -10,10 +37,12 @@ import { intervalForAmount } from "../bottleIntervalRules";
 import { hasType, isProjected, projectedEvent } from "../helpers";
 
 // ---------------------------------------------------------------------------
-// Bottle helpers
+// Predicates / helpers
 // ---------------------------------------------------------------------------
 
 const isBottle = hasType("bottle");
+
+const MIDNIGHT = 24 * 60;
 
 function buildProjectedBottle(ctx: Context, n: number, startTime: number): Event {
   // ID is keyed to startTime, NOT slot number. Slot number changes when
@@ -34,255 +63,166 @@ function buildProjectedBottle(ctx: Context, n: number, startTime: number): Event
   });
 }
 
-// ---------------------------------------------------------------------------
-// R5.11 — Project bottle placeholders
-// ---------------------------------------------------------------------------
-
-/**
- * R5.11 — Project bottle placeholders up to settings.bottleChain.bottlesPerDay.
- *
- * Anchoring (per the resolved R5.10/R5.11 spec):
- * - With zero recorded bottles, the first placeholder lands at
- *   `Day.wakeTime + bottleChain.bufferAfterWakeMinutes`. Subsequent
- *   placeholders cascade at `defaultBottleIntervalMinutes` until
- *   `bottlesPerDay` total exist.
- * - With one or more recorded bottles, R5.1 takes over: cascade resumes
- *   from the latest recorded bottle's startTime. (Implemented in a
- *   subsequent rule.)
- *
- * Recorded bottles are never touched. The reality-wins guard would
- * throw if this rule mutated one.
- */
-const RuleProjectBottlePlaceholders: Rule = {
-  id: "R5.11",
-  description:
-    "Project bottle placeholders up to bottlesPerDay, anchored at wake + buffer when no recordings yet",
-  matches: (events, ctx) => {
-    if (ctx.day.wakeTime === undefined) return false;
-    // Fire only when no bottles of any kind exist yet — placeholders
-    // need a clean slate. Once recordings land, R5.1 owns the cascade.
-    return !events.some(isBottle);
-  },
-  produces: (events, ctx) => projectPlaceholders(ctx, events),
-};
-
-function projectPlaceholders(ctx: Context, existing: Event[]): Event[] {
-  const wakeTime = ctx.day.wakeTime;
-  if (wakeTime === undefined) return existing;
-
-  const { bottlesPerDay, bufferAfterWakeMinutes } = ctx.settings.bottleChain;
-  // No prior recording yet; all placeholders carry defaultBottleAmountOz,
-  // so every step's interval looks up the rule for that default amount.
-  const interval = intervalForAmount(
-    ctx.settings.bottleIntervalRules,
-    ctx.settings.defaultBottleAmountOz,
-    ctx.settings.defaultBottleIntervalMinutes,
-  );
-  const firstStart = wakeTime + bufferAfterWakeMinutes;
-
-  const placeholders: Event[] = [];
-  for (let i = 0; i < bottlesPerDay; i++) {
-    placeholders.push(buildProjectedBottle(ctx, i + 1, firstStart + i * interval));
-  }
-
-  return [...existing, ...placeholders];
-}
-
-// ---------------------------------------------------------------------------
-// R5.1 — Cascade from the latest recorded bottle
-// ---------------------------------------------------------------------------
-
-/**
- * R5.1 — Once at least one non-projected bottle exists, the cascade resumes
- * from the LATEST such bottle (by startTime). Projected bottles fill
- * in until the total bottle count meets `bottlesPerDay`.
- *
- * "Non-projected" = recorded (started/completed) OR overridden. Overridden
- * bottles represent a user commitment to a slot (e.g. assigning an owner
- * to a projected placeholder) — predict-don't-prescribe treats that
- * commitment the same as a recording for cascade-anchoring purposes.
- * Without this, owner-assignment on a projection collapses the cascade:
- * the overridden doc satisfies R5.11's "no bottles" gate and blocks
- * R5.11, while failing R5.1's old `isRecordedEvent` gate.
- *
- * Recorded / overridden bottles are never moved or removed.
- *
- * Depends on R5.11 only by ordering — once any non-projected bottle
- * lands, R5.11 stops firing and R5.1 takes over.
- */
-const RuleCascadeFromLatestRecorded: Rule = {
-  id: "R5.1",
-  description: "Cascade additional projected bottles from the latest non-projected bottle",
-  matches: (events, ctx) => {
-    const bottles = events.filter(isBottle);
-    if (!bottles.some((b) => !isProjected(b))) return false;
-    return bottles.length < ctx.settings.bottleChain.bottlesPerDay;
-  },
-  produces: (events, ctx) => cascadeFromLatest(ctx, events),
-};
-
-function cascadeFromLatest(ctx: Context, existing: Event[]): Event[] {
-  const bottles = existing.filter(isBottle);
-  if (!bottles.some((b) => !isProjected(b))) return existing;
-
-  const target = ctx.settings.bottleChain.bottlesPerDay;
-  const needed = target - bottles.length;
-  if (needed <= 0) return existing;
-
-  // Cascade from the latest bottle of ANY kind. The chain may already
-  // include projections downstream of a recorded anchor; we extend from
-  // the tip, not from the recorded anchor itself, so we don't re-emit
-  // at the same times on subsequent evaluator passes.
-  const latest = bottles.reduce((max, b) => (b.startTime > max.startTime ? b : max));
-
-  // Find the highest existing eventKey index so new keys don't collide
-  // (R5.3 — index from MAX, not latest-by-time).
-  const maxIndex = bottles.reduce((m, b) => {
-    const match = /^bottle_(\d+)$/.exec(b.eventKey);
-    if (!match) return m;
-    return Math.max(m, parseInt(match[1]!, 10));
-  }, 0);
-
-  const defaultInterval = ctx.settings.defaultBottleIntervalMinutes;
-  // R5.8: cascade stops when the next projected start would land at or
-  // after tomorrow's defaultWakeTime. After that point, the bottle
-  // belongs to tomorrow, not today.
-  const tomorrowWake = ctx.settings.defaultWakeTime + 24 * 60;
-
-  // Each step's interval depends on the PREVIOUS bottle's amountOz via
-  // `bottleIntervalRules` (V2-restored amount-conditional rule). After the
-  // first projection, subsequent bottles all carry `defaultBottleAmountOz`,
-  // so steps 2..N typically converge on the default-amount rule's interval.
-  const projections: Event[] = [];
-  let prev = latest;
-  for (let i = 1; i <= needed; i++) {
-    const interval = intervalForAmount(
-      ctx.settings.bottleIntervalRules,
-      prev.amountOz,
-      defaultInterval,
-    );
-    const start = prev.startTime + interval;
-    if (start >= tomorrowWake) break; // R5.8
-    const projection = buildProjectedBottle(ctx, maxIndex + i, start);
-    projections.push(projection);
-    prev = projection;
-  }
-
-  return [...existing, ...projections];
-}
-
-// ---------------------------------------------------------------------------
-// R5.6 — Move projected bottles out of naps
-// ---------------------------------------------------------------------------
-
-/**
- * R5.6 — Move a projected bottle that lands inside a nap to the nap edge
- * that's closer to the predicted interval.
- *
- * Predictive lens (§0): the engine forecasts the *likely* next feed time.
- * Bottles "before nap" vs "after nap" are both plausible; pick the edge
- * closer to the cadence the cascade was already predicting.
- *
- * For each projected bottle whose startTime is strictly inside a nap's
- * (start, end), compute:
- *   predicted = prevBottle.startTime + defaultBottleIntervalMinutes
- * Move to whichever of (nap.startTime, nap.endTime) has smaller
- * |edge - predicted|. If the closer edge is in the past (< nowMinutes),
- * use the far edge instead.
- *
- * Recorded mid-nap bottles are never moved (the §0 reality-wins guard
- * would throw — but we also gate by lifecycle.state === "projected" to
- * make intent explicit).
- *
- * Iterates to fixed point (R5.7) via the evaluator: moving a bottle out
- * of nap_2 might land it inside nap_3, triggering another match.
- */
-const RuleMoveProjectedBottleOutOfNap: Rule = {
-  id: "R5.6",
-  description:
-    "Move projected bottles inside naps to whichever edge is closer to the predicted interval",
-  // R3.1 (nap chain projection) is NOT listed here even though we need
-  // its output: declaring it would force every bottle test to include
-  // the nap rules, but R5.6 reads naps from events at evaluation time —
-  // if R3.1 hasn't run, there are no naps and R5.6 simply doesn't fire.
-  // The evaluator's fixed-point loop ensures R5.6 picks up naps once
-  // R3.1 emits them on a subsequent pass.
-  dependsOn: ["R5.1", "R5.11"],
-  matches: (events, ctx) => findFirstOverlap(events, ctx.settings.putdownLeadMinutes) !== null,
-  produces: (events, ctx) => {
-    const overlap = findFirstOverlap(events, ctx.settings.putdownLeadMinutes);
-    if (!overlap) return events;
-    const { bottle, region } = overlap;
-    // Snap to the merged-interval boundary of transitively-overlapping
-    // naps containing the bottle. A bottle landing on the edge of one
-    // nap that's inside an adjacent overlapping nap creates a cycle if
-    // we look only at directly-containing naps; merging the connected
-    // component breaks the cycle.
-    const predicted = predictedNextStart(events, bottle, ctx);
-    const distBefore = Math.abs(predicted - region.start);
-    const distAfter = Math.abs(predicted - region.end);
-    let chosen = distBefore <= distAfter ? region.start : region.end;
-    if (chosen < ctx.nowMinutes) chosen = chosen === region.start ? region.end : region.start;
-    return events.map((e) => (e.id === bottle.id ? { ...e, startTime: chosen } : e));
-  },
-};
-
 type Region = { start: number; end: number };
-type Overlap = { bottle: Event; region: Region };
 
 /**
- * Merge nap intervals (extended on the front by `putdownLead` minutes
- * to cover the wind-down window) into connected regions. The wind-down
- * is "no bottles" territory — feeding right before the parent puts the
- * baby down defeats the purpose. The bottle is moved to BEFORE the
- * wind-down, not to nap.start.
+ * Nap regions for the bottle snap check. Per DOMAIN.md §4 and
+ * SIMPLIFICATION_SCOPE.md §2.1, the no-feed region is the nap ITSELF
+ * (`[nap.start, nap.end]`) — NOT extended backward through putdown.
+ * Wind-down is render-only synthetic; a bottle can land during it.
  *
- * Returns regions sorted by start; each region's [start, end] is the
- * union boundary the bottle must clear.
+ * Overlapping naps are merged into one region — otherwise a bottle
+ * could snap out of nap A only to land inside nap B (a real edge case
+ * caught by the property test in `properties.test.ts`).
  */
-function mergedNapRegions(events: Event[], putdownLead: number): Region[] {
-  const intervals: Region[] = events
+function napRegions(events: Event[]): Region[] {
+  const raw = events
     .filter((e) => e.type === "nap" && e.endTime !== undefined)
-    .map((e) => ({ start: e.startTime - putdownLead, end: e.endTime! }))
+    .map((e) => ({ start: e.startTime, end: e.endTime! }))
     .sort((a, b) => a.start - b.start);
   const merged: Region[] = [];
-  for (const iv of intervals) {
+  for (const r of raw) {
     const last = merged[merged.length - 1];
-    if (last && iv.start <= last.end) {
-      last.end = Math.max(last.end, iv.end);
+    if (last && r.start <= last.end) {
+      last.end = Math.max(last.end, r.end);
     } else {
-      merged.push({ ...iv });
+      merged.push({ ...r });
     }
   }
   return merged;
 }
 
-function findFirstOverlap(events: Event[], putdownLead: number): Overlap | null {
-  const regions = mergedNapRegions(events, putdownLead);
-  if (regions.length === 0) return null;
-  for (const event of events) {
-    if (!isBottle(event) || !isProjected(event)) continue;
-    const region = regions.find((r) => event.startTime > r.start && event.startTime < r.end);
-    if (region) return { bottle: event, region };
-  }
-  return null;
+/**
+ * If `proposed` lands STRICTLY inside any nap region, snap to whichever
+ * edge is closer to `proposed`. Tie favors `region.start` (bottle
+ * before nap is generally preferred — see DOMAIN.md §4: bottle CAN BE
+ * the wind-down). If the chosen edge is in the past relative to
+ * `nowMinutes`, use the other edge.
+ *
+ * If no overlap, returns `proposed` unchanged.
+ */
+function snapOutOfNap(proposed: number, regions: Region[], nowMinutes: number): number {
+  const region = regions.find((r) => proposed > r.start && proposed < r.end);
+  if (!region) return proposed;
+  const distBefore = Math.abs(proposed - region.start);
+  const distAfter = Math.abs(proposed - region.end);
+  let chosen = distBefore <= distAfter ? region.start : region.end;
+  if (chosen < nowMinutes) chosen = chosen === region.start ? region.end : region.start;
+  return chosen;
 }
 
-function predictedNextStart(events: Event[], bottle: Event, ctx: Context): number {
-  // The "previous" bottle is the chronologically-closest bottle whose
-  // startTime is < this bottle's CURRENT startTime. If none exists,
-  // there's no cadence to honor — fall back to current startTime so the
-  // edge with smallest |edge - currentStart| is chosen.
-  const earlier = events
-    .filter((e) => isBottle(e) && e.id !== bottle.id && e.startTime < bottle.startTime)
-    .sort((a, b) => b.startTime - a.startTime)[0];
-  if (!earlier) return bottle.startTime;
-  const interval = intervalForAmount(
-    ctx.settings.bottleIntervalRules,
-    earlier.amountOz,
-    ctx.settings.defaultBottleIntervalMinutes,
-  );
-  return earlier.startTime + interval;
+// ---------------------------------------------------------------------------
+// R5 — Sequential bottle cascade (unified)
+// ---------------------------------------------------------------------------
+
+const RuleSequentialBottleCascade: Rule = {
+  id: "R5",
+  description:
+    "Sequential bottle cascade: anchor → propose → snap-out-of-nap → advance, bidirectional, midnight-capped",
+  // Naps may not be projected yet on the first pass; the evaluator's
+  // fixed-point loop re-runs this rule once R3.1 emits them. We don't
+  // declare R3.1 as a hard dependency because some bottle tests run
+  // without the nap rules and expect placeholders regardless.
+  matches: (events, ctx) => {
+    if (ctx.day.wakeTime === undefined) return false;
+    const bottles = events.filter(isBottle);
+    return bottles.length < ctx.settings.bottleChain.bottlesPerDay;
+  },
+  produces: (events, ctx) => projectBottleChain(events, ctx),
+};
+
+function projectBottleChain(events: Event[], ctx: Context): Event[] {
+  const wakeTime = ctx.day.wakeTime;
+  if (wakeTime === undefined) return events;
+
+  const target = ctx.settings.bottleChain.bottlesPerDay;
+  const bottles = events.filter(isBottle);
+  if (bottles.length >= target) return events;
+
+  const regions = napRegions(events);
+  const wakeBuffer = wakeTime + ctx.settings.bottleChain.bufferAfterWakeMinutes;
+  const defaultInterval = ctx.settings.defaultBottleIntervalMinutes;
+  const rules = ctx.settings.bottleIntervalRules;
+
+  // Morning-or-later bottles: ones that participate in the day's
+  // chain. Overnight bottles (startTime < wakeTime) tally toward
+  // bottlesPerDay but do NOT participate in cascade anchoring or
+  // backfill (DOMAIN.md §2 midnight rule: morning rhythm is driven
+  // by wake-up, not mid-night feeds).
+  const morningBottles = bottles
+    .filter((b) => b.startTime >= wakeTime)
+    .sort((a, b) => a.startTime - b.startTime);
+  const anchors = morningBottles.filter((b) => !isProjected(b));
+
+  // Highest bottle eventKey index for new keys (R5.4 renumbers anyway,
+  // but stable keys per pass keep the fixed-point check from looping).
+  const maxIndex = bottles.reduce((m, b) => {
+    const match = /^bottle_(\d+)$/.exec(b.eventKey);
+    return match ? Math.max(m, parseInt(match[1]!, 10)) : m;
+  }, 0);
+
+  let nextIndex = maxIndex + 1;
+  const projections: Event[] = [];
+  let totalCount = bottles.length;
+
+  const snap = (proposed: number) => snapOutOfNap(proposed, regions, ctx.nowMinutes);
+
+  // === Backward backfill ===
+  // Walks from the EARLIEST morning bottle backward at -interval steps,
+  // gated on:
+  //   - Only fires if there's a non-projected anchor somewhere in the
+  //     chain (otherwise we'd phantom-anchor a cold-start chain at its
+  //     own wake+buffer seed).
+  //   - Stops at wake+buffer.
+  //   - Uses the earliest CURRENT morning bottle as the walker's `prev`
+  //     so subsequent evaluator passes extend from prior projections
+  //     instead of re-emitting them (idempotency).
+  if (anchors.length > 0 && morningBottles.length > 0) {
+    let prev = morningBottles[0]!;
+    while (totalCount < target) {
+      const interval = intervalForAmount(rules, prev.amountOz, defaultInterval);
+      const proposed = prev.startTime - interval;
+      if (proposed < wakeBuffer) break;
+      const placed = snap(proposed);
+      if (placed < wakeBuffer) break;
+      const projection = buildProjectedBottle(ctx, nextIndex++, placed);
+      projections.push(projection);
+      totalCount++;
+      prev = projection;
+    }
+  }
+
+  // === Forward cascade ===
+  // Uses the LATEST morning bottle (recorded, overridden, OR projected
+  // from a prior pass) as the walker's `prev`. Idempotency: subsequent
+  // evaluator passes extend the chain instead of re-emitting it.
+  let prev: Event;
+  if (morningBottles.length > 0) {
+    prev = morningBottles[morningBottles.length - 1]!;
+  } else {
+    // Cold start: seed the first bottle at wake+buffer.
+    // (Overnight bottles, if any, count toward total but don't anchor.)
+    const seed = snap(wakeBuffer);
+    if (seed >= MIDNIGHT) return [...events, ...projections];
+    const firstProj = buildProjectedBottle(ctx, nextIndex++, seed);
+    projections.push(firstProj);
+    totalCount++;
+    prev = firstProj;
+  }
+
+  while (totalCount < target) {
+    const interval = intervalForAmount(rules, prev.amountOz, defaultInterval);
+    const proposed = prev.startTime + interval;
+    if (proposed >= MIDNIGHT) break; // midnight rule (DOMAIN.md §2)
+    const placed = snap(proposed);
+    if (placed >= MIDNIGHT) break;
+    const projection = buildProjectedBottle(ctx, nextIndex++, placed);
+    projections.push(projection);
+    totalCount++;
+    prev = projection;
+  }
+
+  return [...events, ...projections];
 }
 
 // ---------------------------------------------------------------------------
@@ -292,20 +232,16 @@ function predictedNextStart(events: Event[], bottle: Event, ctx: Context): numbe
 /**
  * R5.4 — Bottles are renumbered chronologically for display.
  *
- * After cascade and overlap resolution, the engine sorts bottles by
- * startTime and rewrites eventKey/label as `bottle_1`, `bottle_2`, etc.
- * This ensures the timeline shows bottles in monotonic order regardless
- * of how the user inserted them.
- *
- * R5.5: this is engine-side only. Firestore docs keep their original
- * eventKey (the persistence layer reads `id` for lookups, never
- * eventKey). The reality-wins guard allows this rewrite because eventKey
- * and label are display fields, not authoritative recorded fields.
+ * After cascade produces a complete chain, sort bottles by startTime
+ * and rewrite eventKey/label as `bottle_1`, `bottle_2`, etc. for
+ * display. This is engine-side only; Firestore docs keep their
+ * original eventKey (the persistence layer reads `id`, never
+ * eventKey).
  */
 const RuleRenumberBottlesChronologically: Rule = {
   id: "R5.4",
   description: "Renumber bottle eventKey/label chronologically for display",
-  dependsOn: ["R5.1", "R5.11"],
+  dependsOn: ["R5"],
   matches: (events) => {
     const ordered = bottlesByStartTime(events);
     return ordered.some((b, i) => b.eventKey !== `bottle_${i + 1}`);
@@ -330,9 +266,4 @@ function bottlesByStartTime(events: Event[]): Event[] {
   return events.filter(isBottle).sort((a, b) => a.startTime - b.startTime);
 }
 
-export const RULES: Rule[] = [
-  RuleProjectBottlePlaceholders,
-  RuleCascadeFromLatestRecorded,
-  RuleMoveProjectedBottleOutOfNap,
-  RuleRenumberBottlesChronologically,
-];
+export const RULES: Rule[] = [RuleSequentialBottleCascade, RuleRenumberBottlesChronologically];
