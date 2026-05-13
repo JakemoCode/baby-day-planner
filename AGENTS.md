@@ -4,6 +4,19 @@
 This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` before writing any code. Heed deprecation notices.
 <!-- END:nextjs-agent-rules -->
 
+## Domain model — READ THIS FIRST
+
+`DOMAIN.md` at the repo root is the authoritative plain-English description of how babies actually behave. It is **not** a spec, **not** requirements, and **not** rules for the engine — it is the domain the implementation is supposed to fit.
+
+Read `DOMAIN.md` before:
+- Adding any new engine rule
+- Reviewing requirements doc changes
+- Starting any multi-PR campaign that touches scheduling logic
+
+Drift between `DOMAIN.md` and the implementation is the canary for the "step back and audit" workspace rule (`~/Workspace/.claude/rules/step-back.md`). If the implementation overflows the model (more abstractions than the domain warrants), that IS the proactive trigger to stop and reassess.
+
+Jake's lived experience in `DOMAIN.md` §1–§7 wins over research notes in §8 when they disagree. Update `DOMAIN.md` first when the model changes; the implementation follows.
+
 ## Testing
 
 Workspace-wide testing discipline applies: see `~/Workspace/.claude/rules/testing.md`. Project-specific notes:
