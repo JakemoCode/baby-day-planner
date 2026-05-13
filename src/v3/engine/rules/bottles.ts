@@ -41,8 +41,36 @@ import { hasType, isProjected, projectedEvent } from "../helpers";
 // ---------------------------------------------------------------------------
 
 const isBottle = hasType("bottle");
+const isBedtime = hasType("bedtime");
 
 const MIDNIGHT = 24 * 60;
+
+/**
+ * Forward cap for the bottle cascade. The day's RHYTHM CHAIN is
+ * `[wakeTime, forwardCap)`. Outside that window, bottles are passive
+ * members of the day (overnight feeds, dream feeds, baby-wakes-hungry
+ * recordings) — they're tallied for the calendar day but don't anchor
+ * the cascade and aren't projected forward into.
+ *
+ * Per DOMAIN.md §1 + §3: baby's waking-and-eating cadence stops at
+ * bedtime. Cascading bottle projections through the bedtime block
+ * mechanically would predict feeds during sleep, which is wrong.
+ *
+ * Resolution: cap forward cascade at the projected bedtime's startTime
+ * if present, falling back to midnight (the "midnight rule" boundary)
+ * if no bedtime has been projected yet.
+ *
+ * Idempotency: bedtime might not be projected on the first evaluator
+ * pass (R7.6 depends on R3.1). On pass 1 the cascade uses MIDNIGHT;
+ * pass 2 sees bedtime, trims its own past-bedtime projections, and
+ * stops cascading at bedtime. The trim step is what prevents the
+ * stale midnight projections from persisting.
+ */
+function forwardCapFor(events: Event[]): number {
+  const bedtime = events.find(isBedtime);
+  if (!bedtime) return MIDNIGHT;
+  return Math.min(MIDNIGHT, bedtime.startTime);
+}
 
 function buildProjectedBottle(ctx: Context, n: number, startTime: number): Event {
   // ID is keyed to startTime, NOT slot number. Slot number changes when
@@ -107,7 +135,15 @@ function snapOutOfNap(proposed: number, regions: Region[], nowMinutes: number): 
   const distBefore = Math.abs(proposed - region.start);
   const distAfter = Math.abs(proposed - region.end);
   let chosen = distBefore <= distAfter ? region.start : region.end;
-  if (chosen < nowMinutes) chosen = chosen === region.start ? region.end : region.start;
+  if (chosen < nowMinutes) {
+    // Past-edge fallback: prefer the other edge ONLY if it's not also
+    // in the past. With both edges past (baby slept through the
+    // morning-buffer window in a property-test fixture), holding the
+    // closer choice avoids a snap-to-pre-wake time that would then
+    // get trimmed by the chain-range filter, looping the cascade.
+    const other = chosen === region.start ? region.end : region.start;
+    if (other >= nowMinutes) chosen = other;
+  }
   return chosen;
 }
 
@@ -154,10 +190,22 @@ function canCascade(events: Event[], ctx: Context): boolean {
   const wakeTime = ctx.day.wakeTime;
   if (wakeTime === undefined) return false;
   const bottles = events.filter(isBottle);
-  const morningBottles = bottles
-    .filter((b) => b.startTime >= wakeTime)
+  const cap = forwardCapFor(events);
+
+  // Trimming check: any PROJECTED bottle outside the rhythm chain
+  // [wakeTime, cap) needs to be removed. Fires when bedtime appears
+  // mid-flight and pass-1's midnight-capped projections are now
+  // past-bedtime stragglers.
+  const needsTrim = bottles.some(
+    (b) => isProjected(b) && (b.startTime < wakeTime || b.startTime >= cap),
+  );
+  if (needsTrim) return true;
+
+  // Chain bottles: in-window for the day's rhythm chain.
+  const chainBottles = bottles
+    .filter((b) => b.startTime >= wakeTime && b.startTime < cap)
     .sort((a, b) => a.startTime - b.startTime);
-  const anchors = morningBottles.filter((b) => !isProjected(b));
+  const anchors = chainBottles.filter((b) => !isProjected(b));
   const target = ctx.settings.bottleChain.bottlesPerDay;
 
   if (anchors.length === 0) {
@@ -169,12 +217,13 @@ function canCascade(events: Event[], ctx: Context): boolean {
   const wakeBuffer = wakeTime + ctx.settings.bottleChain.bufferAfterWakeMinutes;
   const defaultInterval = ctx.settings.defaultBottleIntervalMinutes;
   const rules = ctx.settings.bottleIntervalRules;
-  const latest = morningBottles[morningBottles.length - 1]!;
-  const earliest = morningBottles[0]!;
+  const latest = chainBottles[chainBottles.length - 1]!;
+  const earliest = chainBottles[0]!;
   const forwardInterval = intervalForAmount(rules, latest.amountOz, defaultInterval);
-  const canExtendForward = latest.startTime + forwardInterval < MIDNIGHT;
+  const canExtendForward = forwardInterval > 0 && latest.startTime + forwardInterval < cap;
   const backwardInterval = intervalForAmount(rules, earliest.amountOz, defaultInterval);
-  const canExtendBackward = earliest.startTime - backwardInterval >= wakeBuffer;
+  const canExtendBackward =
+    backwardInterval > 0 && earliest.startTime - backwardInterval >= wakeBuffer;
   return canExtendForward || canExtendBackward;
 }
 
@@ -183,21 +232,34 @@ function projectBottleChain(events: Event[], ctx: Context): Event[] {
   if (wakeTime === undefined) return events;
 
   const target = ctx.settings.bottleChain.bottlesPerDay;
-  const bottles = events.filter(isBottle);
-  const regions = napRegions(events);
+  const cap = forwardCapFor(events);
   const wakeBuffer = wakeTime + ctx.settings.bottleChain.bufferAfterWakeMinutes;
   const defaultInterval = ctx.settings.defaultBottleIntervalMinutes;
   const rules = ctx.settings.bottleIntervalRules;
 
-  // Morning-or-later bottles: ones that participate in the day's
-  // chain. Overnight bottles (startTime < wakeTime) tally toward
-  // bottlesPerDay but do NOT participate in cascade anchoring or
-  // backfill (DOMAIN.md §2 midnight rule: morning rhythm is driven
-  // by wake-up, not mid-night feeds).
-  const morningBottles = bottles
-    .filter((b) => b.startTime >= wakeTime)
+  // Step 1: trim projected bottles outside the rhythm chain
+  // [wakeTime, cap). These are stale pass-1 projections that became
+  // past-bedtime (or overnight, defensively) once R7.6 emitted a
+  // bedtime event. Recorded / overridden bottles are NEVER trimmed —
+  // they're protected by the reality-wins axiom and represent passive
+  // members of the day (overnight feeds, dream feeds, etc.).
+  const trimmedEvents = events.filter((e) => {
+    if (!isBottle(e)) return true;
+    if (!isProjected(e)) return true;
+    return e.startTime >= wakeTime && e.startTime < cap;
+  });
+
+  const bottles = trimmedEvents.filter(isBottle);
+  const regions = napRegions(trimmedEvents);
+
+  // Chain bottles: in-window for the day's rhythm chain. Outside-window
+  // bottles (overnight, post-bedtime recordings) tally toward
+  // bottlesPerDay but do NOT anchor cascade or backfill (DOMAIN.md §1
+  // + §3: cascade follows the wake-to-bedtime rhythm).
+  const chainBottles = bottles
+    .filter((b) => b.startTime >= wakeTime && b.startTime < cap)
     .sort((a, b) => a.startTime - b.startTime);
-  const anchors = morningBottles.filter((b) => !isProjected(b));
+  const anchors = chainBottles.filter((b) => !isProjected(b));
   const isAnchored = anchors.length > 0;
 
   // Highest bottle eventKey index for new keys (R5.4 renumbers anyway,
@@ -232,8 +294,8 @@ function projectBottleChain(events: Event[], ctx: Context): Event[] {
   //   - Uses the earliest CURRENT morning bottle as the walker's `prev`
   //     so subsequent evaluator passes extend from prior projections
   //     instead of re-emitting them (idempotency).
-  if (isAnchored && morningBottles.length > 0) {
-    let prev = morningBottles[0]!;
+  if (isAnchored && chainBottles.length > 0) {
+    let prev = chainBottles[0]!;
     // No total-count cap here: backfill only fires in the anchored
     // case, which has no cap (see reachedColdStartCap()).
     while (true) {
@@ -258,18 +320,27 @@ function projectBottleChain(events: Event[], ctx: Context): Event[] {
   }
 
   // === Forward cascade ===
-  // Uses the LATEST morning bottle (recorded, overridden, OR projected
+  // Uses the LATEST chain bottle (recorded, overridden, OR projected
   // from a prior pass) as the walker's `prev`. Idempotency: subsequent
   // evaluator passes extend the chain instead of re-emitting it.
+  // Cap = bedtime.startTime if a bedtime exists, else MIDNIGHT — the
+  // cascade stops at the boundary between today's rhythm chain and
+  // overnight / tomorrow.
   let prev: Event;
-  if (morningBottles.length > 0) {
-    prev = morningBottles[morningBottles.length - 1]!;
+  if (chainBottles.length > 0) {
+    prev = chainBottles[chainBottles.length - 1]!;
   } else {
     // Cold start: seed the first bottle at wake+buffer.
-    // (Overnight bottles, if any, count toward total but don't anchor.)
-    if (reachedColdStartCap()) return [...events, ...projections];
+    if (reachedColdStartCap()) return [...trimmedEvents, ...projections];
+    if (wakeBuffer >= cap) return [...trimmedEvents, ...projections];
     const seed = snap(wakeBuffer);
-    if (seed >= MIDNIGHT) return [...events, ...projections];
+    if (seed >= cap) return [...trimmedEvents, ...projections];
+    // If snap pushed the seed before wakeTime, the cold-start slot
+    // can't be placed cleanly (a recorded nap straddles the
+    // wake-buffer window). Refuse to seed — the trim filter would
+    // remove it on the next pass anyway, causing a convergence
+    // loop.
+    if (seed < wakeTime) return [...trimmedEvents, ...projections];
     const firstProj = buildProjectedBottle(ctx, nextIndex++, seed);
     projections.push(firstProj);
     totalCount++;
@@ -283,9 +354,9 @@ function projectBottleChain(events: Event[], ctx: Context): Event[] {
     const interval = intervalForAmount(rules, prev.amountOz, defaultInterval);
     if (interval <= 0) break;
     const proposed = prev.startTime + interval;
-    if (proposed >= MIDNIGHT) break; // midnight rule (DOMAIN.md §2)
+    if (proposed >= cap) break; // bedtime / midnight cap
     const placed = snap(proposed);
-    if (placed >= MIDNIGHT) break;
+    if (placed >= cap) break;
     // Strict-monotonic guard: snap to a nap edge could in pathological
     // cases land at or before prev.startTime, looping.
     if (placed <= prev.startTime) break;
@@ -295,7 +366,7 @@ function projectBottleChain(events: Event[], ctx: Context): Event[] {
     prev = projection;
   }
 
-  return [...events, ...projections];
+  return [...trimmedEvents, ...projections];
 }
 
 // ---------------------------------------------------------------------------

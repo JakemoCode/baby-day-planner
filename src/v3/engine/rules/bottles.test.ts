@@ -18,9 +18,11 @@ import type { Rule } from "../evaluator";
 import { projectDay } from "../projectDay";
 import { RULES as NAP_RULES } from "./naps";
 import { RULES as BOTTLE_RULES } from "./bottles";
+import { RULES as BEDTIME_RULES } from "./bedtime";
 
 const ALL: Rule[] = [...BOTTLE_RULES];
 const ALL_WITH_NAPS: Rule[] = [...NAP_RULES, ...BOTTLE_RULES];
+const ALL_WITH_BEDTIME: Rule[] = [...NAP_RULES, ...BEDTIME_RULES, ...BOTTLE_RULES];
 
 describe("R5.11 — placeholder projection when no bottle has been recorded", () => {
   it("projects bottlesPerDay placeholders, anchored at wake + buffer, spaced by interval", () => {
@@ -1231,5 +1233,109 @@ describe("Sequential bottle cascade — bottlesPerDay is a cold-start target, no
       16 * 60 + 10,
       19 * 60 + 10,
     ]);
+  });
+});
+
+describe("Sequential bottle cascade — caps forward at bedtime (DOMAIN.md §1 + §3)", () => {
+  it("cold-start cascade stops at projected bedtime, not at midnight", () => {
+    // Setup: wake 7:00, buffer 10, default interval 180, bottlesPerDay 10.
+    // bedtimeThreshold = 19:00 → R7.6 substitutes the nap at/past 19:00
+    // with a bedtime event.
+    //
+    // Without bedtime cap, cold-start cascade would produce 6 bottles
+    // up to midnight: 7:10, 10:10, 13:10, 16:10, 19:10, 22:10 (next
+    // would be 25:10 ≥ 1440). WITH bedtime cap, the 19:10 and 22:10
+    // slots are past bedtime → NOT projected.
+    const ctx = aContext({
+      day: aDay({ wakeTime: 7 * 60 }),
+      settings: aSettings({
+        bottleChain: { bottlesPerDay: 10, bufferAfterWakeMinutes: 10 },
+        defaultBottleIntervalMinutes: 180,
+        defaultWakeTime: 7 * 60,
+        bedtimeThreshold: 19 * 60,
+        wakeWindowsMinutes: [120, 135, 135, 150],
+      }),
+      actuals: [],
+      nowMinutes: 6 * 60,
+    });
+
+    const out = projectDay(
+      {
+        day: ctx.day,
+        settings: ctx.settings,
+        actuals: ctx.actuals,
+        nowMinutes: ctx.nowMinutes,
+      },
+      { rules: ALL_WITH_BEDTIME },
+    );
+
+    const bottles = out
+      .filter((e) => e.type === "bottle")
+      .sort((a, b) => a.startTime - b.startTime);
+
+    expect(bottles.length).toBeGreaterThan(0);
+    // No bottle at or past bedtime (19:00).
+    for (const b of bottles) {
+      expect(b.startTime).toBeLessThan(19 * 60);
+    }
+    // Bedtime event projected.
+    const bedtime = out.find((e) => e.type === "bedtime");
+    expect(bedtime?.startTime).toBe(19 * 60);
+  });
+
+  it("recorded bottle past bedtime is preserved but does NOT cascade forward from there", () => {
+    // Dream-feed-like scenario: user records a 21:00 bottle (past
+    // bedtime 19:00). Recording stays (reality wins). Forward cascade
+    // anchors on the latest IN-CHAIN bottle (pre-bedtime), NOT on the
+    // post-bedtime recording — the engine doesn't predict 24:00 / 3:00
+    // / 6:00 overnight feeds.
+    const dreamFeed = aRecordedBottle({
+      id: "rec_dream",
+      eventKey: "bottle_dream",
+      start: 21 * 60,
+      amountOz: 4,
+    });
+    const recordedMorning = aRecordedBottle({
+      id: "rec_morning",
+      eventKey: "bottle_1",
+      start: 16 * 60,
+      amountOz: 5,
+    });
+
+    const ctx = aContext({
+      day: aDay({ wakeTime: 7 * 60 }),
+      settings: aSettings({
+        bottleChain: { bottlesPerDay: 5, bufferAfterWakeMinutes: 10 },
+        defaultBottleIntervalMinutes: 180,
+        defaultWakeTime: 7 * 60,
+        bedtimeThreshold: 19 * 60,
+        wakeWindowsMinutes: [120, 135, 135, 150],
+      }),
+      actuals: [recordedMorning, dreamFeed],
+      nowMinutes: 22 * 60,
+    });
+
+    const out = projectDay(
+      {
+        day: ctx.day,
+        settings: ctx.settings,
+        actuals: ctx.actuals,
+        nowMinutes: ctx.nowMinutes,
+      },
+      { rules: ALL_WITH_BEDTIME },
+    );
+
+    const bottles = out
+      .filter((e) => e.type === "bottle")
+      .sort((a, b) => a.startTime - b.startTime);
+
+    // Both recordings preserved.
+    expect(bottles.find((b) => b.id === recordedMorning.id)).toBeDefined();
+    expect(bottles.find((b) => b.id === dreamFeed.id)).toBeDefined();
+    // No PROJECTED bottle at/past 19:00 (bedtime cap).
+    const projectedPastBedtime = bottles.filter(
+      (b) => b.lifecycle.state === "projected" && b.startTime >= 19 * 60,
+    );
+    expect(projectedPastBedtime).toEqual([]);
   });
 });
