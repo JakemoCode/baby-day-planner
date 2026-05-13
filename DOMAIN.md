@@ -78,6 +78,27 @@ than the nominal interval would have allowed.
 a bottle (sometimes several). This is normal at younger ages
 and tapers off as the baby grows.
 
+**The "midnight rule" — bottles belong to the calendar day
+they happen on.** A bottle's day is determined by its clock
+time, not by which wake-to-next-wake window it falls in. A
+bottle at 2 AM Wednesday is **Wednesday's** bottle, not
+Tuesday's — even though Tuesday's wake-to-next-wake window
+might still feel "in progress" to the parent. The day
+boundary is 12:00 AM, period.
+
+Practically:
+- Today's bottles = bottles with `startTime ∈ [00:00, 23:59]`
+  of today's calendar date.
+- Overnight bottles count toward the calendar day they fall
+  in (tallied against `bottlesPerDay` for that day).
+- Overnight bottles do **NOT anchor the day's cascade.** The
+  morning rhythm is driven by wake-up, not a mid-night feed.
+  The cascade still anchors at `wakeTime + buffer` regardless
+  of any overnight bottles already recorded.
+- The bottle cascade stops at midnight (`1440`), not
+  tomorrow's wake time. Anything past midnight belongs to
+  tomorrow.
+
 ---
 
 ## §3 Bedtime — a fuzzy emergent thing, not a clock time
