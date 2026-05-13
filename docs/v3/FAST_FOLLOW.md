@@ -501,6 +501,34 @@ Mechanics: in `EventEditDrawerV3.tsx`, the `EDIT_TITLE_BY_TYPE` constant is a fl
 
 ---
 
+## §F25 — Manual nap recorded inside bedtime block claims `nap_1` eventKey
+
+**Source**: Jake, 2026-05-13 click-test of PR #138.
+
+**Status**: `pending`
+
+**What**: when the user manually records a nap during the bedtime block (e.g. baby wakes at 8 PM hungry/fussy and goes back down for a short nap), the new doc gets assigned `eventKey: nap_1` — colliding with the day's actual nap_1 from earlier and rendering with the wrong label ("Nap 1 (60 min)" at 8:03 PM).
+
+Likely same write-path family as §F24 (Start Nap duplicate). The drawer's save-path doesn't scan existing naps for the next free `nap_N` slot when bedtime has already been emitted.
+
+**Why fast-follow**: render-correct (bedtime + recorded nap both display), but the eventKey collision will break downstream rules that key off `nap_N` (e.g. short-nap-adjustment looking at `nap_${i}`). Bundle with §F24 if they share a fix.
+
+---
+
+## §F26 — Putdown chip synthesized for naps that fall inside the bedtime block
+
+**Source**: Jake, 2026-05-13 click-test of PR #138.
+
+**Status**: `pending`
+
+**What**: `putdown.ts` synthesizes a putdown chip (`hasPutdown: true`) for the manually-recorded 8:03 PM nap during bedtime, showing "Putdown · 7:48p" inside the green bedtime block. Visually noisy and conceptually wrong — baby is already in bedtime; you don't "put them down" again for a within-bedtime nap.
+
+Mechanics: `putdown.ts` flags any future-relative projected nap (or any nap matching its match predicate) without checking whether the nap's `startTime` falls inside an existing bedtime event. Add a filter: skip `hasPutdown` if `nap.startTime ∈ [bedtime.startTime, bedtime.endTime]`.
+
+**Why fast-follow**: cosmetic only — engine output is correct, render layer over-decorates. One-predicate fix in `putdown.ts`.
+
+---
+
 ## How items land here
 
 Two paths:
