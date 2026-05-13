@@ -7,7 +7,7 @@
 import type { Context, Event } from "../../schemas";
 import type { Rule } from "../evaluator";
 import { intervalForAmount } from "../bottleIntervalRules";
-import { hasType, isProjected, isRecordedEvent, projectedEvent } from "../helpers";
+import { hasType, isProjected, projectedEvent } from "../helpers";
 
 // ---------------------------------------------------------------------------
 // Bottle helpers
@@ -93,22 +93,29 @@ function projectPlaceholders(ctx: Context, existing: Event[]): Event[] {
 // ---------------------------------------------------------------------------
 
 /**
- * R5.1 — Once at least one bottle has been recorded, the cascade resumes
- * from the LATEST recorded bottle (by startTime). Projected bottles fill
+ * R5.1 — Once at least one non-projected bottle exists, the cascade resumes
+ * from the LATEST such bottle (by startTime). Projected bottles fill
  * in until the total bottle count meets `bottlesPerDay`.
  *
- * Recorded bottles are never moved or removed (reality wins, §0).
+ * "Non-projected" = recorded (started/completed) OR overridden. Overridden
+ * bottles represent a user commitment to a slot (e.g. assigning an owner
+ * to a projected placeholder) — predict-don't-prescribe treats that
+ * commitment the same as a recording for cascade-anchoring purposes.
+ * Without this, owner-assignment on a projection collapses the cascade:
+ * the overridden doc satisfies R5.11's "no bottles" gate and blocks
+ * R5.11, while failing R5.1's old `isRecordedEvent` gate.
  *
- * Depends on R5.11 only by ordering — once a recording lands, R5.11 stops
- * firing (its match condition is "no bottles of any kind"), and R5.1
- * takes over.
+ * Recorded / overridden bottles are never moved or removed.
+ *
+ * Depends on R5.11 only by ordering — once any non-projected bottle
+ * lands, R5.11 stops firing and R5.1 takes over.
  */
 const RuleCascadeFromLatestRecorded: Rule = {
   id: "R5.1",
-  description: "Cascade additional projected bottles from the latest recorded bottle",
+  description: "Cascade additional projected bottles from the latest non-projected bottle",
   matches: (events, ctx) => {
     const bottles = events.filter(isBottle);
-    if (!bottles.some(isRecordedEvent)) return false;
+    if (!bottles.some((b) => !isProjected(b))) return false;
     return bottles.length < ctx.settings.bottleChain.bottlesPerDay;
   },
   produces: (events, ctx) => cascadeFromLatest(ctx, events),
@@ -116,7 +123,7 @@ const RuleCascadeFromLatestRecorded: Rule = {
 
 function cascadeFromLatest(ctx: Context, existing: Event[]): Event[] {
   const bottles = existing.filter(isBottle);
-  if (!bottles.some(isRecordedEvent)) return existing;
+  if (!bottles.some((b) => !isProjected(b))) return existing;
 
   const target = ctx.settings.bottleChain.bottlesPerDay;
   const needed = target - bottles.length;
