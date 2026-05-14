@@ -25,11 +25,6 @@
   cursor: pointer;
   white-space: nowrap;
   line-height: 1;
-  /* Cap to the cluster's allotted width so long labels (e.g. "Dream Feed")
-   * can wrap the timestamp to a second row instead of clipping. The
-   * cluster (InstantCluster.module.css) sets `width: <widthPx>` from
-   * the timeline's GUTTER_W. */
-  max-width: 100%;
   transition:
     background var(--motion-fast) var(--easing-out),
     border-color var(--motion-fast) var(--easing-out);
@@ -74,10 +69,6 @@
    * sit visually lower than the label. */
   align-items: center;
   gap: 6px;
-  /* When label + time exceed the chip's max-width, drop the time to a
-   * second row instead of overflowing the gutter. align-items above
-   * applies per-row, so the wrapped time aligns with the label's row. */
-  flex-wrap: wrap;
 }
 
 .label {

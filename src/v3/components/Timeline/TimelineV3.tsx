@@ -29,7 +29,7 @@ const BLOCK_LEFT_INSET = AXIS_W + 8;
 const BLOCK_RIGHT_INSET = GUTTER_W + 24;
 const PUTDOWN_RIGHT_EXTRA = 30;
 const CUSTOM_LEFT_EXTRA = 110;
-const LEADER_LINE_W = 12;
+const LEADER_LINE_W = 8;
 const VIEWPORT_PADDING_MIN = 30;
 const DEFAULT_VIEWPORT = { start: 7 * 60, end: 21 * 60 };
 const SCROLL_TOP_PADDING_PX = 80;
@@ -209,8 +209,8 @@ export function TimelineV3({
           <InstantCluster
             key={g.key}
             items={g.items}
-            topPx={yOf(g.startMinutes) - 10}
-            rightPx={BLOCK_RIGHT_INSET - GUTTER_W + 4}
+            topPx={yOf(g.startMinutes) - 12}
+            rightPx={BLOCK_RIGHT_INSET - GUTTER_W}
             widthPx={GUTTER_W - 8}
             leaderWidthPx={LEADER_LINE_W}
             owners={owners}

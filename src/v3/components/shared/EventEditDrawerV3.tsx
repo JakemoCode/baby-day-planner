@@ -161,7 +161,13 @@ export function EventEditDrawerV3({
 
   const handleStartTimeChange = (raw: string) => {
     const next = parseHM24(raw);
-    if (!showEndTime || next === undefined) {
+    // Naps preserve their start→end duration as the user nudges
+    // startTime, and seed a default duration if none is set yet —
+    // a nap implies a duration. Extras decide instant-vs-block at
+    // save based on whether the user explicitly entered an endTime,
+    // so we DON'T auto-fill endTime from a startTime change for
+    // extras (would silently promote them to block).
+    if (type !== "nap" || next === undefined) {
       setForm((prev) => ({ ...prev, startTime: next }));
       return;
     }
