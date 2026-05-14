@@ -70,9 +70,6 @@ export const v3SettingsDoc: Record<string, unknown> = {
   pumpTimes: [10 * 60 + 30, 14 * 60 + 30], // [630, 870]
   pumpOwnerSlot: "parent2",
   dreamFeedEnabled: true,
-  dreamFeedStart: 20 * 60 + 30, // 1230
-  dreamFeedEnd: 21 * 60, // 1260
-  dreamFeedOffsetAfterBedtimeMinutes: 90,
   dailyRecurring: [{ id: "cook-dinner", label: "Cook Dinner", time: 17 * 60, enabled: true }],
   daycare: {
     enabled: false,

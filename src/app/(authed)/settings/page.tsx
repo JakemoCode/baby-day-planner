@@ -158,6 +158,16 @@ export default function SettingsPage() {
         />
       </Section>
 
+      <Section title="Dream feed">
+        <CheckboxRow
+          id="dreamFeedEnabled"
+          label="Label first post-bedtime bottle as Dream Feed"
+          value={value.dreamFeedEnabled}
+          onChange={(v) => set("dreamFeedEnabled", v)}
+          help="Render-only label. The bottle cascade is unchanged; the first projected bottle past bedtime is just renamed."
+        />
+      </Section>
+
       <Section title="Timeline display">
         <ColorModeRow
           id="timelineColorMode"

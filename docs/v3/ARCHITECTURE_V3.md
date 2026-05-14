@@ -91,7 +91,7 @@ type Event = {
   // Domain attributes
   label: string;
   owner?: Owner;
-  amountOz?: number;              // bottle / dream_feed only
+  amountOz?: number;              // bottle only
 
   // Putdown — render-only reminder. true ⇒ renderer prepends a
   // virtual putdown block. Set by rules; never persisted (the parent
@@ -127,7 +127,6 @@ type EventType =
                        //   `lifecycle` is always `{state: 'projected'}`.
   | 'bottle'           // instant; lifecycle applies
   | 'bedtime'          // block; lifecycle applies
-  | 'dream_feed'       // instant; lifecycle applies
   | 'pump'             // instant; lifecycle applies
   | 'extra'            // block or instant; lifecycle applies (custom user events)
   | 'daily_recurring'  // block or instant; lifecycle applies (R11 — replaces V2's `cook_dinner`)
@@ -507,7 +506,6 @@ code: ~1500 lines including helpers, vs. V2's ~2000 across 12 files.
 - `wakeWindows.ts` (R4.x)
 - `bottles.ts` (R5.x)
 - `putdown.ts` (R6.x)
-- `dreamFeed.ts` (R8.x)
 - `pumps.ts` (R9.x)
 - `extras.ts` (R10.x)
 - `cookDinner.ts` (R11.x) — naming TBD; rename to `dailyRecurring.ts`
@@ -595,7 +593,7 @@ on cycles, surfacing the issue at startup, not in production.
 **Invariants enforced**:
 - The `started` state applies ONLY to block-kind events (`nap`,
   `bedtime`, and any `extra` / `daily_recurring` configured with a
-  duration). Instant events (`bottle`, `dream_feed`, `pump`, instant
+  duration). Instant events (`bottle`, `pump`, instant
   extras) record start + any payload in one tap and transition
   `projected → completed` directly. There is no "End Bottle".
 - Once `completed`, never returns to `projected`.

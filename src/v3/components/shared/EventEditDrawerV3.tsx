@@ -73,7 +73,6 @@ const EDIT_TITLE_BY_TYPE: Record<EventType, string> = {
   bottle: "Edit bottle",
   pump: "Edit pump",
   bedtime: "Edit bedtime",
-  dream_feed: "Edit dream feed",
   extra: "Edit event",
   daily_recurring: "Edit recurring event",
   daycare_dropoff: "Edit daycare dropoff",
@@ -149,21 +148,26 @@ export function EventEditDrawerV3({
 
   const showStartTime = type !== "wake_window";
   const showEndTime = type === "nap" || type === "extra";
-  const showAmount = type === "bottle" || type === "dream_feed";
+  const showAmount = type === "bottle";
   const showOwner =
     type === "nap" ||
     type === "wake_window" ||
     type === "bottle" ||
     type === "extra" ||
-    type === "bedtime" ||
-    type === "dream_feed";
+    type === "bedtime";
   const showLabel = type === "extra";
 
   const errors = validateForm(type, form.startTime, form.endTime, sourceEvent.id, existingEvents);
 
   const handleStartTimeChange = (raw: string) => {
     const next = parseHM24(raw);
-    if (!showEndTime || next === undefined) {
+    // Naps preserve their start→end duration as the user nudges
+    // startTime, and seed a default duration if none is set yet —
+    // a nap implies a duration. Extras decide instant-vs-block at
+    // save based on whether the user explicitly entered an endTime,
+    // so we DON'T auto-fill endTime from a startTime change for
+    // extras (would silently promote them to block).
+    if (type !== "nap" || next === undefined) {
       setForm((prev) => ({ ...prev, startTime: next }));
       return;
     }

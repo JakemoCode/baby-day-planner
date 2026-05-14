@@ -10,8 +10,6 @@ export type NextBottlePreviewProps = {
   owners: OwnersConfig;
   /** Most recent recorded bottle, shown as subtext when present. */
   lastBottle?: Event;
-  /** Upcoming dream feed (projected). Replaces empty state when chain is exhausted. */
-  dreamFeed?: Event;
 };
 
 function formatOz(oz: number): string {
@@ -23,26 +21,11 @@ function formatLast(b: Event): string {
   return b.amountOz != null ? `Last: ${time} · ${formatOz(b.amountOz)}` : `Last: ${time}`;
 }
 
-export function NextBottlePreview({
-  bottle,
-  bottle1Pending,
-  lastBottle,
-  dreamFeed,
-}: NextBottlePreviewProps) {
+export function NextBottlePreview({ bottle, bottle1Pending, lastBottle }: NextBottlePreviewProps) {
   const meta = lastBottle ? formatLast(lastBottle) : undefined;
   const metaProp = meta !== undefined ? { meta } : {};
 
   if (!bottle) {
-    if (dreamFeed && !bottle1Pending) {
-      return (
-        <PreviewCard
-          heading="Next bottle"
-          ariaLabel="Next bottle"
-          primary={`Dream feed at ${formatTimeForDisplay(dreamFeed.startTime)}`}
-          {...metaProp}
-        />
-      );
-    }
     const message = bottle1Pending ? "Start first bottle for schedule" : "No more bottles today";
     return (
       <PreviewCard

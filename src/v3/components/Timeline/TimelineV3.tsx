@@ -23,10 +23,10 @@ export type TimelineV3Props = {
   colorMode?: "type" | "owner";
 };
 
-const AXIS_W = 36;
+const AXIS_W = 28;
 const GUTTER_W = 124;
-const BLOCK_LEFT_INSET = AXIS_W + 4;
-const BLOCK_RIGHT_INSET = GUTTER_W;
+const BLOCK_LEFT_INSET = AXIS_W + 8;
+const BLOCK_RIGHT_INSET = GUTTER_W + 24;
 const PUTDOWN_RIGHT_EXTRA = 30;
 const CUSTOM_LEFT_EXTRA = 110;
 const LEADER_LINE_W = 8;
@@ -209,8 +209,8 @@ export function TimelineV3({
           <InstantCluster
             key={g.key}
             items={g.items}
-            topPx={yOf(g.startMinutes) - 10}
-            rightPx={4}
+            topPx={yOf(g.startMinutes) - 12}
+            rightPx={BLOCK_RIGHT_INSET - GUTTER_W}
             widthPx={GUTTER_W - 8}
             leaderWidthPx={LEADER_LINE_W}
             owners={owners}

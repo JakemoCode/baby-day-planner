@@ -25,7 +25,6 @@ src/v3/
 │     ├─ wakeWindows.ts  ← R4.x  (TBD)
 │     ├─ bottles.ts      ← R5.x  (TBD)
 │     ├─ putdown.ts      ← R6.x  (TBD)
-│     ├─ dreamFeed.ts    ← R8.x  (TBD)
 │     ├─ pumps.ts        ← R9.x  (TBD)
 │     ├─ extras.ts       ← R10.x (TBD)
 │     ├─ dailyRecurring.ts ← R11.x (TBD)

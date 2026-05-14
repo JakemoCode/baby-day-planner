@@ -237,13 +237,16 @@ describe("DashboardPage (V3)", () => {
   });
 
   it("does NOT show end-of-day when there is still an upcoming event after bedtime", () => {
+    // A post-bedtime bottle (this is how a dream feed manifests in the
+    // new render-only-label model — a regular bottle whose label happens
+    // to be "Dream Feed").
     const upcoming: Event = {
       id: "evt-1",
       dayId: "day-1",
-      eventKey: "dream_feed",
-      type: "dream_feed",
+      eventKey: "bottle_6",
+      type: "bottle",
       kind: "instant",
-      label: "Dream feed",
+      label: "Dream Feed",
       startTime: 22 * 60,
       hasPutdown: false,
       lifecycle: { state: "projected" },

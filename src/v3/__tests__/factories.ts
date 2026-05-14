@@ -158,9 +158,6 @@ export function aSettings(overrides: Partial<Settings> = {}): Settings {
     pumpTimes: [10 * 60 + 30, 14 * 60 + 30],
     pumpOwnerSlot: "parent2",
     dreamFeedEnabled: true,
-    dreamFeedStart: 20 * 60 + 30,
-    dreamFeedEnd: 21 * 60,
-    dreamFeedOffsetAfterBedtimeMinutes: 90,
     dailyRecurring: [],
     daycare: {
       enabled: false,

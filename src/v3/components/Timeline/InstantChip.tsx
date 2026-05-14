@@ -16,14 +16,14 @@ export type InstantChipProps = {
 
 /**
  * Chip label rules (parity with V2 + new V3 types):
- *   - bottle keeps event.label ("Bottle 1") so per-event ordinal stays visible
- *   - dream_feed → "Dream Feed"
+ *   - bottle uses event.label — typically "Bottle N" from R5.4 chronological
+ *     renumber, OR "Dream Feed" from the render-time relabel
+ *     (src/v3/ui/dreamFeedLabel.ts)
  *   - bedtime → "Bed", pump → "Pump" (or label if it already starts with Pump)
  *   - daycare_dropoff/pickup → "Daycare ↓" / "Daycare ↑"
  *   - daily_recurring / extra → use the event's label directly
  */
 function chipText(event: Event): string {
-  if (event.type === "dream_feed") return "Dream Feed";
   if (event.type === "bedtime") return "Bed";
   if (event.type === "pump") return event.label.startsWith("Pump") ? event.label : "Pump";
   if (event.type === "daycare_dropoff") return "Daycare ↓";

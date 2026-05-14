@@ -140,7 +140,9 @@ describe("buildCreateTemplate (V3)", () => {
     expect(tpl.startTime).toBe(NOW);
   });
 
-  it("seeds an extra template (block) with empty label so the drawer prompts for one", () => {
+  it("seeds an extra template (instant) with empty label; kind upgrades to block on save iff endTime is set", () => {
+    // Template defaults to instant — final kind is decided in
+    // formToEvent based on whether the user fills in endTime.
     const tpl = buildCreateTemplate({
       type: "extra",
       dayId: "d-1",
@@ -149,7 +151,7 @@ describe("buildCreateTemplate (V3)", () => {
       nowMinutes: NOW,
     });
     expect(tpl.type).toBe("extra");
-    expect(tpl.kind).toBe("block");
+    expect(tpl.kind).toBe("instant");
     expect(tpl.label).toBe("");
   });
 
