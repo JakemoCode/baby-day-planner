@@ -184,6 +184,7 @@
 
 .owner {
   margin-left: var(--space-1);
+  font-size: 12px;
   font-weight: var(--weight-medium);
   color: var(--owner-color, inherit);
 }

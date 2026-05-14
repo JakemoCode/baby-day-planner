@@ -86,7 +86,7 @@
 }
 
 .ownerName {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: var(--weight-medium);
   line-height: 1;
   /* Owner name should hug the left edge of the chip body, not center
