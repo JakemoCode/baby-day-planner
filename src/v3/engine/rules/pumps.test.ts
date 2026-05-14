@@ -13,14 +13,15 @@ import { RULES as PUMP_RULES } from "./pumps";
 
 const ALL: Rule[] = [...PUMP_RULES];
 
-function aRecordedPump(start: number, eventKey: string): Event {
+function aRecordedPump(start: number, eventKey: string, durationMin = 25): Event {
   return {
     id: `actual_${eventKey}`,
     dayId: "day_test",
     eventKey,
     type: "pump",
-    kind: "instant",
+    kind: "block",
     startTime: start,
+    endTime: start + durationMin,
     label: "Pump",
     hasPutdown: false,
     lifecycle: { state: "completed", committedAt: start },
@@ -53,7 +54,11 @@ describe("R9.1 / R9.3 — pumps from settings.pumpTimes, first anchored to wakeT
     expect(pumps).toHaveLength(2);
     expect(pumps[0]!.startTime).toBe(7 * 60); // first anchored to wake
     expect(pumps[1]!.startTime).toBe(14 * 60 + 30);
-    expect(pumps.every((p) => p.kind === "instant")).toBe(true);
+    // Pumps are duration blocks: kind=block + endTime = start + default duration.
+    expect(pumps.every((p) => p.kind === "block")).toBe(true);
+    const dur = ctx.settings.defaultPumpDurationMinutes;
+    expect(pumps[0]!.endTime).toBe(7 * 60 + dur);
+    expect(pumps[1]!.endTime).toBe(14 * 60 + 30 + dur);
     expect(pumps.every((p) => p.lifecycle.state === "projected")).toBe(true);
     expect(pumps.every((p) => p.owner !== undefined && p.owner.slot === "parent2")).toBe(true);
   });

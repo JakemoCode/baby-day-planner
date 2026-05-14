@@ -269,6 +269,8 @@ export type Settings = {
   // Pumps
   pumpTimes: TimeMin[];
   pumpOwnerSlot: OwnerSlot;
+  /** Default duration of a pump session; pumps render as blocks of this length. */
+  defaultPumpDurationMinutes: number;
 
   // Dream feed — render-only label. When enabled, the first projected
   // bottle whose startTime > bedtime.startTime is rendered with the label

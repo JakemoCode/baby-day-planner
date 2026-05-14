@@ -87,7 +87,7 @@ export function Block({
         ? { type: "button" as const, onClick, "aria-label": a11y }
         : { role: "presentation" as const })}
     >
-      {event.type === "extra" && (
+      {(event.type === "extra" || event.type === "pump") && (
         <>
           <span className={styles.markerLine} data-edge="top" aria-hidden="true" />
           <span className={styles.markerLine} data-edge="bottom" aria-hidden="true" />

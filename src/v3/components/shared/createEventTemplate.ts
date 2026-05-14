@@ -71,9 +71,10 @@ export function buildCreateTemplate({
       dayId,
       eventKey: pumpId,
       type: "pump",
-      kind: "instant",
+      kind: "block",
       label: "Pump",
       startTime: nowMinutes,
+      endTime: nowMinutes + settings.defaultPumpDurationMinutes,
       hasPutdown: false,
       lifecycle: { state: "projected" },
     };

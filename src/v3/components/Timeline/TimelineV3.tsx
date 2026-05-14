@@ -46,7 +46,11 @@ function blockGeometry(event: Event): { leftPx: number; rightPx: number } {
   if (event.eventKey === PUTDOWN_KIND_TAG) {
     return { leftPx: BLOCK_LEFT_INSET, rightPx: BLOCK_RIGHT_INSET + PUTDOWN_RIGHT_EXTRA };
   }
-  if (event.type === "extra") {
+  // Right-column duration blocks: extras and pumps. Both are
+  // parent-side activities that coexist with the main schedule
+  // (naps / bedtime), so they get their own narrow column on the
+  // right rather than spanning the full block lane.
+  if (event.type === "extra" || event.type === "pump") {
     return { leftPx: BLOCK_LEFT_INSET + CUSTOM_LEFT_EXTRA, rightPx: BLOCK_RIGHT_INSET };
   }
   return { leftPx: BLOCK_LEFT_INSET, rightPx: BLOCK_RIGHT_INSET };

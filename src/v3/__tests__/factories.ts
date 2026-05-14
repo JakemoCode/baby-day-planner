@@ -157,6 +157,7 @@ export function aSettings(overrides: Partial<Settings> = {}): Settings {
     putdownLeadMinutes: 15,
     pumpTimes: [10 * 60 + 30, 14 * 60 + 30],
     pumpOwnerSlot: "parent2",
+    defaultPumpDurationMinutes: 25,
     dreamFeedEnabled: true,
     dailyRecurring: [],
     daycare: {

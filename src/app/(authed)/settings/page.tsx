@@ -150,6 +150,13 @@ export default function SettingsPage() {
 
       <Section title="Pumps">
         <PumpTimesRow value={value.pumpTimes} onChange={(v) => set("pumpTimes", v)} />
+        <NumberRow
+          id="defaultPumpDurationMinutes"
+          label="Default pump duration (min)"
+          value={value.defaultPumpDurationMinutes}
+          onChange={(v) => set("defaultPumpDurationMinutes", v)}
+          help="How long a pump session typically takes; pumps render as duration blocks of this length."
+        />
         <OwnerSlotRow
           id="pumpOwnerSlot"
           label="Pump owner"

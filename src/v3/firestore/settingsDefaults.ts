@@ -70,6 +70,7 @@ const DEFAULTS: Omit<Settings, "childId"> = {
   putdownLeadMinutes: 15,
   pumpTimes: [],
   pumpOwnerSlot: "parent2",
+  defaultPumpDurationMinutes: 25,
   dreamFeedEnabled: false,
   dailyRecurring: [],
   daycare: {
