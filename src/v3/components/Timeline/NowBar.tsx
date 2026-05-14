@@ -2,7 +2,7 @@
 
 import styles from "./NowBar.module.css";
 import type { TimeMin } from "../../schemas";
-import { formatTimeForDisplay } from "../../ui/time";
+import { formatTimeShort } from "../../ui/time";
 
 export type NowBarProps = {
   topPx: number;
@@ -29,7 +29,7 @@ export function NowBar({ topPx, axisWidthPx, rightPx = 0, nowMinutes }: NowBarPr
         className={styles.pill}
         style={{ left: 0, top: `${topPx - 9}px` }}
       >
-        {formatTimeForDisplay(nowMinutes)}
+        {formatTimeShort(nowMinutes)}
       </div>
     </>
   );

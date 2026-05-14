@@ -46,6 +46,7 @@ export const PLACEHOLDER_SETTINGS: Settings = {
   putdownLeadMinutes: 15,
   pumpTimes: [],
   pumpOwnerSlot: "parent2",
+  defaultPumpDurationMinutes: 25,
   dreamFeedEnabled: false,
   dailyRecurring: [],
   daycare: {

@@ -83,6 +83,14 @@
   border-color: var(--color-muted);
 }
 
+/* Pump: distinct dusty-lavender fill so pumps read as their own
+ * activity class. Owner is conveyed by the left stripe (existing
+ * [data-owner] rule), not by text inside the block. */
+.block[data-type="pump"][data-color-mode="type"] {
+  background: var(--color-pump-tint);
+  border-color: color-mix(in srgb, var(--color-pump-tint) 80%, var(--color-fg) 20%);
+}
+
 /* === Owner-mode fills (alternate) ============================
  * In owner mode, the configured owner color tints the whole block.
  * 20% mix keeps text legible against the background; if no owner is
@@ -176,6 +184,7 @@
 
 .owner {
   margin-left: var(--space-1);
+  font-size: 12px;
   font-weight: var(--weight-medium);
   color: var(--owner-color, inherit);
 }

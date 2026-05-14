@@ -27,7 +27,13 @@ const AXIS_W = 28;
 const GUTTER_W = 124;
 const BLOCK_LEFT_INSET = AXIS_W + 8;
 const BLOCK_RIGHT_INSET = GUTTER_W + 24;
-const PUTDOWN_RIGHT_EXTRA = 30;
+// Putdown stops ~30px before the chip column for a comfortable
+// right-shoulder gap. Chip column's inner-left edge sits at
+// (BLOCK_RIGHT_INSET - 4) from the container's right (chip is
+// `right: BLOCK_RIGHT_INSET - GUTTER_W + 4; width: GUTTER_W - 8`).
+// Putdown no longer renders an owner name — the owner stripe
+// inherits from the parent nap — so the freed space pushes the gap.
+const PUTDOWN_RIGHT_INSET = BLOCK_RIGHT_INSET + 26;
 const CUSTOM_LEFT_EXTRA = 110;
 const LEADER_LINE_W = 8;
 const VIEWPORT_PADDING_MIN = 30;
@@ -44,9 +50,13 @@ function formatHourLabel(hour24: number): string {
 
 function blockGeometry(event: Event): { leftPx: number; rightPx: number } {
   if (event.eventKey === PUTDOWN_KIND_TAG) {
-    return { leftPx: BLOCK_LEFT_INSET, rightPx: BLOCK_RIGHT_INSET + PUTDOWN_RIGHT_EXTRA };
+    return { leftPx: BLOCK_LEFT_INSET, rightPx: PUTDOWN_RIGHT_INSET };
   }
-  if (event.type === "extra") {
+  // Right-column duration blocks: extras and pumps. Both are
+  // parent-side activities that coexist with the main schedule
+  // (naps / bedtime), so they get their own narrow column on the
+  // right rather than spanning the full block lane.
+  if (event.type === "extra" || event.type === "pump") {
     return { leftPx: BLOCK_LEFT_INSET + CUSTOM_LEFT_EXTRA, rightPx: BLOCK_RIGHT_INSET };
   }
   return { leftPx: BLOCK_LEFT_INSET, rightPx: BLOCK_RIGHT_INSET };
@@ -183,8 +193,7 @@ export function TimelineV3({
             //   legibility floor (17px content area = clears
             //   `--text-sm` × 1.2 line-height = 16.8px) to ensure the
             //   single-row label `Putdown · 8:08p · Kelly` doesn't clip.
-            //   The matching `padding: 0 6px` lives in Block.module.css
-            //   — keep both in sync.
+            //   The matching `padding: 0 6px` lives in Block.module.css.
             const naturalH = (end - event.startTime) * pxPerMin;
             const minH = isPutdown ? 20 : 24;
             const heightPxBlock = Math.max(minH, naturalH);

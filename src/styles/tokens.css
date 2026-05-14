@@ -31,6 +31,7 @@
   --color-success: #5e7c5b; /* deeper sage */
   --color-warning: #c97e5b; /* terracotta */
   --color-danger: #a64f3a; /* deep rust */
+  --color-pump-tint: #ddd2e5; /* dusty lavender — pump block fill */
 
   /* ─────── Owner colors ─────── */
   --color-owner-jake: #7a8fa8; /* dusty blue */
@@ -118,6 +119,7 @@
     --color-success: #7c9a78;
     --color-warning: #d99878;
     --color-danger: #c47659;
+    --color-pump-tint: #3c2f44;
 
     --color-owner-jake: #94a8c0;
     --color-owner-kelly: #e0a695;

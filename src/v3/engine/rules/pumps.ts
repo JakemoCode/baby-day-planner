@@ -8,7 +8,10 @@
  * R9.3: first entry is anchored to `day.wakeTime` (overriding the setting)
  *       so nursing parents don't have to update settings every morning.
  * R9.4: actuals with the same eventKey suppress the projection.
- * R9.5: instant kind, no duration.
+ * R9.5: kind = block; duration = settings.defaultPumpDurationMinutes.
+ *       Pumping is a 20–30 min activity that blocks the owner from
+ *       other concurrent tasks (e.g. mom pumping can't do dream feed),
+ *       so render as a duration block in the right column.
  *
  * Owner default = `settings.pumpOwnerSlot`.
  */
@@ -79,8 +82,9 @@ function buildProjectedPump(ctx: Context, startTime: TimeMin, eventKey: string):
     id: `proj_${eventKey}`,
     eventKey,
     type: "pump",
-    kind: "instant",
+    kind: "block",
     startTime,
+    endTime: startTime + ctx.settings.defaultPumpDurationMinutes,
     label: "Pump",
     owner: { slot: ctx.settings.pumpOwnerSlot },
   });

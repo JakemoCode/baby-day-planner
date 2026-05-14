@@ -2,7 +2,7 @@
 
 import styles from "./Block.module.css";
 import type { Event, OwnersConfig } from "../../schemas";
-import { formatTimeForDisplay, formatTimeShort } from "../../ui/time";
+import { formatRangeShort, formatTimeForDisplay, formatTimeShort } from "../../ui/time";
 import { ownerColor, ownerDisplayName } from "../../ui/owners";
 import { ownerStyleVar } from "../../ui/ownerStyle";
 import { PUTDOWN_KIND_TAG } from "./expandPutdown";
@@ -22,15 +22,10 @@ export type BlockProps = {
   rightPx: number;
 };
 
-function formatRange(start: number, end: number): string {
-  const s = formatTimeForDisplay(start);
-  const e = formatTimeForDisplay(end);
-  const sP = s.slice(-2);
-  const eP = e.slice(-2);
-  if (sP === eP) {
-    return `${s.replace(/\s(AM|PM)$/, "")}–${e}`;
-  }
-  return `${s} – ${e}`;
+// a11y-only verbose range: screen readers do better with the full
+// "1:00 PM" pronunciation than the timeline's compact "1-1:15p".
+function formatRangeVerbose(start: number, end: number): string {
+  return `${formatTimeForDisplay(start)} to ${formatTimeForDisplay(end)}`;
 }
 
 function blockLabel(event: Event): string {
@@ -55,13 +50,24 @@ export function Block({
 }: BlockProps) {
   const interactive = !!onClick;
   const Tag = interactive ? "button" : "div";
-  const range = event.endTime !== undefined ? formatRange(event.startTime, event.endTime) : "";
+  const range = event.endTime !== undefined ? formatRangeShort(event.startTime, event.endTime) : "";
   const ownerName = ownerDisplayName(event.owner, owners);
   const ownerColorValue = ownerColor(event.owner, owners);
   const slotKey = ownerSlotKey(event.owner);
-  const a11y = `${event.label}${range ? ` ${range}` : ""}${ownerName ? ` ${ownerName}` : ""}`;
+  const rangeA11y =
+    event.endTime !== undefined ? formatRangeVerbose(event.startTime, event.endTime) : "";
+  const a11y = `${event.label}${rangeA11y ? ` ${rangeA11y}` : ""}${ownerName ? ` ${ownerName}` : ""}`;
   const napShortForm = event.type === "nap" && heightPx < NAP_TWO_ROW_THRESHOLD_PX;
   const isPutdown = event.eventKey === PUTDOWN_KIND_TAG;
+  // Pump: "Pump" + time range on two lines. Owner is conveyed by the
+  // left-stripe color (existing [data-owner] rule), not by text —
+  // "owner knows who they are." Block is sized to content (max-content)
+  // and inset 4px from the main block's right edge so a sliver of the
+  // parent block's shoulder shows past the pump.
+  const isPump = event.type === "pump";
+  const positionStyle = isPump
+    ? { right: `${rightPx}px`, width: "max-content" as const }
+    : { left: `${leftPx}px`, right: `${rightPx}px` };
   // Reuse V2's "putdown" data-type so the existing CSS selectors apply.
   // V3 doesn't have a putdown type at the schema level; this is the
   // renderer's contract with the stylesheet, not with the data model.
@@ -79,8 +85,7 @@ export function Block({
       style={{
         top: `${topPx}px`,
         height: `${heightPx}px`,
-        left: `${leftPx}px`,
-        right: `${rightPx}px`,
+        ...positionStyle,
         ...ownerStyleVar(ownerColorValue),
       }}
       {...(interactive
@@ -96,22 +101,16 @@ export function Block({
       <span className={styles.label}>
         {blockLabel(event)}
         {isPutdown && (
-          <>
-            <span className={styles.inlineTime}> · {formatTimeShort(event.startTime)}</span>
-            {ownerName && (
-              <span className={styles.owner} {...(slotKey ? { "data-owner": slotKey } : {})}>
-                · {ownerName}
-              </span>
-            )}
-          </>
+          <span className={styles.inlineTime}> · {formatTimeShort(event.startTime)}</span>
         )}
-        {napShortForm && ownerName && (
+        {napShortForm && !isPutdown && ownerName && (
           <span className={styles.owner} {...(slotKey ? { "data-owner": slotKey } : {})}>
             · {ownerName}
           </span>
         )}
       </span>
-      {range && !isPutdown && !napShortForm && (
+      {isPump && range && <span className={styles.range}>{range}</span>}
+      {range && !isPutdown && !napShortForm && !isPump && (
         <span className={styles.range}>
           {range}
           {ownerName && (

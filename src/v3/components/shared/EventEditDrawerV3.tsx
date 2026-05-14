@@ -147,7 +147,7 @@ export function EventEditDrawerV3({
   const canDelete = mode === "edit" && onDelete !== undefined && isRecorded(sourceEvent.lifecycle);
 
   const showStartTime = type !== "wake_window";
-  const showEndTime = type === "nap" || type === "extra";
+  const showEndTime = type === "nap" || type === "extra" || type === "pump";
   const showAmount = type === "bottle";
   const showOwner =
     type === "nap" ||
@@ -161,13 +161,14 @@ export function EventEditDrawerV3({
 
   const handleStartTimeChange = (raw: string) => {
     const next = parseHM24(raw);
-    // Naps preserve their start→end duration as the user nudges
-    // startTime, and seed a default duration if none is set yet —
-    // a nap implies a duration. Extras decide instant-vs-block at
-    // save based on whether the user explicitly entered an endTime,
-    // so we DON'T auto-fill endTime from a startTime change for
-    // extras (would silently promote them to block).
-    if (type !== "nap" || next === undefined) {
+    // Naps and pumps preserve their start→end duration as the user
+    // nudges startTime — both imply a duration baked into their
+    // template (nap default length, pump default duration). Extras
+    // decide instant-vs-block at save based on whether the user
+    // explicitly entered an endTime, so we DON'T auto-fill endTime
+    // from a startTime change for extras.
+    const preservesDuration = type === "nap" || type === "pump";
+    if (!preservesDuration || next === undefined) {
       setForm((prev) => ({ ...prev, startTime: next }));
       return;
     }

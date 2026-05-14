@@ -126,16 +126,20 @@ describe("buildCreateTemplate (V3)", () => {
     expect(tpl.label).toBe("Nap 2");
   });
 
-  it("seeds a pump template (instant) with a unique eventKey", () => {
+  it("seeds a pump template (block) with default duration and unique eventKey", () => {
+    // Pumps are duration events (20–30 min); template starts as block
+    // with endTime = startTime + defaultPumpDurationMinutes.
+    const s = settings();
     const tpl = buildCreateTemplate({
       type: "pump",
       dayId: "d-1",
       actuals: [],
-      settings: settings(),
+      settings: s,
       nowMinutes: NOW,
     });
     expect(tpl.type).toBe("pump");
-    expect(tpl.kind).toBe("instant");
+    expect(tpl.kind).toBe("block");
+    expect(tpl.endTime).toBe(NOW + s.defaultPumpDurationMinutes);
     expect(tpl.eventKey).toMatch(/^pump_/);
     expect(tpl.startTime).toBe(NOW);
   });
