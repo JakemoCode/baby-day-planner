@@ -23,13 +23,13 @@ export type TimelineV3Props = {
   colorMode?: "type" | "owner";
 };
 
-const AXIS_W = 36;
+const AXIS_W = 28;
 const GUTTER_W = 124;
-const BLOCK_LEFT_INSET = AXIS_W + 4;
-const BLOCK_RIGHT_INSET = GUTTER_W;
+const BLOCK_LEFT_INSET = AXIS_W + 8;
+const BLOCK_RIGHT_INSET = GUTTER_W + 24;
 const PUTDOWN_RIGHT_EXTRA = 30;
 const CUSTOM_LEFT_EXTRA = 110;
-const LEADER_LINE_W = 8;
+const LEADER_LINE_W = 12;
 const VIEWPORT_PADDING_MIN = 30;
 const DEFAULT_VIEWPORT = { start: 7 * 60, end: 21 * 60 };
 const SCROLL_TOP_PADDING_PX = 80;
