@@ -31,23 +31,5 @@ export function useV3Projection(input: UseV3ProjectionInput): Event[] {
     nowMinutes,
     ...(input.template !== undefined ? { template: input.template } : {}),
   });
-  // TEMP DIAGNOSTIC (PR #139 click-test): remove before merge.
-  const bedtime = events.find((e) => e.type === "bedtime");
-  const bottles = events
-    .filter((e) => e.type === "bottle")
-    .map((e) => ({
-      id: e.id,
-      key: e.eventKey,
-      start: e.startTime,
-      label: e.label,
-      state: e.lifecycle.state,
-    }));
-  // eslint-disable-next-line no-console
-  console.log("[dreamFeed-debug]", {
-    dreamFeedEnabled: input.settings.dreamFeedEnabled,
-    bedtimeStart: bedtime?.startTime,
-    bedtimeState: bedtime?.lifecycle.state,
-    bottles,
-  });
   return applyDreamFeedLabel(events, input.settings);
 }

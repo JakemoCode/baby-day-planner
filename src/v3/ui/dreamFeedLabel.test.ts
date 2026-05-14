@@ -4,10 +4,10 @@
  * Behavior contract per docs/v3/SIMPLIFICATION_SCOPE.md §3:
  *   - When settings.dreamFeedEnabled === false, return events unchanged.
  *   - When no bedtime exists, return events unchanged.
- *   - When enabled + bedtime present, the FIRST projected bottle whose
- *     startTime > bedtime.startTime is relabeled "Dream Feed".
- *   - Recorded bottles are not relabeled (it's a forecast hint, not
- *     retroactive renaming).
+ *   - When enabled + bedtime present, the FIRST bottle (by startTime)
+ *     whose startTime > bedtime.startTime is relabeled "Dream Feed".
+ *   - Lifecycle-agnostic: recorded bottles are relabeled too. "Dream
+ *     Feed" is the slot name, not a forecast hint.
  *   - Only ONE bottle is relabeled — subsequent post-bedtime bottles
  *     keep their normal "Bottle N" labels.
  */
@@ -75,9 +75,9 @@ describe("applyDreamFeedLabel", () => {
     expect(out.find((e) => e.id === "b7")?.label).toBe("Bottle 7"); // subsequent untouched
   });
 
-  it("does NOT relabel a recorded bottle that happens to be post-bedtime", () => {
-    // The user already recorded this bottle — its label is whatever
-    // they/the engine assigned at record time. Don't rewrite history.
+  it("DOES relabel a recorded bottle when it's the first post-bedtime bottle (slot, not forecast)", () => {
+    // Per Jake 2026-05-14: "Dream Feed" is the name of the slot. If
+    // the user actually logged a 10 PM bottle, it IS the dream feed.
     const settings = aSettings({ dreamFeedEnabled: true });
     const bedtime = aProjectedBedtime({ start: 19 * 60 });
     const recorded = aRecordedBottle({
@@ -87,7 +87,7 @@ describe("applyDreamFeedLabel", () => {
       label: "Bottle 6",
     });
     const out = applyDreamFeedLabel([bedtime, recorded], settings);
-    expect(out.find((e) => e.id === "b6r")?.label).toBe("Bottle 6");
+    expect(out.find((e) => e.id === "b6r")?.label).toBe("Dream Feed");
   });
 
   it("does NOT relabel a bottle whose startTime equals bedtime.startTime (strict >)", () => {
@@ -101,6 +101,30 @@ describe("applyDreamFeedLabel", () => {
     });
     const out = applyDreamFeedLabel([bedtime, atBedtime], settings);
     expect(out.find((e) => e.id === "b-at")?.label).toBe("Bottle 5");
+  });
+
+  it("picks earliest by startTime, not array order", () => {
+    // Events aren't guaranteed time-sorted in every callsite. The
+    // relabel target is the post-bedtime bottle with the earliest
+    // startTime, not the first one encountered in iteration.
+    const settings = aSettings({ dreamFeedEnabled: true });
+    const bedtime = aProjectedBedtime({ start: 19 * 60 });
+    const later = aProjectedBottle({
+      id: "b-late",
+      eventKey: "bottle_7",
+      label: "Bottle 7",
+      startTime: 25 * 60,
+    });
+    const earlier = aProjectedBottle({
+      id: "b-early",
+      eventKey: "bottle_6",
+      label: "Bottle 6",
+      startTime: 22 * 60,
+    });
+    // Array order: later first, then earlier.
+    const out = applyDreamFeedLabel([bedtime, later, earlier], settings);
+    expect(out.find((e) => e.id === "b-early")?.label).toBe("Dream Feed");
+    expect(out.find((e) => e.id === "b-late")?.label).toBe("Bottle 7");
   });
 
   it("preserves event identity for non-relabeled events (===, no needless copies)", () => {
