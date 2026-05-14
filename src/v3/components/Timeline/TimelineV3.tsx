@@ -27,7 +27,10 @@ const AXIS_W = 28;
 const GUTTER_W = 124;
 const BLOCK_LEFT_INSET = AXIS_W + 8;
 const BLOCK_RIGHT_INSET = GUTTER_W + 24;
-const PUTDOWN_RIGHT_EXTRA = 30;
+// Putdown's right inset is anchored to GUTTER_W, not BLOCK_RIGHT_INSET,
+// so widening the regular-block right inset doesn't shrink putdown's
+// label space (which would truncate "Putdown · 5:15p · Jake").
+const PUTDOWN_RIGHT_INSET = GUTTER_W + 30;
 const CUSTOM_LEFT_EXTRA = 110;
 const LEADER_LINE_W = 8;
 const VIEWPORT_PADDING_MIN = 30;
@@ -44,7 +47,7 @@ function formatHourLabel(hour24: number): string {
 
 function blockGeometry(event: Event): { leftPx: number; rightPx: number } {
   if (event.eventKey === PUTDOWN_KIND_TAG) {
-    return { leftPx: BLOCK_LEFT_INSET, rightPx: BLOCK_RIGHT_INSET + PUTDOWN_RIGHT_EXTRA };
+    return { leftPx: BLOCK_LEFT_INSET, rightPx: PUTDOWN_RIGHT_INSET };
   }
   // Right-column duration blocks: extras and pumps. Both are
   // parent-side activities that coexist with the main schedule

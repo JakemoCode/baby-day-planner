@@ -62,6 +62,10 @@ export function Block({
   const a11y = `${event.label}${range ? ` ${range}` : ""}${ownerName ? ` ${ownerName}` : ""}`;
   const napShortForm = event.type === "nap" && heightPx < NAP_TWO_ROW_THRESHOLD_PX;
   const isPutdown = event.eventKey === PUTDOWN_KIND_TAG;
+  // Pumps render "Pump" on row 1 and owner alone on row 2 — no time
+  // range, no duration. Per Jake 2026-05-14: pump presence is what
+  // matters; the block's vertical span already conveys the duration.
+  const isPump = event.type === "pump";
   // Reuse V2's "putdown" data-type so the existing CSS selectors apply.
   // V3 doesn't have a putdown type at the schema level; this is the
   // renderer's contract with the stylesheet, not with the data model.
@@ -111,7 +115,14 @@ export function Block({
           </span>
         )}
       </span>
-      {range && !isPutdown && !napShortForm && (
+      {isPump && ownerName && (
+        <span className={styles.range}>
+          <span className={styles.owner} {...(slotKey ? { "data-owner": slotKey } : {})}>
+            {ownerName}
+          </span>
+        </span>
+      )}
+      {range && !isPutdown && !napShortForm && !isPump && (
         <span className={styles.range}>
           {range}
           {ownerName && (
