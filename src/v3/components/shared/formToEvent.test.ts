@@ -91,6 +91,59 @@ describe("formToEvent — lifecycle dispatch from projected", () => {
     expect(next.lifecycle).toEqual({ state: "overridden", annotatedAt: NOW });
   });
 
+  it("extra template (kind=instant) + endTime filled in on save → upgrades to block + started", () => {
+    // Template defaults to instant. If the user enters an endTime in
+    // the drawer, save derives kind="block". With no endTime committed
+    // yet (block-in-progress) the lifecycle is "started".
+    const source: Event = {
+      id: "x-1",
+      dayId: "d-1",
+      eventKey: "x-1",
+      type: "extra",
+      kind: "instant",
+      label: "Walk",
+      startTime: 9 * 60,
+      hasPutdown: false,
+      lifecycle: { state: "projected" },
+    };
+    const form: FormState = {
+      startTime: 9 * 60 + 5,
+      endTime: 9 * 60 + 35,
+      amountOz: undefined,
+      owner: undefined,
+      label: "Walk",
+    };
+    const next = formToEvent(form, source, NOW);
+    expect(next.kind).toBe("block");
+    expect(next.endTime).toBe(9 * 60 + 35);
+    expect(next.lifecycle).toEqual({ state: "completed", committedAt: NOW });
+  });
+
+  it("extra template (kind=instant) + no endTime on save → stays instant + completed", () => {
+    const source: Event = {
+      id: "x-2",
+      dayId: "d-1",
+      eventKey: "x-2",
+      type: "extra",
+      kind: "instant",
+      label: "Snack",
+      startTime: 10 * 60,
+      hasPutdown: false,
+      lifecycle: { state: "projected" },
+    };
+    const form: FormState = {
+      startTime: 10 * 60 + 15,
+      endTime: undefined,
+      amountOz: undefined,
+      owner: undefined,
+      label: "Snack",
+    };
+    const next = formToEvent(form, source, NOW);
+    expect(next.kind).toBe("instant");
+    expect(next.endTime).toBeUndefined();
+    expect(next.lifecycle).toEqual({ state: "completed", committedAt: NOW });
+  });
+
   it("projected non-nap/bedtime block (e.g. extra) + time changed + endTime → completed (unchanged)", () => {
     // Regression guard: the predict-don't-prescribe rule is targeted at nap
     // and bedtime, NOT all block types. An "extra" event keeps the V2-style

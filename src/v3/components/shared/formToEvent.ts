@@ -39,10 +39,24 @@ export type FormState = {
 export function formToEvent(form: FormState, source: Event, nowMinutes: TimeMin): Event {
   const timeChanged = form.startTime !== source.startTime || form.endTime !== source.endTime;
 
-  const lifecycle: Lifecycle = computeLifecycle(source, timeChanged, form.endTime, nowMinutes);
+  // Custom events derive kind from the form: endTime present → block,
+  // absent → instant. The template defaults to one (see
+  // createEventTemplate.ts); the final shape is decided here at save.
+  // Other event types keep their schema-defined kind regardless.
+  const kind: Event["kind"] =
+    source.type === "extra" ? (form.endTime !== undefined ? "block" : "instant") : source.kind;
+
+  const lifecycle: Lifecycle = computeLifecycle(
+    source,
+    kind,
+    timeChanged,
+    form.endTime,
+    nowMinutes,
+  );
 
   const next: Event = {
     ...source,
+    kind,
     startTime: form.startTime,
     label: form.label || source.label,
     lifecycle,
@@ -93,6 +107,7 @@ function isSchedulingType(type: Event["type"]): boolean {
 
 function computeLifecycle(
   source: Event,
+  kind: Event["kind"],
   timeChanged: boolean,
   endTime: TimeMin | undefined,
   nowMinutes: TimeMin,
@@ -100,7 +115,9 @@ function computeLifecycle(
   if (source.lifecycle.state === "projected") {
     if (!timeChanged) return { state: "overridden", annotatedAt: nowMinutes };
     // Block with no endTime is "I started this but it's not done yet."
-    if (source.kind === "block" && endTime === undefined) {
+    // Uses the effective (save-time) kind so a custom event without an
+    // endTime is treated as instant → completed, not started-block.
+    if (kind === "block" && endTime === undefined) {
       return { state: "started", committedAt: nowMinutes };
     }
     // Scheduling-type carve-out: nap/bedtime time-edits are intent,

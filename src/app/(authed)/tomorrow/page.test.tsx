@@ -164,27 +164,30 @@ describe("TomorrowPage (V3)", () => {
     // it into extras. Re-opening that same event via the timeline tap
     // routes through the edit-of-projected branch; the bug being
     // guarded against is a second save creating a duplicate entry.
+    //
+    // Extras now default to instant (kind upgraded to "block" only if
+    // the user enters an endTime), so the saved extra renders as an
+    // instant-chip, not a timeline-block.
     await userEvent.click(screen.getByRole("button", { name: /add extra event/i }));
     await userEvent.click(screen.getByRole("button", { name: /^save$/i }));
 
-    // Find the projected extra in the timeline and tap it to re-edit.
-    const extraBlock = screen
-      .getAllByTestId("timeline-block")
+    const extraChip = screen
+      .getAllByTestId("instant-chip")
       .find((el) => el.dataset.type === "extra");
-    expect(extraBlock).toBeDefined();
-    await userEvent.click(extraBlock!);
+    expect(extraChip).toBeDefined();
+    await userEvent.click(extraChip!);
     await userEvent.click(screen.getByRole("button", { name: /^save$/i }));
 
     // Tap and save again — verifies the dedup invariant on a 3rd pass.
-    const extraBlock2 = screen
-      .getAllByTestId("timeline-block")
+    const extraChips2 = screen
+      .getAllByTestId("instant-chip")
       .filter((el) => el.dataset.type === "extra");
-    expect(extraBlock2).toHaveLength(1);
-    await userEvent.click(extraBlock2[0]!);
+    expect(extraChips2).toHaveLength(1);
+    await userEvent.click(extraChips2[0]!);
     await userEvent.click(screen.getByRole("button", { name: /^save$/i }));
 
     const finalExtras = screen
-      .getAllByTestId("timeline-block")
+      .getAllByTestId("instant-chip")
       .filter((el) => el.dataset.type === "extra");
     expect(finalExtras).toHaveLength(1);
   });

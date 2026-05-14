@@ -79,13 +79,15 @@ export function buildCreateTemplate({
     };
   }
 
+  // Custom (extra) events default to instant. If the user fills in an
+  // endTime in the drawer, formToEvent upgrades kind to "block" on save.
   const extraId = newEventId("extra");
   return {
     id: extraId,
     dayId,
     eventKey: extraId,
     type: "extra",
-    kind: "block",
+    kind: "instant",
     label: "",
     startTime: nowMinutes,
     hasPutdown: false,
