@@ -153,7 +153,7 @@ describe("TimelineV3", () => {
       />,
     );
     expect(screen.getByTestId("now-line")).toBeInTheDocument();
-    expect(screen.getByTestId("now-pill")).toHaveTextContent("9:30 AM");
+    expect(screen.getByTestId("now-pill")).toHaveTextContent("9:30a");
   });
 
   // §F9 PORT — coverage previously asserted in V2 timeline tests.

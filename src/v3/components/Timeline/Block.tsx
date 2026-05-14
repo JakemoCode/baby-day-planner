@@ -2,7 +2,7 @@
 
 import styles from "./Block.module.css";
 import type { Event, OwnersConfig } from "../../schemas";
-import { formatTimeForDisplay, formatTimeShort } from "../../ui/time";
+import { formatRangeShort, formatTimeForDisplay, formatTimeShort } from "../../ui/time";
 import { ownerColor, ownerDisplayName } from "../../ui/owners";
 import { ownerStyleVar } from "../../ui/ownerStyle";
 import { PUTDOWN_KIND_TAG } from "./expandPutdown";
@@ -22,15 +22,10 @@ export type BlockProps = {
   rightPx: number;
 };
 
-function formatRange(start: number, end: number): string {
-  const s = formatTimeForDisplay(start);
-  const e = formatTimeForDisplay(end);
-  const sP = s.slice(-2);
-  const eP = e.slice(-2);
-  if (sP === eP) {
-    return `${s.replace(/\s(AM|PM)$/, "")}–${e}`;
-  }
-  return `${s} – ${e}`;
+// a11y-only verbose range: screen readers do better with the full
+// "1:00 PM" pronunciation than the timeline's compact "1-1:15p".
+function formatRangeVerbose(start: number, end: number): string {
+  return `${formatTimeForDisplay(start)} to ${formatTimeForDisplay(end)}`;
 }
 
 function blockLabel(event: Event): string {
@@ -55,11 +50,13 @@ export function Block({
 }: BlockProps) {
   const interactive = !!onClick;
   const Tag = interactive ? "button" : "div";
-  const range = event.endTime !== undefined ? formatRange(event.startTime, event.endTime) : "";
+  const range = event.endTime !== undefined ? formatRangeShort(event.startTime, event.endTime) : "";
   const ownerName = ownerDisplayName(event.owner, owners);
   const ownerColorValue = ownerColor(event.owner, owners);
   const slotKey = ownerSlotKey(event.owner);
-  const a11y = `${event.label}${range ? ` ${range}` : ""}${ownerName ? ` ${ownerName}` : ""}`;
+  const rangeA11y =
+    event.endTime !== undefined ? formatRangeVerbose(event.startTime, event.endTime) : "";
+  const a11y = `${event.label}${rangeA11y ? ` ${rangeA11y}` : ""}${ownerName ? ` ${ownerName}` : ""}`;
   const napShortForm = event.type === "nap" && heightPx < NAP_TWO_ROW_THRESHOLD_PX;
   const isPutdown = event.eventKey === PUTDOWN_KIND_TAG;
   // Pump: "Pump" + time range on two lines. Owner is conveyed by the
@@ -104,14 +101,7 @@ export function Block({
       <span className={styles.label}>
         {blockLabel(event)}
         {isPutdown && (
-          <>
-            <span className={styles.inlineTime}> · {formatTimeShort(event.startTime)}</span>
-            {ownerName && (
-              <span className={styles.owner} {...(slotKey ? { "data-owner": slotKey } : {})}>
-                · {ownerName}
-              </span>
-            )}
-          </>
+          <span className={styles.inlineTime}> · {formatTimeShort(event.startTime)}</span>
         )}
         {napShortForm && !isPutdown && ownerName && (
           <span className={styles.owner} {...(slotKey ? { "data-owner": slotKey } : {})}>

@@ -27,10 +27,13 @@ const AXIS_W = 28;
 const GUTTER_W = 124;
 const BLOCK_LEFT_INSET = AXIS_W + 8;
 const BLOCK_RIGHT_INSET = GUTTER_W + 24;
-// Putdown's right inset is anchored to GUTTER_W, not BLOCK_RIGHT_INSET,
-// so widening the regular-block right inset doesn't shrink putdown's
-// label space (which would truncate "Putdown · 5:15p · Jake").
-const PUTDOWN_RIGHT_INSET = GUTTER_W + 30;
+// Putdown stops ~30px before the chip column for a comfortable
+// right-shoulder gap. Chip column's inner-left edge sits at
+// (BLOCK_RIGHT_INSET - 4) from the container's right (chip is
+// `right: BLOCK_RIGHT_INSET - GUTTER_W + 4; width: GUTTER_W - 8`).
+// Putdown no longer renders an owner name — the owner stripe
+// inherits from the parent nap — so the freed space pushes the gap.
+const PUTDOWN_RIGHT_INSET = BLOCK_RIGHT_INSET + 26;
 const CUSTOM_LEFT_EXTRA = 110;
 const LEADER_LINE_W = 8;
 const VIEWPORT_PADDING_MIN = 30;

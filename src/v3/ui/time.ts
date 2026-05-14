@@ -52,6 +52,26 @@ export function formatTimeShort(minutes: TimeMin): string {
 }
 
 /**
+ * Compact time-range formatter used for all duration displays on the
+ * timeline. Output shapes:
+ *   - same period (most ranges):    "1 - 1:15p", "9:30 - 10a"
+ *   - cross period (bedtime etc.):  "10p - 7a"
+ *
+ * Period suffix is dropped from the start when start and end share it,
+ * because the trailing "a"/"p" applies to the whole range.
+ */
+export function formatRangeShort(start: TimeMin, end: TimeMin): string {
+  const s = formatTimeShort(start);
+  const e = formatTimeShort(end);
+  const sP = s.slice(-1);
+  const eP = e.slice(-1);
+  if (sP === eP) {
+    return `${s.slice(0, -1)} - ${e}`;
+  }
+  return `${s} - ${e}`;
+}
+
+/**
  * Format a non-negative minute count as a compact hours/minutes string.
  *   45 → "45m"
  *   60 → "1h"
