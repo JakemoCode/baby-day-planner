@@ -23,9 +23,9 @@ export type TimelineV3Props = {
   colorMode?: "type" | "owner";
 };
 
-const AXIS_W = 36;
-const GUTTER_W = 124;
-const BLOCK_LEFT_INSET = AXIS_W + 4;
+const AXIS_W = 28;
+const GUTTER_W = 132;
+const BLOCK_LEFT_INSET = AXIS_W + 2;
 const BLOCK_RIGHT_INSET = GUTTER_W;
 const PUTDOWN_RIGHT_EXTRA = 30;
 const CUSTOM_LEFT_EXTRA = 110;
