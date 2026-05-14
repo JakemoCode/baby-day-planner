@@ -210,7 +210,7 @@ export function TimelineV3({
             key={g.key}
             items={g.items}
             topPx={yOf(g.startMinutes) - 10}
-            rightPx={4}
+            rightPx={BLOCK_RIGHT_INSET - GUTTER_W + 4}
             widthPx={GUTTER_W - 8}
             leaderWidthPx={LEADER_LINE_W}
             owners={owners}
