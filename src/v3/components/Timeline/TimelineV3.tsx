@@ -186,12 +186,13 @@ export function TimelineV3({
             // Min height differs by event type:
             // - Tappable blocks: 24px floor so a 1-minute accidental nap
             //   still gets a thumb-sized target.
-            // - Putdown synthetics: not tappable. Renders two lines —
-            //   "Putdown" on row 1 and "<time> · <owner>" on row 2 —
-            //   so floor at 34px (label 16.8 + range 14.4 + padding).
+            // - Putdown synthetics: not tappable, but need a 20px
+            //   legibility floor (17px content area = clears
+            //   `--text-sm` × 1.2 line-height = 16.8px) to ensure the
+            //   single-row label `Putdown · 8:08p · Kelly` doesn't clip.
             //   The matching `padding: 0 6px` lives in Block.module.css.
             const naturalH = (end - event.startTime) * pxPerMin;
-            const minH = isPutdown ? 34 : 24;
+            const minH = isPutdown ? 20 : 24;
             const heightPxBlock = Math.max(minH, naturalH);
             const tap = onEventTap && !isPutdown ? () => onEventTap(event) : undefined;
             return (

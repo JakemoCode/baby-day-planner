@@ -69,7 +69,7 @@ export function Block({
   // parent block's shoulder shows past the pump.
   const isPump = event.type === "pump";
   const positionStyle = isPump
-    ? { right: `${rightPx + 4}px`, width: "max-content" as const }
+    ? { right: `${rightPx}px`, width: "max-content" as const }
     : { left: `${leftPx}px`, right: `${rightPx}px` };
   // Reuse V2's "putdown" data-type so the existing CSS selectors apply.
   // V3 doesn't have a putdown type at the schema level; this is the
@@ -103,22 +103,22 @@ export function Block({
       )}
       <span className={styles.label}>
         {blockLabel(event)}
+        {isPutdown && (
+          <>
+            <span className={styles.inlineTime}> · {formatTimeShort(event.startTime)}</span>
+            {ownerName && (
+              <span className={styles.owner} {...(slotKey ? { "data-owner": slotKey } : {})}>
+                · {ownerName}
+              </span>
+            )}
+          </>
+        )}
         {napShortForm && !isPutdown && ownerName && (
           <span className={styles.owner} {...(slotKey ? { "data-owner": slotKey } : {})}>
             · {ownerName}
           </span>
         )}
       </span>
-      {isPutdown && (
-        <span className={styles.range}>
-          {formatTimeShort(event.startTime)}
-          {ownerName && (
-            <span className={styles.owner} {...(slotKey ? { "data-owner": slotKey } : {})}>
-              · {ownerName}
-            </span>
-          )}
-        </span>
-      )}
       {isPump && range && <span className={styles.range}>{range}</span>}
       {range && !isPutdown && !napShortForm && !isPump && (
         <span className={styles.range}>
