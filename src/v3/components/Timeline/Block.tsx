@@ -62,10 +62,15 @@ export function Block({
   const a11y = `${event.label}${range ? ` ${range}` : ""}${ownerName ? ` ${ownerName}` : ""}`;
   const napShortForm = event.type === "nap" && heightPx < NAP_TWO_ROW_THRESHOLD_PX;
   const isPutdown = event.eventKey === PUTDOWN_KIND_TAG;
-  // Pumps render "Pump" on row 1 and owner alone on row 2 — no time
-  // range, no duration. Per Jake 2026-05-14: pump presence is what
-  // matters; the block's vertical span already conveys the duration.
+  // Pump: "Pump" + time range on two lines. Owner is conveyed by the
+  // left-stripe color (existing [data-owner] rule), not by text —
+  // "owner knows who they are." Block is sized to content (max-content)
+  // and inset 4px from the main block's right edge so a sliver of the
+  // parent block's shoulder shows past the pump.
   const isPump = event.type === "pump";
+  const positionStyle = isPump
+    ? { right: `${rightPx + 4}px`, width: "max-content" as const }
+    : { left: `${leftPx}px`, right: `${rightPx}px` };
   // Reuse V2's "putdown" data-type so the existing CSS selectors apply.
   // V3 doesn't have a putdown type at the schema level; this is the
   // renderer's contract with the stylesheet, not with the data model.
@@ -83,15 +88,14 @@ export function Block({
       style={{
         top: `${topPx}px`,
         height: `${heightPx}px`,
-        left: `${leftPx}px`,
-        right: `${rightPx}px`,
+        ...positionStyle,
         ...ownerStyleVar(ownerColorValue),
       }}
       {...(interactive
         ? { type: "button" as const, onClick, "aria-label": a11y }
         : { role: "presentation" as const })}
     >
-      {(event.type === "extra" || event.type === "pump") && (
+      {event.type === "extra" && (
         <>
           <span className={styles.markerLine} data-edge="top" aria-hidden="true" />
           <span className={styles.markerLine} data-edge="bottom" aria-hidden="true" />
@@ -99,29 +103,23 @@ export function Block({
       )}
       <span className={styles.label}>
         {blockLabel(event)}
-        {isPutdown && (
-          <>
-            <span className={styles.inlineTime}> · {formatTimeShort(event.startTime)}</span>
-            {ownerName && (
-              <span className={styles.owner} {...(slotKey ? { "data-owner": slotKey } : {})}>
-                · {ownerName}
-              </span>
-            )}
-          </>
-        )}
-        {napShortForm && ownerName && (
+        {napShortForm && !isPutdown && ownerName && (
           <span className={styles.owner} {...(slotKey ? { "data-owner": slotKey } : {})}>
             · {ownerName}
           </span>
         )}
       </span>
-      {isPump && ownerName && (
+      {isPutdown && (
         <span className={styles.range}>
-          <span className={styles.owner} {...(slotKey ? { "data-owner": slotKey } : {})}>
-            {ownerName}
-          </span>
+          {formatTimeShort(event.startTime)}
+          {ownerName && (
+            <span className={styles.owner} {...(slotKey ? { "data-owner": slotKey } : {})}>
+              · {ownerName}
+            </span>
+          )}
         </span>
       )}
+      {isPump && range && <span className={styles.range}>{range}</span>}
       {range && !isPutdown && !napShortForm && !isPump && (
         <span className={styles.range}>
           {range}
