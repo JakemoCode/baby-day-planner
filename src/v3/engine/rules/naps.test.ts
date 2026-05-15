@@ -194,7 +194,7 @@ describe("R3.4/R3.5 — wake_window(N).endTime always tracks nap(N).startTime", 
     // User drawer-edits Nap 2 to 14:00-15:30. Under the invariant,
     // ww_2 must stretch from 10:30 to 14:00 — no gap.
     // Preceding nap_1 anchors slot 1 chronologically (nap_1 9:00-10:30
-     // → cursor at 10:30 entering slot 2).
+    // → cursor at 10:30 entering slot 2).
     const recordedNap1 = aRecordedNap({
       id: "actual_nap_1",
       eventKey: "nap_1",
@@ -777,15 +777,11 @@ describe("FAB-added nap (UUID eventKey) inserts into the rhythm chronologically"
     expect(uuidOut!.eventKey).toBe("nap_abc123");
 
     // A wake window directly preceding it ends at the UUID nap's start.
-    const wwBefore = out.find(
-      (e) => e.type === "wake_window" && e.endTime === 13 * 60 + 30,
-    );
+    const wwBefore = out.find((e) => e.type === "wake_window" && e.endTime === 13 * 60 + 30);
     expect(wwBefore).toBeDefined();
 
     // The next wake window after the UUID nap starts at its end (14:30).
-    const wwAfter = out.find(
-      (e) => e.type === "wake_window" && e.startTime === 14 * 60 + 30,
-    );
+    const wwAfter = out.find((e) => e.type === "wake_window" && e.startTime === 14 * 60 + 30);
     expect(wwAfter).toBeDefined();
   });
 
@@ -871,9 +867,7 @@ describe("Post-threshold real nap → bedtime in projection (DOMAIN.md §3)", ()
 
     // A separate coerced bedtime event has been emitted at the late
     // nap's startTime; its id derives from the nap's id.
-    const coercedBedtime = out.find(
-      (e) => e.type === "bedtime" && e.startTime === 19 * 60 + 30,
-    );
+    const coercedBedtime = out.find((e) => e.type === "bedtime" && e.startTime === 19 * 60 + 30);
     expect(coercedBedtime).toBeDefined();
     expect(coercedBedtime!.id).toContain(lateNap.id);
     expect(coercedBedtime!.label).toBe("Bedtime");

@@ -126,10 +126,7 @@ function projectSleepCascade(ctx: Context, existing: Event[]): Event[] {
     let consumedAdditive = false;
     if (slotKeyed) {
       chosen = slotKeyed;
-    } else if (
-      nextAdditive !== undefined &&
-      nextAdditive.startTime <= naturalNapStart + napLen
-    ) {
+    } else if (nextAdditive !== undefined && nextAdditive.startTime <= naturalNapStart + napLen) {
       chosen = nextAdditive;
       consumedAdditive = true;
     }
@@ -205,7 +202,7 @@ function buildCoercedBedtime(_ctx: Context, realNap: Event, settings: Settings):
   // prefix keeps the bedtime distinct in the engine's eventes list
   // while letting the render layer associate it back to the nap doc
   // for tap-routing.
-  return {
+  const base: Event = {
     id: `coerced_bedtime_${realNap.id}`,
     dayId: realNap.dayId,
     eventKey: `bedtime_coerced_${realNap.eventKey}`,
@@ -214,10 +211,10 @@ function buildCoercedBedtime(_ctx: Context, realNap: Event, settings: Settings):
     startTime: realNap.startTime,
     endTime: realNap.endTime ?? settings.defaultWakeTime + 24 * 60,
     label: "Bedtime",
-    owner: realNap.owner,
     hasPutdown: false,
     lifecycle: { state: "projected" },
   };
+  return realNap.owner ? { ...base, owner: realNap.owner } : base;
 }
 
 function buildWakeWindow(ctx: Context, n: number, start: number, end: number): Event {
