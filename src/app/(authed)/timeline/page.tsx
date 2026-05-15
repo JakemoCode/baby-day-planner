@@ -134,6 +134,7 @@ export default function TimelinePage() {
         }
         owners={settings.owners}
         nowMinutes={nowMinutes}
+        bedtimeThreshold={settings.bedtimeThreshold}
         existingEvents={projected}
         open={drawer.open}
         event={drawer.open ? (drawer.mode === "edit" ? drawer.event : drawer.template) : null}
