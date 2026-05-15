@@ -43,6 +43,21 @@
   outline-offset: 1px;
 }
 
+/* === Z-index ordering ========================================
+ * Order (back to front):
+ *   wake_window (1) → nap, bedtime (2) → putdown (3) → extra (4) → pump (5)
+ *
+ * Pumps must render in front of sleep blocks because they're a parallel
+ * parent-schedule activity sized to max-content. Extras above nap/bedtime
+ * so user content never hides behind a cascade-projected block.
+ */
+.block[data-type="wake_window"] { z-index: 1; }
+.block[data-type="nap"],
+.block[data-type="bedtime"]    { z-index: 2; }
+.block[data-type="putdown"]    { z-index: 3; }
+.block[data-type="extra"]      { z-index: 4; }
+.block[data-type="pump"]       { z-index: 5; }
+
 /* === Type-mode fills (default) ============================== */
 
 .block[data-type="wake_window"][data-color-mode="type"] {
