@@ -11,6 +11,14 @@ export type ConfirmDialogProps = {
   cancelLabel?: string;
   onConfirm: () => void;
   onCancel: () => void;
+  /**
+   * Optional dismiss handler for Escape / backdrop click. When provided,
+   * Escape and backdrop fire `onDismiss` instead of `onCancel` — useful
+   * when the explicit Cancel button has a destructive default and you
+   * want "I haven't decided" to leave state alone. Falls back to
+   * `onCancel` when omitted (backwards-compatible).
+   */
+  onDismiss?: () => void;
 };
 
 export function ConfirmDialog({
@@ -21,17 +29,19 @@ export function ConfirmDialog({
   cancelLabel = "Cancel",
   onConfirm,
   onCancel,
+  onDismiss,
 }: ConfirmDialogProps) {
   const titleId = useId();
+  const handleDismiss = onDismiss ?? onCancel;
 
   useEffect(() => {
     if (!open) return;
     const handleKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onCancel();
+      if (e.key === "Escape") handleDismiss();
     };
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
-  }, [open, onCancel]);
+  }, [open, handleDismiss]);
 
   if (!open) return null;
 
@@ -40,7 +50,7 @@ export function ConfirmDialog({
       className={styles.backdrop}
       role="presentation"
       onClick={(e) => {
-        if (e.target === e.currentTarget) onCancel();
+        if (e.target === e.currentTarget) handleDismiss();
       }}
     >
       <div role="dialog" aria-modal="true" aria-labelledby={titleId} className={styles.dialog}>

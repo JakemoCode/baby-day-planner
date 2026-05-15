@@ -115,6 +115,8 @@ describe("NapActionButton", () => {
     const [calledNap, endTime] = onEnd.mock.calls[0] ?? [];
     expect(calledNap).toEqual(nap);
     expect(typeof endTime).toBe("number");
+    expect(endTime).toBeGreaterThanOrEqual(0);
+    expect(endTime).toBeLessThan(24 * 60);
   });
 });
 

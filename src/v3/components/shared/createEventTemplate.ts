@@ -25,11 +25,12 @@ export type BuildTemplateInput = {
   /** Current time as TimeMin so the form opens with a sensible default. */
   nowMinutes: TimeMin;
   /**
-   * Full engine projection for the day (includes engine-emitted nap_N /
-   * bottle_N projections). Used to pick the next free slot index when
-   * the user manually creates an off-pattern nap (e.g., during bedtime).
-   * Without this, the template-builder would scan recorded events only
-   * and could claim an eventKey already occupied by a projection — §F25.
+   * Full engine projection for the day (includes engine-emitted
+   * `bottle_N` projections). Used to pick the next free slot index
+   * when numbering a new bottle so the template-builder agrees with
+   * the engine's chronological renumber. Without this, the builder
+   * would scan recorded events only and could claim an eventKey
+   * already occupied by a projection.
    *
    * Optional for callers that don't have it (rare; only legacy paths).
    * When omitted, falls back to "count of recorded events + 1".

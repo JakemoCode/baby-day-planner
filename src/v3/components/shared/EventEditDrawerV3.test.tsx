@@ -476,6 +476,9 @@ describe("Past-threshold prompt when editing a nap (physiology cascade)", () => 
         eventKey: "bedtime",
         startTime: 20 * 60,
         label: "Bedtime",
+        // Source nap had endTime → bedtime lifecycle is `completed`,
+        // NOT `overridden` (which formToEvent would have produced).
+        lifecycle: expect.objectContaining({ state: "completed" }),
       }),
     );
   });
@@ -504,6 +507,34 @@ describe("Past-threshold prompt when editing a nap (physiology cascade)", () => 
     expect(onSave).toHaveBeenCalledWith(
       expect.objectContaining({ type: "nap", startTime: 20 * 60 }),
     );
+    expect(onDelete).not.toHaveBeenCalled();
+  });
+
+  it("Escape dismisses the prompt without saving (returns to drawer)", async () => {
+    const onSave = vi.fn();
+    const onDelete = vi.fn();
+    render(
+      <EventEditDrawerV3
+        open
+        mode="edit"
+        event={recordedNap(9 * 60, 10 * 60)}
+        owners={owners}
+        nowMinutes={NOW}
+        bedtimeThreshold={THRESHOLD}
+        onSave={onSave}
+        onCancel={() => {}}
+        onDelete={onDelete}
+      />,
+    );
+    const startInput = screen.getByLabelText("Start time");
+    await userEvent.clear(startInput);
+    await userEvent.type(startInput, "20:00");
+    await userEvent.click(screen.getByRole("button", { name: /save/i }));
+    expect(screen.getByText(/change to bedtime\?/i)).toBeVisible();
+    // Escape dismisses the prompt — neither path saves nor deletes.
+    await userEvent.keyboard("{Escape}");
+    expect(screen.queryByText(/change to bedtime\?/i)).toBeNull();
+    expect(onSave).not.toHaveBeenCalled();
     expect(onDelete).not.toHaveBeenCalled();
   });
 

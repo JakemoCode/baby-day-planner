@@ -222,15 +222,20 @@ export function EventEditDrawerV3({
     void onSave(next);
   };
 
-  const handleConfirmChangeToBedtime = () => {
+  const handleConfirmChangeToBedtime = async () => {
+    if (!pendingPastThresholdNap) return;
     const napCandidate = pendingPastThresholdNap;
-    if (!napCandidate) return;
     setPendingPastThresholdNap(null);
-    // Carry forward owner; lifecycle inherits from the candidate (the
-    // form-derived Event already has the right shape — committed/started/
-    // overridden — based on what changed). Replace doc:
-    //   1. If sourceEvent is recorded, delete the original nap doc.
-    //   2. Save a new bedtime event at the same startTime.
+    // Carry forward owner + endTime. Lifecycle is derived per the
+    // user's gesture: bedtime created via "Yes change" is a fresh
+    // commit, NOT an annotation on a projection — so use `completed`
+    // when an endTime exists, else `started`. (Inheriting the nap's
+    // `overridden` lifecycle from formToEvent would mis-tag the
+    // bedtime as an annotation rather than a recording.)
+    const bedtimeLifecycle: Event["lifecycle"] =
+      napCandidate.endTime !== undefined
+        ? { state: "completed", committedAt: napCandidate.startTime }
+        : { state: "started", committedAt: napCandidate.startTime };
     const bedtimeBase: Event = {
       id: newEventId("bedtime"),
       dayId: napCandidate.dayId,
@@ -240,21 +245,31 @@ export function EventEditDrawerV3({
       label: "Bedtime",
       startTime: napCandidate.startTime,
       hasPutdown: false,
-      lifecycle: napCandidate.lifecycle,
+      lifecycle: bedtimeLifecycle,
       ...(napCandidate.endTime !== undefined ? { endTime: napCandidate.endTime } : {}),
       ...(napCandidate.owner ? { owner: napCandidate.owner } : {}),
     };
+    // Sequence: delete original FIRST so the dual-doc state can never
+    // surface (the user sees one chip turn into the other, not two).
+    // Awaiting both surfaces failures rather than fire-and-forget.
     if (isRecorded(sourceEvent.lifecycle) && onDelete) {
-      void onDelete(sourceEvent);
+      await onDelete(sourceEvent);
     }
-    void onSave(bedtimeBase);
+    await onSave(bedtimeBase);
   };
 
   const handleKeepAsNap = () => {
+    if (!pendingPastThresholdNap) return;
     const napCandidate = pendingPastThresholdNap;
-    if (!napCandidate) return;
     setPendingPastThresholdNap(null);
     void onSave(napCandidate);
+  };
+
+  const handleDismissPrompt = () => {
+    // Escape / backdrop dismiss: clear the pending save without
+    // committing. Returns the user to the drawer with their edits
+    // intact so they can re-decide or change the time.
+    setPendingPastThresholdNap(null);
   };
 
   return (
@@ -396,7 +411,10 @@ export function EventEditDrawerV3({
         confirmLabel="Yes, change to bedtime"
         cancelLabel="No, keep as nap"
         onCancel={handleKeepAsNap}
-        onConfirm={handleConfirmChangeToBedtime}
+        onConfirm={() => {
+          void handleConfirmChangeToBedtime();
+        }}
+        onDismiss={handleDismissPrompt}
       />
     </div>
   );
