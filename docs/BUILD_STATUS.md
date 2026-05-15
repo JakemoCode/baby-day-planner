@@ -1,6 +1,6 @@
 # Build Status
 
-> Last refresh: 2026-05-12
+> Last refresh: 2026-05-15
 > Repo: `github.com/JakemoCode/baby-day-planner`
 
 ## Where we are
@@ -13,6 +13,13 @@ History, ArchivedDay, and Settings pages all render on V3.
 wiped wholesale — no back-compat shim, no V2 hooks, no V2 components.
 Post-cutover bug-fixes and feature restorations are tracked in
 `docs/v3/FAST_FOLLOW.md`.
+
+**Physiology cascade landed (PR #149, 2026-05-15)** — `wakeWindowsMinutes`
+is now a cadence sequence (cascade extends to bedtime threshold using
+the last WW value); FAB drops the nap option; drawer prompt converts
+past-threshold nap edits to bedtime; dashboard CTA swaps to "Start
+Bedtime Now" past threshold; pumps render in front of sleep blocks.
+See `docs/superpowers/specs/2026-05-15-physiology-cascade-design.md`.
 
 Wave 9 (PWA manifest + service worker + E2E + design audit) is the
 last build wave on the original Plan C roadmap. Not yet started.

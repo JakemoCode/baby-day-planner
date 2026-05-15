@@ -52,11 +52,18 @@ function projectSleepCascade(ctx: Context, existing: Event[]): Event[] {
   const napLen = ctx.settings.defaultNapLengthMinutes;
   const threshold = ctx.settings.bedtimeThreshold;
 
+  if (wws.length === 0) return existing;
+
   // Index existing naps so we don't emit duplicates and so the cascade
-  // can defer to reality at each slot.
+  // can defer to reality at each slot. Slot-keyed naps (`nap_N`
+  // eventKey) anchor slot N regardless of how N relates to wws.length —
+  // reality wins per DOMAIN.md §1. There's no additive UUID path under
+  // the physiology cascade (FAB has no nap option).
   const existingNapByKey = new Map<string, Event>();
   for (const e of existing) {
-    if (isNap(e)) existingNapByKey.set(e.eventKey, e);
+    if (isNap(e) && /^nap_\d+$/.test(e.eventKey)) {
+      existingNapByKey.set(e.eventKey, e);
+    }
   }
 
   // A manual bedtime (recorded/overridden) in actuals is authoritative.
@@ -67,13 +74,22 @@ function projectSleepCascade(ctx: Context, existing: Event[]): Event[] {
   const projected: Event[] = [];
   let cursor = wakeTime;
 
-  for (let i = 0; i < wws.length; i++) {
-    const baseWw = wws[i]!;
+  // Defensive cap: under reasonable inputs the cascade terminates at
+  // bedtime threshold within a single calendar day. The cap prevents
+  // pathological loops (e.g., threshold misconfigured beyond physically
+  // possible day length).
+  const HARD_CAP = 48;
+
+  for (let n = 1; n <= HARD_CAP; n++) {
+    // WW length: configured value for slots 1..wws.length; repeat the
+    // last value beyond that — physiology, not config, ends the day.
+    const baseWw = wws[Math.min(n - 1, wws.length - 1)]!;
     // Short-nap adjustment: if the previous nap is RECORDED (lifecycle
     // 'completed') and shorter than shortNapThresholdMinutes, shrink THIS
     // wake window by shortNapAdjustmentMinutes. Annotations (overridden)
     // carry intent, not measurement, and don't trigger the adjustment.
-    const prevRecordedShort = i > 0 && isShortRecordedNap(existingNapByKey.get(`nap_${i}`), ctx);
+    const prevRecordedShort =
+      n > 1 && isShortRecordedNap(existingNapByKey.get(`nap_${n - 1}`), ctx);
     const wwMinutes = prevRecordedShort
       ? Math.max(0, baseWw - ctx.settings.shortNapAdjustmentMinutes)
       : baseWw;
@@ -81,11 +97,10 @@ function projectSleepCascade(ctx: Context, existing: Event[]): Event[] {
     const wwStart = cursor;
 
     // Manual bedtime short-circuit: if wwStart is at/after the manual
-    // bedtime, stop entirely. (R7.4 / R7.4b — no orphan WWs or naps
-    // beyond the authoritative bedtime.)
+    // bedtime, stop entirely. (R7.4 — no orphan WWs or naps beyond the
+    // authoritative bedtime.)
     if (manualBedtime && wwStart >= manualBedtime.startTime) break;
 
-    const n = i + 1;
     const napKey = `nap_${n}`;
     const existingNap = existingNapByKey.get(napKey);
 
@@ -109,9 +124,14 @@ function projectSleepCascade(ctx: Context, existing: Event[]): Event[] {
       break;
     }
 
-    // If a manual bedtime sits between wwStart and the would-be napStart,
-    // truncate the WW at bedtime and stop — no nap_n emitted.
-    if (manualBedtime && napStart >= manualBedtime.startTime) {
+    // Manual bedtime suppression: a manual bedtime is the day's
+    // terminator. Suppress any projected nap whose interval would
+    // extend INTO it (start >= bedtime OR start+napLen > bedtime).
+    // Recorded naps with explicit endTimes still pass through —
+    // reality wins. Per DOMAIN.md §3 ("once bedtime hits, all bedtime").
+    const projectedExtendsIntoBedtime =
+      manualBedtime && !existingNap && napStart + napLen > manualBedtime.startTime;
+    if (manualBedtime && (napStart >= manualBedtime.startTime || projectedExtendsIntoBedtime)) {
       projected.push(buildWakeWindow(ctx, n, wwStart, manualBedtime.startTime));
       break;
     }

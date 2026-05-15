@@ -15,7 +15,7 @@ import { newEventId } from "../../lib/newEventId";
 import { isRecorded } from "../../schemas";
 import type { Event, EventType, Settings, TimeMin } from "../../schemas";
 
-export type CreatableType = "bottle" | "nap" | "pump" | "extra";
+export type CreatableType = "bottle" | "pump" | "extra";
 
 export type BuildTemplateInput = {
   type: CreatableType;
@@ -25,11 +25,12 @@ export type BuildTemplateInput = {
   /** Current time as TimeMin so the form opens with a sensible default. */
   nowMinutes: TimeMin;
   /**
-   * Full engine projection for the day (includes engine-emitted nap_N /
-   * bottle_N projections). Used to pick the next free slot index when
-   * the user manually creates an off-pattern nap (e.g., during bedtime).
-   * Without this, the template-builder would scan recorded events only
-   * and could claim an eventKey already occupied by a projection — §F25.
+   * Full engine projection for the day (includes engine-emitted
+   * `bottle_N` projections). Used to pick the next free slot index
+   * when numbering a new bottle so the template-builder agrees with
+   * the engine's chronological renumber. Without this, the builder
+   * would scan recorded events only and could claim an eventKey
+   * already occupied by a projection.
    *
    * Optional for callers that don't have it (rare; only legacy paths).
    * When omitted, falls back to "count of recorded events + 1".
@@ -61,32 +62,6 @@ export function buildCreateTemplate({
     };
   }
 
-  if (type === "nap") {
-    // A nap "slot" is a position in the cascade (slot N corresponds
-    // to wakeWindowsMinutes[N-1]). If the next free slot index would
-    // exceed the configured slot count, the user is creating an
-    // off-pattern nap (e.g. baby wakes mid-bedtime for a feed and
-    // goes back down). Use a UUID-based eventKey for these — the
-    // cascade's `^nap_\d+$` slot matcher won't pick it up, so it
-    // renders as a one-off nap without eating bedtime substitution
-    // for an actual cascade slot.
-    const nextN = nextFreeSlot("nap", actuals, projected);
-    const maxSlot = settings.wakeWindowsMinutes.length;
-    const fitsSlot = nextN <= maxSlot;
-    const napId = newEventId("nap");
-    return {
-      id: napId,
-      dayId,
-      eventKey: fitsSlot ? `nap_${nextN}` : napId,
-      type: "nap",
-      kind: "block",
-      label: fitsSlot ? `Nap ${nextN}` : "Nap",
-      startTime: nowMinutes,
-      hasPutdown: false,
-      lifecycle: { state: "projected" },
-    };
-  }
-
   if (type === "pump") {
     const pumpId = newEventId("pump");
     return {
@@ -103,20 +78,28 @@ export function buildCreateTemplate({
     };
   }
 
-  // Custom (extra) events default to instant. If the user fills in an
-  // endTime in the drawer, formToEvent upgrades kind to "block" on save.
-  const extraId = newEventId("extra");
-  return {
-    id: extraId,
-    dayId,
-    eventKey: extraId,
-    type: "extra",
-    kind: "instant",
-    label: "",
-    startTime: nowMinutes,
-    hasPutdown: false,
-    lifecycle: { state: "projected" },
-  };
+  if (type === "extra") {
+    // Custom (extra) events default to instant. If the user fills in an
+    // endTime in the drawer, formToEvent upgrades kind to "block" on save.
+    const extraId = newEventId("extra");
+    return {
+      id: extraId,
+      dayId,
+      eventKey: extraId,
+      type: "extra",
+      kind: "instant",
+      label: "",
+      startTime: nowMinutes,
+      hasPutdown: false,
+      lifecycle: { state: "projected" },
+    };
+  }
+
+  // CreatableType is exhaustive (bottle | pump | extra); this throw
+  // catches any stray caller passing an unsupported type — most
+  // notably a legacy "nap" callsite, removed under the physiology
+  // cascade per spec PR #146.
+  throw new Error(`buildCreateTemplate: unsupported type ${String(type)}`);
 }
 
 /**

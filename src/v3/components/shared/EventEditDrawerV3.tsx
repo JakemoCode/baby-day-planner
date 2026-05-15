@@ -5,6 +5,7 @@ import styles from "./EventEditDrawer.module.css";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import type { Event, EventType, OwnerRef, OwnersConfig, TimeMin } from "../../schemas";
 import { isRecorded } from "../../schemas";
+import { newEventId } from "../../lib/newEventId";
 import { formatHM24, formatTimeForDisplay, parseHM24 } from "../../ui/time";
 import { OwnerPickerV3 } from "./OwnerPickerV3";
 import { formToEvent, type FormState } from "./formToEvent";
@@ -18,6 +19,19 @@ export type EventEditDrawerV3Props = {
   owners: OwnersConfig;
   /** Current time as TimeMin; stamps lifecycle.committedAt / annotatedAt at save. */
   nowMinutes: TimeMin;
+  /**
+   * Settings.bedtimeThreshold — drives the "Change to bedtime?" prompt
+   * when a nap edit moves startTime from below to at/after threshold.
+   * Per spec PR #146 R2 (physiology cascade).
+   */
+  bedtimeThreshold: TimeMin;
+  /**
+   * Settings.defaultWakeTime — used to compute the bedtime block's
+   * endTime when a nap is converted to bedtime via the past-threshold
+   * prompt. Per DOMAIN.md §3, bedtime extends to the next morning's
+   * wake (defaultWakeTime + 24h), NOT the source nap's endTime.
+   */
+  defaultWakeTime: TimeMin;
   onSave: (event: Event) => void | Promise<void>;
   onCancel: () => void;
   onDelete?: (event: Event) => void | Promise<void>;
@@ -116,6 +130,8 @@ export function EventEditDrawerV3({
   event,
   owners,
   nowMinutes,
+  bedtimeThreshold,
+  defaultWakeTime,
   onSave,
   onCancel,
   onDelete,
@@ -124,6 +140,11 @@ export function EventEditDrawerV3({
   const sourceEvent = event;
   const [form, setForm] = useState<InternalForm>(() => eventToForm(sourceEvent));
   const [confirmOpen, setConfirmOpen] = useState(false);
+  // Past-threshold prompt: when a nap edit crosses bedtimeThreshold,
+  // hold the would-be saved Event here pending the parent's "Change to
+  // bedtime?" decision. Yes → delete original (if recorded) + save a
+  // bedtime doc; No → save the held nap as-is. Per spec PR #146 R2.
+  const [pendingPastThresholdNap, setPendingPastThresholdNap] = useState<Event | null>(null);
   const titleId = useId();
 
   useEffect(() => {
@@ -191,7 +212,73 @@ export function EventEditDrawerV3({
       label: form.label,
     };
     const next = formToEvent(formForTransform, sourceEvent, nowMinutes);
+
+    // Prompt trigger: a nap whose startTime crossed from below
+    // threshold to at/after threshold during this edit (spec R2 / Q6).
+    // Owner-only edits on already-late naps don't re-prompt; back-edits
+    // from past-threshold to within-threshold don't prompt either.
+    const crossedThreshold =
+      next.type === "nap" &&
+      sourceEvent.startTime < bedtimeThreshold &&
+      next.startTime >= bedtimeThreshold;
+
+    if (crossedThreshold) {
+      setPendingPastThresholdNap(next);
+      return;
+    }
+
     void onSave(next);
+  };
+
+  const handleConfirmChangeToBedtime = async () => {
+    if (!pendingPastThresholdNap) return;
+    const napCandidate = pendingPastThresholdNap;
+    setPendingPastThresholdNap(null);
+    // Per DOMAIN.md §3: bedtime IS the day's last sleep. Its endTime
+    // is the next morning's wake (defaultWakeTime + 24h), NOT the
+    // source nap's endTime — the nap's recorded endTime represents
+    // a within-day sleep, but bedtime extends through the night.
+    // Lifecycle is `started` (bedtime is in progress; the user is
+    // declaring the day's bedtime begins here).
+    const bedtimeBase: Event = {
+      id: newEventId("bedtime"),
+      dayId: napCandidate.dayId,
+      eventKey: "bedtime",
+      type: "bedtime",
+      kind: "block",
+      label: "Bedtime",
+      startTime: napCandidate.startTime,
+      endTime: defaultWakeTime + 24 * 60,
+      hasPutdown: false,
+      // `overridden`, not `started`: putdown.ts derives hasPutdown
+      // from {projected, overridden} only — `started` silently drops
+      // the chip. Cascade's manualBedtime check is `!isProjected`,
+      // so `overridden` remains authoritative and matches the
+      // existing drawer-edit override shape.
+      lifecycle: { state: "overridden", annotatedAt: nowMinutes },
+      ...(napCandidate.owner ? { owner: napCandidate.owner } : {}),
+    };
+    // Sequence: delete original FIRST so the dual-doc state can never
+    // surface (the user sees one chip turn into the other, not two).
+    // Awaiting both surfaces failures rather than fire-and-forget.
+    if (isRecorded(sourceEvent.lifecycle) && onDelete) {
+      await onDelete(sourceEvent);
+    }
+    await onSave(bedtimeBase);
+  };
+
+  const handleKeepAsNap = () => {
+    if (!pendingPastThresholdNap) return;
+    const napCandidate = pendingPastThresholdNap;
+    setPendingPastThresholdNap(null);
+    void onSave(napCandidate);
+  };
+
+  const handleDismissPrompt = () => {
+    // Escape / backdrop dismiss: clear the pending save without
+    // committing. Returns the user to the drawer with their edits
+    // intact so they can re-decide or change the time.
+    setPendingPastThresholdNap(null);
   };
 
   return (
@@ -324,6 +411,19 @@ export function EventEditDrawerV3({
           setConfirmOpen(false);
           if (sourceEvent && onDelete) void onDelete(sourceEvent);
         }}
+      />
+
+      <ConfirmDialog
+        open={pendingPastThresholdNap !== null}
+        title="Change to bedtime?"
+        body="This nap starts at or after your bedtime threshold. Saving as bedtime is usually what physiology calls for; keep it as a nap if you specifically intend an extra sleep before bedtime."
+        confirmLabel="Yes, change to bedtime"
+        cancelLabel="No, keep as nap"
+        onCancel={handleKeepAsNap}
+        onConfirm={() => {
+          void handleConfirmChangeToBedtime();
+        }}
+        onDismiss={handleDismissPrompt}
       />
     </div>
   );

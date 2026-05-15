@@ -160,7 +160,6 @@ export default function DashboardPage() {
     return seen.size;
   };
   const nextBottleNumber = uniqueRecordedKeys("bottle") + 1;
-  const nextNapNumber = uniqueRecordedKeys("nap") + 1;
   const lastBottle = lastEventOfType(actuals, "bottle");
   const lastNap = lastEventOfType(actuals, "nap");
   const lastBottleTime = lastBottle?.startTime;
@@ -196,6 +195,9 @@ export default function DashboardPage() {
   };
   const handleStartNap = async (nap: Event) => {
     await createOptimistic(nap);
+  };
+  const handleStartBedtime = async (bedtime: Event) => {
+    await createOptimistic(bedtime);
   };
   const handleEndNap = async (nap: Event, endTime: number) => {
     if (!day || day.id === "") return;
@@ -252,11 +254,12 @@ export default function DashboardPage() {
           <NapActionButton
             inProgressNap={inProgressNap}
             dayId={day.id}
-            nextNumber={nextNapNumber}
-            maxSlot={settings.wakeWindowsMinutes.length}
+            nowMinutes={nowMinutes}
+            bedtimeThreshold={settings.bedtimeThreshold}
             {...(nn ? { nextProjectedNap: nn } : {})}
             onStart={handleStartNap}
             onEnd={handleEndNap}
+            onStartBedtime={handleStartBedtime}
           />
           <StartDayButton hasTomorrowPlan={false} onStart={handleStartDay} />
         </div>
@@ -291,6 +294,8 @@ export default function DashboardPage() {
         }
         owners={settings.owners}
         nowMinutes={nowMinutes}
+        bedtimeThreshold={settings.bedtimeThreshold}
+        defaultWakeTime={settings.defaultWakeTime}
         existingEvents={projected}
         open={drawer.open}
         event={drawer.open ? (drawer.mode === "edit" ? drawer.event : drawer.template) : null}

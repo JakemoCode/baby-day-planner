@@ -45,6 +45,16 @@ day adjust accordingly. The better the configured wake windows
 match this particular baby, the more accurate the predictions
 become.
 
+**Wake-window cadence is a sequence, not a slot count.** The
+configured `wakeWindowsMinutes` array describes the natural
+cadence — when entries run out, the cadence simply continues with
+the last configured value. Physiology, not configuration, ends the
+day: when the cascade's next projected nap would cross the bedtime
+threshold, the next sleep IS bedtime. A baby who happens to take
+a 15-minute nap every hour for six hours just has six naps
+projected for that part of the day; physiology will still drag
+them to bedtime.
+
 ---
 
 ## §2 Feeding — bottles, intervals, and the no-eating-during-naps rule
@@ -131,6 +141,12 @@ forecast based on configured thresholds and the day's
 trajectory. A nap that lands at or after the bedtime
 threshold IS bedtime — there's no separate event type from
 the baby's perspective; it's just the last sleep of the day.
+
+**Overnight wake-ups are normal interruptions, not new naps.**
+A baby waking during the bedtime block (e.g., crying for a
+bottle at 2 AM, then going back to sleep) is part of normal
+bedtime — it does NOT create a separate nap event. The bedtime
+block extends continuously until the next morning's wake.
 
 ---
 
