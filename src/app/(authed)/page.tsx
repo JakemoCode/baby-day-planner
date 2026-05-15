@@ -197,6 +197,9 @@ export default function DashboardPage() {
   const handleStartNap = async (nap: Event) => {
     await createOptimistic(nap);
   };
+  const handleStartBedtime = async (bedtime: Event) => {
+    await createOptimistic(bedtime);
+  };
   const handleEndNap = async (nap: Event, endTime: number) => {
     if (!day || day.id === "") return;
     // committedAt on a completed nap = the START time (preserved from the
@@ -252,11 +255,12 @@ export default function DashboardPage() {
           <NapActionButton
             inProgressNap={inProgressNap}
             dayId={day.id}
-            nextNumber={nextNapNumber}
-            maxSlot={settings.wakeWindowsMinutes.length}
+            nowMinutes={nowMinutes}
+            bedtimeThreshold={settings.bedtimeThreshold}
             {...(nn ? { nextProjectedNap: nn } : {})}
             onStart={handleStartNap}
             onEnd={handleEndNap}
+            onStartBedtime={handleStartBedtime}
           />
           <StartDayButton hasTomorrowPlan={false} onStart={handleStartDay} />
         </div>
