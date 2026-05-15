@@ -243,7 +243,7 @@ in `src/v3/components/shared/`, then call sites swap in.
 - **Start Bottle button needs owner**: the current "Start" action commits without prompting for owner — add inline owner pick or default to last-used
 - **Edit nap start time from dashboard**: naps usually get "Started" 5+ min after actual start (busy putting baby down). Need an easy retro-edit affordance on the dashboard, not just in the drawer
 - **"In wake window" banner — show "asleep?"**: clarify state when baby's already napping but the WW projection is still active
-- ~~**"Start bedtime" CTA after bedtime threshold**: dashboard should switch primary action to bedtime once `nowMinutes ≥ settings.bedtimeThreshold`~~ — **delivered** in the physiology cascade campaign (PR for `feat/v3-physiology-cascade`).
+- **"Start bedtime" CTA after bedtime threshold**: dashboard should switch primary action to bedtime once `nowMinutes ≥ settings.bedtimeThreshold`
 - **Button hierarchy**: Primary = start next event, Secondary = edit last event, Tertiary = skip event
 
 **Why fast-follow**: UX polish on a working dashboard; engine-orthogonal.

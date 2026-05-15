@@ -9,7 +9,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { Event, OwnersConfig, TimeMin } from "../../schemas";
+import type { Event, OwnersConfig } from "../../schemas";
 import { EventEditDrawerV3 } from "./EventEditDrawerV3";
 
 const owners: OwnersConfig = {
@@ -19,7 +19,6 @@ const owners: OwnersConfig = {
 };
 
 const NOW = 8 * 60 + 30;
-const THRESHOLD = 19 * 60; // 7:00 PM — well past existing test scenarios.
 
 const projectedNap = (overrides: Partial<Event> = {}): Event => ({
   id: "nap-1",
@@ -57,7 +56,6 @@ describe("EventEditDrawerV3", () => {
         event={projectedNap()}
         owners={owners}
         nowMinutes={NOW}
-        bedtimeThreshold={THRESHOLD}
         onSave={() => {}}
         onCancel={() => {}}
       />,
@@ -73,7 +71,6 @@ describe("EventEditDrawerV3", () => {
         event={projectedNap()}
         owners={owners}
         nowMinutes={NOW}
-        bedtimeThreshold={THRESHOLD}
         onSave={() => {}}
         onCancel={() => {}}
       />,
@@ -90,7 +87,6 @@ describe("EventEditDrawerV3", () => {
         event={projectedBottle()}
         owners={owners}
         nowMinutes={NOW}
-        bedtimeThreshold={THRESHOLD}
         onSave={() => {}}
         onCancel={() => {}}
       />,
@@ -108,7 +104,6 @@ describe("EventEditDrawerV3", () => {
         event={projectedNap()}
         owners={owners}
         nowMinutes={NOW}
-        bedtimeThreshold={THRESHOLD}
         onSave={onSave}
         onCancel={() => {}}
       />,
@@ -130,7 +125,6 @@ describe("EventEditDrawerV3", () => {
         event={projectedNap()}
         owners={owners}
         nowMinutes={NOW}
-        bedtimeThreshold={THRESHOLD}
         onSave={onSave}
         onCancel={() => {}}
       />,
@@ -153,7 +147,6 @@ describe("EventEditDrawerV3", () => {
         event={projectedNap()}
         owners={owners}
         nowMinutes={NOW}
-        bedtimeThreshold={THRESHOLD}
         onSave={onSave}
         onCancel={() => {}}
       />,
@@ -189,7 +182,6 @@ describe("EventEditDrawerV3", () => {
         event={source}
         owners={owners}
         nowMinutes={NOW}
-        bedtimeThreshold={THRESHOLD}
         existingEvents={[recordedNap]}
         onSave={() => {}}
         onCancel={() => {}}
@@ -210,7 +202,6 @@ describe("EventEditDrawerV3", () => {
         event={projectedNap()}
         owners={owners}
         nowMinutes={NOW}
-        bedtimeThreshold={THRESHOLD}
         existingEvents={[projectedOther]}
         onSave={() => {}}
         onCancel={() => {}}
@@ -231,7 +222,6 @@ describe("EventEditDrawerV3", () => {
         event={projectedNap()}
         owners={owners}
         nowMinutes={NOW}
-        bedtimeThreshold={THRESHOLD}
         onSave={() => {}}
         onCancel={onCancel}
       />,
@@ -248,7 +238,6 @@ describe("EventEditDrawerV3", () => {
         event={projectedNap()}
         owners={owners}
         nowMinutes={NOW}
-        bedtimeThreshold={THRESHOLD}
         onSave={() => {}}
         onCancel={() => {}}
         onDelete={() => {}}
@@ -286,7 +275,6 @@ describe("EventEditDrawerV3", () => {
         event={overriddenNap}
         owners={owners}
         nowMinutes={NOW}
-        bedtimeThreshold={THRESHOLD}
         onSave={async (event) => {
           // Mirror the page's `actuals.some(a => a.id === drawer.event.id)` check.
           const exists = actuals.some((a) => a.id === event.id);
@@ -322,7 +310,6 @@ describe("EventEditDrawerV3", () => {
         event={projectedNap({ lifecycle: { state: "completed", committedAt: 10 * 60 } })}
         owners={owners}
         nowMinutes={NOW}
-        bedtimeThreshold={THRESHOLD}
         onSave={() => {}}
         onCancel={() => {}}
         onDelete={() => {}}
@@ -353,7 +340,6 @@ describe("EventEditDrawerV3", () => {
         event={ww}
         owners={owners}
         nowMinutes={NOW}
-        bedtimeThreshold={THRESHOLD}
         onSave={() => {}}
         onCancel={() => {}}
       />,
@@ -389,7 +375,6 @@ describe("EventEditDrawerV3", () => {
         event={extra}
         owners={owners}
         nowMinutes={NOW}
-        bedtimeThreshold={THRESHOLD}
         onSave={() => {}}
         onCancel={() => {}}
       />,
@@ -399,133 +384,5 @@ describe("EventEditDrawerV3", () => {
     expect(screen.getByLabelText("End time")).toHaveValue("15:00");
     expect(screen.queryByLabelText("Amount (oz)")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Jake" })).toBeInTheDocument();
-  });
-});
-
-describe("Past-threshold prompt when editing a nap (physiology cascade)", () => {
-  // Per spec PR #146 R2: a nap whose startTime crosses from below to
-  // at/after bedtimeThreshold prompts "Change to bedtime?" before save.
-  // Yes → delete original (if recorded) + save bedtime doc. No → save
-  // as nap; cascade emits projected bedtime after.
-
-  const recordedNap = (start: TimeMin, end: TimeMin): Event => ({
-    id: "nap-rec",
-    dayId: "d-1",
-    eventKey: "nap_2",
-    type: "nap",
-    kind: "block",
-    startTime: start,
-    endTime: end,
-    label: "Nap 2",
-    hasPutdown: false,
-    lifecycle: { state: "completed", committedAt: start },
-  });
-
-  it("does not prompt when nap stays below threshold", async () => {
-    const onSave = vi.fn();
-    const onDelete = vi.fn();
-    render(
-      <EventEditDrawerV3
-        open
-        mode="edit"
-        event={recordedNap(9 * 60, 10 * 60)}
-        owners={owners}
-        nowMinutes={NOW}
-        bedtimeThreshold={THRESHOLD}
-        onSave={onSave}
-        onCancel={() => {}}
-        onDelete={onDelete}
-      />,
-    );
-    await userEvent.click(screen.getByRole("button", { name: /save/i }));
-    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ type: "nap" }));
-    expect(onDelete).not.toHaveBeenCalled();
-    expect(screen.queryByText(/change to bedtime\?/i)).toBeNull();
-  });
-
-  it("prompts when nap crosses to past-threshold; Yes deletes nap + saves bedtime", async () => {
-    const onSave = vi.fn();
-    const onDelete = vi.fn();
-    const original = recordedNap(9 * 60, 10 * 60);
-    render(
-      <EventEditDrawerV3
-        open
-        mode="edit"
-        event={original}
-        owners={owners}
-        nowMinutes={NOW}
-        bedtimeThreshold={THRESHOLD}
-        onSave={onSave}
-        onCancel={() => {}}
-        onDelete={onDelete}
-      />,
-    );
-    // Move nap startTime to 20:00 (past threshold 19:00).
-    const startInput = screen.getByLabelText("Start time");
-    await userEvent.clear(startInput);
-    await userEvent.type(startInput, "20:00");
-    await userEvent.click(screen.getByRole("button", { name: /save/i }));
-    // Prompt appears.
-    expect(screen.getByText(/change to bedtime\?/i)).toBeVisible();
-    await userEvent.click(screen.getByRole("button", { name: /yes, change to bedtime/i }));
-    // Original nap doc deleted; bedtime doc saved.
-    expect(onDelete).toHaveBeenCalledWith(original);
-    expect(onSave).toHaveBeenCalledWith(
-      expect.objectContaining({
-        type: "bedtime",
-        eventKey: "bedtime",
-        startTime: 20 * 60,
-        label: "Bedtime",
-      }),
-    );
-  });
-
-  it("prompts on cross; No saves as nap, no delete", async () => {
-    const onSave = vi.fn();
-    const onDelete = vi.fn();
-    render(
-      <EventEditDrawerV3
-        open
-        mode="edit"
-        event={recordedNap(9 * 60, 10 * 60)}
-        owners={owners}
-        nowMinutes={NOW}
-        bedtimeThreshold={THRESHOLD}
-        onSave={onSave}
-        onCancel={() => {}}
-        onDelete={onDelete}
-      />,
-    );
-    const startInput = screen.getByLabelText("Start time");
-    await userEvent.clear(startInput);
-    await userEvent.type(startInput, "20:00");
-    await userEvent.click(screen.getByRole("button", { name: /save/i }));
-    await userEvent.click(screen.getByRole("button", { name: /no, keep as nap/i }));
-    expect(onSave).toHaveBeenCalledWith(
-      expect.objectContaining({ type: "nap", startTime: 20 * 60 }),
-    );
-    expect(onDelete).not.toHaveBeenCalled();
-  });
-
-  it("does not prompt when nap was already past threshold (owner-only edit)", async () => {
-    const onSave = vi.fn();
-    const onDelete = vi.fn();
-    render(
-      <EventEditDrawerV3
-        open
-        mode="edit"
-        event={recordedNap(20 * 60, 21 * 60)} // already past 19:00
-        owners={owners}
-        nowMinutes={NOW}
-        bedtimeThreshold={THRESHOLD}
-        onSave={onSave}
-        onCancel={() => {}}
-        onDelete={onDelete}
-      />,
-    );
-    // No time change; just save.
-    await userEvent.click(screen.getByRole("button", { name: /save/i }));
-    expect(screen.queryByText(/change to bedtime\?/i)).toBeNull();
-    expect(onSave).toHaveBeenCalled();
   });
 });

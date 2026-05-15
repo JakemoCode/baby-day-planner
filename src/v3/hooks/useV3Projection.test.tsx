@@ -36,11 +36,8 @@ describe("useV3Projection — engine wiring (real projectDay)", () => {
     const events = result.current;
 
     // Cascade must emit nap_1 + nap_2 from wakeWindowsMinutes=[120,150].
-    // Under the physiology cascade, additional naps are also projected
-    // via cadence-extension up to bedtime threshold; we assert the
-    // first two as the relevant chain prefix.
     const naps = events.filter((e) => e.type === "nap");
-    expect(naps.slice(0, 2).map((n) => n.eventKey)).toEqual(["nap_1", "nap_2"]);
+    expect(naps.map((n) => n.eventKey)).toEqual(["nap_1", "nap_2"]);
 
     // First wake window starts at wakeTime, lasts 120 min. nap_1 follows.
     const ww1 = events.find((e) => e.eventKey === "wake_window_1");

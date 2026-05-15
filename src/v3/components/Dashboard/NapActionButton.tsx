@@ -8,75 +8,59 @@ import { ActionButton } from "./ActionButton";
 export type NapActionButtonProps = {
   inProgressNap: Event | undefined;
   dayId: string;
+  nextNumber: number;
   /**
-   * The next-upcoming projected nap, if any. Start Nap promotes that
-   * projection (uses its eventKey + label) so the cascade keys off
-   * the same `nap_N` slot. Under the physiology cascade this is
-   * always defined within-day — past threshold the CTA swaps to
-   * Start Bedtime Now instead, so no UUID fallback is needed.
+   * The next-upcoming projected nap, if any. When provided, Start Nap
+   * **promotes** that projection (uses its eventKey + label) instead of
+   * inventing a new slot. Prevents the §F24 duplicate where a fresh
+   * `nap_${nextNumber}` doc landed next to its still-projected sibling.
+   * Falls back to `nap_${nextNumber}` (or a UUID for off-pattern naps,
+   * see `maxSlot`) when no projection exists.
    */
-  nextProjectedNap?: Event | undefined;
-  /** Current wall-clock TimeMin (used for the CTA swap decision). */
-  nowMinutes: TimeMin;
-  /** Settings.bedtimeThreshold — drives the CTA swap. */
-  bedtimeThreshold: TimeMin;
+  nextProjectedNap?: Event;
+  /**
+   * Cascade slot count (= settings.wakeWindowsMinutes.length). When
+   * the fallback `nextNumber` would exceed this — i.e. the user is
+   * starting a nap past the configured slot count — the new doc gets
+   * a UUID-based eventKey so it doesn't masquerade as a cascade slot
+   * and eat bedtime substitution.
+   */
+  maxSlot: number;
   onStart: (nap: Event) => Promise<void>;
   onEnd: (nap: Event, endTime: TimeMin) => Promise<void>;
-  onStartBedtime: (bedtime: Event) => Promise<void>;
 };
 
 export function NapActionButton({
   inProgressNap,
   dayId,
+  nextNumber,
   nextProjectedNap,
-  nowMinutes,
-  bedtimeThreshold,
+  maxSlot,
   onStart,
   onEnd,
-  onStartBedtime,
 }: NapActionButtonProps) {
-  const pastThreshold = nowMinutes >= bedtimeThreshold;
-
   const handleClick = () => {
     const nowMin = currentLocalMinutes();
     if (inProgressNap) {
       void onEnd(inProgressNap, nowMin);
       return;
     }
-
-    // Past threshold → start bedtime instead. The dashboard primary
-    // CTA stays always-actionable; physiology takes over from rhythm
-    // once it's bedtime o'clock (DOMAIN.md §3).
-    if (pastThreshold) {
-      const bedtimeId = newEventId("bedtime");
-      const bedtime: Event = {
-        id: bedtimeId,
-        dayId,
-        eventKey: "bedtime",
-        type: "bedtime",
-        kind: "block",
-        label: "Bedtime",
-        startTime: nowMin,
-        hasPutdown: false,
-        lifecycle: { state: "started", committedAt: nowMin },
-      };
-      void onStartBedtime(bedtime);
-      return;
-    }
-
-    // Standard path: promote nextProjectedNap. Under the physiology
-    // cascade nextProjectedNap is always defined within-day; if a
-    // caller invokes this without one (e.g. settings misconfigured),
-    // bail safely rather than minting a UUID nap.
-    if (!nextProjectedNap) return;
+    // Promote the nearest projection if one exists — its eventKey
+    // (`nap_N`) is what the cascade keys off, so consolidation happens
+    // automatically. Otherwise fall back to the next computed slot,
+    // unless that slot would exceed the cascade's configured slot count
+    // (off-pattern nap → UUID eventKey).
     const napId = newEventId("nap");
+    const fitsSlot = nextNumber <= maxSlot;
+    const eventKey = nextProjectedNap?.eventKey ?? (fitsSlot ? `nap_${nextNumber}` : napId);
+    const label = nextProjectedNap?.label ?? (fitsSlot ? `Nap ${nextNumber}` : "Nap");
     const nap: Event = {
       id: napId,
       dayId,
-      eventKey: nextProjectedNap.eventKey,
+      eventKey,
       type: "nap",
       kind: "block",
-      label: nextProjectedNap.label,
+      label,
       startTime: nowMin,
       hasPutdown: false,
       lifecycle: { state: "started", committedAt: nowMin },
@@ -84,11 +68,9 @@ export function NapActionButton({
     void onStart(nap);
   };
 
-  const label = inProgressNap ? "End Nap" : pastThreshold ? "Start Bedtime Now" : "Start Nap Now";
-
   return (
     <ActionButton variant="secondary" onClick={handleClick}>
-      {label}
+      {inProgressNap ? "End Nap" : "Start Nap Now"}
     </ActionButton>
   );
 }

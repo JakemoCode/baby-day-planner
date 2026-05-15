@@ -14,6 +14,7 @@ type Option = { type: CreatableType; label: string; sub: string };
 
 const OPTIONS: ReadonlyArray<Option> = [
   { type: "bottle", label: "Bottle", sub: "Off-cycle feed" },
+  { type: "nap", label: "Nap", sub: "Unplanned sleep" },
   { type: "pump", label: "Pump", sub: "Off-schedule pump" },
   { type: "extra", label: "Custom", sub: "Anything else" },
 ];
