@@ -40,48 +40,54 @@ describe("R3.1 — projected nap chain from wakeWindowsMinutes", () => {
       { rules: NAP_RULES },
     );
 
-    // Expected cascade for the first 2 slots (cadence-extension carries
-    // it past the configured array under the physiology cascade — we
-    // assert the relevant chain prefix here).
+    // Expected cascade:
     //   ww_1 : 7:00 → 9:00   (120 min)
     //   nap_1: 9:00 → 10:00  (60 min)
     //   ww_2 : 10:00 → 11:30 (90 min)
     //   nap_2: 11:30 → 12:30 (60 min)
-    const ww1 = out.find((e) => e.eventKey === "wake_window_1");
-    expect(ww1).toMatchObject({
-      type: "wake_window",
-      kind: "block",
-      startTime: 7 * 60,
-      endTime: 9 * 60,
-      lifecycle: { state: "projected" },
-    });
+    const summary = out.map((e) => ({
+      eventKey: e.eventKey,
+      type: e.type,
+      kind: e.kind,
+      startTime: e.startTime,
+      endTime: e.endTime,
+      lifecycle: e.lifecycle.state,
+    }));
 
-    const nap1 = out.find((e) => e.eventKey === "nap_1");
-    expect(nap1).toMatchObject({
-      type: "nap",
-      kind: "block",
-      startTime: 9 * 60,
-      endTime: 10 * 60,
-      lifecycle: { state: "projected" },
-    });
-
-    const ww2 = out.find((e) => e.eventKey === "wake_window_2");
-    expect(ww2).toMatchObject({
-      type: "wake_window",
-      kind: "block",
-      startTime: 10 * 60,
-      endTime: 11 * 60 + 30,
-      lifecycle: { state: "projected" },
-    });
-
-    const nap2 = out.find((e) => e.eventKey === "nap_2");
-    expect(nap2).toMatchObject({
-      type: "nap",
-      kind: "block",
-      startTime: 11 * 60 + 30,
-      endTime: 12 * 60 + 30,
-      lifecycle: { state: "projected" },
-    });
+    expect(summary).toEqual([
+      {
+        eventKey: "wake_window_1",
+        type: "wake_window",
+        kind: "block",
+        startTime: 7 * 60,
+        endTime: 9 * 60,
+        lifecycle: "projected",
+      },
+      {
+        eventKey: "nap_1",
+        type: "nap",
+        kind: "block",
+        startTime: 9 * 60,
+        endTime: 10 * 60,
+        lifecycle: "projected",
+      },
+      {
+        eventKey: "wake_window_2",
+        type: "wake_window",
+        kind: "block",
+        startTime: 10 * 60,
+        endTime: 11 * 60 + 30,
+        lifecycle: "projected",
+      },
+      {
+        eventKey: "nap_2",
+        type: "nap",
+        kind: "block",
+        startTime: 11 * 60 + 30,
+        endTime: 12 * 60 + 30,
+        lifecycle: "projected",
+      },
+    ]);
   });
 });
 
@@ -377,14 +383,13 @@ describe("R3.3 — recorded naps coexist with projected cascade", () => {
       { rules: NAP_RULES },
     );
 
-    // The first 4 events are ww_1, nap_1, ww_2, nap_2 (no duplicate
-    // nap_2). The cascade extends past wws.length under the physiology
-    // cascade; we assert the relevant chain prefix here.
-    const firstFourKeys = out
-      .filter((e) => e.type === "wake_window" || e.type === "nap")
-      .map((e) => e.eventKey)
-      .slice(0, 4);
-    expect(firstFourKeys).toEqual(["wake_window_1", "nap_1", "wake_window_2", "nap_2"]);
+    // Exactly 4 events: ww_1, nap_1, ww_2, nap_2 (no duplicate nap_2).
+    expect(out.map((e) => e.eventKey)).toEqual([
+      "wake_window_1",
+      "nap_1",
+      "wake_window_2",
+      "nap_2",
+    ]);
 
     // The recorded nap_2 must be the one in the output (preserved per §0).
     const napTwo = out.find((e) => e.eventKey === "nap_2");
@@ -730,137 +735,5 @@ describe("R7.7 — manual bedtime is the user's authoritative declaration", () =
 
     expect(out.find((e) => e.eventKey === "nap_4")).toBeUndefined();
     expect(out.find((e) => e.eventKey === "nap_5")).toBeUndefined();
-  });
-});
-
-describe("Cascade extends past wakeWindowsMinutes.length (physiology cascade)", () => {
-  // Per docs/superpowers/specs/2026-05-15-physiology-cascade-design.md:
-  // The wakeWindowsMinutes array is a CADENCE sequence, not a slot
-  // count. The cascade walks until the next projected nap would cross
-  // bedtimeThreshold, using the last WW value past the configured
-  // array.
-
-  it("with wws=[120], cascade emits nap_1, nap_2, nap_3, ... until threshold", () => {
-    // wakeTime 7:00, wws=[120], napLen 60, threshold 19:00.
-    // Each rhythm position uses WW=120 (repeats last):
-    //   ww_1 7-9, nap_1 9-10, ww_2 10-12, nap_2 12-13, ww_3 13-15,
-    //   nap_3 15-16, ww_4 16-18, nap_4 18-19 → threshold reached →
-    //   bedtime at 19:00 (nap_4 would cross threshold).
-    const ctx = aContext({
-      day: aDay({ wakeTime: 7 * 60 }),
-      settings: aSettings({
-        wakeWindowsMinutes: [120],
-        defaultNapLengthMinutes: 60,
-        bedtimeThreshold: 19 * 60,
-        defaultWakeTime: 7 * 60,
-      }),
-      actuals: [],
-    });
-
-    const out = projectDay(
-      {
-        day: ctx.day,
-        settings: ctx.settings,
-        actuals: ctx.actuals,
-        nowMinutes: ctx.nowMinutes,
-      },
-      { rules: NAP_RULES },
-    );
-
-    // Multiple naps emitted past the single-element array.
-    expect(out.find((e) => e.eventKey === "nap_1")).toBeDefined();
-    expect(out.find((e) => e.eventKey === "nap_2")).toBeDefined();
-    expect(out.find((e) => e.eventKey === "nap_3")).toBeDefined();
-
-    // Bedtime terminates the cascade.
-    const bedtime = out.find((e) => e.type === "bedtime");
-    expect(bedtime).toBeDefined();
-    expect(bedtime!.startTime).toBeGreaterThanOrEqual(19 * 60);
-  });
-
-  it("with wws=[120, 90], cascade uses 90-min WW from position 2 onward", () => {
-    // wakeTime 7:00, wws=[120, 90], napLen 60, threshold 19:00.
-    //   ww_1 7-9, nap_1 9-10 (WW=120)
-    //   ww_2 10-11:30, nap_2 11:30-12:30 (WW=90)
-    //   ww_3 12:30-14, nap_3 14-15 (WW=90, repeated)
-    //   ww_4 15-16:30, nap_4 16:30-17:30 (WW=90)
-    //   ww_5 17:30-19, projected nap would start at 19:00 → bedtime.
-    const ctx = aContext({
-      day: aDay({ wakeTime: 7 * 60 }),
-      settings: aSettings({
-        wakeWindowsMinutes: [120, 90],
-        defaultNapLengthMinutes: 60,
-        bedtimeThreshold: 19 * 60,
-        defaultWakeTime: 7 * 60,
-      }),
-      actuals: [],
-    });
-
-    const out = projectDay(
-      {
-        day: ctx.day,
-        settings: ctx.settings,
-        actuals: ctx.actuals,
-        nowMinutes: ctx.nowMinutes,
-      },
-      { rules: NAP_RULES },
-    );
-
-    const nap3 = out.find((e) => e.eventKey === "nap_3");
-    expect(nap3).toBeDefined();
-    expect(nap3!.startTime).toBe(14 * 60);
-    expect(nap3!.endTime).toBe(15 * 60);
-
-    const nap4 = out.find((e) => e.eventKey === "nap_4");
-    expect(nap4).toBeDefined();
-    expect(nap4!.startTime).toBe(16 * 60 + 30);
-
-    const bedtime = out.find((e) => e.type === "bedtime");
-    expect(bedtime).toBeDefined();
-    expect(bedtime!.startTime).toBe(19 * 60);
-  });
-
-  it("slot-keyed recorded nap_5 anchors slot 5 even when wws.length=1", () => {
-    // wws=[60] (single-element cadence), napLen=60, threshold=19:00,
-    // recorded nap_5 at 16:00-17:00. Cascade walks slots 1-4 with the
-    // repeated 60-min WW (nap_1 8-9, nap_2 10-11, nap_3 12-13, nap_4
-    // 14-15), then at slot 5 finds the recorded nap_5 and anchors:
-    // ww_5 = 15:00 → 16:00 (recorded nap_5 starts).
-    const recordedNap5 = aRecordedNap({
-      id: "actual_nap_5",
-      eventKey: "nap_5",
-      start: 16 * 60,
-      end: 17 * 60,
-    });
-
-    const ctx = aContext({
-      day: aDay({ wakeTime: 7 * 60 }),
-      settings: aSettings({
-        wakeWindowsMinutes: [60],
-        defaultNapLengthMinutes: 60,
-        bedtimeThreshold: 19 * 60,
-        defaultWakeTime: 7 * 60,
-      }),
-      actuals: [recordedNap5],
-    });
-
-    const out = projectDay(
-      {
-        day: ctx.day,
-        settings: ctx.settings,
-        actuals: ctx.actuals,
-        nowMinutes: ctx.nowMinutes,
-      },
-      { rules: NAP_RULES },
-    );
-
-    const napFive = out.find((e) => e.id === recordedNap5.id);
-    expect(napFive).toBeDefined();
-    expect(napFive!.startTime).toBe(16 * 60);
-
-    // Wake window 5 ends at the recorded nap_5's start.
-    const ww5 = out.find((e) => e.eventKey === "wake_window_5");
-    expect(ww5).toBeDefined();
-    expect(ww5!.endTime).toBe(16 * 60);
   });
 });

@@ -87,21 +87,77 @@ describe("buildCreateTemplate (V3)", () => {
     expect(tpl.label).toBe("Bottle 2");
   });
 
-  // Per spec PR #146: parents adjust by editing existing projected
-  // nap chips, never by adding new naps via FAB. The "nap" branch in
-  // buildCreateTemplate is removed; the picker no longer offers it.
-  // A defensive throw catches any stray caller.
-  it("throws if called with type='nap' (not a CreatableType anymore)", () => {
-    expect(() =>
-      buildCreateTemplate({
-        // @ts-expect-error — nap is no longer a CreatableType.
-        type: "nap",
-        dayId: "d-1",
-        actuals: [],
-        settings: settings(),
-        nowMinutes: NOW,
-      }),
-    ).toThrow();
+  it("seeds a nap template as block-kind without endTime (drawer fills end)", () => {
+    const tpl = buildCreateTemplate({
+      type: "nap",
+      dayId: "d-1",
+      actuals: [],
+      settings: settings(),
+      nowMinutes: NOW,
+    });
+    expect(tpl.type).toBe("nap");
+    expect(tpl.kind).toBe("block");
+    expect(tpl.endTime).toBeUndefined();
+    expect(tpl.eventKey).toBe("nap_1");
+    expect(tpl.lifecycle).toEqual({ state: "projected" });
+  });
+
+  it("numbers a new nap by counting recorded naps", () => {
+    const recordedNap: Event = {
+      id: "n-1",
+      dayId: "d-1",
+      eventKey: "nap_1",
+      type: "nap",
+      kind: "block",
+      startTime: 9 * 60,
+      endTime: 10 * 60,
+      label: "Nap 1",
+      hasPutdown: false,
+      lifecycle: { state: "completed", committedAt: 10 * 60 },
+    };
+    const tpl = buildCreateTemplate({
+      type: "nap",
+      dayId: "d-1",
+      actuals: [recordedNap],
+      settings: settings(),
+      nowMinutes: NOW,
+    });
+    expect(tpl.eventKey).toBe("nap_2");
+    expect(tpl.label).toBe("Nap 2");
+  });
+
+  it("off-pattern nap (beyond wakeWindowsMinutes.length) gets a UUID eventKey, not nap_N", () => {
+    // Regression for the cascade-eating bug introduced by §F25's
+    // "scan projections" fix: a manual nap added past the configured
+    // slot count was getting eventKey `nap_${maxSlot+1}`, which the
+    // cascade then deferred to instead of substituting bedtime —
+    // bedtime would render as "Nap N+1".
+    //
+    // wws.length = 4 here; projected has nap_1..nap_4. nextFreeSlot
+    // would return 5, but 5 > 4 → use UUID, label "Nap".
+    const projected: Event[] = [1, 2, 3, 4].map((n) => ({
+      id: `proj_nap_${n}`,
+      dayId: "d-1",
+      eventKey: `nap_${n}`,
+      type: "nap",
+      kind: "block",
+      startTime: 9 * 60 + n * 60,
+      label: `Nap ${n}`,
+      hasPutdown: false,
+      lifecycle: { state: "projected" },
+    }));
+    const tpl = buildCreateTemplate({
+      type: "nap",
+      dayId: "d-1",
+      actuals: [],
+      settings: settings({ wakeWindowsMinutes: [120, 135, 135, 150] }),
+      nowMinutes: 22 * 60,
+      projected,
+    });
+    // eventKey shouldn't be `nap_5` (would collide with bedtime's slot).
+    expect(tpl.eventKey).not.toMatch(/^nap_\d+$/);
+    expect(tpl.eventKey).toMatch(/^nap_/); // UUID still prefixed
+    expect(tpl.label).toBe("Nap");
   });
 
   it("seeds a pump template (block) with default duration and unique eventKey", () => {
@@ -138,7 +194,7 @@ describe("buildCreateTemplate (V3)", () => {
   });
 
   it("never sets owner on a freshly seeded template (drawer picks)", () => {
-    for (const t of ["bottle", "pump", "extra"] as const) {
+    for (const t of ["bottle", "nap", "pump", "extra"] as const) {
       const tpl = buildCreateTemplate({
         type: t,
         dayId: "d-1",

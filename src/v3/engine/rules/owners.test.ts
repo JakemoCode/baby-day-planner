@@ -303,19 +303,13 @@ describe("R12.3 — projected wake_windows inherit template.wakeWindowOwners[N-1
 
     const out = run(ctx);
 
-    // Under the physiology cascade, additional wake windows emit past
-    // wws.length via cadence-extension. We assert the first 4 (the
-    // ones the template covers) carry the template owner; cadence-
-    // extended WWs beyond the template list naturally have no owner.
     const wws = out
       .filter((e) => e.type === "wake_window")
-      .sort((a, b) => a.startTime - b.startTime)
-      .slice(0, 4);
+      .sort((a, b) => a.startTime - b.startTime);
     expect(wws).toHaveLength(4);
     expect(wws.every((w) => w.owner !== undefined && w.owner.slot === "parent2")).toBe(true);
-    // Sanity: naps in the template-covered slots did NOT bleed into
-    // the WW owner choice.
-    const naps = out.filter((e) => e.type === "nap").slice(0, 4);
+    // Sanity: naps did NOT bleed into the WW owner choice.
+    const naps = out.filter((e) => e.type === "nap");
     expect(naps.every((n) => n.owner !== undefined && n.owner.slot === "parent1")).toBe(true);
   });
 

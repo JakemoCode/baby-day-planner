@@ -145,12 +145,8 @@ describe("R4.2 — wake_window owner overrides survive recompute", () => {
 
     const out = run(ctx);
 
-    // Under the physiology cascade, the cascade extends past wws.length
-    // via cadence-extension; we assert the first 2 wake windows (covering
-    // the configured array) — none have an owner since no overrides
-    // were passed.
     const wakeWindows = out.filter((e) => e.type === "wake_window");
-    expect(wakeWindows.length).toBeGreaterThanOrEqual(2);
+    expect(wakeWindows).toHaveLength(2);
     expect(wakeWindows.every((e) => e.owner === undefined)).toBe(true);
   });
 });
