@@ -15,6 +15,8 @@ const useV3TemplatesMock = vi.fn();
 const useV3ProjectionMock = vi.fn();
 const useNowMinutesMock = vi.fn();
 const startNewDayMock = vi.fn();
+const getOrCreatePlannedDayMock = vi.fn();
+const createEventMock = vi.fn();
 const saveSettingsMock = vi.fn();
 
 vi.mock("@/v3/hooks/useV3Day", () => ({
@@ -37,6 +39,10 @@ vi.mock("@/hooks/useNowMinutes", () => ({
 }));
 vi.mock("@/v3/repositories/days", () => ({
   startNewDay: (...args: unknown[]) => startNewDayMock(...args),
+  getOrCreatePlannedDay: (...args: unknown[]) => getOrCreatePlannedDayMock(...args),
+}));
+vi.mock("@/v3/repositories/events", () => ({
+  createEvent: (...args: unknown[]) => createEventMock(...args),
 }));
 vi.mock("@/v3/repositories/settings", () => ({
   saveSettings: (...args: unknown[]) => saveSettingsMock(...args),
@@ -296,6 +302,11 @@ describe("DashboardPage (V3)", () => {
   });
 
   it("uniqueRecordedKeys counts distinct eventKey across recorded actuals only", () => {
+    // Pin the wall clock to the test day's date so the §F22 calendar-day
+    // routing in handleLogBottle takes the same-day branch (i.e. uses
+    // createOptimistic, not the cross-day createEvent path).
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(new Date("2026-05-10T09:00:00"));
     // Two recorded bottle docs with the SAME eventKey (Start/End pair),
     // plus one projected bottle (must be ignored). nextNumber should be 2,
     // not 3 — verified via the StartBottleButton tracking next ordinal.
@@ -342,5 +353,47 @@ describe("DashboardPage (V3)", () => {
     const created = createOptimistic.mock.calls[0]?.[0] as Event;
     expect(created.eventKey).toBe("bottle_2");
     expect(created.label).toBe("Bottle 2");
+  });
+
+  it("§F22 — bottle recorded at 2 AM next-day routes to a freshly-created planned day, not the active day", async () => {
+    // Pin the wall clock to 2 AM on the day AFTER the active day's date.
+    // Active day.date = "2026-05-10"; wall clock = 2026-05-11 02:00.
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(new Date("2026-05-11T02:00:00"));
+
+    const plannedTomorrow = makeDay({
+      id: "day-tomorrow-id",
+      date: "2026-05-11",
+      status: "planned",
+    });
+    getOrCreatePlannedDayMock.mockResolvedValue(plannedTomorrow);
+    createEventMock.mockResolvedValue(undefined);
+
+    const { createOptimistic } = setupHooks({ nowMinutes: 2 * 60 });
+    renderWithAuth(<DashboardPage />);
+
+    const btn = screen.getByRole("button", { name: /Start Bottle Now/i });
+    btn.click();
+
+    // Wait for async handler.
+    await Promise.resolve();
+    await Promise.resolve();
+
+    // Cross-day path: createOptimistic NOT called (would land on active
+    // day). getOrCreatePlannedDay called with the wall-clock date.
+    // createEvent called with the bottle docked under tomorrow's id.
+    expect(createOptimistic).not.toHaveBeenCalled();
+    expect(getOrCreatePlannedDayMock).toHaveBeenCalledTimes(1);
+    const [, , dateArg] = getOrCreatePlannedDayMock.mock.calls[0] as [
+      unknown,
+      string,
+      string,
+      number,
+    ];
+    expect(dateArg).toBe("2026-05-11");
+    expect(createEventMock).toHaveBeenCalledTimes(1);
+    const [, , createdEvent] = createEventMock.mock.calls[0] as [unknown, string, Event];
+    expect(createdEvent.type).toBe("bottle");
+    expect(createdEvent.dayId).toBe("day-tomorrow-id");
   });
 });

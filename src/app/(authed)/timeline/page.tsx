@@ -117,6 +117,7 @@ export default function TimelinePage() {
             actuals,
             settings,
             nowMinutes,
+            projected,
           });
           setDrawer({ open: true, mode: "create", template: tpl });
         }}

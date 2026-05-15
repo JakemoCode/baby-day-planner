@@ -24,6 +24,17 @@ export type BuildTemplateInput = {
   settings: Settings;
   /** Current time as TimeMin so the form opens with a sensible default. */
   nowMinutes: TimeMin;
+  /**
+   * Full engine projection for the day (includes engine-emitted nap_N /
+   * bottle_N projections). Used to pick the next free slot index when
+   * the user manually creates an off-pattern nap (e.g., during bedtime).
+   * Without this, the template-builder would scan recorded events only
+   * and could claim an eventKey already occupied by a projection — §F25.
+   *
+   * Optional for callers that don't have it (rare; only legacy paths).
+   * When omitted, falls back to "count of recorded events + 1".
+   */
+  projected?: Event[];
 };
 
 export function buildCreateTemplate({
@@ -32,9 +43,10 @@ export function buildCreateTemplate({
   actuals,
   settings,
   nowMinutes,
+  projected,
 }: BuildTemplateInput): Event {
   if (type === "bottle") {
-    const nextN = countByType(actuals, "bottle") + 1;
+    const nextN = nextFreeSlot("bottle", actuals, projected);
     return {
       id: newEventId("bottle"),
       dayId,
@@ -50,7 +62,7 @@ export function buildCreateTemplate({
   }
 
   if (type === "nap") {
-    const nextN = countByType(actuals, "nap") + 1;
+    const nextN = nextFreeSlot("nap", actuals, projected);
     return {
       id: newEventId("nap"),
       dayId,
@@ -97,12 +109,36 @@ export function buildCreateTemplate({
 }
 
 /**
- * Count events of a given type that are RECORDED (started/completed).
- * Projected entries are excluded so the FAB-create ordinal agrees with
- * the dashboard's `uniqueRecordedKeys` count — otherwise a lingering
- * projected bottle would push FAB-created events to `bottle_N+1` while
- * StartBottleButton emits `bottle_N`.
+ * Compute the next free slot index for `<type>_N` events, scanning
+ * BOTH recorded actuals and (when provided) engine projections. The
+ * eventKey shape is `${type}_N` (e.g., `nap_3`, `bottle_5`) — we look
+ * for the highest existing N and return N+1.
+ *
+ * Why scan projections too: a manual nap creation inside the bedtime
+ * block had no recorded sibling but the cascade had already emitted
+ * `nap_1..nap_3`; counting recorded-only would return 1 and the new
+ * doc would collide with the projected `nap_1` (§F25).
+ *
+ * When `projected` is undefined, falls back to "recorded count + 1"
+ * for backwards compatibility with callers that don't pass it.
  */
-function countByType(events: Event[], type: EventType): number {
-  return events.filter((e) => e.type === type && isRecorded(e.lifecycle)).length;
+function nextFreeSlot(type: EventType, actuals: Event[], projected?: Event[]): number {
+  if (!projected) {
+    return actuals.filter((e) => e.type === type && isRecorded(e.lifecycle)).length + 1;
+  }
+  const re = new RegExp(`^${type}_(\\d+)$`);
+  let maxN = 0;
+  const scan = (events: Event[]) => {
+    for (const e of events) {
+      if (e.type !== type) continue;
+      const m = re.exec(e.eventKey);
+      if (m && m[1]) {
+        const n = parseInt(m[1], 10);
+        if (n > maxN) maxN = n;
+      }
+    }
+  };
+  scan(actuals);
+  scan(projected);
+  return maxN + 1;
 }
