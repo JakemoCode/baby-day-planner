@@ -95,6 +95,15 @@ describe("R3.4 / R3.5 — wake window endTime tracks the next nap's start", () =
   it("with a recorded nap_2 LATER than projected, ww_2 stretches to the recorded start", () => {
     // Projected cascade (no actuals) would put nap_2 at 11:30.
     // The recorded nap_2 actually started at 13:00 — ww_2 must stretch.
+    // Preceding nap_1 anchors slot 1 chronologically (under the
+    // chronological cascade, a real nap with no preceding nap would
+    // fill rhythm position 1 regardless of eventKey).
+    const recordedNap1 = aRecordedNap({
+      id: "actual_nap_1",
+      eventKey: "nap_1",
+      start: 9 * 60,
+      end: 10 * 60,
+    });
     const recordedNap2 = aRecordedNap({
       id: "actual_nap_2",
       eventKey: "nap_2",
@@ -108,7 +117,7 @@ describe("R3.4 / R3.5 — wake window endTime tracks the next nap's start", () =
         wakeWindowsMinutes: [120, 90],
         defaultNapLengthMinutes: 60,
       }),
-      actuals: [recordedNap2],
+      actuals: [recordedNap1, recordedNap2],
     });
 
     const out = projectDay(
@@ -129,6 +138,13 @@ describe("R3.4 / R3.5 — wake window endTime tracks the next nap's start", () =
   it("with a recorded nap_2 EARLIER than projected, ww_2 shrinks to the recorded start", () => {
     // Projected cascade (no actuals) would put nap_2 at 11:30.
     // The baby actually went down at 10:30 — ww_2 must shrink to that.
+    // Preceding nap_1 anchors slot 1 chronologically.
+    const recordedNap1 = aRecordedNap({
+      id: "actual_nap_1",
+      eventKey: "nap_1",
+      start: 9 * 60,
+      end: 10 * 60,
+    });
     const recordedNap2 = aRecordedNap({
       id: "actual_nap_2_early",
       eventKey: "nap_2",
@@ -142,7 +158,7 @@ describe("R3.4 / R3.5 — wake window endTime tracks the next nap's start", () =
         wakeWindowsMinutes: [120, 90],
         defaultNapLengthMinutes: 60,
       }),
-      actuals: [recordedNap2],
+      actuals: [recordedNap1, recordedNap2],
     });
 
     const out = projectDay(
@@ -177,6 +193,14 @@ describe("R3.4/R3.5 — wake_window(N).endTime always tracks nap(N).startTime", 
     //   ww_1 7:00-9:00, nap_1 9:00-10:30, ww_2 10:30-13:00, nap_2 13:00-14:30.
     // User drawer-edits Nap 2 to 14:00-15:30. Under the invariant,
     // ww_2 must stretch from 10:30 to 14:00 — no gap.
+    // Preceding nap_1 anchors slot 1 chronologically (nap_1 9:00-10:30
+     // → cursor at 10:30 entering slot 2).
+    const recordedNap1 = aRecordedNap({
+      id: "actual_nap_1",
+      eventKey: "nap_1",
+      start: 9 * 60,
+      end: 10 * 60 + 30,
+    });
     const overriddenNap2 = aRecordedNap({
       id: "manual_nap_2",
       eventKey: "nap_2",
@@ -191,7 +215,7 @@ describe("R3.4/R3.5 — wake_window(N).endTime always tracks nap(N).startTime", 
         wakeWindowsMinutes: [120, 150],
         defaultNapLengthMinutes: 90,
       }),
-      actuals: [overriddenNap2],
+      actuals: [recordedNap1, overriddenNap2],
     });
 
     const out = projectDay(
@@ -319,8 +343,16 @@ describe("R3.7 — short recorded nap shortens the FOLLOWING wake window", () =>
 
 describe("R3.6 — inverted nap data collapses the wake window to zero", () => {
   it("with a recorded nap_2 BEFORE the previous nap ended, ww_2 is zero-length (not inverted)", () => {
-    // Cascade: nap_1 projected ends at 10:00; recorded nap_2 starts at 9:30.
-    // ww_2 must NOT render with end < start. Clamp endTime to start.
+    // Cascade: recorded nap_1 ends at 10:00; recorded nap_2 starts at
+    // 9:30 (BEFORE nap_1's end). cursor advances to nap_1.endTime
+    // (10:00); nap_2's startTime (9:30) is now < cursor → clamp ww_2
+    // to zero-length, not negative.
+    const recordedNap1 = aRecordedNap({
+      id: "actual_nap_1",
+      eventKey: "nap_1",
+      start: 9 * 60,
+      end: 10 * 60,
+    });
     const recordedNap2 = aRecordedNap({
       id: "actual_nap_2_inverted",
       eventKey: "nap_2",
@@ -334,7 +366,7 @@ describe("R3.6 — inverted nap data collapses the wake window to zero", () => {
         wakeWindowsMinutes: [120, 90],
         defaultNapLengthMinutes: 60,
       }),
-      actuals: [recordedNap2],
+      actuals: [recordedNap1, recordedNap2],
     });
 
     const out = projectDay(
