@@ -52,12 +52,33 @@ function projectSleepCascade(ctx: Context, existing: Event[]): Event[] {
   const napLen = ctx.settings.defaultNapLengthMinutes;
   const threshold = ctx.settings.bedtimeThreshold;
 
-  // Index existing naps so we don't emit duplicates and so the cascade
-  // can defer to reality at each slot.
-  const existingNapByKey = new Map<string, Event>();
+  // Two classes of real naps:
+  //   - slot-keyed (`nap_N` eventKey): the user/promotion path declared
+  //     this nap fills cascade slot N (e.g. drawer-edit on a projected
+  //     nap, or NapActionButton's nextProjectedNap promotion). Slot-keyed
+  //     naps ALWAYS claim slot N regardless of distance from natural —
+  //     reality wins for that slot.
+  //   - additive (non-slot eventKey, e.g. UUID): the FAB Add Nap path.
+  //     Purely additive — never displaces a slot. Inserted into the
+  //     rhythm chronologically when its startTime falls within a slot's
+  //     natural placement window.
+  //
+  // This split preserves the slot-claiming semantics of `nap_N` (so a
+  // late-recorded nap_2 still stretches ww_2 even when far from
+  // natural) while adding a chronological-insert path for FAB-added
+  // UUID naps that re-anchors downstream projections.
+  const slotKeyedNapByN = new Map<number, Event>();
+  const additives: Event[] = [];
   for (const e of existing) {
-    if (isNap(e)) existingNapByKey.set(e.eventKey, e);
+    if (!isNap(e) || isProjected(e)) continue;
+    const m = /^nap_(\d+)$/.exec(e.eventKey);
+    if (m && m[1]) {
+      slotKeyedNapByN.set(parseInt(m[1], 10), e);
+    } else {
+      additives.push(e);
+    }
   }
+  additives.sort((a, b) => a.startTime - b.startTime);
 
   // A manual bedtime (recorded/overridden) in actuals is authoritative.
   // It pins the cascade's terminator at its startTime — no projected
@@ -66,51 +87,80 @@ function projectSleepCascade(ctx: Context, existing: Event[]): Event[] {
 
   const projected: Event[] = [];
   let cursor = wakeTime;
+  let additiveIdx = 0;
+  let prevNap: Event | undefined;
 
   for (let i = 0; i < wws.length; i++) {
     const baseWw = wws[i]!;
-    // Short-nap adjustment: if the previous nap is RECORDED (lifecycle
-    // 'completed') and shorter than shortNapThresholdMinutes, shrink THIS
-    // wake window by shortNapAdjustmentMinutes. Annotations (overridden)
-    // carry intent, not measurement, and don't trigger the adjustment.
-    const prevRecordedShort = i > 0 && isShortRecordedNap(existingNapByKey.get(`nap_${i}`), ctx);
+    // Short-nap adjustment based on the previous nap (slot-keyed,
+    // additive, or projected) — only RECORDED short naps trigger.
+    const prevRecordedShort = isShortRecordedNap(prevNap, ctx);
     const wwMinutes = prevRecordedShort
       ? Math.max(0, baseWw - ctx.settings.shortNapAdjustmentMinutes)
       : baseWw;
 
     const wwStart = cursor;
+    const naturalNapStart = wwStart + wwMinutes;
 
-    // Manual bedtime short-circuit: if wwStart is at/after the manual
-    // bedtime, stop entirely. (R7.4 / R7.4b — no orphan WWs or naps
-    // beyond the authoritative bedtime.)
     if (manualBedtime && wwStart >= manualBedtime.startTime) break;
 
     const n = i + 1;
-    const napKey = `nap_${n}`;
-    const existingNap = existingNapByKey.get(napKey);
+    const slotKeyed = slotKeyedNapByN.get(n);
 
-    // The nap's startTime is whichever the cascade lands on: reality
-    // wins (recorded/overridden) over projection.
-    //
-    // R3.6 inversion guard: an overridden start earlier than wwStart
-    // (e.g. user shifted it before the previous nap ended) clamps to
-    // wwStart so the WW renders zero-length rather than negative.
-    const napStart = existingNap ? Math.max(wwStart, existingNap.startTime) : wwStart + wwMinutes;
+    // Skip additives that ended before cursor (already accounted for).
+    while (
+      additiveIdx < additives.length &&
+      (additives[additiveIdx]!.endTime ?? additives[additiveIdx]!.startTime + napLen) <= cursor
+    ) {
+      additiveIdx++;
+    }
+    const nextAdditive: Event | undefined = additives[additiveIdx];
 
-    // Bedtime substitution (R7.5 / R7.6 / R7.11): if no manual bedtime
-    // exists AND this slot's PROJECTED nap would reach the threshold
-    // (start ≥ threshold OR its interval crosses it), emit bedtime at
-    // napStart and stop the cascade. Reality wins: a recorded/overridden
-    // nap at this slot is NOT substituted — it stays as a nap.
+    // Decide what fills this slot:
+    //   1. Slot-keyed (`nap_N`) wins if present — always claims slot N.
+    //   2. Else, if the next additive's startTime falls within the
+    //      slot's natural window [wwStart, naturalNapStart + napLen],
+    //      it consumes this slot (FAB-added nap inserted into rhythm).
+    //   3. Else, project the slot.
+    let chosen: Event | undefined;
+    let consumedAdditive = false;
+    if (slotKeyed) {
+      chosen = slotKeyed;
+    } else if (
+      nextAdditive !== undefined &&
+      nextAdditive.startTime <= naturalNapStart + napLen
+    ) {
+      chosen = nextAdditive;
+      consumedAdditive = true;
+    }
+
+    // R3.6 inversion guard: a chosen nap with start earlier than wwStart
+    // clamps to wwStart so the WW renders zero-length rather than
+    // negative.
+    const napStart = chosen ? Math.max(wwStart, chosen.startTime) : naturalNapStart;
+
+    // Bedtime substitution (projection-only path): no manual bedtime,
+    // no chosen real nap, projected nap would reach/cross threshold →
+    // emit bedtime at napStart, stop.
     const wouldCrossThreshold = napStart >= threshold || napStart + napLen > threshold;
-    if (!manualBedtime && !existingNap && wouldCrossThreshold) {
+    if (!manualBedtime && !chosen && wouldCrossThreshold) {
       projected.push(buildWakeWindow(ctx, n, wwStart, napStart));
       projected.push(buildProjectedBedtime(ctx, napStart, ctx.settings));
       break;
     }
 
-    // If a manual bedtime sits between wwStart and the would-be napStart,
-    // truncate the WW at bedtime and stop — no nap_n emitted.
+    // Bedtime coercion (real nap past threshold): per DOMAIN.md §3, any
+    // sleep at/after threshold IS bedtime. Emit a bedtime derived from
+    // the real nap's id/eventKey/owner so taps map back to the same
+    // Firestore doc. Doc stays type=nap; only the projection mutates.
+    // Applies to both slot-keyed and additive chosen naps.
+    if (!manualBedtime && chosen && chosen.startTime >= threshold) {
+      projected.push(buildWakeWindow(ctx, n, wwStart, napStart));
+      projected.push(buildCoercedBedtime(ctx, chosen, ctx.settings));
+      if (consumedAdditive) additiveIdx++;
+      break;
+    }
+
     if (manualBedtime && napStart >= manualBedtime.startTime) {
       projected.push(buildWakeWindow(ctx, n, wwStart, manualBedtime.startTime));
       break;
@@ -118,28 +168,56 @@ function projectSleepCascade(ctx: Context, existing: Event[]): Event[] {
 
     projected.push(buildWakeWindow(ctx, n, wwStart, napStart));
 
-    if (existingNap) {
-      // Cursor advances from reality's endTime.
-      cursor = existingNap.endTime ?? existingNap.startTime + napLen;
+    if (chosen) {
+      cursor = chosen.endTime ?? chosen.startTime + napLen;
+      prevNap = chosen;
+      if (consumedAdditive) additiveIdx++;
     } else {
       const napEnd = napStart + napLen;
-      projected.push(
-        projectedEvent({
-          ctx,
-          id: `proj_nap_${n}`,
-          eventKey: napKey,
-          type: "nap",
-          kind: "block",
-          startTime: napStart,
-          endTime: napEnd,
-          label: `Nap ${n}`,
-        }),
-      );
+      const projNap = projectedEvent({
+        ctx,
+        id: `proj_nap_${n}`,
+        eventKey: `nap_${n}`,
+        type: "nap",
+        kind: "block",
+        startTime: napStart,
+        endTime: napEnd,
+        label: `Nap ${n}`,
+      });
+      projected.push(projNap);
       cursor = napEnd;
+      prevNap = projNap;
     }
   }
 
   return [...existing, ...projected];
+}
+
+function buildCoercedBedtime(_ctx: Context, realNap: Event, settings: Settings): Event {
+  // Engine-coerce: a real nap whose startTime ≥ bedtimeThreshold
+  // projects as bedtime per DOMAIN.md §3. The Firestore doc stays
+  // type=nap (and remains in the output via `existing`); this is a
+  // SEPARATE projected bedtime event derived from the nap's data.
+  //
+  // Why a derived id rather than reusing the nap's id: the evaluator's
+  // `checkRealityWins` invariant rejects any output event with a
+  // recorded event's id but a different type. Using a `coerced_bedtime_`
+  // prefix keeps the bedtime distinct in the engine's eventes list
+  // while letting the render layer associate it back to the nap doc
+  // for tap-routing.
+  return {
+    id: `coerced_bedtime_${realNap.id}`,
+    dayId: realNap.dayId,
+    eventKey: `bedtime_coerced_${realNap.eventKey}`,
+    type: "bedtime",
+    kind: "block",
+    startTime: realNap.startTime,
+    endTime: realNap.endTime ?? settings.defaultWakeTime + 24 * 60,
+    label: "Bedtime",
+    owner: realNap.owner,
+    hasPutdown: false,
+    lifecycle: { state: "projected" },
+  };
 }
 
 function buildWakeWindow(ctx: Context, n: number, start: number, end: number): Event {
