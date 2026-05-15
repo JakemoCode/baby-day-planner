@@ -6,7 +6,9 @@ Declarative rules-engine rewrite of the baby-day planner's day-projection logic.
 
 **Phase 1 — engine in isolation.** No UI changes; V2 still wired everywhere.
 
-See `docs/v3/ARCHITECTURE_V3.md` for the full plan and `docs/v3/REQUIREMENTS.md` for the rules this engine implements.
+See `docs/v3/ARCHITECTURE_V3.md` for the full plan. Engine rules:
+`docs/v3/ENGINE_SPEC.md`. Data model: `docs/v3/DATA_MODEL.md`.
+Render/UX rules: `docs/v3/RENDER_SPEC.md`.
 
 ## Layout
 

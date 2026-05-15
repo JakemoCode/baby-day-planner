@@ -1,7 +1,7 @@
 /**
  * R11.x — Daily recurring event rules.
  *
- * Source: docs/v3/REQUIREMENTS.md §11.
+ * Source: docs/v3/ENGINE_SPEC.md §11.
  *
  * Implemented here:
  *   R11.1 — Settings.dailyRecurring is the source of truth.

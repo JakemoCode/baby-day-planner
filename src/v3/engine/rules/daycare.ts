@@ -1,7 +1,7 @@
 /**
  * R21.x — Daycare dropoff/pickup + auto-owner-assign.
  *
- * Source: docs/v3/REQUIREMENTS.md §21.
+ * Source: docs/v3/ENGINE_SPEC.md §21.
  *
  * Implemented here:
  *   R21.1 — daycare_dropoff and daycare_pickup as instant events

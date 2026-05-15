@@ -6,8 +6,11 @@
 > were resolved before the build; the §10 effort estimates were historical
 > and have been removed.
 
-> Companion docs: `REQUIREMENTS.md` (what), `EDGE_CASES.md` (regression
-> seed), `OUT_OF_SCOPE.md` (what we're NOT doing).
+> Companion docs: [`ENGINE_SPEC.md`](ENGINE_SPEC.md) (engine rules),
+> [`DATA_MODEL.md`](DATA_MODEL.md) (schema + lifecycle),
+> [`RENDER_SPEC.md`](RENDER_SPEC.md) (display rules),
+> [`EDGE_CASES.md`](EDGE_CASES.md) (regression seed),
+> [`OUT_OF_SCOPE.md`](OUT_OF_SCOPE.md) (what we're NOT doing).
 
 ---
 
@@ -326,7 +329,7 @@ Implementation:
 
 ```ts
 type Rule = {
-  id: string;                              // 'R3.5' from REQUIREMENTS.md
+  id: string;                              // 'R3.5' from ENGINE_SPEC.md
   description: string;                     // human-readable
 
   // What this rule needs to be true before it can run
@@ -726,7 +729,7 @@ test.prop([fc.array(arbActual), arbDay, settingsArb])(
 ```
 
 Run with `numRuns: 1000+` per property in CI. Each property checks an
-invariant from `REQUIREMENTS.md`.
+invariant from `ENGINE_SPEC.md`.
 
 ### 6.2 Example-based tests (`EDGE_CASES.md` seeds)
 
@@ -1043,8 +1046,11 @@ _Pending:_
 ## Source References
 
 - V2 source: deleted in PR-C1; reachable via `git log -- src/domain/`.
-- Companion: `docs/v3/REQUIREMENTS.md` (rules), `docs/v3/EDGE_CASES.md`
-  (seeds), `docs/v3/OUT_OF_SCOPE.md` (non-goals).
+- Companion: [`ENGINE_SPEC.md`](ENGINE_SPEC.md) (engine rules),
+  [`DATA_MODEL.md`](DATA_MODEL.md) (schema + lifecycle),
+  [`RENDER_SPEC.md`](RENDER_SPEC.md) (display rules),
+  [`EDGE_CASES.md`](EDGE_CASES.md) (regression seeds),
+  [`OUT_OF_SCOPE.md`](OUT_OF_SCOPE.md) (non-goals).
 - Strategy plan (historical): `docs/_archive/V3_REWRITE_PLAN.md`.
 - Locked decisions:
   `~/.claude/projects/.../memory/project_decisions.md`.
