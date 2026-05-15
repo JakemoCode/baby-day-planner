@@ -447,46 +447,6 @@ The whole file violates the standard, not just the two new helpers added in PR #
 
 ---
 
-## §F22 — Drawer save-path: route bottles to the correct calendar day
-
-**Source**: Jake, 2026-05-13 ("midnight rule"). Engine implication of `DOMAIN.md` §2 captured during the bottle-cascade refactor.
-
-**Status**: `pending`
-
-**What**: when the user records a bottle at 2 AM Wednesday, the bottle's day doc should be Wednesday's, NOT the currently-active Tuesday-PM day doc. Today the drawer's save handler routes writes to `useV3Events`'s configured `dayId`, which is the active day at click-time — meaning a 2 AM feed gets attached to the wrong calendar day.
-
-Implementation sketch:
-- Determine the bottle's calendar date from its `startTime` (or from `currentLocalMinutes()` if recording "now")
-- Look up the day doc for that calendar date; create it if missing (anchoring at `defaultWakeTime` per `DOMAIN.md` §2 for any auto-created day)
-- Route `createOptimistic` / `updateOptimistic` to that day's events sub-collection
-
-**Why fast-follow, not in the bottle-cascade PR**: engine already handles overnight bottles correctly (`startTime < wakeTime` doesn't anchor; midnight cap stops cascade at 1440). The save-path fix is a separate write-path concern with its own day-doc lifecycle implications. Worth its own PR with deliberate test coverage.
-
-**No data migration needed**: Jake confirmed dev-only with no production users yet. Wipe + start fresh.
-
----
-
-## §F24 — Start Nap action creates duplicate nap instead of promoting the projection
-
-**Source**: Jake, 2026-05-13 click-test.
-
-**Status**: `pending`
-
-**What**: tapping "Start Nap" on the dashboard creates a brand-new nap event at `nowMinutes`, butted up against the projected upcoming nap. The new nap renders as a tiny chip (24px tall) just above the projected one (visible in inspector as `button.Block-module__AWIW3G__block`, labeled "Nap 1" — the un-renumbered fresh eventKey from `createEventTemplate`).
-
-This is the same write-path flavor as the original §F19 bug: the action button routes through `createOptimistic` because the next nap is a projection (id starts with `proj_`), so `isPersistedActual` returns false → create-new path. The user's intent — "I'm starting THAT nap now" — is to promote the projection from `projected` → `started`, not to create a sibling.
-
-**Fix sketch**:
-- When the action button (NapActionButton on dashboard) fires "Start Nap," find the next-upcoming projected nap from the engine output.
-- Persist a real doc with that nap's `eventKey` (so renumbering aligns), `startTime: nowMinutes`, `lifecycle: { state: "started", committedAt: nowMinutes }`, no endTime yet.
-- Don't go through the generic `createOptimistic({ ...projectedTemplate, id: newEventId(...) })` path — that's drawer-edit semantics, not action-button semantics.
-
-The same pattern likely affects "Start Bedtime" and any other "Start \<event\>" action button. Audit and fix together if scoped together.
-
-**Why fast-follow**: real bug but no data corruption beyond the visible duplicate. Engine handles the duplicate naps reasonably (chain still cascades). The user-facing fix is in the dashboard action button save path, not in the engine.
-
----
-
 ## §F23 — Edit drawer title should include event number when present
 
 **Source**: Jake, 2026-05-13 click-test.
@@ -498,34 +458,6 @@ The same pattern likely affects "Start Bedtime" and any other "Start \<event\>" 
 Mechanics: in `EventEditDrawerV3.tsx`, the `EDIT_TITLE_BY_TYPE` constant is a flat map of `type → string`. Replace with logic that derives the title from `event.label` (which already has the number for bottles/naps) or builds it from `type + extracted number from eventKey`.
 
 **Why fast-follow**: tiny UI change, engine-orthogonal. Couple-line patch.
-
----
-
-## §F25 — Manual nap recorded inside bedtime block claims `nap_1` eventKey
-
-**Source**: Jake, 2026-05-13 click-test of PR #138.
-
-**Status**: `pending`
-
-**What**: when the user manually records a nap during the bedtime block (e.g. baby wakes at 8 PM hungry/fussy and goes back down for a short nap), the new doc gets assigned `eventKey: nap_1` — colliding with the day's actual nap_1 from earlier and rendering with the wrong label ("Nap 1 (60 min)" at 8:03 PM).
-
-Likely same write-path family as §F24 (Start Nap duplicate). The drawer's save-path doesn't scan existing naps for the next free `nap_N` slot when bedtime has already been emitted.
-
-**Why fast-follow**: render-correct (bedtime + recorded nap both display), but the eventKey collision will break downstream rules that key off `nap_N` (e.g. short-nap-adjustment looking at `nap_${i}`). Bundle with §F24 if they share a fix.
-
----
-
-## §F26 — Putdown chip synthesized for naps that fall inside the bedtime block
-
-**Source**: Jake, 2026-05-13 click-test of PR #138.
-
-**Status**: `pending`
-
-**What**: `putdown.ts` synthesizes a putdown chip (`hasPutdown: true`) for the manually-recorded 8:03 PM nap during bedtime, showing "Putdown · 7:48p" inside the green bedtime block. Visually noisy and conceptually wrong — baby is already in bedtime; you don't "put them down" again for a within-bedtime nap.
-
-Mechanics: `putdown.ts` flags any future-relative projected nap (or any nap matching its match predicate) without checking whether the nap's `startTime` falls inside an existing bedtime event. Add a filter: skip `hasPutdown` if `nap.startTime ∈ [bedtime.startTime, bedtime.endTime]`.
-
-**Why fast-follow**: cosmetic only — engine output is correct, render layer over-decorates. One-predicate fix in `putdown.ts`.
 
 ---
 
