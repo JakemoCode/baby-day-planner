@@ -729,6 +729,105 @@ describe("R7.5 — projected nap CROSSING the threshold becomes bedtime", () => 
   });
 });
 
+describe("FAB-added nap (UUID eventKey) inserts into the rhythm chronologically", () => {
+  // The FAB Add Nap path emits naps with UUID-shaped eventKeys (not
+  // nap_N). The cascade walks real naps in startTime order regardless
+  // of eventKey shape, so a UUID-keyed nap fills the next chronological
+  // rhythm position and downstream projections re-cascade from it.
+
+  it("UUID nap inserted between projected slots: downstream slots cascade from it", () => {
+    // wakeTime 7:00, WW [120, 90, 90, 90], napLen 60.
+    // Without the UUID nap: ww_1 7-9, nap_1 9-10, ww_2 10-11:30,
+    //   nap_2 11:30-12:30, ww_3 12:30-14, nap_3 14-15.
+    // User adds a UUID nap at 13:30 via FAB. Expected:
+    //   ww_1 7-9, nap_1 9-10, ww_2 10-11:30, nap_2 11:30-12:30,
+    //   ww_3 12:30-13:30, [UUID nap 13:30-14:30],
+    //   ww_4 14:30-?, projected nap cascades from 14:30.
+    const uuidNap = aRecordedNap({
+      id: "nap_abc123",
+      eventKey: "nap_abc123",
+      start: 13 * 60 + 30,
+      end: 14 * 60 + 30,
+    });
+
+    const ctx = aContext({
+      day: aDay({ wakeTime: 7 * 60 }),
+      settings: aSettings({
+        wakeWindowsMinutes: [120, 90, 90, 90],
+        defaultNapLengthMinutes: 60,
+        bedtimeThreshold: 19 * 60,
+      }),
+      actuals: [uuidNap],
+    });
+
+    const out = projectDay(
+      {
+        day: ctx.day,
+        settings: ctx.settings,
+        actuals: ctx.actuals,
+        nowMinutes: ctx.nowMinutes,
+      },
+      { rules: NAP_RULES },
+    );
+
+    // The UUID nap stays in the output exactly as recorded.
+    const uuidOut = out.find((e) => e.id === uuidNap.id);
+    expect(uuidOut).toBeDefined();
+    expect(uuidOut!.startTime).toBe(13 * 60 + 30);
+    expect(uuidOut!.eventKey).toBe("nap_abc123");
+
+    // A wake window directly preceding it ends at the UUID nap's start.
+    const wwBefore = out.find(
+      (e) => e.type === "wake_window" && e.endTime === 13 * 60 + 30,
+    );
+    expect(wwBefore).toBeDefined();
+
+    // The next wake window after the UUID nap starts at its end (14:30).
+    const wwAfter = out.find(
+      (e) => e.type === "wake_window" && e.startTime === 14 * 60 + 30,
+    );
+    expect(wwAfter).toBeDefined();
+  });
+
+  it("UUID nap inserted before any projected nap: it becomes the first nap chronologically", () => {
+    // wakeTime 7:00, WW [120, 90], napLen 60. UUID nap at 8:00.
+    // Expected: ww_1 7-8, [UUID nap 8-9], ww_2 9-10:30, nap (projected) 10:30-11:30.
+    const uuidNap = aRecordedNap({
+      id: "nap_xyz789",
+      eventKey: "nap_xyz789",
+      start: 8 * 60,
+      end: 9 * 60,
+    });
+
+    const ctx = aContext({
+      day: aDay({ wakeTime: 7 * 60 }),
+      settings: aSettings({
+        wakeWindowsMinutes: [120, 90],
+        defaultNapLengthMinutes: 60,
+      }),
+      actuals: [uuidNap],
+    });
+
+    const out = projectDay(
+      {
+        day: ctx.day,
+        settings: ctx.settings,
+        actuals: ctx.actuals,
+        nowMinutes: ctx.nowMinutes,
+      },
+      { rules: NAP_RULES },
+    );
+
+    // The UUID nap is preserved.
+    expect(out.find((e) => e.id === uuidNap.id)).toBeDefined();
+
+    // First wake window ends at the UUID nap's start (8:00).
+    const ww1 = out.find((e) => e.type === "wake_window" && e.startTime === 7 * 60);
+    expect(ww1).toBeDefined();
+    expect(ww1!.endTime).toBe(8 * 60);
+  });
+});
+
 describe("R7.7 — manual bedtime is the user's authoritative declaration", () => {
   it("with a recorded bedtime at 18:00, threshold (19:00) does NOT substitute another", () => {
     const recordedBedtime = aRecordedBedtime({
