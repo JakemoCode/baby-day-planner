@@ -37,3 +37,31 @@ Shipped in two coordinated PRs:
   PR #117 produced an `overridden` nap.
 
 Putdown is render-only and now re-derives correctly from edited naps.
+
+## §F22 — Drawer save-path: route bottles to the correct calendar day
+
+Shipped in **PR #143** (commit `d15731f`). Drawer save-path now routes
+writes to the correct calendar day based on the event's `startTime`,
+not the active `dayId` — so a 2 AM bottle attaches to the right day.
+
+## §F24 — Start Nap action creates duplicate nap instead of promoting projection
+
+Shipped in **PR #143** (commit `d15731f`). NapActionButton now
+promotes the next-projected nap's `eventKey` instead of inventing a
+new `nap_${nextNumber}` slot, eliminating the side-by-side duplicate.
+PR #143 follow-up (commit `4231f39`) added UUID `eventKey` for
+off-pattern naps so they don't masquerade as cascade slots.
+
+## §F25 — Manual nap recorded inside bedtime block claims `nap_1` eventKey
+
+Shipped in **PR #143** (commit `d15731f`) alongside §F22/§F24 — the
+save-path now scans existing naps for the next free `nap_N` slot
+before assigning, so an in-bedtime manual nap no longer collides
+with the day's actual `nap_1`.
+
+## §F26 — Putdown chip synthesized for naps inside the bedtime block
+
+Structurally closed by current `putdown.ts` lifecycle gate. The rule
+only sets `hasPutdown=true` for `{projected, overridden}` lifecycles
+— a manually-recorded nap is `started` or `completed`, so the
+synthetic chip can no longer be emitted. No standalone fix needed.
