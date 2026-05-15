@@ -2,13 +2,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import type { Event, OwnersConfig } from "../schemas";
 import { useV3Events } from "./useV3Events";
-import type * as EventDefaultsModule from "../firestore/eventDefaults";
 
 const watchEventsMock = vi.fn();
 const createEventMock = vi.fn().mockResolvedValue(undefined);
 const updateEventMock = vi.fn().mockResolvedValue(undefined);
 const deleteEventMock = vi.fn().mockResolvedValue(undefined);
-const withV3EventDefaultsMock = vi.fn();
 
 vi.mock("../repositories/events", () => ({
   watchEvents: (...args: unknown[]) => watchEventsMock(...args),
@@ -16,15 +14,6 @@ vi.mock("../repositories/events", () => ({
   updateEvent: (...args: unknown[]) => updateEventMock(...args),
   deleteEvent: (...args: unknown[]) => deleteEventMock(...args),
 }));
-vi.mock("../firestore/eventDefaults", async () => {
-  const actual = await vi.importActual<typeof EventDefaultsModule>("../firestore/eventDefaults");
-  return {
-    withV3EventDefaults: (...args: Parameters<typeof actual.withV3EventDefaults>) => {
-      withV3EventDefaultsMock(...args);
-      return actual.withV3EventDefaults(...args);
-    },
-  };
-});
 vi.mock("@/lib/firebase/client", () => ({ db: {} }));
 
 const baseEvent = (overrides: Partial<Event>): Event => ({
@@ -47,10 +36,13 @@ describe("useV3Events", () => {
     createEventMock.mockClear();
     updateEventMock.mockClear();
     deleteEventMock.mockClear();
-    withV3EventDefaultsMock.mockClear();
   });
 
-  it("passes owners through to withV3EventDefaults inside the watcher callback", async () => {
+  it("applies V3 event defaults to incoming Firestore events", async () => {
+    // withV3EventDefaults fills in `kind` (derived from type) and
+    // `hasPutdown` (defaults false). Send a partial event that is missing
+    // `kind` to verify the hook's watcher callback actually runs the
+    // defaulter rather than passing the raw doc through.
     let cb: ((events: Event[]) => void) | undefined;
     watchEventsMock.mockImplementation((_db, _cid, _did, callback) => {
       cb = callback;
@@ -62,10 +54,15 @@ describe("useV3Events", () => {
       other: [{ id: "daycare", displayName: "Daycare", color: "#333" }],
     };
     const { result } = renderHook(() => useV3Events("child-1", "day-1", owners));
-    const incoming = baseEvent({});
+    // A nap without `kind` set — defaulter derives "block" from type.
+    const incoming = baseEvent({ type: "nap", kind: undefined as unknown as Event["kind"] });
     cb!([incoming]);
     await waitFor(() => expect(result.current.events).toHaveLength(1));
-    expect(withV3EventDefaultsMock).toHaveBeenCalledWith(incoming, owners);
+    // withV3EventDefaults must have run — a raw pass-through would leave
+    // kind as undefined, but the hook output must have kind="block".
+    expect(result.current.events[0]?.kind).toBe("block");
+    // hasPutdown default is false (not undefined).
+    expect(result.current.events[0]?.hasPutdown).toBe(false);
   });
 
   it("exposes V3 events from the repo watcher", async () => {
