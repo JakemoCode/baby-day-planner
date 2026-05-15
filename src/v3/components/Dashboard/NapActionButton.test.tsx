@@ -23,6 +23,7 @@ describe("NapActionButton", () => {
         inProgressNap={undefined}
         dayId="d1"
         nextNumber={1}
+        maxSlot={6}
         onStart={async () => {}}
         onEnd={async () => {}}
       />,
@@ -36,6 +37,7 @@ describe("NapActionButton", () => {
         inProgressNap={napInProgress()}
         dayId="d1"
         nextNumber={2}
+        maxSlot={6}
         onStart={async () => {}}
         onEnd={async () => {}}
       />,
@@ -50,6 +52,7 @@ describe("NapActionButton", () => {
         inProgressNap={undefined}
         dayId="d1"
         nextNumber={1}
+        maxSlot={6}
         onStart={onStart}
         onEnd={async () => {}}
       />,
@@ -79,6 +82,7 @@ describe("NapActionButton", () => {
         inProgressNap={undefined}
         dayId="d1"
         nextNumber={2}
+        maxSlot={6}
         onStart={onStart}
         onEnd={async () => {}}
       />,
@@ -97,6 +101,7 @@ describe("NapActionButton", () => {
         inProgressNap={nap}
         dayId="d1"
         nextNumber={2}
+        maxSlot={6}
         onStart={async () => {}}
         onEnd={onEnd}
       />,

@@ -95,3 +95,17 @@ export function currentLocalMinutes(): TimeMin {
   const now = new Date();
   return now.getHours() * 60 + now.getMinutes();
 }
+
+/**
+ * Read the wall clock and return today's local calendar date as an
+ * ISO `YYYY-MM-DD` string. Matches the format of `Day.date`. Used by
+ * the bottle save-path to route overnight feeds to the correct
+ * calendar day (the midnight rule — DOMAIN.md §2).
+ */
+export function currentLocalDate(): string {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, "0");
+  const d = String(now.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}

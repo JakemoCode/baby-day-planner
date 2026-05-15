@@ -126,6 +126,40 @@ describe("buildCreateTemplate (V3)", () => {
     expect(tpl.label).toBe("Nap 2");
   });
 
+  it("off-pattern nap (beyond wakeWindowsMinutes.length) gets a UUID eventKey, not nap_N", () => {
+    // Regression for the cascade-eating bug introduced by §F25's
+    // "scan projections" fix: a manual nap added past the configured
+    // slot count was getting eventKey `nap_${maxSlot+1}`, which the
+    // cascade then deferred to instead of substituting bedtime —
+    // bedtime would render as "Nap N+1".
+    //
+    // wws.length = 4 here; projected has nap_1..nap_4. nextFreeSlot
+    // would return 5, but 5 > 4 → use UUID, label "Nap".
+    const projected: Event[] = [1, 2, 3, 4].map((n) => ({
+      id: `proj_nap_${n}`,
+      dayId: "d-1",
+      eventKey: `nap_${n}`,
+      type: "nap",
+      kind: "block",
+      startTime: 9 * 60 + n * 60,
+      label: `Nap ${n}`,
+      hasPutdown: false,
+      lifecycle: { state: "projected" },
+    }));
+    const tpl = buildCreateTemplate({
+      type: "nap",
+      dayId: "d-1",
+      actuals: [],
+      settings: settings({ wakeWindowsMinutes: [120, 135, 135, 150] }),
+      nowMinutes: 22 * 60,
+      projected,
+    });
+    // eventKey shouldn't be `nap_5` (would collide with bedtime's slot).
+    expect(tpl.eventKey).not.toMatch(/^nap_\d+$/);
+    expect(tpl.eventKey).toMatch(/^nap_/); // UUID still prefixed
+    expect(tpl.label).toBe("Nap");
+  });
+
   it("seeds a pump template (block) with default duration and unique eventKey", () => {
     // Pumps are duration events (20–30 min); template starts as block
     // with endTime = startTime + defaultPumpDurationMinutes.

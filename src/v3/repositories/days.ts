@@ -57,6 +57,38 @@ export async function getDayByDate(
   return snap.empty ? null : snap.docs[0]!.data();
 }
 
+/**
+ * Get the day doc for the given calendar date, lazy-creating a
+ * `planned` doc if none exists. Used by the bottle save-path to route
+ * overnight feeds (§F22 + DOMAIN.md §2 "midnight rule") to the correct
+ * calendar day without disturbing the active day.
+ *
+ * `planned` status (not `active`) so the caller's existing active-day
+ * subscription isn't affected — the new doc only matters once the user
+ * formally starts that day, at which point `startNewDay` flips it to
+ * active. The lazy-created doc inherits `defaultWakeTime` from settings.
+ */
+export async function getOrCreatePlannedDay(
+  db: Firestore,
+  childId: string,
+  date: string,
+  defaultWakeTime: TimeMin,
+): Promise<Day> {
+  const existing = await getDayByDate(db, childId, date);
+  if (existing) return existing;
+  const newDay: Day = {
+    id: `day-${date}-${Date.now()}`,
+    childId,
+    date,
+    status: "planned",
+    wakeTime: defaultWakeTime,
+    suppressedRecurringIds: [],
+    suppressedDaycareDay: false,
+  };
+  await setDoc(dayRef(db, childId, newDay.id), newDay);
+  return newDay;
+}
+
 export async function archiveDay(db: Firestore, childId: string, dayId: string): Promise<void> {
   await updateDoc(dayRef(db, childId, dayId), { status: "archived" });
 }

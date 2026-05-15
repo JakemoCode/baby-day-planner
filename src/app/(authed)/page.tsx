@@ -20,7 +20,8 @@ import { useV3Settings } from "@/v3/hooks/useV3Settings";
 import { useV3Templates } from "@/v3/hooks/useV3Templates";
 import { useV3Projection } from "@/v3/hooks/useV3Projection";
 import { PLACEHOLDER_DAY, PLACEHOLDER_SETTINGS } from "@/v3/hooks/projectionPlaceholders";
-import { startNewDay } from "@/v3/repositories/days";
+import { getOrCreatePlannedDay, startNewDay } from "@/v3/repositories/days";
+import { createEvent } from "@/v3/repositories/events";
 import { saveSettings } from "@/v3/repositories/settings";
 import { DEFAULT_WAKE_TIME, withV3SettingsDefaults } from "@/v3/firestore/settingsDefaults";
 import { db } from "@/lib/firebase/client";
@@ -175,6 +176,22 @@ export default function DashboardPage() {
   const hideNapPreview = nextType === "nap" || nextType === "bedtime";
 
   const handleLogBottle = async (bottle: Event) => {
+    // §F22 / midnight rule (DOMAIN.md §2): a bottle recorded at 2 AM
+    // belongs to today's *calendar* day, not the currently-active day
+    // doc (which is yesterday's planning day until the user starts the
+    // new one). If the wall-clock date differs from the active day's
+    // date, lazy-create a `planned` doc for that date and write there.
+    const bottleDate = todayDate();
+    if (bottleDate !== day.date) {
+      const target = await getOrCreatePlannedDay(
+        db,
+        CHILD_ID,
+        bottleDate,
+        settings.defaultWakeTime,
+      );
+      await createEvent(db, CHILD_ID, { ...bottle, dayId: target.id });
+      return;
+    }
     await createOptimistic(bottle);
   };
   const handleStartNap = async (nap: Event) => {
@@ -236,6 +253,8 @@ export default function DashboardPage() {
             inProgressNap={inProgressNap}
             dayId={day.id}
             nextNumber={nextNapNumber}
+            maxSlot={settings.wakeWindowsMinutes.length}
+            {...(nn ? { nextProjectedNap: nn } : {})}
             onStart={handleStartNap}
             onEnd={handleEndNap}
           />
@@ -255,6 +274,7 @@ export default function DashboardPage() {
             actuals,
             settings,
             nowMinutes,
+            projected,
           });
           setDrawer({ open: true, mode: "create", template: tpl });
         }}
