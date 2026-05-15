@@ -250,7 +250,13 @@ export function EventEditDrawerV3({
       startTime: napCandidate.startTime,
       endTime: defaultWakeTime + 24 * 60,
       hasPutdown: false,
-      lifecycle: { state: "started", committedAt: nowMinutes },
+      // committedAt = the bedtime's own startTime, NOT nowMinutes.
+      // This is correct for both the dashboard-real-time edit (where
+      // user just dragged time to "now-ish") AND the Tomorrow planner
+      // (where nowMinutes is a synthetic noon anchor and could be <
+      // startTime, which would make `committedAt < startTime` — a
+      // structurally weird shape for a `started` doc).
+      lifecycle: { state: "started", committedAt: napCandidate.startTime },
       ...(napCandidate.owner ? { owner: napCandidate.owner } : {}),
     };
     // Sequence: delete original FIRST so the dual-doc state can never

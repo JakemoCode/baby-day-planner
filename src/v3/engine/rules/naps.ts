@@ -124,9 +124,14 @@ function projectSleepCascade(ctx: Context, existing: Event[]): Event[] {
       break;
     }
 
-    // If a manual bedtime sits between wwStart and the would-be napStart,
-    // truncate the WW at bedtime and stop — no nap_n emitted.
-    if (manualBedtime && napStart >= manualBedtime.startTime) {
+    // Manual bedtime suppression: a manual bedtime is the day's
+    // terminator. Suppress any projected nap whose interval would
+    // extend INTO it (start >= bedtime OR start+napLen > bedtime).
+    // Recorded naps with explicit endTimes still pass through —
+    // reality wins. Per DOMAIN.md §3 ("once bedtime hits, all bedtime").
+    const projectedExtendsIntoBedtime =
+      manualBedtime && !existingNap && napStart + napLen > manualBedtime.startTime;
+    if (manualBedtime && (napStart >= manualBedtime.startTime || projectedExtendsIntoBedtime)) {
       projected.push(buildWakeWindow(ctx, n, wwStart, manualBedtime.startTime));
       break;
     }

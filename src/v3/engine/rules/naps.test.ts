@@ -733,6 +733,60 @@ describe("R7.7 — manual bedtime is the user's authoritative declaration", () =
   });
 });
 
+describe("Manual bedtime suppresses any projected nap that would extend INTO it", () => {
+  // Click-test bug 2026-05-15: user converted nap_5 to bedtime via the
+  // past-threshold prompt at 19:05; cascade kept projecting nap_5 from
+  // 18:50-19:35 (default 45-min duration), overlapping the manual
+  // bedtime visually. Per DOMAIN.md §3 ("once bedtime hits, it's all
+  // bedtime") any projected nap that would extend INTO the manual
+  // bedtime must be suppressed and the WW truncated at bedtime.
+
+  it("projected nap_1 19:00-19:45 + manual bedtime 19:30 → ww_1 truncates at bedtime, no nap_1 emitted", () => {
+    const manualBedtime = aRecordedBedtime({
+      id: "manual_bedtime",
+      eventKey: "bedtime",
+      start: 19 * 60 + 30,
+      end: 31 * 60,
+    });
+
+    const ctx = aContext({
+      day: aDay({ wakeTime: 18 * 60 }),
+      settings: aSettings({
+        wakeWindowsMinutes: [60],
+        defaultNapLengthMinutes: 45,
+        bedtimeThreshold: 19 * 60,
+        defaultWakeTime: 7 * 60,
+      }),
+      actuals: [manualBedtime],
+    });
+
+    const out = projectDay(
+      {
+        day: ctx.day,
+        settings: ctx.settings,
+        actuals: ctx.actuals,
+        nowMinutes: ctx.nowMinutes,
+      },
+      { rules: NAP_RULES },
+    );
+
+    // No projected nap_1 — it would have extended into bedtime.
+    expect(out.find((e) => e.eventKey === "nap_1")).toBeUndefined();
+
+    // ww_1 truncates at the manual bedtime's startTime, not at the
+    // would-be projected nap's startTime.
+    const ww1 = out.find((e) => e.eventKey === "wake_window_1");
+    expect(ww1).toBeDefined();
+    expect(ww1!.startTime).toBe(18 * 60);
+    expect(ww1!.endTime).toBe(19 * 60 + 30);
+
+    // Manual bedtime preserved as-is.
+    const bedtimes = out.filter((e) => e.type === "bedtime");
+    expect(bedtimes).toHaveLength(1);
+    expect(bedtimes[0]!.id).toBe(manualBedtime.id);
+  });
+});
+
 describe("Cascade extends past wakeWindowsMinutes.length (physiology cascade)", () => {
   // Per docs/superpowers/specs/2026-05-15-physiology-cascade-design.md:
   // The wakeWindowsMinutes array is a CADENCE sequence, not a slot
