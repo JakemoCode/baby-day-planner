@@ -25,6 +25,13 @@ export type EventEditDrawerV3Props = {
    * Per spec PR #146 R2 (physiology cascade).
    */
   bedtimeThreshold: TimeMin;
+  /**
+   * Settings.defaultWakeTime — used to compute the bedtime block's
+   * endTime when a nap is converted to bedtime via the past-threshold
+   * prompt. Per DOMAIN.md §3, bedtime extends to the next morning's
+   * wake (defaultWakeTime + 24h), NOT the source nap's endTime.
+   */
+  defaultWakeTime: TimeMin;
   onSave: (event: Event) => void | Promise<void>;
   onCancel: () => void;
   onDelete?: (event: Event) => void | Promise<void>;
@@ -124,6 +131,7 @@ export function EventEditDrawerV3({
   owners,
   nowMinutes,
   bedtimeThreshold,
+  defaultWakeTime,
   onSave,
   onCancel,
   onDelete,
@@ -226,16 +234,12 @@ export function EventEditDrawerV3({
     if (!pendingPastThresholdNap) return;
     const napCandidate = pendingPastThresholdNap;
     setPendingPastThresholdNap(null);
-    // Carry forward owner + endTime. Lifecycle is derived per the
-    // user's gesture: bedtime created via "Yes change" is a fresh
-    // commit, NOT an annotation on a projection — so use `completed`
-    // when an endTime exists, else `started`. (Inheriting the nap's
-    // `overridden` lifecycle from formToEvent would mis-tag the
-    // bedtime as an annotation rather than a recording.)
-    const bedtimeLifecycle: Event["lifecycle"] =
-      napCandidate.endTime !== undefined
-        ? { state: "completed", committedAt: napCandidate.startTime }
-        : { state: "started", committedAt: napCandidate.startTime };
+    // Per DOMAIN.md §3: bedtime IS the day's last sleep. Its endTime
+    // is the next morning's wake (defaultWakeTime + 24h), NOT the
+    // source nap's endTime — the nap's recorded endTime represents
+    // a within-day sleep, but bedtime extends through the night.
+    // Lifecycle is `started` (bedtime is in progress; the user is
+    // declaring the day's bedtime begins here).
     const bedtimeBase: Event = {
       id: newEventId("bedtime"),
       dayId: napCandidate.dayId,
@@ -244,9 +248,9 @@ export function EventEditDrawerV3({
       kind: "block",
       label: "Bedtime",
       startTime: napCandidate.startTime,
+      endTime: defaultWakeTime + 24 * 60,
       hasPutdown: false,
-      lifecycle: bedtimeLifecycle,
-      ...(napCandidate.endTime !== undefined ? { endTime: napCandidate.endTime } : {}),
+      lifecycle: { state: "started", committedAt: nowMinutes },
       ...(napCandidate.owner ? { owner: napCandidate.owner } : {}),
     };
     // Sequence: delete original FIRST so the dual-doc state can never

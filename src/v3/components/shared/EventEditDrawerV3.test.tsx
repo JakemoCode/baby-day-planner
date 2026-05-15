@@ -20,6 +20,7 @@ const owners: OwnersConfig = {
 
 const NOW = 8 * 60 + 30;
 const THRESHOLD = 19 * 60; // 7:00 PM — well past existing test scenarios.
+const DEFAULT_WAKE_TIME = 7 * 60; // 7:00 AM next day = 1860 in cross-day TimeMin
 
 const projectedNap = (overrides: Partial<Event> = {}): Event => ({
   id: "nap-1",
@@ -58,6 +59,7 @@ describe("EventEditDrawerV3", () => {
         owners={owners}
         nowMinutes={NOW}
         bedtimeThreshold={THRESHOLD}
+        defaultWakeTime={DEFAULT_WAKE_TIME}
         onSave={() => {}}
         onCancel={() => {}}
       />,
@@ -74,6 +76,7 @@ describe("EventEditDrawerV3", () => {
         owners={owners}
         nowMinutes={NOW}
         bedtimeThreshold={THRESHOLD}
+        defaultWakeTime={DEFAULT_WAKE_TIME}
         onSave={() => {}}
         onCancel={() => {}}
       />,
@@ -91,6 +94,7 @@ describe("EventEditDrawerV3", () => {
         owners={owners}
         nowMinutes={NOW}
         bedtimeThreshold={THRESHOLD}
+        defaultWakeTime={DEFAULT_WAKE_TIME}
         onSave={() => {}}
         onCancel={() => {}}
       />,
@@ -109,6 +113,7 @@ describe("EventEditDrawerV3", () => {
         owners={owners}
         nowMinutes={NOW}
         bedtimeThreshold={THRESHOLD}
+        defaultWakeTime={DEFAULT_WAKE_TIME}
         onSave={onSave}
         onCancel={() => {}}
       />,
@@ -131,6 +136,7 @@ describe("EventEditDrawerV3", () => {
         owners={owners}
         nowMinutes={NOW}
         bedtimeThreshold={THRESHOLD}
+        defaultWakeTime={DEFAULT_WAKE_TIME}
         onSave={onSave}
         onCancel={() => {}}
       />,
@@ -154,6 +160,7 @@ describe("EventEditDrawerV3", () => {
         owners={owners}
         nowMinutes={NOW}
         bedtimeThreshold={THRESHOLD}
+        defaultWakeTime={DEFAULT_WAKE_TIME}
         onSave={onSave}
         onCancel={() => {}}
       />,
@@ -190,6 +197,7 @@ describe("EventEditDrawerV3", () => {
         owners={owners}
         nowMinutes={NOW}
         bedtimeThreshold={THRESHOLD}
+        defaultWakeTime={DEFAULT_WAKE_TIME}
         existingEvents={[recordedNap]}
         onSave={() => {}}
         onCancel={() => {}}
@@ -211,6 +219,7 @@ describe("EventEditDrawerV3", () => {
         owners={owners}
         nowMinutes={NOW}
         bedtimeThreshold={THRESHOLD}
+        defaultWakeTime={DEFAULT_WAKE_TIME}
         existingEvents={[projectedOther]}
         onSave={() => {}}
         onCancel={() => {}}
@@ -232,6 +241,7 @@ describe("EventEditDrawerV3", () => {
         owners={owners}
         nowMinutes={NOW}
         bedtimeThreshold={THRESHOLD}
+        defaultWakeTime={DEFAULT_WAKE_TIME}
         onSave={() => {}}
         onCancel={onCancel}
       />,
@@ -249,6 +259,7 @@ describe("EventEditDrawerV3", () => {
         owners={owners}
         nowMinutes={NOW}
         bedtimeThreshold={THRESHOLD}
+        defaultWakeTime={DEFAULT_WAKE_TIME}
         onSave={() => {}}
         onCancel={() => {}}
         onDelete={() => {}}
@@ -287,6 +298,7 @@ describe("EventEditDrawerV3", () => {
         owners={owners}
         nowMinutes={NOW}
         bedtimeThreshold={THRESHOLD}
+        defaultWakeTime={DEFAULT_WAKE_TIME}
         onSave={async (event) => {
           // Mirror the page's `actuals.some(a => a.id === drawer.event.id)` check.
           const exists = actuals.some((a) => a.id === event.id);
@@ -323,6 +335,7 @@ describe("EventEditDrawerV3", () => {
         owners={owners}
         nowMinutes={NOW}
         bedtimeThreshold={THRESHOLD}
+        defaultWakeTime={DEFAULT_WAKE_TIME}
         onSave={() => {}}
         onCancel={() => {}}
         onDelete={() => {}}
@@ -354,6 +367,7 @@ describe("EventEditDrawerV3", () => {
         owners={owners}
         nowMinutes={NOW}
         bedtimeThreshold={THRESHOLD}
+        defaultWakeTime={DEFAULT_WAKE_TIME}
         onSave={() => {}}
         onCancel={() => {}}
       />,
@@ -390,6 +404,7 @@ describe("EventEditDrawerV3", () => {
         owners={owners}
         nowMinutes={NOW}
         bedtimeThreshold={THRESHOLD}
+        defaultWakeTime={DEFAULT_WAKE_TIME}
         onSave={() => {}}
         onCancel={() => {}}
       />,
@@ -432,6 +447,7 @@ describe("Past-threshold prompt when editing a nap (physiology cascade)", () => 
         owners={owners}
         nowMinutes={NOW}
         bedtimeThreshold={THRESHOLD}
+        defaultWakeTime={DEFAULT_WAKE_TIME}
         onSave={onSave}
         onCancel={() => {}}
         onDelete={onDelete}
@@ -455,6 +471,7 @@ describe("Past-threshold prompt when editing a nap (physiology cascade)", () => 
         owners={owners}
         nowMinutes={NOW}
         bedtimeThreshold={THRESHOLD}
+        defaultWakeTime={DEFAULT_WAKE_TIME}
         onSave={onSave}
         onCancel={() => {}}
         onDelete={onDelete}
@@ -476,9 +493,14 @@ describe("Past-threshold prompt when editing a nap (physiology cascade)", () => 
         eventKey: "bedtime",
         startTime: 20 * 60,
         label: "Bedtime",
-        // Source nap had endTime → bedtime lifecycle is `completed`,
-        // NOT `overridden` (which formToEvent would have produced).
-        lifecycle: expect.objectContaining({ state: "completed" }),
+        // Per DOMAIN.md §3: bedtime extends to next morning's wake.
+        // Source nap's endTime (10:00) is dropped; bedtime endTime
+        // = defaultWakeTime + 24h = 7:00 + 1440 = 1860.
+        endTime: DEFAULT_WAKE_TIME + 24 * 60,
+        // Lifecycle is `started` (bedtime in progress) — NOT
+        // `overridden` (formToEvent's output) and NOT `completed`
+        // (the user is starting bedtime, not declaring it ended).
+        lifecycle: expect.objectContaining({ state: "started" }),
       }),
     );
   });
@@ -494,6 +516,7 @@ describe("Past-threshold prompt when editing a nap (physiology cascade)", () => 
         owners={owners}
         nowMinutes={NOW}
         bedtimeThreshold={THRESHOLD}
+        defaultWakeTime={DEFAULT_WAKE_TIME}
         onSave={onSave}
         onCancel={() => {}}
         onDelete={onDelete}
@@ -521,6 +544,7 @@ describe("Past-threshold prompt when editing a nap (physiology cascade)", () => 
         owners={owners}
         nowMinutes={NOW}
         bedtimeThreshold={THRESHOLD}
+        defaultWakeTime={DEFAULT_WAKE_TIME}
         onSave={onSave}
         onCancel={() => {}}
         onDelete={onDelete}
@@ -549,6 +573,7 @@ describe("Past-threshold prompt when editing a nap (physiology cascade)", () => 
         owners={owners}
         nowMinutes={NOW}
         bedtimeThreshold={THRESHOLD}
+        defaultWakeTime={DEFAULT_WAKE_TIME}
         onSave={onSave}
         onCancel={() => {}}
         onDelete={onDelete}
