@@ -733,6 +733,55 @@ describe("R7.7 — manual bedtime is the user's authoritative declaration", () =
   });
 });
 
+describe("Overridden bedtime gets putdown synth (regression: 2026-05-15 conversion-loses-putdown bug)", () => {
+  // When the past-threshold "Change to bedtime?" prompt converts a
+  // nap to bedtime, the bedtime doc has lifecycle `overridden`. The
+  // putdown rule (R6.1) derives hasPutdown from {projected,overridden}
+  // — `overridden` IS in the set, so the putdown chip survives the
+  // conversion. (Earlier code used `started` lifecycle, which silently
+  // dropped the putdown chip.)
+
+  it("a manually-recorded bedtime with `overridden` lifecycle gets hasPutdown=true via R6.1", () => {
+    const overriddenBedtime: Event = {
+      id: "manual_bedtime",
+      dayId: "d-1",
+      eventKey: "bedtime",
+      type: "bedtime",
+      kind: "block",
+      startTime: 19 * 60 + 5,
+      endTime: 31 * 60,
+      label: "Bedtime",
+      hasPutdown: false, // start unset; R6.1 should flip it to true
+      lifecycle: { state: "overridden", annotatedAt: 19 * 60 },
+    };
+
+    const ctx = aContext({
+      day: aDay({ wakeTime: 7 * 60 }),
+      settings: aSettings({
+        wakeWindowsMinutes: [120, 90, 90, 90, 90],
+        defaultNapLengthMinutes: 60,
+        bedtimeThreshold: 19 * 60,
+        defaultWakeTime: 7 * 60,
+      }),
+      actuals: [overriddenBedtime],
+    });
+
+    const out = projectDay(
+      {
+        day: ctx.day,
+        settings: ctx.settings,
+        actuals: ctx.actuals,
+        nowMinutes: ctx.nowMinutes,
+      },
+      { rules: ALL_RULES },
+    );
+
+    const bedtime = out.find((e) => e.id === overriddenBedtime.id);
+    expect(bedtime).toBeDefined();
+    expect(bedtime!.hasPutdown).toBe(true);
+  });
+});
+
 describe("Manual bedtime suppresses any projected nap that would extend INTO it", () => {
   // Click-test bug 2026-05-15: user converted nap_5 to bedtime via the
   // past-threshold prompt at 19:05; cascade kept projecting nap_5 from

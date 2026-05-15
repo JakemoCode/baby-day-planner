@@ -250,13 +250,17 @@ export function EventEditDrawerV3({
       startTime: napCandidate.startTime,
       endTime: defaultWakeTime + 24 * 60,
       hasPutdown: false,
-      // committedAt = the bedtime's own startTime, NOT nowMinutes.
-      // This is correct for both the dashboard-real-time edit (where
-      // user just dragged time to "now-ish") AND the Tomorrow planner
-      // (where nowMinutes is a synthetic noon anchor and could be <
-      // startTime, which would make `committedAt < startTime` — a
-      // structurally weird shape for a `started` doc).
-      lifecycle: { state: "started", committedAt: napCandidate.startTime },
+      // `overridden`, NOT `started`. The user dragged a projected
+      // chip to declare "the projected bedtime's properties are
+      // these" — that IS what `overridden` describes. Three concrete
+      // benefits over `started`:
+      //   - putdown.ts derives hasPutdown from {projected,overridden}
+      //     only — `started` would silently lose the putdown chip.
+      //   - cascade's manualBedtime check is `!isProjected`, so
+      //     `overridden` is still treated as authoritative.
+      //   - Match the existing drawer-edit override pattern; no new
+      //     code path to maintain.
+      lifecycle: { state: "overridden", annotatedAt: nowMinutes },
       ...(napCandidate.owner ? { owner: napCandidate.owner } : {}),
     };
     // Sequence: delete original FIRST so the dual-doc state can never

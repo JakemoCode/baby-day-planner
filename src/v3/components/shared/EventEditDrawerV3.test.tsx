@@ -497,10 +497,12 @@ describe("Past-threshold prompt when editing a nap (physiology cascade)", () => 
         // Source nap's endTime (10:00) is dropped; bedtime endTime
         // = defaultWakeTime + 24h = 7:00 + 1440 = 1860.
         endTime: DEFAULT_WAKE_TIME + 24 * 60,
-        // Lifecycle is `started` (bedtime in progress) — NOT
-        // `overridden` (formToEvent's output) and NOT `completed`
-        // (the user is starting bedtime, not declaring it ended).
-        lifecycle: expect.objectContaining({ state: "started" }),
+        // `overridden` lifecycle: the user dragged a projected chip
+        // to declare "the projected bedtime is at this time."
+        // `overridden` triggers putdown synthesis (putdown.ts:42) AND
+        // is treated as manualBedtime by the cascade (!isProjected).
+        // `started` would silently lose the putdown chip.
+        lifecycle: expect.objectContaining({ state: "overridden" }),
       }),
     );
   });
