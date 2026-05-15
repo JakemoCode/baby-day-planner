@@ -253,6 +253,7 @@ export default function DashboardPage() {
             inProgressNap={inProgressNap}
             dayId={day.id}
             nextNumber={nextNapNumber}
+            maxSlot={settings.wakeWindowsMinutes.length}
             {...(nn ? { nextProjectedNap: nn } : {})}
             onStart={handleStartNap}
             onEnd={handleEndNap}

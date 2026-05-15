@@ -62,14 +62,25 @@ export function buildCreateTemplate({
   }
 
   if (type === "nap") {
+    // A nap "slot" is a position in the cascade (slot N corresponds
+    // to wakeWindowsMinutes[N-1]). If the next free slot index would
+    // exceed the configured slot count, the user is creating an
+    // off-pattern nap (e.g. baby wakes mid-bedtime for a feed and
+    // goes back down). Use a UUID-based eventKey for these — the
+    // cascade's `^nap_\d+$` slot matcher won't pick it up, so it
+    // renders as a one-off nap without eating bedtime substitution
+    // for an actual cascade slot.
     const nextN = nextFreeSlot("nap", actuals, projected);
+    const maxSlot = settings.wakeWindowsMinutes.length;
+    const fitsSlot = nextN <= maxSlot;
+    const napId = newEventId("nap");
     return {
-      id: newEventId("nap"),
+      id: napId,
       dayId,
-      eventKey: `nap_${nextN}`,
+      eventKey: fitsSlot ? `nap_${nextN}` : napId,
       type: "nap",
       kind: "block",
-      label: `Nap ${nextN}`,
+      label: fitsSlot ? `Nap ${nextN}` : "Nap",
       startTime: nowMinutes,
       hasPutdown: false,
       lifecycle: { state: "projected" },
