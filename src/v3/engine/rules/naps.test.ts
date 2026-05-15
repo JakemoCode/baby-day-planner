@@ -828,6 +828,142 @@ describe("FAB-added nap (UUID eventKey) inserts into the rhythm chronologically"
   });
 });
 
+describe("Post-threshold real nap → bedtime in projection (DOMAIN.md §3)", () => {
+  // Per DOMAIN.md §3: "any sleep that starts after the time at which
+  // baby's circadian rhythm says 'bedtime' is likely to be just that."
+  // The engine projection emits a separate bedtime event derived from
+  // the recorded/overridden nap's data when the nap's startTime ≥
+  // bedtimeThreshold. The Firestore doc stays type=nap; the render
+  // layer can dedup display.
+
+  it("real nap at startTime ≥ threshold emits a coerced bedtime event", () => {
+    const lateNap = aRecordedNap({
+      id: "nap_late",
+      eventKey: "nap_late",
+      start: 19 * 60 + 30,
+      end: 20 * 60 + 30,
+    });
+
+    const ctx = aContext({
+      day: aDay({ wakeTime: 7 * 60 }),
+      settings: aSettings({
+        wakeWindowsMinutes: [120, 90, 90, 90, 90],
+        defaultNapLengthMinutes: 60,
+        bedtimeThreshold: 19 * 60,
+        defaultWakeTime: 7 * 60,
+      }),
+      actuals: [lateNap],
+    });
+
+    const out = projectDay(
+      {
+        day: ctx.day,
+        settings: ctx.settings,
+        actuals: ctx.actuals,
+        nowMinutes: ctx.nowMinutes,
+      },
+      { rules: NAP_RULES },
+    );
+
+    // Original nap doc is preserved in the output as type=nap.
+    const napDoc = out.find((e) => e.id === lateNap.id && e.type === "nap");
+    expect(napDoc).toBeDefined();
+
+    // A separate coerced bedtime event has been emitted at the late
+    // nap's startTime; its id derives from the nap's id.
+    const coercedBedtime = out.find(
+      (e) => e.type === "bedtime" && e.startTime === 19 * 60 + 30,
+    );
+    expect(coercedBedtime).toBeDefined();
+    expect(coercedBedtime!.id).toContain(lateNap.id);
+    expect(coercedBedtime!.label).toBe("Bedtime");
+  });
+
+  it("post-coercion: cascade emits no naps or wake_windows past the coerced bedtime", () => {
+    const lateNap = aRecordedNap({
+      id: "nap_late",
+      eventKey: "nap_late",
+      start: 19 * 60 + 30,
+      end: 20 * 60 + 30,
+    });
+
+    const ctx = aContext({
+      day: aDay({ wakeTime: 7 * 60 }),
+      settings: aSettings({
+        wakeWindowsMinutes: [120, 90, 90, 90, 90, 90, 90],
+        defaultNapLengthMinutes: 60,
+        bedtimeThreshold: 19 * 60,
+        defaultWakeTime: 7 * 60,
+      }),
+      actuals: [lateNap],
+    });
+
+    const out = projectDay(
+      {
+        day: ctx.day,
+        settings: ctx.settings,
+        actuals: ctx.actuals,
+        nowMinutes: ctx.nowMinutes,
+      },
+      { rules: NAP_RULES },
+    );
+
+    const bedtime = out.find((e) => e.type === "bedtime");
+    expect(bedtime).toBeDefined();
+    // No projected wake_window or projected nap past the coerced
+    // bedtime. Excludes the original lateNap doc (which lives at the
+    // same startTime as the bedtime).
+    const orphan = out.filter(
+      (e) =>
+        (e.type === "wake_window" || e.type === "nap") &&
+        e.startTime >= bedtime!.startTime &&
+        e.id !== lateNap.id,
+    );
+    expect(orphan).toHaveLength(0);
+  });
+
+  it("manual bedtime takes precedence over coercion (R7.7 still holds)", () => {
+    const manualBedtime = aRecordedBedtime({
+      id: "actual_bedtime",
+      eventKey: "bedtime",
+      start: 18 * 60,
+      end: 30 * 60,
+    });
+    const lateNap = aRecordedNap({
+      id: "nap_late",
+      eventKey: "nap_late",
+      start: 19 * 60 + 30,
+      end: 20 * 60 + 30,
+    });
+
+    const ctx = aContext({
+      day: aDay({ wakeTime: 7 * 60 }),
+      settings: aSettings({
+        wakeWindowsMinutes: [120, 90, 90, 90, 90],
+        defaultNapLengthMinutes: 60,
+        bedtimeThreshold: 19 * 60,
+        defaultWakeTime: 7 * 60,
+      }),
+      actuals: [manualBedtime, lateNap],
+    });
+
+    const out = projectDay(
+      {
+        day: ctx.day,
+        settings: ctx.settings,
+        actuals: ctx.actuals,
+        nowMinutes: ctx.nowMinutes,
+      },
+      { rules: NAP_RULES },
+    );
+
+    // Only the manual bedtime exists; no coerced bedtime emitted.
+    const bedtimes = out.filter((e) => e.type === "bedtime");
+    expect(bedtimes).toHaveLength(1);
+    expect(bedtimes[0]!.id).toBe(manualBedtime.id);
+  });
+});
+
 describe("R7.7 — manual bedtime is the user's authoritative declaration", () => {
   it("with a recorded bedtime at 18:00, threshold (19:00) does NOT substitute another", () => {
     const recordedBedtime = aRecordedBedtime({
