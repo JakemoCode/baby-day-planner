@@ -89,16 +89,25 @@ for the decision rationale.
 
 ## §3 Naps
 
-### R3.1 The day's projected nap chain comes from `settings.wakeWindowsMinutes`
+### R3.1 The day's projected nap chain extends until bedtime threshold (physiology cascade)
 
-The settings array `[ww1, ww2, ww3, ww4]` produces N wake windows and N
-naps. The wake_window_N event lasts `ww[N-1]` minutes; nap_N follows
-immediately.
+The settings array `wakeWindowsMinutes` is a **cadence sequence**, not
+a slot count. The cascade walks `wake_window → nap → wake_window → ...`
+until the next projected nap would cross `settings.bedtimeThreshold` —
+at which point the next sleep IS bedtime.
 
-- **Why**: parents tune wake windows by index based on the baby's age.
-- **Edge case it prevents**: changing settings.defaultNapLengthMinutes
-  not propagating to projection (each nap uses defaultNapLengthMinutes
-  for its end time).
+- WW length for rhythm position N is `wakeWindowsMinutes[min(N-1, length-1)]`
+  — when N exceeds the configured array, the **last value repeats**.
+- Slot-keyed real naps (`nap_N` eventKey) anchor slot N regardless of
+  N vs `wakeWindowsMinutes.length` — reality wins per DOMAIN.md §1.
+- **Why**: physiology, not configuration, ends the day. A baby who
+  takes more naps than the configured array describes simply gets more
+  cadence-extended projections; bedtime emerges when the threshold is
+  reached.
+- **Edge case it prevents**: a 15-minute nap every hour for six hours
+  used to leave the rest of the day un-projected once the cascade hit
+  `wakeWindowsMinutes.length`. Now the cascade keeps projecting naps
+  until physiology (the threshold) takes over.
 
 ### R3.2 Each projected nap defaults to `defaultNapLengthMinutes`
 
