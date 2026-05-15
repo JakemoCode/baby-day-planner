@@ -742,18 +742,13 @@ describe("Overridden bedtime gets putdown synth (regression: 2026-05-15 conversi
   // dropped the putdown chip.)
 
   it("a manually-recorded bedtime with `overridden` lifecycle gets hasPutdown=true via R6.1", () => {
-    const overriddenBedtime: Event = {
+    const overriddenBedtime = aRecordedBedtime({
       id: "manual_bedtime",
-      dayId: "d-1",
       eventKey: "bedtime",
-      type: "bedtime",
-      kind: "block",
-      startTime: 19 * 60 + 5,
-      endTime: 31 * 60,
-      label: "Bedtime",
-      hasPutdown: false, // start unset; R6.1 should flip it to true
+      start: 19 * 60 + 5,
+      end: 31 * 60,
       lifecycle: { state: "overridden", annotatedAt: 19 * 60 },
-    };
+    });
 
     const ctx = aContext({
       day: aDay({ wakeTime: 7 * 60 }),

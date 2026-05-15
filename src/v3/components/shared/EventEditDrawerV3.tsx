@@ -250,16 +250,11 @@ export function EventEditDrawerV3({
       startTime: napCandidate.startTime,
       endTime: defaultWakeTime + 24 * 60,
       hasPutdown: false,
-      // `overridden`, NOT `started`. The user dragged a projected
-      // chip to declare "the projected bedtime's properties are
-      // these" — that IS what `overridden` describes. Three concrete
-      // benefits over `started`:
-      //   - putdown.ts derives hasPutdown from {projected,overridden}
-      //     only — `started` would silently lose the putdown chip.
-      //   - cascade's manualBedtime check is `!isProjected`, so
-      //     `overridden` is still treated as authoritative.
-      //   - Match the existing drawer-edit override pattern; no new
-      //     code path to maintain.
+      // `overridden`, not `started`: putdown.ts derives hasPutdown
+      // from {projected, overridden} only — `started` silently drops
+      // the chip. Cascade's manualBedtime check is `!isProjected`,
+      // so `overridden` remains authoritative and matches the
+      // existing drawer-edit override shape.
       lifecycle: { state: "overridden", annotatedAt: nowMinutes },
       ...(napCandidate.owner ? { owner: napCandidate.owner } : {}),
     };
