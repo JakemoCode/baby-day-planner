@@ -1,7 +1,7 @@
 /**
  * R12.x — Template-driven owner inheritance.
  *
- * Source: docs/v3/REQUIREMENTS.md §12.
+ * Source: docs/v3/ENGINE_SPEC.md §12.
  *
  * Implemented here:
  *   R12.2 — projected naps inherit template.napOwners[N-1]

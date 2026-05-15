@@ -20,7 +20,7 @@
  *   - a recorded/overridden bedtime in `actuals` short-circuits the
  *     cascade at its startTime (no further nap/WW emitted past it)
  *
- * Source: docs/v3/REQUIREMENTS.md §3 (nap rules) + §7 (bedtime rules).
+ * Source: docs/v3/ENGINE_SPEC.md §3 (nap rules) + §7 (bedtime rules).
  */
 
 import type { Context, Event, Settings } from "../../schemas";

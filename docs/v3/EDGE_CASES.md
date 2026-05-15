@@ -2,7 +2,8 @@
 
 > Inventory of (input scenario × expected output) for V3's regression
 > suite. Every entry is sourced from a fix commit on V2 main or a
-> decision in `REQUIREMENTS.md`. Each row is property-test ready.
+> decision in [`ENGINE_SPEC.md`](ENGINE_SPEC.md) /
+> [`DATA_MODEL.md`](DATA_MODEL.md). Each row is property-test ready.
 
 > **How to use**: V3's test suite (likely fast-check) feeds these
 > scenarios as concrete examples that must hold, alongside randomly
@@ -1237,7 +1238,7 @@
 - Punted: 3 cases
 
 **Total: 148 cases.** All property-test ready. Rules they enforce
-referenced from `REQUIREMENTS.md`.
+referenced from [`ENGINE_SPEC.md`](ENGINE_SPEC.md).
 
 ---
 
@@ -1246,8 +1247,8 @@ referenced from `REQUIREMENTS.md`.
 - V2 source code as of `main` (2026-05-07).
 - Git fix history: 32 fix commits between 2026-05-02 and 2026-05-07.
 - Locked decisions: `~/.claude/projects/.../memory/project_decisions.md`.
-- Rules they enforce: `docs/v3/REQUIREMENTS.md`.
-- Architecture they will be tested against: `docs/v3/ARCHITECTURE_V3.md`.
+- Rules they enforce: [`ENGINE_SPEC.md`](ENGINE_SPEC.md).
+- Architecture they will be tested against: [`ARCHITECTURE_V3.md`](ARCHITECTURE_V3.md).
 
 ---
 
@@ -1260,7 +1261,7 @@ referenced from `REQUIREMENTS.md`.
   bedtime acts as a hard wall and clips. R7.6 vs R7.7 distinction
   enforced.
 
-### Review 1 (Jake, 2026-05-08) — Synced with REQUIREMENTS.md changes
+### Review 1 (Jake, 2026-05-08) — Synced with ENGINE_SPEC.md changes
 
 - **EC-N17**: revised — wake window owner from template only
   (no nap inheritance).

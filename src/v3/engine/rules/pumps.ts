@@ -1,7 +1,7 @@
 /**
  * R9.x — Pump rules.
  *
- * Source: docs/v3/REQUIREMENTS.md §9.
+ * Source: docs/v3/ENGINE_SPEC.md §9.
  *
  * R9.1: emit a projected pump for each entry in `settings.pumpTimes`.
  * R9.2: eventKey is `pump_${HH:MM}` (time encoded for dedupe — R9.4).

@@ -1,3 +1,15 @@
+# REQUIREMENTS_v3_legacy.md — Archived
+
+> **Archived as of docs reorg PR (2026-05-14).** This is a verbatim copy of
+> `docs/v3/REQUIREMENTS.md` as it existed before the 4-way split.
+> The content has been redistributed into: `ENGINE_SPEC.md` (scheduling
+> rules), `DATA_MODEL.md` (schema / lifecycle / persistence),
+> `RENDER_SPEC.md` (display / UX), and `REQUIREMENTS_review_log.md`
+> (review history). Refer to those docs for the active spec; this file
+> is preserved for historical context and git blame traceability.
+
+---
+
 # V3 Requirements — Domain Rules
 
 > Source of truth for "what the engine and UI MUST do." Every rule below

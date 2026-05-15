@@ -3,7 +3,8 @@
 Lightweight blueprint for collapsing the V3 engine from ~179 numbered
 rules to ~5-7 scheduling rules + clearly-separated render/UX/data-model
 concerns. Intentionally not a rewrite of `REQUIREMENTS.md` — that
-follows once the engine actually matches this scope.
+followed once the engine matched this scope (now done; see `ENGINE_SPEC.md`,
+`DATA_MODEL.md`, and `RENDER_SPEC.md`).
 
 This doc is the spec for the incremental simplification work
 (the bottle-cascade PR onward). If we discover during implementation that the
@@ -13,7 +14,7 @@ scope is wrong, we update this doc, not the code-to-be-written.
 
 ## §1 Why simplify
 
-The engine grew organically. REQUIREMENTS.md currently has 179
+The engine grew organically. The original REQUIREMENTS.md had 179
 numbered rules across 22 sections — but the underlying domain
 (baby behavior) is ~5-6 paragraphs of plain English. The
 discrepancy comes from three sources:
@@ -107,7 +108,7 @@ Other overnight bottles can happen (baby wakes hungry at 2 AM). Those are just r
 
 ## §4 Render / UX concerns — split into a separate doc
 
-Rules currently in REQUIREMENTS.md that are render or interaction concerns, NOT scheduling:
+Rules from the original REQUIREMENTS.md that were render or interaction concerns, NOT scheduling (now in `RENDER_SPEC.md`):
 
 - R3.11 (24px minimum tappable height)
 - R3.12 (inline duration display when endTime is set)
@@ -123,13 +124,13 @@ Rules currently in REQUIREMENTS.md that are render or interaction concerns, NOT 
 - R18 (dashboard)
 - R19 (settings)
 
-These move to `docs/v3/RENDER_SPEC.md` (or similar) after #132 lands. The numbered rule system in REQUIREMENTS.md becomes engine-only.
+These now live in [`docs/v3/RENDER_SPEC.md`](RENDER_SPEC.md). The engine-only rules live in [`ENGINE_SPEC.md`](ENGINE_SPEC.md).
 
 ---
 
 ## §5 Data model + lifecycle — unchanged
 
-- R1.* (schema, identity, kind, times) — keeps current home in `docs/v3/REQUIREMENTS.md` §1 and `src/v3/schemas.ts`.
+- R1.* (schema, identity, kind, times) — now in [`DATA_MODEL.md`](DATA_MODEL.md) and `src/v3/schemas.ts`.
 - R2.* (lifecycle, status transitions) — same.
 - R14.* (day lifecycle), R20.* (persistence) — same.
 - R22.* (membership) — same.
@@ -170,7 +171,7 @@ No changes here. The simplification is about *scheduling rule* count, not the un
 | **Nap-cascade PR**: sequential nap cascade | Inline R7.5/R7.6/R7.11 (bedtime substitution) + R7.4/R7.4b (drop past-bedtime projections) into R3.1. Delete `bedtime.ts`. | ✅ Merged (PR #138) |
 | **Dream-feed PR**: render-only label | Delete `dreamFeed.ts` + `dream_feed` event type. Render-time `applyDreamFeedLabel` relabels first projected post-bedtime bottle. | This PR |
 | **Pumps + dailyRecurring collapse PR** (optional) | Reassess whether unifying R9 + R11 is worth abstraction cost after dream-feed lands. Daycare R21.3 (ownership window) stays separate regardless. | After dream-feed |
-| **Docs reorg PR**: REQUIREMENTS reorg | Split render/UX into `RENDER_SPEC.md`. Renumber engine-only rules. Archive `REQUIREMENTS.md` as `REQUIREMENTS_v3_legacy.md`. | After scheduled-recurring |
+| **Docs reorg PR**: REQUIREMENTS reorg | Split render/UX into `RENDER_SPEC.md`. Renumber engine-only rules. Archive `REQUIREMENTS.md` as `REQUIREMENTS_v3_legacy.md`. | ✅ This PR |
 | **Stop** | Engine matches scope; doc matches engine. | — |
 
 Pause points: after each PR. If the bottle-cascade PR doesn't produce the predicted gap-reduction + complexity-reduction, we re-evaluate before the nap cascade.

@@ -1,7 +1,7 @@
 /**
  * R6.x — Putdown rules (render-only flag).
  *
- * Source: docs/v3/REQUIREMENTS.md §6.
+ * Source: docs/v3/ENGINE_SPEC.md §6.
  *
  * R6.1: putdown is purely predictive — never recorded, never persisted.
  * The engine sets `hasPutdown: true` on naps and bedtimes whose lifecycle
