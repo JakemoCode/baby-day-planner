@@ -88,7 +88,8 @@ function projectSleepCascade(ctx: Context, existing: Event[]): Event[] {
     // 'completed') and shorter than shortNapThresholdMinutes, shrink THIS
     // wake window by shortNapAdjustmentMinutes. Annotations (overridden)
     // carry intent, not measurement, and don't trigger the adjustment.
-    const prevRecordedShort = n > 1 && isShortRecordedNap(existingNapByKey.get(`nap_${n - 1}`), ctx);
+    const prevRecordedShort =
+      n > 1 && isShortRecordedNap(existingNapByKey.get(`nap_${n - 1}`), ctx);
     const wwMinutes = prevRecordedShort
       ? Math.max(0, baseWw - ctx.settings.shortNapAdjustmentMinutes)
       : baseWw;

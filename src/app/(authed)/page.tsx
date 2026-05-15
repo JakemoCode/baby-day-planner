@@ -160,7 +160,6 @@ export default function DashboardPage() {
     return seen.size;
   };
   const nextBottleNumber = uniqueRecordedKeys("bottle") + 1;
-  const nextNapNumber = uniqueRecordedKeys("nap") + 1;
   const lastBottle = lastEventOfType(actuals, "bottle");
   const lastNap = lastEventOfType(actuals, "nap");
   const lastBottleTime = lastBottle?.startTime;

@@ -84,11 +84,7 @@ export function NapActionButton({
     void onStart(nap);
   };
 
-  const label = inProgressNap
-    ? "End Nap"
-    : pastThreshold
-      ? "Start Bedtime Now"
-      : "Start Nap Now";
+  const label = inProgressNap ? "End Nap" : pastThreshold ? "Start Bedtime Now" : "Start Nap Now";
 
   return (
     <ActionButton variant="secondary" onClick={handleClick}>
