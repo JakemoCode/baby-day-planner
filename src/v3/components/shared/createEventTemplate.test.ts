@@ -87,7 +87,17 @@ describe("buildCreateTemplate (V3)", () => {
     expect(tpl.label).toBe("Bottle 2");
   });
 
-  it("seeds a nap template as block-kind without endTime (drawer fills end)", () => {
+  // The FAB add-nap path is purely additive — never claims a cascade
+  // slot, never numbers in the label. The chronological cascade
+  // (src/v3/engine/rules/naps.ts) walks real naps by startTime
+  // regardless of eventKey shape, so the UUID nap inserts into the
+  // rhythm at the user's chosen time without displacing projections.
+  // Display labels (`Nap 1`, `Nap 2`, …) come from the cascade's
+  // chronological numbering pass; the create-time label is just "Nap".
+  // Retro-record an actual rhythm nap by editing the projected nap
+  // chip via the drawer.
+
+  it("seeds a nap template as block-kind without endTime, UUID eventKey, label 'Nap'", () => {
     const tpl = buildCreateTemplate({
       type: "nap",
       dayId: "d-1",
@@ -98,11 +108,13 @@ describe("buildCreateTemplate (V3)", () => {
     expect(tpl.type).toBe("nap");
     expect(tpl.kind).toBe("block");
     expect(tpl.endTime).toBeUndefined();
-    expect(tpl.eventKey).toBe("nap_1");
+    expect(tpl.eventKey).not.toMatch(/^nap_\d+$/);
+    expect(tpl.eventKey).toMatch(/^nap_/); // UUID still has "nap_" prefix
+    expect(tpl.label).toBe("Nap");
     expect(tpl.lifecycle).toEqual({ state: "projected" });
   });
 
-  it("numbers a new nap by counting recorded naps", () => {
+  it("ignores recorded nap count — eventKey + label do not change with prior naps", () => {
     const recordedNap: Event = {
       id: "n-1",
       dayId: "d-1",
@@ -122,19 +134,11 @@ describe("buildCreateTemplate (V3)", () => {
       settings: settings(),
       nowMinutes: NOW,
     });
-    expect(tpl.eventKey).toBe("nap_2");
-    expect(tpl.label).toBe("Nap 2");
+    expect(tpl.eventKey).not.toMatch(/^nap_\d+$/);
+    expect(tpl.label).toBe("Nap");
   });
 
-  it("off-pattern nap (beyond wakeWindowsMinutes.length) gets a UUID eventKey, not nap_N", () => {
-    // Regression for the cascade-eating bug introduced by §F25's
-    // "scan projections" fix: a manual nap added past the configured
-    // slot count was getting eventKey `nap_${maxSlot+1}`, which the
-    // cascade then deferred to instead of substituting bedtime —
-    // bedtime would render as "Nap N+1".
-    //
-    // wws.length = 4 here; projected has nap_1..nap_4. nextFreeSlot
-    // would return 5, but 5 > 4 → use UUID, label "Nap".
+  it("ignores projected naps — eventKey + label do not change with prior projections", () => {
     const projected: Event[] = [1, 2, 3, 4].map((n) => ({
       id: `proj_nap_${n}`,
       dayId: "d-1",
@@ -154,9 +158,7 @@ describe("buildCreateTemplate (V3)", () => {
       nowMinutes: 22 * 60,
       projected,
     });
-    // eventKey shouldn't be `nap_5` (would collide with bedtime's slot).
     expect(tpl.eventKey).not.toMatch(/^nap_\d+$/);
-    expect(tpl.eventKey).toMatch(/^nap_/); // UUID still prefixed
     expect(tpl.label).toBe("Nap");
   });
 
