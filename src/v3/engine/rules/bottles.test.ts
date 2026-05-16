@@ -275,7 +275,11 @@ describe("Sequential cascade — bottle landing in nap snaps to nap.start (wind-
 });
 
 describe("R5.6 — convergence regression with various nowMinutes", () => {
-  it.each([0, 5 * 60, 10 * 60, 15 * 60, 20 * 60])("converges with nowMinutes=%i", (now) => {
+  // One representative case (nowMinutes=0, i.e. pre-wake) is enough to
+  // guard against infinite-loop convergence bugs in this scenario.
+  // The 200-run property test in properties.test.ts already provides
+  // stronger convergence signal across random inputs.
+  it("converges and produces bottles when nowMinutes is before wake", () => {
     const recordedBottle = aRecordedBottle({
       id: "rec_b1",
       eventKey: "bottle_1",
@@ -296,20 +300,31 @@ describe("R5.6 — convergence regression with various nowMinutes", () => {
         wakeWindowsMinutes: [120, 135, 135, 150],
       }),
       actuals: [recordedBottle, recordedNap],
-      nowMinutes: now,
+      nowMinutes: 0,
     });
 
-    expect(() =>
-      projectDay(
-        {
-          day: ctx.day,
-          settings: ctx.settings,
-          actuals: ctx.actuals,
-          nowMinutes: ctx.nowMinutes,
-        },
-        { rules: ALL_WITH_NAPS },
-      ),
-    ).not.toThrow();
+    const out = projectDay(
+      {
+        day: ctx.day,
+        settings: ctx.settings,
+        actuals: ctx.actuals,
+        nowMinutes: ctx.nowMinutes,
+      },
+      { rules: ALL_WITH_NAPS },
+    );
+
+    const bottles = out
+      .filter((e) => e.type === "bottle")
+      .sort((a, b) => a.startTime - b.startTime);
+    // Recorded bottle anchors the cascade; at least one bottle produced.
+    expect(bottles.length).toBeGreaterThan(0);
+    // Cascade starts from (or before) the recorded bottle.
+    expect(bottles[0]!.startTime).toBeLessThanOrEqual(8 * 60 + 15);
+    // No bottle lands strictly inside the recorded nap (10:16–12:14).
+    for (const b of bottles) {
+      const insideNap = b.startTime > 10 * 60 + 16 && b.startTime < 12 * 60 + 14;
+      expect(insideNap).toBe(false);
+    }
   });
 });
 
