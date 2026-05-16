@@ -9,7 +9,15 @@
 
 import type { TimeMin } from "../schemas";
 
-const MINUTES_PER_DAY = 24 * 60;
+export const MINUTES_PER_DAY: TimeMin = 24 * 60; // 1440
+
+/**
+ * Express `wakeTime` as the equivalent TimeMin on the following calendar day.
+ * Used for bedtime endTime computation (R7.1) and overnight bottle bookkeeping.
+ */
+export function nextDayAt(wakeTime: TimeMin): TimeMin {
+  return (wakeTime + MINUTES_PER_DAY) as TimeMin;
+}
 
 function clockFace(minutes: TimeMin): { h24: number; m: number } {
   const wrapped = ((minutes % MINUTES_PER_DAY) + MINUTES_PER_DAY) % MINUTES_PER_DAY;

@@ -6,12 +6,26 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  MINUTES_PER_DAY,
   currentLocalMinutes,
   formatHM24,
   formatHoursMinutes,
   formatTimeForDisplay,
   formatTimeShort,
+  nextDayAt,
 } from "./time";
+
+describe("MINUTES_PER_DAY and nextDayAt — cross-day TimeMin arithmetic", () => {
+  it("MINUTES_PER_DAY equals 1440", () => {
+    expect(MINUTES_PER_DAY).toBe(1440);
+  });
+  it("nextDayAt(0) returns MINUTES_PER_DAY (1440)", () => {
+    expect(nextDayAt(0)).toBe(MINUTES_PER_DAY);
+  });
+  it("nextDayAt(7 * 60) returns 31 * 60 (1860) — R7.1 wake-tomorrow", () => {
+    expect(nextDayAt(7 * 60)).toBe(31 * 60);
+  });
+});
 
 describe("formatHM24 — TimeMin → 'HH:MM' (zero-padded 24h)", () => {
   it("formats midnight", () => {
