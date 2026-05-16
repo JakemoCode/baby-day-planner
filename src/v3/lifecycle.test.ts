@@ -100,20 +100,13 @@ describe("reduceLifecycle — invalid transitions", () => {
 });
 
 describe("isSchedulingType", () => {
-  it("returns true for nap, bedtime, daily_recurring", () => {
-    expect(isSchedulingType("nap")).toBe(true);
-    expect(isSchedulingType("bedtime")).toBe(true);
-    expect(isSchedulingType("daily_recurring")).toBe(true);
-  });
-
-  it("returns false for recording types (bottle, pump, extra, wake_window, daycare)", () => {
-    expect(isSchedulingType("bottle")).toBe(false);
-    expect(isSchedulingType("pump")).toBe(false);
-    expect(isSchedulingType("extra")).toBe(false);
-    expect(isSchedulingType("wake_window")).toBe(false);
-    expect(isSchedulingType("daycare_dropoff")).toBe(false);
-    expect(isSchedulingType("daycare_pickup")).toBe(false);
-  });
+  it.each(["nap", "bedtime", "daily_recurring"] as const)("isSchedulingType(%s) → true", (type) =>
+    expect(isSchedulingType(type)).toBe(true),
+  );
+  it.each(["bottle", "pump", "extra", "wake_window", "daycare_dropoff", "daycare_pickup"] as const)(
+    "isSchedulingType(%s) → false",
+    (type) => expect(isSchedulingType(type)).toBe(false),
+  );
 });
 
 describe("reduceLifecycle — DRAWER_SAVE", () => {

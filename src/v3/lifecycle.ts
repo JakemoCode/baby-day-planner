@@ -166,17 +166,14 @@ export function reduceLifecycle(current: Lifecycle, action: LifecycleAction): Li
       }
 
       // current.state === "overridden"
-      if (timeChanged) {
-        // Re-scheduling a scheduling-type stays overridden.
-        if (isSchedulingType(eventType)) {
-          return { state: "overridden", annotatedAt: nowMinutes };
-        }
-        // Other overridden + time-edit: promote to completed.
-        return { state: "completed", committedAt: nowMinutes };
+      // No time change: field edit only → lifecycle unchanged.
+      if (!timeChanged) return current;
+      // Re-scheduling a scheduling-type stays overridden.
+      if (isSchedulingType(eventType)) {
+        return { state: "overridden", annotatedAt: nowMinutes };
       }
-
-      // overridden + no time change: field edit only → lifecycle unchanged.
-      return current;
+      // Other overridden + time-edit: promote to completed.
+      return { state: "completed", committedAt: nowMinutes };
     }
   }
 }
