@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { act, renderHook, waitFor } from "@testing-library/react";
-import type { Event, OwnersConfig } from "../schemas";
+import type { Event } from "../schemas";
 import { useV3Events } from "./useV3Events";
 
 const watchEventsMock = vi.fn();
@@ -48,12 +48,7 @@ describe("useV3Events", () => {
       cb = callback;
       return () => {};
     });
-    const owners: OwnersConfig = {
-      parent1: { displayName: "Jake", color: "#111" },
-      parent2: { displayName: "Sam", color: "#222" },
-      other: [{ id: "daycare", displayName: "Daycare", color: "#333" }],
-    };
-    const { result } = renderHook(() => useV3Events("child-1", "day-1", owners));
+    const { result } = renderHook(() => useV3Events("child-1", "day-1"));
     // Simulate a converter-defaulted nap: kind="block", hasPutdown=false.
     const incoming = baseEvent({ type: "nap", kind: "block", hasPutdown: false });
     cb!([incoming]);

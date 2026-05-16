@@ -64,7 +64,7 @@ export default function DashboardPage() {
     events: actuals,
     createOptimistic,
     updateOptimistic,
-  } = useV3Events(CHILD_ID, day?.id ?? "", settings?.owners);
+  } = useV3Events(CHILD_ID, day?.id ?? "");
   const { templates } = useV3Templates(CHILD_ID);
   const [drawer, setDrawer] = useState<DrawerState>({ open: false });
   const [pickerOpen, setPickerOpen] = useState(false);

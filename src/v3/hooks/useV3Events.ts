@@ -8,7 +8,7 @@ import {
   updateEvent as updateEventRepo,
   watchEvents,
 } from "../repositories/events";
-import type { Event, OwnersConfig } from "../schemas";
+import type { Event } from "../schemas";
 
 export type UseV3EventsResult = {
   events: Event[];
@@ -18,11 +18,7 @@ export type UseV3EventsResult = {
   deleteOptimistic: (eventId: string) => Promise<void>;
 };
 
-export function useV3Events(
-  childId: string,
-  dayId: string,
-  owners?: OwnersConfig,
-): UseV3EventsResult {
+export function useV3Events(childId: string, dayId: string): UseV3EventsResult {
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -37,7 +33,7 @@ export function useV3Events(
       setEvents(next);
       setLoading(false);
     });
-  }, [childId, dayId, owners]);
+  }, [childId, dayId]);
 
   const createOptimistic = useCallback(
     async (event: Event) => {
