@@ -7,7 +7,6 @@ import type { Day, Event } from "@/v3/schemas";
 import { useV3Settings } from "@/v3/hooks/useV3Settings";
 import { getDayByDate } from "@/v3/repositories/days";
 import { listEvents } from "@/v3/repositories/events";
-import { withV3EventDefaults } from "@/v3/firestore/eventDefaults";
 import { db } from "@/lib/firebase/client";
 import { LoadingState } from "@/components/shared/LoadingState";
 import { EmptyState } from "@/components/shared/EmptyState";
@@ -48,12 +47,12 @@ export default function ArchivedDayPage() {
 
   useEffect(() => {
     if (!day?.id || !settings?.owners) return;
-    const ownersRef = settings.owners;
     let cancelled = false;
     listEvents(db, CHILD_ID, day.id)
       .then((raw) => {
         if (cancelled) return;
-        setEvents(raw.map((e) => withV3EventDefaults(e, ownersRef)));
+        // v3EventConverter.fromFirestore already applies withV3EventDefaults.
+        setEvents(raw);
       })
       .catch((err) => {
         if (cancelled) return;

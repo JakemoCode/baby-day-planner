@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { db } from "@/lib/firebase/client";
-import { withV3EventDefaults } from "../firestore/eventDefaults";
 import {
   createEvent as createEventRepo,
   deleteEvent as deleteEventRepo,
@@ -33,10 +32,9 @@ export function useV3Events(
     // doc id, which trips reserved-id validation (`__.*__`).
     if (!dayId) return;
     return watchEvents(db, childId, dayId, (next) => {
-      // Defense-in-depth: fill hasPutdown / kind / lifecycle defaults
-      // on partial / hand-edited docs. The converter applies the same
-      // defaulter, so this is a belt-and-suspenders pass.
-      setEvents(next.map((e) => withV3EventDefaults(e, owners)));
+      // The v3EventConverter already applies withV3EventDefaults on read;
+      // events arrive here fully defaulted.
+      setEvents(next);
       setLoading(false);
     });
   }, [childId, dayId, owners]);
