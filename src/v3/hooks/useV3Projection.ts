@@ -16,14 +16,17 @@ import type { Day, Event, OwnershipTemplate, Settings } from "../schemas";
 import { applyDreamFeedLabel } from "../ui/dreamFeedLabel";
 
 export type UseV3ProjectionInput = {
-  day: Day;
-  settings: Settings;
+  day: Day | null;
+  settings: Settings | null;
   actuals: Event[];
   template?: OwnershipTemplate;
 };
 
 export function useV3Projection(input: UseV3ProjectionInput): Event[] {
   const nowMinutes = useNowMinutes();
+  if (input.day === null || input.settings === null) {
+    return [];
+  }
   const events = projectDay({
     day: input.day,
     settings: input.settings,

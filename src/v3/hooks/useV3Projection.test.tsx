@@ -30,6 +30,40 @@ const settings = aSettings({
   defaultBottleIntervalMinutes: 180,
 });
 
+describe("useV3Projection — null inputs (loading state)", () => {
+  it("returns [] when day is null", () => {
+    const { result } = renderHook(() => useV3Projection({ day: null, settings, actuals: [] }));
+    expect(result.current).toEqual([]);
+  });
+
+  it("returns [] when settings is null", () => {
+    const { result } = renderHook(() => useV3Projection({ day, settings: null, actuals: [] }));
+    expect(result.current).toEqual([]);
+  });
+
+  it("returns [] when both day and settings are null", () => {
+    const { result } = renderHook(() =>
+      useV3Projection({ day: null, settings: null, actuals: [] }),
+    );
+    expect(result.current).toEqual([]);
+  });
+
+  it("produces real output once inputs become non-null", () => {
+    const { result, rerender } = renderHook(
+      ({ d, s }: { d: typeof day | null; s: typeof settings | null }) =>
+        useV3Projection({ day: d, settings: s, actuals: [] }),
+      { initialProps: { d: null as typeof day | null, s: null as typeof settings | null } },
+    );
+    expect(result.current).toEqual([]);
+
+    act(() => {
+      rerender({ d: day, s: settings });
+    });
+
+    expect(result.current.length).toBeGreaterThan(0);
+  });
+});
+
 describe("useV3Projection — engine wiring (real projectDay)", () => {
   it("produces the cascade output for the given day + settings (empty actuals)", () => {
     const { result } = renderHook(() => useV3Projection({ day, settings, actuals: [] }));

@@ -5,7 +5,6 @@ import type { Day, Event, OwnerRef, OwnershipTemplate } from "@/v3/schemas";
 import { useV3Settings } from "@/v3/hooks/useV3Settings";
 import { useV3Templates } from "@/v3/hooks/useV3Templates";
 import { useV3Projection } from "@/v3/hooks/useV3Projection";
-import { PLACEHOLDER_SETTINGS } from "@/v3/hooks/projectionPlaceholders";
 import { saveTemplate } from "@/v3/repositories/templates";
 import { setOwnerInTemplate } from "@/v3/components/DayTemplates/setOwnerInTemplate";
 import { templateSlotForEvent } from "@/v3/components/DayTemplates/templateSlot";
@@ -65,13 +64,9 @@ export default function DayTemplatesPage() {
     [settings?.defaultWakeTime],
   );
 
-  // V3 engine projects bottle placeholders from `settings.bottleChain`,
-  // so no seed actuals are needed. PLACEHOLDER_SETTINGS keeps the hook
-  // order stable while real settings load; the early-return below
-  // guarantees we never render output derived from the placeholder.
   const projected = useV3Projection({
     day: syntheticDay,
-    settings: settings ?? PLACEHOLDER_SETTINGS,
+    settings,
     actuals: [] as Event[],
     template: activeTemplate,
   });
