@@ -8,10 +8,24 @@
  */
 
 import type { Event, TimeMin } from "./schemas";
+import { PUTDOWN_KIND_TAG } from "./components/Timeline/expandPutdown";
 
 /** Stable ascending sort by startTime. Returns a new array. */
 function sortByStart(events: Event[]): Event[] {
   return [...events].sort((a, b) => a.startTime - b.startTime);
+}
+
+/**
+ * Render-synthetic putdown events carry their parent's `type` (so the
+ * timeline geometry can stay typed) but `eventKey === PUTDOWN_KIND_TAG`.
+ * Selectors operating on "engine events" must ignore them — otherwise a
+ * synthetic putdown with `type === "nap"` looks like the next nap and
+ * gets routed to e.g. `nextProjectedNap.eventKey`. (Caused a Firestore
+ * INVALID_ARGUMENT crash on Start Nap Now when its id was minted from
+ * the putdown's PUTDOWN_KIND_TAG eventKey.)
+ */
+function isEngineEvent(e: Event): boolean {
+  return e.eventKey !== PUTDOWN_KIND_TAG;
 }
 
 /**
@@ -20,7 +34,7 @@ function sortByStart(events: Event[]): Event[] {
  * counts as "next" (not "past").
  */
 export function nextEvent(events: Event[], nowMinutes: TimeMin): Event | undefined {
-  return sortByStart(events).find((e) => e.startTime >= nowMinutes);
+  return sortByStart(events.filter(isEngineEvent)).find((e) => e.startTime >= nowMinutes);
 }
 
 /** `nextEvent` filtered to `type === "bottle"`. */
@@ -59,5 +73,5 @@ export function currentWakeWindow(events: Event[], nowMinutes: TimeMin): Event |
  * formatted strings.
  */
 export function projectedBedtime(events: Event[]): Event | undefined {
-  return sortByStart(events.filter((e) => e.type === "bedtime"))[0];
+  return sortByStart(events.filter((e) => e.type === "bedtime").filter(isEngineEvent))[0];
 }
