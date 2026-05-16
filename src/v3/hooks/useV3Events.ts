@@ -13,8 +13,7 @@ import type { Event } from "../schemas";
 export type UseV3EventsResult = {
   events: Event[];
   loading: boolean;
-  createOptimistic: (event: Event) => Promise<void>;
-  updateOptimistic: (eventId: string, patch: Partial<Event>) => Promise<void>;
+  saveEvent: (event: Event) => Promise<void>;
   deleteOptimistic: (eventId: string) => Promise<void>;
 };
 
@@ -59,5 +58,20 @@ export function useV3Events(childId: string, dayId: string): UseV3EventsResult {
     [childId, dayId],
   );
 
-  return { events, loading, createOptimistic, updateOptimistic, deleteOptimistic };
+  // Routes create vs update based on whether the event already exists in
+  // local actuals. Inlines the isPersistedActual predicate — one routing
+  // decision, not N duplicated across call sites.
+  const saveEvent = useCallback(
+    async (event: Event) => {
+      const isExisting = events.some((e) => e.id === event.id);
+      if (isExisting) {
+        await updateOptimistic(event.id, event);
+      } else {
+        await createOptimistic(event);
+      }
+    },
+    [events, createOptimistic, updateOptimistic],
+  );
+
+  return { events, loading, saveEvent, deleteOptimistic };
 }

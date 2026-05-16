@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import type { Event, OwnershipTemplate } from "@/v3/schemas";
 import { useNowMinutes } from "@/hooks/useNowMinutes";
-import { isPersistedActual } from "@/v3/lib/isPersistedActual";
 import { newEventId } from "@/v3/lib/newEventId";
 import { useV3Day } from "@/v3/hooks/useV3Day";
 import { useV3Events } from "@/v3/hooks/useV3Events";
@@ -42,12 +41,7 @@ export default function TimelinePage() {
   const nowMinutes = useNowMinutes();
   const { day, loading: dayLoading } = useV3Day(CHILD_ID);
   const { settings, loading: settingsLoading } = useV3Settings(CHILD_ID);
-  const {
-    events: actuals,
-    createOptimistic,
-    updateOptimistic,
-    deleteOptimistic,
-  } = useV3Events(CHILD_ID, day?.id ?? "");
+  const { events: actuals, saveEvent, deleteOptimistic } = useV3Events(CHILD_ID, day?.id ?? "");
   const { templates } = useV3Templates(CHILD_ID);
   const [drawer, setDrawer] = useState<DrawerState>({ open: false });
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -135,14 +129,16 @@ export default function TimelinePage() {
         event={drawer.open ? (drawer.mode === "edit" ? drawer.event : drawer.template) : null}
         mode={drawer.open && drawer.mode === "edit" ? "edit" : "create"}
         onSave={async (event) => {
-          if (drawer.open && drawer.mode === "edit") {
-            if (isPersistedActual(drawer.event.id, actuals)) {
-              await updateOptimistic(event.id, event);
-            } else {
-              await createOptimistic({ ...event, id: newEventId("manual") });
-            }
+          if (
+            drawer.open &&
+            drawer.mode === "edit" &&
+            !actuals.some((e) => e.id === drawer.event.id)
+          ) {
+            // Editing a projected (non-persisted) event: re-ID so it lands
+            // as a new actual rather than colliding with the projected slot.
+            await saveEvent({ ...event, id: newEventId("manual") });
           } else {
-            await createOptimistic(event);
+            await saveEvent(event);
           }
           setDrawer({ open: false });
         }}
@@ -151,7 +147,7 @@ export default function TimelinePage() {
           if (
             drawer.open &&
             drawer.mode === "edit" &&
-            !isPersistedActual(drawer.event.id, actuals)
+            !actuals.some((e) => e.id === drawer.event.id)
           ) {
             setDrawer({ open: false });
             return;

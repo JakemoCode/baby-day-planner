@@ -69,7 +69,7 @@ describe("useV3Events", () => {
     await waitFor(() => expect(result.current.events).toHaveLength(1));
   });
 
-  it("applies createOptimistic immediately, then calls repository", async () => {
+  it("saveEvent on a non-existing event creates it immediately and calls repository", async () => {
     let cb: ((events: Event[]) => void) | undefined;
     watchEventsMock.mockImplementation((_db, _cid, _did, callback) => {
       cb = callback;
@@ -81,17 +81,36 @@ describe("useV3Events", () => {
 
     const newEvent = baseEvent({ id: "e-new", startTime: 9 * 60 });
     await act(async () => {
-      await result.current.createOptimistic(newEvent);
+      await result.current.saveEvent(newEvent);
     });
     expect(createEventMock).toHaveBeenCalledWith({}, "child-1", newEvent);
     // Optimistic state must contain the exact event we inserted, not
     // just "something with that id." A bug that wrote a partial copy
-    // (e.g. stripping lifecycle on insert) would have passed the
-    // previous .toBeDefined() check.
+    // (e.g. stripping lifecycle on insert) would have passed a mere
+    // .toBeDefined() check.
     expect(result.current.events.find((e) => e.id === "e-new")).toEqual(newEvent);
   });
 
-  it("createOptimistic keeps events sorted by TimeMin numerically", async () => {
+  it("saveEvent on an existing event updates it in place and calls repository", async () => {
+    let cb: ((events: Event[]) => void) | undefined;
+    watchEventsMock.mockImplementation((_db, _cid, _did, callback) => {
+      cb = callback;
+      return () => {};
+    });
+    const { result } = renderHook(() => useV3Events("child-1", "day-1"));
+    cb!([baseEvent({ id: "e-1", amountOz: 5 })]);
+    await waitFor(() => expect(result.current.events).toHaveLength(1));
+
+    const updatedEvent = baseEvent({ id: "e-1", amountOz: 6 });
+    await act(async () => {
+      await result.current.saveEvent(updatedEvent);
+    });
+    expect(result.current.events[0]?.amountOz).toBe(6);
+    expect(updateEventMock).toHaveBeenCalledWith({}, "child-1", "day-1", "e-1", updatedEvent);
+    expect(createEventMock).not.toHaveBeenCalled();
+  });
+
+  it("saveEvent keeps events sorted by startTime numerically after a create", async () => {
     let cb: ((events: Event[]) => void) | undefined;
     watchEventsMock.mockImplementation((_db, _cid, _did, callback) => {
       cb = callback;
@@ -102,25 +121,9 @@ describe("useV3Events", () => {
     await waitFor(() => expect(result.current.events).toHaveLength(2));
 
     await act(async () => {
-      await result.current.createOptimistic(baseEvent({ id: "b", startTime: 11 * 60 }));
+      await result.current.saveEvent(baseEvent({ id: "b", startTime: 11 * 60 }));
     });
     expect(result.current.events.map((e) => e.id)).toEqual(["a", "b", "c"]);
-  });
-
-  it("updateOptimistic patches in place", async () => {
-    let cb: ((events: Event[]) => void) | undefined;
-    watchEventsMock.mockImplementation((_db, _cid, _did, callback) => {
-      cb = callback;
-      return () => {};
-    });
-    const { result } = renderHook(() => useV3Events("child-1", "day-1"));
-    cb!([baseEvent({ id: "e-1", amountOz: 5 })]);
-    await waitFor(() => expect(result.current.events).toHaveLength(1));
-    await act(async () => {
-      await result.current.updateOptimistic("e-1", { amountOz: 6 });
-    });
-    expect(result.current.events[0]?.amountOz).toBe(6);
-    expect(updateEventMock).toHaveBeenCalledWith({}, "child-1", "day-1", "e-1", { amountOz: 6 });
   });
 
   it("deleteOptimistic drops the event from local state", async () => {

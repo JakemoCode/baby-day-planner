@@ -8,7 +8,6 @@ import { useV3Templates } from "@/v3/hooks/useV3Templates";
 import { startNewDay } from "@/v3/repositories/days";
 import { createEvent } from "@/v3/repositories/events";
 import { saveTemplate } from "@/v3/repositories/templates";
-import { isPersistedActual } from "@/v3/lib/isPersistedActual";
 import { newDayId } from "@/v3/lib/newEventId";
 import { db } from "@/lib/firebase/client";
 import { LoadingState } from "@/components/shared/LoadingState";
@@ -186,7 +185,7 @@ export default function TomorrowPage() {
         mode={drawer.open && drawer.mode === "edit" ? "edit" : "create"}
         onSave={(event) => {
           if (drawer.open && drawer.mode === "edit") {
-            if (isPersistedActual(drawer.event.id, extras)) {
+            if (extras.some((e) => e.id === drawer.event.id)) {
               setExtras((prev) => prev.map((e) => (e.id === event.id ? event : e)));
             } else {
               // Don't re-ID — the projected event's id (built via
@@ -207,7 +206,7 @@ export default function TomorrowPage() {
           if (
             drawer.open &&
             drawer.mode === "edit" &&
-            !isPersistedActual(drawer.event.id, extras)
+            !extras.some((e) => e.id === drawer.event.id)
           ) {
             setDrawer({ open: false });
             return;

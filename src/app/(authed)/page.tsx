@@ -12,7 +12,6 @@ import {
   projectedBedtime,
 } from "@/v3/selectors";
 import { useNowMinutes } from "@/hooks/useNowMinutes";
-import { isPersistedActual } from "@/v3/lib/isPersistedActual";
 import { newEventId } from "@/v3/lib/newEventId";
 import { useV3Day } from "@/v3/hooks/useV3Day";
 import { useV3Events } from "@/v3/hooks/useV3Events";
@@ -59,11 +58,7 @@ export default function DashboardPage() {
   const nowMinutes = useNowMinutes();
   const { day, loading: dayLoading } = useV3Day(CHILD_ID);
   const { settings, loading: settingsLoading } = useV3Settings(CHILD_ID);
-  const {
-    events: actuals,
-    createOptimistic,
-    updateOptimistic,
-  } = useV3Events(CHILD_ID, day?.id ?? "");
+  const { events: actuals, saveEvent } = useV3Events(CHILD_ID, day?.id ?? "");
   const { templates } = useV3Templates(CHILD_ID);
   const [drawer, setDrawer] = useState<DrawerState>({ open: false });
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -186,20 +181,21 @@ export default function DashboardPage() {
       await createEvent(db, CHILD_ID, { ...bottle, dayId: target.id });
       return;
     }
-    await createOptimistic(bottle);
+    await saveEvent(bottle);
   };
   const handleStartNap = async (nap: Event) => {
-    await createOptimistic(nap);
+    await saveEvent(nap);
   };
   const handleStartBedtime = async (bedtime: Event) => {
-    await createOptimistic(bedtime);
+    await saveEvent(bedtime);
   };
   const handleEndNap = async (nap: Event, endTime: number) => {
     if (!day || day.id === "") return;
     // committedAt on a completed nap = the START time (preserved from the
     // `started` lifecycle), NOT the end time. reduceLifecycle handles this
     // — END copies committedAt forward from the started state.
-    await updateOptimistic(nap.id, {
+    await saveEvent({
+      ...nap,
       endTime,
       lifecycle: reduceLifecycle(nap.lifecycle, { type: "END", at: endTime }),
     });
@@ -296,14 +292,16 @@ export default function DashboardPage() {
         event={drawer.open ? (drawer.mode === "edit" ? drawer.event : drawer.template) : null}
         mode={drawer.open && drawer.mode === "edit" ? "edit" : "create"}
         onSave={async (event) => {
-          if (drawer.open && drawer.mode === "edit") {
-            if (isPersistedActual(drawer.event.id, actuals)) {
-              await updateOptimistic(event.id, event);
-            } else {
-              await createOptimistic({ ...event, id: newEventId("manual") });
-            }
+          if (
+            drawer.open &&
+            drawer.mode === "edit" &&
+            !actuals.some((e) => e.id === drawer.event.id)
+          ) {
+            // Editing a projected (non-persisted) event: re-ID so it lands
+            // as a new actual rather than colliding with the projected slot.
+            await saveEvent({ ...event, id: newEventId("manual") });
           } else {
-            await createOptimistic(event);
+            await saveEvent(event);
           }
           setDrawer({ open: false });
         }}

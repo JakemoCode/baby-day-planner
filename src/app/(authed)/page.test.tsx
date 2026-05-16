@@ -18,6 +18,7 @@ const startNewDayMock = vi.fn();
 const getOrCreatePlannedDayMock = vi.fn();
 const createEventMock = vi.fn();
 const saveSettingsMock = vi.fn();
+const saveEventMock = vi.fn().mockResolvedValue(undefined);
 
 vi.mock("@/v3/hooks/useV3Day", () => ({
   useV3Day: (...args: unknown[]) => useV3DayMock(...args),
@@ -93,8 +94,7 @@ function setupHooks({
   nowMinutes = 8 * 60,
   dayLoading = false,
   settingsLoading = false,
-  createOptimistic = vi.fn().mockResolvedValue(undefined),
-  updateOptimistic = vi.fn().mockResolvedValue(undefined),
+  saveEvent = saveEventMock,
   deleteOptimistic = vi.fn().mockResolvedValue(undefined),
 }: {
   day?: Day | null;
@@ -104,8 +104,7 @@ function setupHooks({
   nowMinutes?: number;
   dayLoading?: boolean;
   settingsLoading?: boolean;
-  createOptimistic?: ReturnType<typeof vi.fn>;
-  updateOptimistic?: ReturnType<typeof vi.fn>;
+  saveEvent?: ReturnType<typeof vi.fn>;
   deleteOptimistic?: ReturnType<typeof vi.fn>;
 } = {}) {
   useV3DayMock.mockReturnValue({ day, loading: dayLoading });
@@ -113,14 +112,13 @@ function setupHooks({
   useV3EventsMock.mockReturnValue({
     events: actuals,
     loading: false,
-    createOptimistic,
-    updateOptimistic,
+    saveEvent,
     deleteOptimistic,
   });
   useV3TemplatesMock.mockReturnValue({ templates: [], loading: false });
   useV3ProjectionMock.mockReturnValue(projected);
   useNowMinutesMock.mockReturnValue(nowMinutes);
-  return { createOptimistic, updateOptimistic, deleteOptimistic };
+  return { saveEvent, deleteOptimistic };
 }
 
 // ---------------------------------------------------------------------------
@@ -129,6 +127,7 @@ function setupHooks({
 
 beforeEach(() => {
   vi.clearAllMocks();
+  saveEventMock.mockResolvedValue(undefined);
 });
 
 describe("DashboardPage (V3)", () => {
@@ -271,7 +270,7 @@ describe("DashboardPage (V3)", () => {
       // committedAt = the START time captured when the user tapped Start.
       lifecycle: { state: "started", committedAt: 9 * 60 },
     };
-    const { updateOptimistic } = setupHooks({
+    const { saveEvent } = setupHooks({
       actuals: [startedNap],
       nowMinutes: 10 * 60, // user taps End at 10:00
     });
@@ -283,15 +282,15 @@ describe("DashboardPage (V3)", () => {
     // microtask drain so the await in handleEndNap resolves
     await Promise.resolve();
 
-    expect(updateOptimistic).toHaveBeenCalledTimes(1);
-    // endTime is whatever wall clock the button captured — don't pin it.
-    // committedAt MUST be the original start (9:00 = 540), NOT the end time
-    // (10:00 = 600). The objectContaining assertion for committedAt: 9 * 60
-    // already implies they differ (nowMinutes is 10 * 60), so no extra
-    // not.toBe guard needed.
-    expect(updateOptimistic).toHaveBeenCalledWith(
-      expect.anything(),
+    expect(saveEvent).toHaveBeenCalledTimes(1);
+    // saveEvent receives the full updated nap. endTime is whatever wall
+    // clock the button captured — don't pin it. committedAt MUST be the
+    // original start (9:00 = 540), NOT the end time (10:00 = 600). The
+    // objectContaining assertion for committedAt: 9 * 60 already implies
+    // they differ (nowMinutes is 10 * 60), so no extra not.toBe guard needed.
+    expect(saveEvent).toHaveBeenCalledWith(
       expect.objectContaining({
+        id: "n-started",
         endTime: expect.any(Number),
         lifecycle: expect.objectContaining({ state: "completed", committedAt: 9 * 60 }),
       }),
@@ -335,7 +334,7 @@ describe("DashboardPage (V3)", () => {
       lifecycle: { state: "projected" },
     };
 
-    const { createOptimistic } = setupHooks({
+    const { saveEvent } = setupHooks({
       actuals: [recordedBottle, recordedBottleDup, projectedBottle],
       nowMinutes: 9 * 60,
     });
@@ -346,8 +345,8 @@ describe("DashboardPage (V3)", () => {
     const btn = screen.getByRole("button", { name: /Start Bottle Now/i });
     btn.click();
 
-    expect(createOptimistic).toHaveBeenCalledTimes(1);
-    expect(createOptimistic).toHaveBeenCalledWith(
+    expect(saveEvent).toHaveBeenCalledTimes(1);
+    expect(saveEvent).toHaveBeenCalledWith(
       expect.objectContaining({ eventKey: "bottle_2", label: "Bottle 2" }),
     );
   });
@@ -366,7 +365,7 @@ describe("DashboardPage (V3)", () => {
     getOrCreatePlannedDayMock.mockResolvedValue(plannedTomorrow);
     createEventMock.mockResolvedValue(undefined);
 
-    const { createOptimistic } = setupHooks({ nowMinutes: 2 * 60 });
+    const { saveEvent } = setupHooks({ nowMinutes: 2 * 60 });
     renderWithAuth(<DashboardPage />);
 
     const btn = screen.getByRole("button", { name: /Start Bottle Now/i });
@@ -376,10 +375,10 @@ describe("DashboardPage (V3)", () => {
     await Promise.resolve();
     await Promise.resolve();
 
-    // Cross-day path: createOptimistic NOT called (would land on active
-    // day). getOrCreatePlannedDay called with the wall-clock date.
+    // Cross-day path: saveEvent NOT called (would land on active day via
+    // hook's dayId). getOrCreatePlannedDay called with the wall-clock date.
     // createEvent called with the bottle docked under tomorrow's id.
-    expect(createOptimistic).not.toHaveBeenCalled();
+    expect(saveEvent).not.toHaveBeenCalled();
     expect(getOrCreatePlannedDayMock).toHaveBeenCalledTimes(1);
     expect(getOrCreatePlannedDayMock).toHaveBeenCalledWith(
       expect.anything(),
