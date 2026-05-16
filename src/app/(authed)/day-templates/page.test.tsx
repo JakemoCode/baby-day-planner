@@ -131,12 +131,16 @@ describe("DayTemplatesPage (V3)", () => {
       expect.objectContaining({
         id: "tmpl-saturday",
         displayName: "Saturday",
-        napOwners: expect.arrayContaining([{ slot: "parent2" }]),
       }),
     );
     const savedTemplate = (
       saveTemplateMock.mock.calls[0] as [unknown, string, OwnershipTemplate]
     )[2];
+    // Pin parent2 to index 0 specifically — that's the slot
+    // templateSlotForEvent assigns to nap_1 (index = N - 1). A regression
+    // in setOwnerInTemplate that wrote to the wrong index would still
+    // satisfy arrayContaining; this assertion fails on off-by-one.
+    expect(savedTemplate.napOwners[0]).toEqual({ slot: "parent2" });
     expect("label" in savedTemplate).toBe(false);
   });
 
