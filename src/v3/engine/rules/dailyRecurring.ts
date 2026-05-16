@@ -26,6 +26,7 @@
 import type { Context, DailyRecurring as RecurringConfig, Event } from "../../schemas";
 import type { Rule } from "../evaluator";
 import { hasType, projectedEvent } from "../helpers";
+import { missingScheduledEvents } from "./missingScheduledEvents";
 
 const isRecurring = hasType("daily_recurring");
 
@@ -48,26 +49,22 @@ const RuleProjectDailyRecurring: Rule = {
 
 function missingRecurring(events: readonly Event[], ctx: Context): RecurringConfig[] {
   const suppressed = new Set(ctx.day.suppressedRecurringIds);
-  // Includes recorded events intentionally — R11.5: a recorded
-  // daily_recurring with this key means reality already happened; the
-  // §0 reality-wins axiom requires we leave it untouched.
-  const existingKeys = new Set(events.filter(isRecurring).map((e) => e.eventKey));
   // Defensive id-dedup (settings UI should prevent duplicates, but a
   // malformed Firestore doc shouldn't double-emit). First entry wins.
   const seenIds = new Set<string>();
-  const out: RecurringConfig[] = [];
+  const candidates: Array<RecurringConfig & { eventKey: string }> = [];
   for (const entry of ctx.settings.dailyRecurring) {
     if (!entry.enabled) continue;
     if (suppressed.has(entry.id)) continue;
     if (seenIds.has(entry.id)) continue;
-    if (existingKeys.has(recurringKey(entry.id))) {
-      seenIds.add(entry.id); // mark so a duplicate later doesn't slip through
-      continue;
-    }
     seenIds.add(entry.id);
-    out.push(entry);
+    candidates.push({ ...entry, eventKey: recurringKey(entry.id) });
   }
-  return out;
+  // R11.5: filter out entries whose eventKey already exists on a
+  // daily_recurring event (recorded or projected). Includes recorded events
+  // intentionally — §0 reality-wins axiom: a recorded event with this key
+  // means reality already happened; leave it untouched.
+  return missingScheduledEvents(candidates, events.filter(isRecurring));
 }
 
 function buildProjection(ctx: Context, entry: RecurringConfig): Event {

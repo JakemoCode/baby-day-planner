@@ -19,6 +19,7 @@
 import type { Context, Event, TimeMin } from "../../schemas";
 import type { Rule } from "../evaluator";
 import { hasType, projectedEvent } from "../helpers";
+import { missingScheduledEvents } from "./missingScheduledEvents";
 
 const isPump = hasType("pump");
 
@@ -50,19 +51,21 @@ type PumpTarget = { startTime: TimeMin; eventKey: string };
 function missingPumps(events: readonly Event[], ctx: Context): PumpTarget[] {
   const times = ctx.settings.pumpTimes;
   if (times.length === 0) return [];
-  const existingKeys = new Set(events.filter(isPump).map((e) => e.eventKey));
   const anchored: TimeMin[] =
     ctx.day.wakeTime !== undefined ? [ctx.day.wakeTime, ...times.slice(1)] : [...times];
+  // Internally dedup by eventKey: two settings entries with the same time,
+  // or a wake-anchored first entry colliding with a later setting, would
+  // otherwise produce duplicate ids (first occurrence wins).
   const seen = new Set<string>();
-  const targets: PumpTarget[] = [];
+  const candidates: PumpTarget[] = [];
   for (const t of anchored) {
     const eventKey = pumpEventKey(t);
-    if (existingKeys.has(eventKey)) continue;
     if (seen.has(eventKey)) continue;
     seen.add(eventKey);
-    targets.push({ startTime: t, eventKey });
+    candidates.push({ startTime: t, eventKey });
   }
-  return targets;
+  // R9.4: filter out candidates whose eventKey already exists on a pump event.
+  return missingScheduledEvents(candidates, events.filter(isPump));
 }
 
 /** Format a TimeMin as `pump_HH:MM` (zero-padded, 24-hour, cross-day safe). */
