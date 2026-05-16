@@ -12,12 +12,28 @@ import type { Event, EventType, TimeMin } from "../../schemas";
 
 export const PUTDOWN_KIND_TAG = "__putdown__";
 
-export function expandPutdownBlocks(
-  events: Event[],
-  putdownLeadMinutes: TimeMin,
-  nowMinutes?: TimeMin,
-  defaultNapLengthMinutes?: TimeMin,
-): Event[] {
+export type ExpandPutdownOptions = {
+  putdownLeadMinutes: TimeMin;
+  /**
+   * Soft-end for started naps with no recorded endTime. Used by the
+   * R6.8 in-progress overlap check. NOTE: also used for in-progress
+   * BEDTIME blocks today, where the right soft-end would be
+   * `nextDayAt(defaultWakeTime)`. The cascade doesn't project any
+   * putdown-eligible events after bedtime starts, so the mismatch
+   * isn't observable — but if a future change emits putdowns past
+   * bedtime, this becomes a real bug. Worth a dedicated soft-end
+   * helper at that point.
+   */
+  defaultNapLengthMinutes: TimeMin;
+  /**
+   * Wall-clock TimeMin. Undefined means "no clock provided, render
+   * every hasPutdown event" — the read-only archived-day path.
+   */
+  nowMinutes?: TimeMin;
+};
+
+export function expandPutdownBlocks(events: Event[], options: ExpandPutdownOptions): Event[] {
+  const { putdownLeadMinutes, defaultNapLengthMinutes, nowMinutes } = options;
   const startedSleeps = events.filter(isInProgressSleep);
   const out: Event[] = [];
   for (const e of events) {
@@ -29,7 +45,7 @@ export function expandPutdownBlocks(
         startedSleeps,
         e.startTime - putdownLeadMinutes,
         e.startTime,
-        defaultNapLengthMinutes ?? 60,
+        defaultNapLengthMinutes,
       )
     ) {
       out.push(syntheticPutdown(e, putdownLeadMinutes));

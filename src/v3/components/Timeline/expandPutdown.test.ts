@@ -29,7 +29,7 @@ const ev = (overrides: Partial<Event>): Event => ({
 describe("expandPutdownBlocks", () => {
   it("is a no-op when no event has hasPutdown:true", () => {
     const input: Event[] = [ev({ id: "a" }), ev({ id: "b", startTime: 13 * 60 })];
-    const out = expandPutdownBlocks(input, 15);
+    const out = expandPutdownBlocks(input, { putdownLeadMinutes: 15, defaultNapLengthMinutes: 60 });
     expect(out).toEqual(input);
   });
 
@@ -40,7 +40,7 @@ describe("expandPutdownBlocks", () => {
       hasPutdown: true,
       owner: { slot: "parent1" },
     });
-    const out = expandPutdownBlocks([nap], 15);
+    const out = expandPutdownBlocks([nap], { putdownLeadMinutes: 15, defaultNapLengthMinutes: 60 });
     expect(out).toHaveLength(2);
     const putdown = out.find((e) => e.id === `putdown:nap-1`);
     expect(putdown).toBeDefined();
@@ -53,7 +53,7 @@ describe("expandPutdownBlocks", () => {
 
   it("synthetic putdown carries a renderer tag so the timeline can detect it", () => {
     const nap = ev({ id: "nap-1", hasPutdown: true });
-    const out = expandPutdownBlocks([nap], 15);
+    const out = expandPutdownBlocks([nap], { putdownLeadMinutes: 15, defaultNapLengthMinutes: 60 });
     const putdown = out.find((e) => e.id === `putdown:nap-1`);
     expect(putdown?.eventKey).toBe(PUTDOWN_KIND_TAG);
   });
@@ -64,7 +64,10 @@ describe("expandPutdownBlocks", () => {
       hasPutdown: true,
       lifecycle: { state: "completed", committedAt: 10 * 60 },
     });
-    const out = expandPutdownBlocks([recorded], 15);
+    const out = expandPutdownBlocks([recorded], {
+      putdownLeadMinutes: 15,
+      defaultNapLengthMinutes: 60,
+    });
     const putdown = out.find((e) => e.id === `putdown:nap-1`);
     expect(putdown?.lifecycle).toEqual({ state: "completed", committedAt: 10 * 60 });
   });
@@ -79,7 +82,10 @@ describe("expandPutdownBlocks", () => {
       label: "Bedtime",
       hasPutdown: true,
     });
-    const out = expandPutdownBlocks([bedtime], 20);
+    const out = expandPutdownBlocks([bedtime], {
+      putdownLeadMinutes: 20,
+      defaultNapLengthMinutes: 60,
+    });
     const putdown = out.find((e) => e.id === `putdown:bed`);
     expect(putdown?.startTime).toBe(19 * 60 - 20);
     expect(putdown?.endTime).toBe(19 * 60);
@@ -91,13 +97,21 @@ describe("expandPutdownBlocks", () => {
   describe("R6.7 — temporal gate (suppress when parent has passed)", () => {
     it("skips the synthetic when parent.startTime <= nowMinutes", () => {
       const past = ev({ id: "nap-past", hasPutdown: true, startTime: 9 * 60 });
-      const out = expandPutdownBlocks([past], 15, 10 * 60);
+      const out = expandPutdownBlocks([past], {
+        putdownLeadMinutes: 15,
+        defaultNapLengthMinutes: 60,
+        nowMinutes: 10 * 60,
+      });
       expect(out.find((e) => e.id === "putdown:nap-past")).toBeUndefined();
     });
 
     it("emits the synthetic when parent.startTime > nowMinutes", () => {
       const future = ev({ id: "nap-future", hasPutdown: true, startTime: 14 * 60 });
-      const out = expandPutdownBlocks([future], 15, 10 * 60);
+      const out = expandPutdownBlocks([future], {
+        putdownLeadMinutes: 15,
+        defaultNapLengthMinutes: 60,
+        nowMinutes: 10 * 60,
+      });
       expect(out.find((e) => e.id === "putdown:nap-future")).toBeDefined();
     });
 
@@ -108,7 +122,10 @@ describe("expandPutdownBlocks", () => {
         startTime: 9 * 60,
         lifecycle: { state: "completed", committedAt: 9 * 60 },
       });
-      const out = expandPutdownBlocks([recorded], 15);
+      const out = expandPutdownBlocks([recorded], {
+        putdownLeadMinutes: 15,
+        defaultNapLengthMinutes: 60,
+      });
       expect(out.find((e) => e.id === "putdown:nap-rec")).toBeDefined();
     });
 
@@ -122,7 +139,11 @@ describe("expandPutdownBlocks", () => {
         startTime: 14 * 60,
         lifecycle: { state: "overridden", annotatedAt: 10 * 60 },
       });
-      const out = expandPutdownBlocks([overridden], 15, 10 * 60);
+      const out = expandPutdownBlocks([overridden], {
+        putdownLeadMinutes: 15,
+        defaultNapLengthMinutes: 60,
+        nowMinutes: 10 * 60,
+      });
       expect(out.find((e) => e.id === "putdown:nap-ov")).toBeDefined();
     });
   });
@@ -142,7 +163,11 @@ describe("expandPutdownBlocks", () => {
         hasPutdown: true,
         lifecycle: { state: "projected" },
       });
-      const out = expandPutdownBlocks([nap2], 15, 10 * 60, DEFAULT_NAP_LENGTH);
+      const out = expandPutdownBlocks([nap2], {
+        putdownLeadMinutes: 15,
+        defaultNapLengthMinutes: DEFAULT_NAP_LENGTH,
+        nowMinutes: 10 * 60,
+      });
       expect(out.find((e) => e.id === "putdown:nap-2")).toBeDefined();
     });
 
@@ -171,7 +196,11 @@ describe("expandPutdownBlocks", () => {
         hasPutdown: true,
         lifecycle: { state: "projected" },
       });
-      const out = expandPutdownBlocks([startedNap1, projNap2], 15, 9 * 60 + 30, DEFAULT_NAP_LENGTH);
+      const out = expandPutdownBlocks([startedNap1, projNap2], {
+        putdownLeadMinutes: 15,
+        defaultNapLengthMinutes: DEFAULT_NAP_LENGTH,
+        nowMinutes: 9 * 60 + 30,
+      });
       // putdown window = [9:30, 9:45] overlaps in-progress nap [9:00, 10:00]
       expect(out.find((e) => e.id === "putdown:nap-2")).toBeUndefined();
     });
@@ -196,7 +225,11 @@ describe("expandPutdownBlocks", () => {
         hasPutdown: true,
         lifecycle: { state: "projected" },
       });
-      const out = expandPutdownBlocks([startedNap1, projNap2], 15, 10 * 60, DEFAULT_NAP_LENGTH);
+      const out = expandPutdownBlocks([startedNap1, projNap2], {
+        putdownLeadMinutes: 15,
+        defaultNapLengthMinutes: DEFAULT_NAP_LENGTH,
+        nowMinutes: 10 * 60,
+      });
       expect(out.find((e) => e.id === "putdown:nap-2")).toBeDefined();
     });
   });

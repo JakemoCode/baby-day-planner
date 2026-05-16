@@ -61,7 +61,10 @@ describe("TimelineV3", () => {
     // Putdown expansion moved out of TimelineV3 into renderProjection.
     // The renderer just paints whatever it's given. Callers compose:
     //   renderProjection(events, settings, nowMinutes?) → TimelineV3
-    const expanded = expandPutdownBlocks([ev({ id: "nap1", hasPutdown: true })], 15);
+    const expanded = expandPutdownBlocks([ev({ id: "nap1", hasPutdown: true })], {
+      putdownLeadMinutes: 15,
+      defaultNapLengthMinutes: 60,
+    });
     render(<TimelineV3 events={expanded} owners={owners} />);
     const blocks = screen.getAllByTestId("timeline-block");
     // 2 blocks: the synthetic putdown + the nap itself.
@@ -129,7 +132,10 @@ describe("TimelineV3", () => {
   it("calls onEventTap with the parent event (never the synthetic putdown)", async () => {
     const onEventTap = vi.fn();
     const events: Event[] = [ev({ id: "nap1", hasPutdown: true })];
-    const expanded = expandPutdownBlocks(events, 15);
+    const expanded = expandPutdownBlocks(events, {
+      putdownLeadMinutes: 15,
+      defaultNapLengthMinutes: 60,
+    });
     render(<TimelineV3 events={expanded} owners={owners} onEventTap={onEventTap} />);
     const blocks = screen.getAllByTestId("timeline-block");
     const napBlock = blocks.find((b) => b.getAttribute("data-type") === "nap");
