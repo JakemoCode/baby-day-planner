@@ -16,11 +16,22 @@ export function expandPutdownBlocks(
   events: Event[],
   putdownLeadMinutes: TimeMin,
   nowMinutes?: TimeMin,
+  defaultNapLengthMinutes?: TimeMin,
 ): Event[] {
+  const startedSleeps = events.filter(isInProgressSleep);
   const out: Event[] = [];
   for (const e of events) {
     out.push(e);
-    if (e.hasPutdown && isStillFuture(e, nowMinutes)) {
+    if (
+      e.hasPutdown &&
+      isStillFuture(e, nowMinutes) &&
+      !windowOverlapsInProgressSleep(
+        startedSleeps,
+        e.startTime - putdownLeadMinutes,
+        e.startTime,
+        defaultNapLengthMinutes ?? 60,
+      )
+    ) {
       out.push(syntheticPutdown(e, putdownLeadMinutes));
     }
   }
@@ -33,6 +44,26 @@ export function expandPutdownBlocks(
 function isStillFuture(parent: Event, nowMinutes: TimeMin | undefined): boolean {
   if (nowMinutes === undefined) return true;
   return parent.startTime > nowMinutes;
+}
+
+// R6.8 — suppress a putdown chip whose window overlaps any in-progress
+// sleep block (started, no endTime). Once the user is already asleep,
+// the wind-down chip for the NEXT sleep is irrelevant and confusing.
+function isInProgressSleep(e: Event): boolean {
+  return (e.type === "nap" || e.type === "bedtime") && e.lifecycle.state === "started";
+}
+
+function windowOverlapsInProgressSleep(
+  startedSleeps: Event[],
+  windowStart: TimeMin,
+  windowEnd: TimeMin,
+  defaultNapLengthMinutes: TimeMin,
+): boolean {
+  return startedSleeps.some((s) => {
+    const sStart = s.startTime;
+    const sEnd = s.endTime ?? s.startTime + defaultNapLengthMinutes;
+    return windowStart < sEnd && windowEnd > sStart;
+  });
 }
 
 function syntheticPutdown(parent: Event, lead: TimeMin): Event {

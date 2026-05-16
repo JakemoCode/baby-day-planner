@@ -126,4 +126,78 @@ describe("expandPutdownBlocks", () => {
       expect(out.find((e) => e.id === "putdown:nap-ov")).toBeDefined();
     });
   });
+
+  // R6.8 — suppress putdown whose window overlaps an in-progress sleep block.
+  // Once the user is already asleep, the wind-down chip for the NEXT sleep
+  // is irrelevant and would render confusingly inside the active nap.
+  describe("R6.8 — in-progress sleep gate", () => {
+    const DEFAULT_NAP_LENGTH = 60;
+
+    it("synthesizes putdown when no in-progress sleep exists (baseline)", () => {
+      // nap_2 is projected future; no started sleep in the list.
+      const nap2 = ev({
+        id: "nap-2",
+        eventKey: "nap_2",
+        startTime: 13 * 60,
+        hasPutdown: true,
+        lifecycle: { state: "projected" },
+      });
+      const out = expandPutdownBlocks([nap2], 15, 10 * 60, DEFAULT_NAP_LENGTH);
+      expect(out.find((e) => e.id === "putdown:nap-2")).toBeDefined();
+    });
+
+    it("suppresses putdown when its window overlaps an in-progress nap with no endTime", () => {
+      // nap_1 started at 9:00, no endTime → soft-end at 9:00 + 60 = 10:00.
+      // nap_2 projected at 13:00 → putdown window [12:45, 13:00].
+      // No overlap between [12:45,13:00] and [9:00,10:00] — so let's use a
+      // tighter scenario: nap_1 started at 9:00, nap_2 at 9:45 (putdown [9:30,9:45]).
+      // Both [9:30,9:45] and [9:00,10:00] overlap.
+      const startedNap1: Event = {
+        id: "nap-1",
+        dayId: "d-1",
+        eventKey: "nap_1",
+        type: "nap",
+        kind: "block",
+        startTime: 9 * 60,
+        label: "Nap 1",
+        hasPutdown: false,
+        lifecycle: { state: "started", committedAt: 9 * 60 },
+      };
+      const projNap2 = ev({
+        id: "nap-2",
+        eventKey: "nap_2",
+        startTime: 9 * 60 + 45,
+        endTime: 10 * 60 + 45,
+        hasPutdown: true,
+        lifecycle: { state: "projected" },
+      });
+      const out = expandPutdownBlocks([startedNap1, projNap2], 15, 9 * 60 + 30, DEFAULT_NAP_LENGTH);
+      // putdown window = [9:30, 9:45] overlaps in-progress nap [9:00, 10:00]
+      expect(out.find((e) => e.id === "putdown:nap-2")).toBeUndefined();
+    });
+
+    it("synthesizes putdown when the in-progress nap's explicit endTime ends before the window", () => {
+      // nap_1 started at 9:00, endTime explicitly 9:20.
+      // nap_2 projected at 13:00 → putdown window [12:45, 13:00].
+      // [12:45,13:00] does NOT overlap [9:00,9:20] → putdown should render.
+      const startedNap1 = ev({
+        id: "nap-1",
+        eventKey: "nap_1",
+        startTime: 9 * 60,
+        endTime: 9 * 60 + 20,
+        hasPutdown: false,
+        lifecycle: { state: "started", committedAt: 9 * 60 },
+      });
+      const projNap2 = ev({
+        id: "nap-2",
+        eventKey: "nap_2",
+        startTime: 13 * 60,
+        endTime: 14 * 60,
+        hasPutdown: true,
+        lifecycle: { state: "projected" },
+      });
+      const out = expandPutdownBlocks([startedNap1, projNap2], 15, 10 * 60, DEFAULT_NAP_LENGTH);
+      expect(out.find((e) => e.id === "putdown:nap-2")).toBeDefined();
+    });
+  });
 });

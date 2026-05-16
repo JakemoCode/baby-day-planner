@@ -83,6 +83,7 @@ describe("NapActionButton", () => {
     expect(onStart).toHaveBeenCalledTimes(1);
     const arg = onStart.mock.calls[0]?.[0] as Event;
     expect(arg).toMatchObject({
+      id: "nap_2",
       type: "nap",
       kind: "block",
       eventKey: "nap_2",
@@ -92,7 +93,6 @@ describe("NapActionButton", () => {
     });
     expect(arg.lifecycle.state).toBe("started");
     expect(arg.endTime).toBeUndefined();
-    expect(arg.id).toMatch(/^nap_/);
   });
 
   it("calls onEnd with the started nap and current TimeMin endTime", async () => {
@@ -162,6 +162,7 @@ describe("NapActionButton — CTA swap past bedtime threshold (§F8)", () => {
     expect(onStartBedtime).toHaveBeenCalledTimes(1);
     const arg = onStartBedtime.mock.calls[0]?.[0] as Event;
     expect(arg).toMatchObject({
+      id: "bedtime",
       type: "bedtime",
       kind: "block",
       eventKey: "bedtime",
