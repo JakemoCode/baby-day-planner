@@ -26,6 +26,7 @@
 import type { Context, Event, Settings } from "../../schemas";
 import type { Rule } from "../evaluator";
 import { hasType, isProjected, isRecordedEvent, projectedEvent } from "../helpers";
+import { nextDayAt } from "../../ui/time";
 
 const isNap = hasType("nap");
 const isWakeWindow = hasType("wake_window");
@@ -185,7 +186,7 @@ function buildProjectedBedtime(ctx: Context, start: number, settings: Settings):
     type: "bedtime",
     kind: "block",
     startTime: start,
-    endTime: settings.defaultWakeTime + 24 * 60,
+    endTime: nextDayAt(settings.defaultWakeTime),
     label: "Bedtime",
   });
 }

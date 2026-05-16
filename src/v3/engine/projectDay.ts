@@ -8,15 +8,16 @@
  */
 
 import type { Context, Event, ProjectInput } from "../schemas";
+import { MINUTES_PER_DAY } from "../ui/time";
 import { evaluate, type Rule } from "./evaluator";
 import { ALL_RULES } from "./rules";
 
 /**
- * Default `nowMinutes` when the caller doesn't pass one. 24*60 = end of day,
- * which matches V2's "evaluate as if the day is over" semantics for batch
+ * Default `nowMinutes` when the caller doesn't pass one. End of day,
+ * matching V2's "evaluate as if the day is over" semantics for batch
  * recompute.
  */
-const DEFAULT_NOW = 24 * 60;
+const DEFAULT_NOW = MINUTES_PER_DAY;
 
 export type ProjectDayOptions = {
   /** Override the rule set (testing). Defaults to ALL_RULES. */

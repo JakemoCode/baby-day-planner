@@ -6,7 +6,7 @@ import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import type { Event, EventType, OwnerRef, OwnersConfig, TimeMin } from "../../schemas";
 import { isRecorded } from "../../schemas";
 import { newEventId } from "../../lib/newEventId";
-import { formatHM24, formatTimeForDisplay, parseHM24 } from "../../ui/time";
+import { formatHM24, formatTimeForDisplay, nextDayAt, parseHM24 } from "../../ui/time";
 import { OwnerPickerV3 } from "./OwnerPickerV3";
 import { formToEvent, type FormState } from "./formToEvent";
 
@@ -248,7 +248,7 @@ export function EventEditDrawerV3({
       kind: "block",
       label: "Bedtime",
       startTime: napCandidate.startTime,
-      endTime: defaultWakeTime + 24 * 60,
+      endTime: nextDayAt(defaultWakeTime),
       hasPutdown: false,
       // `overridden`, not `started`: putdown.ts derives hasPutdown
       // from {projected, overridden} only — `started` silently drops

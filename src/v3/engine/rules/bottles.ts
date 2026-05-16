@@ -35,6 +35,7 @@ import type { Context, Event } from "../../schemas";
 import type { Rule } from "../evaluator";
 import { intervalForAmount } from "../bottleIntervalRules";
 import { hasType, isProjected, projectedEvent } from "../helpers";
+import { MINUTES_PER_DAY } from "../../ui/time";
 
 // ---------------------------------------------------------------------------
 // Predicates / helpers
@@ -43,7 +44,7 @@ import { hasType, isProjected, projectedEvent } from "../helpers";
 const isBottle = hasType("bottle");
 const isBedtime = hasType("bedtime");
 
-const MIDNIGHT = 24 * 60;
+const MIDNIGHT = MINUTES_PER_DAY;
 
 /**
  * Forward cap for the bottle cascade. The day's RHYTHM CHAIN is
