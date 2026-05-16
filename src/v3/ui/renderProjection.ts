@@ -27,5 +27,11 @@ export function renderProjection(
   // Pass 1: dream-feed label (operates on bottles, no structural changes).
   const labeled = applyDreamFeedLabel(events, settings);
   // Pass 2: putdown expansion (synthesizes new render-only chips around naps/bedtimes).
-  return expandPutdownBlocks(labeled, settings.putdownLeadMinutes, nowMinutes);
+  // defaultNapLengthMinutes is used as the soft-end fallback when an in-progress
+  // sleep block has no explicit endTime yet (R6.8).
+  return expandPutdownBlocks(labeled, {
+    putdownLeadMinutes: settings.putdownLeadMinutes,
+    defaultNapLengthMinutes: settings.defaultNapLengthMinutes,
+    ...(nowMinutes !== undefined ? { nowMinutes } : {}),
+  });
 }

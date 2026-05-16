@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { currentWakeWindow, nextBottle, nextEvent, nextNap, projectedBedtime } from "./selectors";
 import type { Event, EventKind, EventType, Lifecycle, TimeMin } from "./schemas";
+import { PUTDOWN_KIND_TAG } from "./components/Timeline/expandPutdown";
 
 const projected: Lifecycle = { state: "projected" };
 
@@ -173,5 +174,49 @@ describe("projectedBedtime", () => {
 
   it("returns undefined for an empty array", () => {
     expect(projectedBedtime([])).toBeUndefined();
+  });
+});
+
+describe("selectors ignore render-synthetic putdown events (regression)", () => {
+  // Putdown synthetics carry the parent's type (so timeline geometry stays
+  // typed) but eventKey === PUTDOWN_KIND_TAG. Without filtering, a nap-
+  // parent putdown looks like the next nap by type — and its eventKey would
+  // get minted as a Firestore doc id ("__putdown__" → INVALID_ARGUMENT).
+  const syntheticNapPutdown = makeEvent({
+    id: "putdown:nap-1",
+    eventKey: PUTDOWN_KIND_TAG,
+    type: "nap",
+    startTime: 9 * 60 - 15, // before the nap it's leading
+  });
+  const realNap = makeEvent({
+    id: "nap_1",
+    eventKey: "nap_1",
+    type: "nap",
+    startTime: 9 * 60,
+  });
+
+  it("nextNap returns the real nap, not the synthetic putdown leading it", () => {
+    expect(nextNap([syntheticNapPutdown, realNap], 8 * 60)).toBe(realNap);
+  });
+
+  it("projectedBedtime ignores a bedtime-parent putdown synthetic", () => {
+    const syntheticBedtimePutdown = makeEvent({
+      id: "putdown:bedtime",
+      eventKey: PUTDOWN_KIND_TAG,
+      type: "bedtime",
+      startTime: 19 * 60 - 20,
+    });
+    const realBedtime = makeEvent({
+      id: "bedtime",
+      eventKey: "bedtime",
+      type: "bedtime",
+      startTime: 19 * 60,
+      endTime: 31 * 60,
+    });
+    expect(projectedBedtime([syntheticBedtimePutdown, realBedtime])).toBe(realBedtime);
+  });
+
+  it("nextEvent (un-type-filtered) also ignores synthetics", () => {
+    expect(nextEvent([syntheticNapPutdown, realNap], 8 * 60)).toBe(realNap);
   });
 });

@@ -476,6 +476,24 @@ reminder is no longer useful).
 If "now" has already passed the putdown's lead-time window, don't
 render it — the reminder window has elapsed.
 
+### R6.8 Putdown is suppressed if its window overlaps an in-progress sleep block
+
+If the user is already asleep (a nap or bedtime with `lifecycle.state === "started"`),
+suppress the synthetic putdown chip for any event whose window
+`[parent.startTime - putdownLeadMinutes, parent.startTime]` overlaps
+the in-progress sleep block's interval. The in-progress block's end
+is `endTime` when set; `startTime + defaultNapLengthMinutes` otherwise.
+
+**Why**: the engine continues projecting the NEXT nap after the current
+one starts (the cascade runs from the in-progress nap's soft endTime).
+Without this gate, renderProjection emits a wind-down chip for that
+next nap at its leadTime — but the leadTime is still inside the
+in-progress nap's body, so the chip renders confusingly inside the
+active nap block. The user is already asleep; the reminder is wrong.
+
+Implemented in `expandPutdownBlocks` (render pass), not the engine —
+consistent with R6.1 (render-only).
+
 ---
 
 ## §7 Bedtime

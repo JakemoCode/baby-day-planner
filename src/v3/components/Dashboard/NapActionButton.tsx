@@ -1,7 +1,6 @@
 "use client";
 
 import type { Event, TimeMin } from "@/v3/schemas";
-import { newEventId } from "@/v3/lib/newEventId";
 import { currentLocalMinutes } from "@/v3/ui/time";
 import { ActionButton } from "./ActionButton";
 
@@ -48,9 +47,8 @@ export function NapActionButton({
     // CTA stays always-actionable; physiology takes over from rhythm
     // once it's bedtime o'clock (DOMAIN.md §3).
     if (pastThreshold) {
-      const bedtimeId = newEventId("bedtime");
       const bedtime: Event = {
-        id: bedtimeId,
+        id: "bedtime",
         dayId,
         eventKey: "bedtime",
         type: "bedtime",
@@ -69,9 +67,8 @@ export function NapActionButton({
     // caller invokes this without one (e.g. settings misconfigured),
     // bail safely rather than minting a UUID nap.
     if (!nextProjectedNap) return;
-    const napId = newEventId("nap");
     const nap: Event = {
-      id: napId,
+      id: nextProjectedNap.eventKey,
       dayId,
       eventKey: nextProjectedNap.eventKey,
       type: "nap",

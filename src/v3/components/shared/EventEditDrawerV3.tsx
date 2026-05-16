@@ -5,7 +5,6 @@ import styles from "./EventEditDrawer.module.css";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import type { Event, EventType, OwnerRef, OwnersConfig, TimeMin } from "../../schemas";
 import { isRecorded } from "../../schemas";
-import { newEventId } from "../../lib/newEventId";
 import { formatHM24, formatTimeForDisplay, nextDayAt, parseHM24 } from "../../ui/time";
 import { OwnerPickerV3 } from "./OwnerPickerV3";
 import { formToEvent, type FormState } from "./formToEvent";
@@ -241,7 +240,7 @@ export function EventEditDrawerV3({
     // Lifecycle is `started` (bedtime is in progress; the user is
     // declaring the day's bedtime begins here).
     const bedtimeBase: Event = {
-      id: newEventId("bedtime"),
+      id: "bedtime",
       dayId: napCandidate.dayId,
       eventKey: "bedtime",
       type: "bedtime",

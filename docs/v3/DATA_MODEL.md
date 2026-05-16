@@ -25,13 +25,24 @@
 
 ### R1.1 Every event has a stable identity composed of `(id, eventKey)`
 
-`id` is the Firestore document id (collision-safe via `Date.now()` suffix).
-`eventKey` is the semantic slot identifier (`nap_2`, `bottle_3`,
-`bedtime`, `wake_window_1`, `cook_dinner`).
+`id` is the Firestore document id. `eventKey` is the semantic slot identifier
+(`nap_2`, `bottle_3`, `bedtime`, `wake_window_1`, `cook_dinner`).
+
+**Slot events (nap, bedtime) use deterministic ids: `id === eventKey`.**
+Nap N has `id === eventKey === "nap_N"`. Bedtime has `id === eventKey === "bedtime"`.
+Events are scoped under a per-day Firestore path
+(`children/{childId}/days/{dayId}/events/{id}`), so ids need not be
+globally unique — day scoping provides the namespace.
+
+All other event types (bottle, extra, pump, daily_recurring, daycare)
+continue to use UUID-based ids via `newEventId`.
 
 - **Why**: `eventKey` lets the engine match user docs against projected
   slots. Two docs with the same `eventKey` (e.g. Start Nap + End Nap)
-  represent one logical event.
+  represent one logical event. With slot ids, `id === eventKey` — no
+  translation layer between the two identity systems. `saveEvent` routes
+  create-vs-update by id match; deterministic ids mean Start Nap Now
+  always routes to update if the nap already exists.
 - **Edge case it prevents**: dashboard counter double-counting Start/End
   pairs. Without `eventKey` dedupe, Nap 1 reads as 2 nap recordings.
 
