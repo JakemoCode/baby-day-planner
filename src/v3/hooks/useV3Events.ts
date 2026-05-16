@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { db } from "@/lib/firebase/client";
 import {
   createEvent as createEventRepo,
@@ -20,6 +20,15 @@ export type UseV3EventsResult = {
 export function useV3Events(childId: string, dayId: string): UseV3EventsResult {
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Mirror `events` into a ref so `saveEvent`'s routing predicate can read
+  // the latest value without re-creating the callback on every Firestore
+  // tick. Keeps `saveEvent`'s identity stable across snapshots — avoids
+  // cascading re-renders / effect re-runs in downstream consumers.
+  const eventsRef = useRef(events);
+  useEffect(() => {
+    eventsRef.current = events;
+  }, [events]);
 
   useEffect(() => {
     // Skip subscription when there's no day yet (e.g. dashboard before
@@ -59,18 +68,30 @@ export function useV3Events(childId: string, dayId: string): UseV3EventsResult {
   );
 
   // Routes create vs update based on whether the event already exists in
-  // local actuals. Inlines the isPersistedActual predicate — one routing
-  // decision, not N duplicated across call sites.
+  // local actuals (read via ref — see eventsRef above for why). Inlines
+  // the isPersistedActual predicate; one routing decision, not N
+  // duplicated across call sites.
+  //
+  // Two contracts the callers rely on:
+  // 1. ID-based routing only — `saveEvent` does not re-ID. If a caller
+  //    passes an event whose id differs from any persisted event, it
+  //    routes to CREATE. Callers that want to update an existing event
+  //    must preserve its id (use spread: `{ ...existing, ...patch }`).
+  // 2. Full-event rewrite on update — `saveEvent` passes the full event
+  //    as the updateDoc patch. updateDoc is field-merge, so unknown
+  //    server-side fields stay untouched, but every field present in the
+  //    in-memory event gets overwritten. Relies on realtime-subscription
+  //    freshness; stale tabs could clobber server values that drifted.
   const saveEvent = useCallback(
     async (event: Event) => {
-      const isExisting = events.some((e) => e.id === event.id);
+      const isExisting = eventsRef.current.some((e) => e.id === event.id);
       if (isExisting) {
         await updateOptimistic(event.id, event);
       } else {
         await createOptimistic(event);
       }
     },
-    [events, createOptimistic, updateOptimistic],
+    [createOptimistic, updateOptimistic],
   );
 
   return { events, loading, saveEvent, deleteOptimistic };
