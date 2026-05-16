@@ -9,7 +9,7 @@
 import { describe, expect, it } from "vitest";
 import type { QueryDocumentSnapshot } from "firebase/firestore";
 import type { Day } from "../schemas";
-import { v3DayConverter } from "./converters";
+import { v3DayConverter, v3SettingsConverter } from "./converters";
 
 function mockSnap(data: Record<string, unknown>): QueryDocumentSnapshot {
   return {
@@ -48,5 +48,27 @@ describe("v3DayConverter", () => {
     expect(back.suppressedRecurringIds).toEqual([]);
     expect(back.suppressedDaycareDay).toBe(false);
     expect(back.wakeTime).toBe(7 * 60 + 30);
+  });
+});
+
+describe("v3SettingsConverter", () => {
+  it("fromFirestore on a partial settings doc applies withV3SettingsDefaults", () => {
+    const partial = { childId: "c-1", defaultWakeTime: 7 * 60 };
+    const back = v3SettingsConverter.fromFirestore(mockSnap(partial));
+    // Explicitly-written field preserved.
+    expect(back.defaultWakeTime).toBe(7 * 60);
+    // Defaulter fills nested shapes that were absent in the raw doc.
+    expect(back.bottleChain).toEqual({ bottlesPerDay: 5, bufferAfterWakeMinutes: 10 });
+    expect(back.daycare.enabled).toBe(false);
+    expect(back.owners.parent1.displayName).toBe("");
+    expect(back.wakeWindowsMinutes).toEqual([120, 150, 180, 180, 180, 180]);
+  });
+
+  it("toFirestore is a passthrough", () => {
+    const partial = { childId: "c-1", defaultWakeTime: 7 * 60 };
+    // toFirestore should return exactly what it receives (no modification).
+    // Cast to partial to avoid building a complete Settings fixture.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect(v3SettingsConverter.toFirestore(partial as any)).toBe(partial);
   });
 });
