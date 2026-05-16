@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { act, renderHook, waitFor } from "@testing-library/react";
-import type { Event, OwnersConfig } from "../schemas";
+import type { Event } from "../schemas";
 import { useV3Events } from "./useV3Events";
 
 const watchEventsMock = vi.fn();
@@ -38,30 +38,23 @@ describe("useV3Events", () => {
     deleteEventMock.mockClear();
   });
 
-  it("applies V3 event defaults to incoming Firestore events", async () => {
-    // withV3EventDefaults fills in `kind` (derived from type) and
-    // `hasPutdown` (defaults false). Send a partial event that is missing
-    // `kind` to verify the hook's watcher callback actually runs the
-    // defaulter rather than passing the raw doc through.
+  it("passes converter-defaulted events through unchanged", async () => {
+    // The converter (v3EventConverter.fromFirestore) applies withV3EventDefaults
+    // before the watcher callback fires; the hook is a pure subscriber and
+    // must not re-apply defaults. Simulate what the converter produces:
+    // a fully-shaped event with kind and hasPutdown already set.
     let cb: ((events: Event[]) => void) | undefined;
     watchEventsMock.mockImplementation((_db, _cid, _did, callback) => {
       cb = callback;
       return () => {};
     });
-    const owners: OwnersConfig = {
-      parent1: { displayName: "Jake", color: "#111" },
-      parent2: { displayName: "Sam", color: "#222" },
-      other: [{ id: "daycare", displayName: "Daycare", color: "#333" }],
-    };
-    const { result } = renderHook(() => useV3Events("child-1", "day-1", owners));
-    // A nap without `kind` set — defaulter derives "block" from type.
-    const incoming = baseEvent({ type: "nap", kind: undefined as unknown as Event["kind"] });
+    const { result } = renderHook(() => useV3Events("child-1", "day-1"));
+    // Simulate a converter-defaulted nap: kind="block", hasPutdown=false.
+    const incoming = baseEvent({ type: "nap", kind: "block", hasPutdown: false });
     cb!([incoming]);
     await waitFor(() => expect(result.current.events).toHaveLength(1));
-    // withV3EventDefaults must have run — a raw pass-through would leave
-    // kind as undefined, but the hook output must have kind="block".
+    // Hook must preserve the converter's output exactly.
     expect(result.current.events[0]?.kind).toBe("block");
-    // hasPutdown default is false (not undefined).
     expect(result.current.events[0]?.hasPutdown).toBe(false);
   });
 

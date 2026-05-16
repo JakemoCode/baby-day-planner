@@ -6,10 +6,10 @@
  * else is passed through. V3 docs are already fully shaped; this is
  * insurance against partial writes / hand-edited docs.
  *
- * Used by `v3EventConverter.fromFirestore` and `useV3Events`.
+ * Used by `v3EventConverter.fromFirestore` — the single canonical seam.
  */
 
-import type { Event, EventKind, EventType, OwnersConfig } from "../schemas";
+import type { Event, EventKind, EventType } from "../schemas";
 
 function deriveKind(input: Partial<Event>): EventKind {
   if (input.kind) return input.kind;
@@ -20,11 +20,7 @@ function deriveKind(input: Partial<Event>): EventKind {
   return "instant";
 }
 
-// `owners` retained on the signature so the call sites (`useV3Events`)
-// don't change shape — V3 events carry slot-based OwnerRef directly so
-// the parameter is now unused, but is preserved so a future
-// owner-resolution defaulter can re-enter without touching consumers.
-export function withV3EventDefaults(input: Partial<Event>, _owners?: OwnersConfig): Event {
+export function withV3EventDefaults(input: Partial<Event>): Event {
   const out: Event = {
     id: input.id ?? "",
     dayId: input.dayId ?? "",
