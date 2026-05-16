@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { LifecycleTransitionError, reduceLifecycle, type LifecycleAction } from "./lifecycle";
+import {
+  LifecycleTransitionError,
+  isSchedulingType,
+  reduceLifecycle,
+  type LifecycleAction,
+} from "./lifecycle";
 import type { Lifecycle } from "./schemas";
 
 const projected: Lifecycle = { state: "projected" };
@@ -91,5 +96,199 @@ describe("reduceLifecycle — invalid transitions", () => {
   it("throws if TIME_EDIT is called on a started block (must use END)", () => {
     const started: Lifecycle = { state: "started", committedAt: 13 * 60 };
     expect(() => reduceLifecycle(started, { type: "TIME_EDIT", at: 14 * 60 })).toThrow(/use END/);
+  });
+});
+
+describe("isSchedulingType", () => {
+  it.each(["nap", "bedtime", "daily_recurring"] as const)("isSchedulingType(%s) → true", (type) =>
+    expect(isSchedulingType(type)).toBe(true),
+  );
+  it.each(["bottle", "pump", "extra", "wake_window", "daycare_dropoff", "daycare_pickup"] as const)(
+    "isSchedulingType(%s) → false",
+    (type) => expect(isSchedulingType(type)).toBe(false),
+  );
+});
+
+describe("reduceLifecycle — DRAWER_SAVE", () => {
+  const NOW = 8 * 60 + 30;
+
+  // ── projected source ──────────────────────────────────────────────────────
+
+  it("projected nap + time changed + endTime present → overridden (scheduling type)", () => {
+    const next = reduceLifecycle(
+      { state: "projected" },
+      {
+        type: "DRAWER_SAVE",
+        eventType: "nap",
+        eventKind: "block",
+        timeChanged: true,
+        hasEndTime: true,
+        nowMinutes: NOW,
+      },
+    );
+    expect(next).toEqual({ state: "overridden", annotatedAt: NOW });
+  });
+
+  it("projected bedtime + time changed → overridden (scheduling type)", () => {
+    const next = reduceLifecycle(
+      { state: "projected" },
+      {
+        type: "DRAWER_SAVE",
+        eventType: "bedtime",
+        eventKind: "block",
+        timeChanged: true,
+        hasEndTime: true,
+        nowMinutes: NOW,
+      },
+    );
+    expect(next).toEqual({ state: "overridden", annotatedAt: NOW });
+  });
+
+  it("projected daily_recurring + time changed → overridden (scheduling type)", () => {
+    const next = reduceLifecycle(
+      { state: "projected" },
+      {
+        type: "DRAWER_SAVE",
+        eventType: "daily_recurring",
+        eventKind: "block",
+        timeChanged: true,
+        hasEndTime: true,
+        nowMinutes: NOW,
+      },
+    );
+    expect(next).toEqual({ state: "overridden", annotatedAt: NOW });
+  });
+
+  it("projected bottle (instant) + time changed → completed (recording type)", () => {
+    const next = reduceLifecycle(
+      { state: "projected" },
+      {
+        type: "DRAWER_SAVE",
+        eventType: "bottle",
+        eventKind: "instant",
+        timeChanged: true,
+        hasEndTime: false,
+        nowMinutes: NOW,
+      },
+    );
+    expect(next).toEqual({ state: "completed", committedAt: NOW });
+  });
+
+  it("projected extra (block) + time changed + endTime → completed (recording type)", () => {
+    const next = reduceLifecycle(
+      { state: "projected" },
+      {
+        type: "DRAWER_SAVE",
+        eventType: "extra",
+        eventKind: "block",
+        timeChanged: true,
+        hasEndTime: true,
+        nowMinutes: NOW,
+      },
+    );
+    expect(next).toEqual({ state: "completed", committedAt: NOW });
+  });
+
+  it("projected extra (block) + time changed + no endTime → started (in-progress block)", () => {
+    const next = reduceLifecycle(
+      { state: "projected" },
+      {
+        type: "DRAWER_SAVE",
+        eventType: "extra",
+        eventKind: "block",
+        timeChanged: true,
+        hasEndTime: false,
+        nowMinutes: NOW,
+      },
+    );
+    expect(next).toEqual({ state: "started", committedAt: NOW });
+  });
+
+  it("projected + no time change (owner/amount only) → overridden", () => {
+    const next = reduceLifecycle(
+      { state: "projected" },
+      {
+        type: "DRAWER_SAVE",
+        eventType: "bottle",
+        eventKind: "instant",
+        timeChanged: false,
+        hasEndTime: false,
+        nowMinutes: NOW,
+      },
+    );
+    expect(next).toEqual({ state: "overridden", annotatedAt: NOW });
+  });
+
+  // ── overridden source ─────────────────────────────────────────────────────
+
+  it("overridden nap + time changed → overridden (idempotent re-scheduling)", () => {
+    const next = reduceLifecycle(
+      { state: "overridden", annotatedAt: 8 * 60 },
+      {
+        type: "DRAWER_SAVE",
+        eventType: "nap",
+        eventKind: "block",
+        timeChanged: true,
+        hasEndTime: true,
+        nowMinutes: NOW,
+      },
+    );
+    expect(next).toEqual({ state: "overridden", annotatedAt: NOW });
+  });
+
+  it("overridden bottle + time changed → completed (locks in the time)", () => {
+    const next = reduceLifecycle(
+      { state: "overridden", annotatedAt: 7 * 60 },
+      {
+        type: "DRAWER_SAVE",
+        eventType: "bottle",
+        eventKind: "instant",
+        timeChanged: true,
+        hasEndTime: false,
+        nowMinutes: NOW,
+      },
+    );
+    expect(next).toEqual({ state: "completed", committedAt: NOW });
+  });
+
+  it("overridden + no time change (field edit only) → lifecycle unchanged", () => {
+    const overridden: Lifecycle = { state: "overridden", annotatedAt: 7 * 60 };
+    const next = reduceLifecycle(overridden, {
+      type: "DRAWER_SAVE",
+      eventType: "nap",
+      eventKind: "block",
+      timeChanged: false,
+      hasEndTime: true,
+      nowMinutes: NOW,
+    });
+    expect(next).toBe(overridden);
+  });
+
+  // ── already-recorded sources stay frozen ─────────────────────────────────
+
+  it("started block stays started regardless of edits", () => {
+    const started: Lifecycle = { state: "started", committedAt: 9 * 60 };
+    const next = reduceLifecycle(started, {
+      type: "DRAWER_SAVE",
+      eventType: "nap",
+      eventKind: "block",
+      timeChanged: true,
+      hasEndTime: false,
+      nowMinutes: NOW,
+    });
+    expect(next).toBe(started);
+  });
+
+  it("completed event stays completed; committedAt is unchanged", () => {
+    const completed: Lifecycle = { state: "completed", committedAt: 10 * 60 };
+    const next = reduceLifecycle(completed, {
+      type: "DRAWER_SAVE",
+      eventType: "bottle",
+      eventKind: "instant",
+      timeChanged: true,
+      hasEndTime: false,
+      nowMinutes: NOW,
+    });
+    expect(next).toBe(completed);
   });
 });

@@ -19,14 +19,38 @@
  * - Once `completed`, never returns to `projected`.
  */
 
-import type { EventKind, Lifecycle, TimeMin } from "./schemas";
+import type { EventKind, EventType, Lifecycle, TimeMin } from "./schemas";
+
+/**
+ * Event types for which drawer time-edits are scheduling intent, not
+ * recordings of reality.
+ *
+ * - `nap` / `bedtime`: Start/End action buttons own the
+ *   projected → started → completed flow; the drawer is scheduling.
+ * - `daily_recurring`: recurring entries have no action buttons; a
+ *   drawer time-edit is a one-day reschedule, not a recording.
+ *
+ * This is the single authoritative predicate — import from here rather
+ * than duplicating the list. (ARCHITECTURE_V3 §4)
+ */
+export function isSchedulingType(type: EventType): boolean {
+  return type === "nap" || type === "bedtime" || type === "daily_recurring";
+}
 
 export type LifecycleAction =
   | { type: "START"; at: TimeMin; eventKind: EventKind }
   | { type: "END"; at: TimeMin }
   | { type: "RECORD_INSTANT"; at: TimeMin; eventKind: EventKind }
   | { type: "TIME_EDIT"; at: TimeMin }
-  | { type: "OWNER_EDIT"; at: TimeMin };
+  | { type: "OWNER_EDIT"; at: TimeMin }
+  | {
+      type: "DRAWER_SAVE";
+      eventType: EventType;
+      eventKind: EventKind;
+      timeChanged: boolean;
+      hasEndTime: boolean;
+      nowMinutes: TimeMin;
+    };
 
 export class LifecycleTransitionError extends Error {
   readonly fromState: Lifecycle["state"];
@@ -111,6 +135,45 @@ export function reduceLifecycle(current: Lifecycle, action: LifecycleAction): Li
         return current;
       }
       return { state: "overridden", annotatedAt: action.at };
+    }
+
+    case "DRAWER_SAVE": {
+      const { eventType, eventKind, timeChanged, hasEndTime, nowMinutes } = action;
+
+      // Already-recorded states (started / completed) stay as-is.
+      // Field edits (owner, amount, label) may apply but lifecycle is frozen.
+      if (current.state === "started" || current.state === "completed") {
+        return current;
+      }
+
+      if (current.state === "projected") {
+        if (!timeChanged) {
+          // No time change: owner/amount/label only → annotate as overridden.
+          return { state: "overridden", annotatedAt: nowMinutes };
+        }
+        // Block with no endTime is "started but not done yet."
+        if (eventKind === "block" && !hasEndTime) {
+          return { state: "started", committedAt: nowMinutes };
+        }
+        // Scheduling types: drawer time-edits are scheduling intent, not
+        // reality. Stay in `overridden` so the engine treats the event as
+        // a future projection (preserves hasPutdown).
+        if (isSchedulingType(eventType)) {
+          return { state: "overridden", annotatedAt: nowMinutes };
+        }
+        // All other types: time-edit locks in the time.
+        return { state: "completed", committedAt: nowMinutes };
+      }
+
+      // current.state === "overridden"
+      // No time change: field edit only → lifecycle unchanged.
+      if (!timeChanged) return current;
+      // Re-scheduling a scheduling-type stays overridden.
+      if (isSchedulingType(eventType)) {
+        return { state: "overridden", annotatedAt: nowMinutes };
+      }
+      // Other overridden + time-edit: promote to completed.
+      return { state: "completed", committedAt: nowMinutes };
     }
   }
 }
