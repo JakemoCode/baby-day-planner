@@ -9,7 +9,6 @@ import { newEventId } from "@/v3/lib/newEventId";
 import { useV3Day } from "@/v3/hooks/useV3Day";
 import { useV3Events } from "@/v3/hooks/useV3Events";
 import { useV3Projection } from "@/v3/hooks/useV3Projection";
-import { PLACEHOLDER_DAY, PLACEHOLDER_SETTINGS } from "@/v3/hooks/projectionPlaceholders";
 import { useV3Settings } from "@/v3/hooks/useV3Settings";
 import { useV3Templates } from "@/v3/hooks/useV3Templates";
 import { LoadingState } from "@/components/shared/LoadingState";
@@ -58,13 +57,9 @@ export default function TimelinePage() {
     return templates.find((t) => t.id === day.templateId);
   }, [day, templates]);
 
-  // useV3Projection requires day + settings; the early-return below
-  // ensures the engine output is never rendered with the placeholders.
-  // The placeholders exist only so React's hook order stays stable
-  // (hooks can't be called conditionally).
   const projected = useV3Projection({
-    day: day ?? PLACEHOLDER_DAY,
-    settings: settings ?? PLACEHOLDER_SETTINGS,
+    day,
+    settings,
     actuals,
     ...(template ? { template } : {}),
   });

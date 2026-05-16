@@ -19,7 +19,6 @@ import { useV3Events } from "@/v3/hooks/useV3Events";
 import { useV3Settings } from "@/v3/hooks/useV3Settings";
 import { useV3Templates } from "@/v3/hooks/useV3Templates";
 import { useV3Projection } from "@/v3/hooks/useV3Projection";
-import { PLACEHOLDER_DAY, PLACEHOLDER_SETTINGS } from "@/v3/hooks/projectionPlaceholders";
 import { getOrCreatePlannedDay, startNewDay } from "@/v3/repositories/days";
 import { createEvent } from "@/v3/repositories/events";
 import { saveSettings } from "@/v3/repositories/settings";
@@ -74,13 +73,9 @@ export default function DashboardPage() {
     return templates.find((t) => t.id === day.templateId);
   }, [day, templates]);
 
-  // Hook order must stay stable, so we always call useV3Projection with
-  // PLACEHOLDER_DAY/PLACEHOLDER_SETTINGS when the real values aren't loaded.
-  // The early return below ensures projected output is never rendered with
-  // those placeholders.
   const projected = useV3Projection({
-    day: day ?? PLACEHOLDER_DAY,
-    settings: settings ?? PLACEHOLDER_SETTINGS,
+    day,
+    settings,
     actuals,
     ...(template ? { template } : {}),
   });
