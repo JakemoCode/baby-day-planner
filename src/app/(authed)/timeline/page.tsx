@@ -91,7 +91,6 @@ export default function TimelinePage() {
       <TimelineV3
         events={projected}
         owners={settings.owners}
-        putdownLeadMinutes={settings.putdownLeadMinutes}
         colorMode={settings.timelineColorMode}
         nowMinutes={nowMinutes}
         scrollToNowOnMount

@@ -47,23 +47,17 @@ const nap: Event = {
 
 describe("ArchivedDayView (V3)", () => {
   it("renders the formatted date as a heading", () => {
-    renderWithAuth(
-      <ArchivedDayView day={day} events={[bottle]} owners={owners} putdownLeadMinutes={15} />,
-    );
+    renderWithAuth(<ArchivedDayView day={day} events={[bottle]} owners={owners} />);
     expect(screen.getByRole("heading")).toHaveTextContent(/Mon, May 4|May 4/i);
   });
 
   it("renders an empty state when there are no events", () => {
-    renderWithAuth(
-      <ArchivedDayView day={day} events={[]} owners={owners} putdownLeadMinutes={15} />,
-    );
+    renderWithAuth(<ArchivedDayView day={day} events={[]} owners={owners} />);
     expect(screen.getByText(/no events|nothing recorded/i)).toBeVisible();
   });
 
   it("renders TimelineV3 with the passed events", () => {
-    renderWithAuth(
-      <ArchivedDayView day={day} events={[bottle, nap]} owners={owners} putdownLeadMinutes={15} />,
-    );
+    renderWithAuth(<ArchivedDayView day={day} events={[bottle, nap]} owners={owners} />);
     // Block + instant chip both come from TimelineV3.
     expect(screen.getAllByTestId("timeline-block").length).toBeGreaterThanOrEqual(1);
     expect(screen.getByTestId("instant-chip")).toBeInTheDocument();
@@ -74,30 +68,20 @@ describe("ArchivedDayView (V3)", () => {
       ...bottle,
       owner: { slot: "parent1" },
     };
-    renderWithAuth(
-      <ArchivedDayView day={day} events={[owned]} owners={owners} putdownLeadMinutes={15} />,
-    );
+    renderWithAuth(<ArchivedDayView day={day} events={[owned]} owners={owners} />);
     // parent1.displayName === "Jake" — owner lookup goes through OwnersConfig.
     expect(screen.getByText(/Jake/)).toBeInTheDocument();
   });
 
   it("does not make events tappable when onEditEvent is omitted", () => {
-    renderWithAuth(
-      <ArchivedDayView day={day} events={[bottle]} owners={owners} putdownLeadMinutes={15} />,
-    );
+    renderWithAuth(<ArchivedDayView day={day} events={[bottle]} owners={owners} />);
     expect(screen.queryByRole("button", { name: /Bottle 1/ })).toBeNull();
   });
 
   it("forwards taps to onEditEvent when provided", async () => {
     const onEditEvent = vi.fn();
     renderWithAuth(
-      <ArchivedDayView
-        day={day}
-        events={[bottle]}
-        owners={owners}
-        putdownLeadMinutes={15}
-        onEditEvent={onEditEvent}
-      />,
+      <ArchivedDayView day={day} events={[bottle]} owners={owners} onEditEvent={onEditEvent} />,
     );
     await userEvent.click(screen.getByRole("button", { name: /Bottle 1/ }));
     expect(onEditEvent).toHaveBeenCalledTimes(1);

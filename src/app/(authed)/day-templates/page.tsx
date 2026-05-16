@@ -142,7 +142,6 @@ export default function DayTemplatesPage() {
       <TimelineV3
         events={projected}
         owners={settings.owners}
-        putdownLeadMinutes={settings.putdownLeadMinutes}
         colorMode={settings.timelineColorMode}
         dimPast={false}
         pxPerHour={settings.timelinePxPerHour}

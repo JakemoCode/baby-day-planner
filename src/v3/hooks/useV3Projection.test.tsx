@@ -18,6 +18,7 @@ import { act, renderHook } from "@testing-library/react";
 import { PARENT1, PARENT2, aDay, aRecordedNap, aSettings, aTemplate } from "../__tests__/factories";
 import type { Event, OwnershipTemplate } from "../schemas";
 import { useV3Projection } from "./useV3Projection";
+import { PUTDOWN_KIND_TAG } from "../components/Timeline/expandPutdown";
 
 vi.mock("../../hooks/useNowMinutes", () => ({
   useNowMinutes: () => 8 * 60 + 30, // 08:30, deterministic
@@ -72,8 +73,11 @@ describe("useV3Projection — engine wiring (real projectDay)", () => {
     // Cascade must emit nap_1 + nap_2 from wakeWindowsMinutes=[120,150].
     // Under the physiology cascade, additional naps are also projected
     // via cadence-extension up to bedtime threshold; we assert the
-    // first two as the relevant chain prefix.
-    const naps = events.filter((e) => e.type === "nap");
+    // first two as the relevant chain prefix. The hook now runs the
+    // render pipeline (renderProjection), which inserts synthetic
+    // putdown chips with type="nap" and eventKey=PUTDOWN_KIND_TAG —
+    // filter those out to get just the canonical nap_N events.
+    const naps = events.filter((e) => e.type === "nap" && e.eventKey !== PUTDOWN_KIND_TAG);
     expect(naps.slice(0, 2).map((n) => n.eventKey)).toEqual(["nap_1", "nap_2"]);
 
     // First wake window starts at wakeTime, lasts 120 min. nap_1 follows.

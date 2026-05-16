@@ -13,6 +13,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { Event, OwnersConfig } from "../../schemas";
 import { TimelineV3 } from "./TimelineV3";
+import { expandPutdownBlocks } from "./expandPutdown";
 
 const owners: OwnersConfig = {
   parent1: { displayName: "Jake", color: "#0af" },
@@ -36,7 +37,7 @@ const ev = (overrides: Partial<Event>): Event => ({
 
 describe("TimelineV3", () => {
   it("renders the empty state when no events", () => {
-    render(<TimelineV3 events={[]} owners={owners} putdownLeadMinutes={15} />);
+    render(<TimelineV3 events={[]} owners={owners} />);
     expect(screen.getByText("Nothing scheduled yet.")).toBeInTheDocument();
   });
 
@@ -51,14 +52,17 @@ describe("TimelineV3", () => {
         label: "Bottle 1",
       }),
     ];
-    render(<TimelineV3 events={events} owners={owners} putdownLeadMinutes={15} />);
+    render(<TimelineV3 events={events} owners={owners} />);
     expect(screen.getAllByTestId("timeline-block").length).toBeGreaterThanOrEqual(1);
     expect(screen.getByTestId("instant-chip")).toBeInTheDocument();
   });
 
-  it("synthesizes a putdown block before parent events with hasPutdown:true", () => {
-    const events: Event[] = [ev({ id: "nap1", hasPutdown: true })];
-    render(<TimelineV3 events={events} owners={owners} putdownLeadMinutes={15} />);
+  it("renders pre-expanded putdown blocks (callers must run renderProjection)", () => {
+    // Putdown expansion moved out of TimelineV3 into renderProjection.
+    // The renderer just paints whatever it's given. Callers compose:
+    //   renderProjection(events, settings, nowMinutes?) → TimelineV3
+    const expanded = expandPutdownBlocks([ev({ id: "nap1", hasPutdown: true })], 15);
+    render(<TimelineV3 events={expanded} owners={owners} />);
     const blocks = screen.getAllByTestId("timeline-block");
     // 2 blocks: the synthetic putdown + the nap itself.
     expect(blocks).toHaveLength(2);
@@ -77,7 +81,7 @@ describe("TimelineV3", () => {
         owner: { slot: "other", otherId: "daycare" },
       }),
     ];
-    render(<TimelineV3 events={events} owners={owners} putdownLeadMinutes={15} />);
+    render(<TimelineV3 events={events} owners={owners} />);
     const block = screen.getByTestId("timeline-block");
     expect(block).toHaveAttribute("data-owner", "parent1");
     const chip = screen.getByTestId("instant-chip");
@@ -86,13 +90,13 @@ describe("TimelineV3", () => {
 
   it("resolves owner refs to display names from OwnersConfig", () => {
     const events: Event[] = [ev({ id: "nap1", owner: { slot: "parent1" } })];
-    render(<TimelineV3 events={events} owners={owners} putdownLeadMinutes={15} />);
+    render(<TimelineV3 events={events} owners={owners} />);
     expect(screen.getByText(/Jake/)).toBeInTheDocument();
   });
 
   it("sets --owner-color inline on blocks from the configured owner palette", () => {
     const events: Event[] = [ev({ id: "nap1", owner: { slot: "parent1" } })];
-    render(<TimelineV3 events={events} owners={owners} putdownLeadMinutes={15} />);
+    render(<TimelineV3 events={events} owners={owners} />);
     const block = screen.getByTestId("timeline-block");
     // Read the raw style attribute — jsdom normalizes hex to rgb() when
     // accessed via .style, so assert against what the component emitted.
@@ -110,14 +114,14 @@ describe("TimelineV3", () => {
         owner: { slot: "other", otherId: "daycare" },
       }),
     ];
-    render(<TimelineV3 events={events} owners={owners} putdownLeadMinutes={15} />);
+    render(<TimelineV3 events={events} owners={owners} />);
     const chip = screen.getByTestId("instant-chip");
     expect(chip.getAttribute("style")).toContain("--owner-color: #ccc");
   });
 
   it("omits --owner-color when an event has no owner (CSS handles the fallback)", () => {
     const events: Event[] = [ev({ id: "nap1" })];
-    render(<TimelineV3 events={events} owners={owners} putdownLeadMinutes={15} />);
+    render(<TimelineV3 events={events} owners={owners} />);
     const block = screen.getByTestId("timeline-block");
     expect(block.getAttribute("style") ?? "").not.toContain("--owner-color");
   });
@@ -125,14 +129,8 @@ describe("TimelineV3", () => {
   it("calls onEventTap with the parent event (never the synthetic putdown)", async () => {
     const onEventTap = vi.fn();
     const events: Event[] = [ev({ id: "nap1", hasPutdown: true })];
-    render(
-      <TimelineV3
-        events={events}
-        owners={owners}
-        putdownLeadMinutes={15}
-        onEventTap={onEventTap}
-      />,
-    );
+    const expanded = expandPutdownBlocks(events, 15);
+    render(<TimelineV3 events={expanded} owners={owners} onEventTap={onEventTap} />);
     const blocks = screen.getAllByTestId("timeline-block");
     const napBlock = blocks.find((b) => b.getAttribute("data-type") === "nap");
     const putdownBlock = blocks.find((b) => b.getAttribute("data-type") === "putdown");
@@ -144,14 +142,7 @@ describe("TimelineV3", () => {
   });
 
   it("renders the now-bar when nowMinutes is provided", () => {
-    render(
-      <TimelineV3
-        events={[ev({ id: "nap1" })]}
-        owners={owners}
-        putdownLeadMinutes={15}
-        nowMinutes={9 * 60 + 30}
-      />,
-    );
+    render(<TimelineV3 events={[ev({ id: "nap1" })]} owners={owners} nowMinutes={9 * 60 + 30} />);
     expect(screen.getByTestId("now-line")).toBeInTheDocument();
     expect(screen.getByTestId("now-pill")).toHaveTextContent("9:30a");
   });
@@ -159,7 +150,7 @@ describe("TimelineV3", () => {
   // §F9 PORT — coverage previously asserted in V2 timeline tests.
 
   it("does NOT render the now-bar when nowMinutes is omitted", () => {
-    render(<TimelineV3 events={[ev({ id: "nap1" })]} owners={owners} putdownLeadMinutes={15} />);
+    render(<TimelineV3 events={[ev({ id: "nap1" })]} owners={owners} />);
     expect(screen.queryByTestId("now-line")).not.toBeInTheDocument();
     expect(screen.queryByTestId("now-pill")).not.toBeInTheDocument();
   });
@@ -167,13 +158,7 @@ describe("TimelineV3", () => {
   it("marks past blocks with data-past='true' when dimPast + nowMinutes provided", () => {
     // Nap at 9:00–10:00; "now" is 11:00 → nap is fully in the past.
     render(
-      <TimelineV3
-        events={[ev({ id: "nap1" })]}
-        owners={owners}
-        putdownLeadMinutes={15}
-        nowMinutes={11 * 60}
-        dimPast
-      />,
+      <TimelineV3 events={[ev({ id: "nap1" })]} owners={owners} nowMinutes={11 * 60} dimPast />,
     );
     const block = screen.getByTestId("timeline-block");
     expect(block).toHaveAttribute("data-past", "true");
@@ -189,29 +174,17 @@ describe("TimelineV3", () => {
         label: "Bottle 1",
       }),
     ];
-    render(
-      <TimelineV3
-        events={events}
-        owners={owners}
-        putdownLeadMinutes={15}
-        nowMinutes={11 * 60}
-        dimPast
-      />,
-    );
+    render(<TimelineV3 events={events} owners={owners} nowMinutes={11 * 60} dimPast />);
     const cluster = screen.getByTestId("instant-cluster");
     expect(cluster).toHaveAttribute("data-past", "true");
   });
 
   it("respects pxPerHour — the timeline height scales proportionally", () => {
     const events: Event[] = [ev({ id: "nap1" })];
-    const { rerender } = render(
-      <TimelineV3 events={events} owners={owners} putdownLeadMinutes={15} pxPerHour={60} />,
-    );
+    const { rerender } = render(<TimelineV3 events={events} owners={owners} pxPerHour={60} />);
     const height60 = parseFloat(screen.getByTestId("timeline-inner").style.height);
 
-    rerender(
-      <TimelineV3 events={events} owners={owners} putdownLeadMinutes={15} pxPerHour={120} />,
-    );
+    rerender(<TimelineV3 events={events} owners={owners} pxPerHour={120} />);
     const height120 = parseFloat(screen.getByTestId("timeline-inner").style.height);
 
     expect(height60).toBeGreaterThan(0);

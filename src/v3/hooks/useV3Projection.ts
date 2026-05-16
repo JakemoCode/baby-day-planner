@@ -13,7 +13,7 @@
 import { useNowMinutes } from "../../hooks/useNowMinutes";
 import { projectDay } from "../engine/projectDay";
 import type { Day, Event, OwnershipTemplate, Settings } from "../schemas";
-import { applyDreamFeedLabel } from "../ui/dreamFeedLabel";
+import { renderProjection } from "../ui/renderProjection";
 
 export type UseV3ProjectionInput = {
   day: Day | null;
@@ -34,5 +34,5 @@ export function useV3Projection(input: UseV3ProjectionInput): Event[] {
     nowMinutes,
     ...(input.template !== undefined ? { template: input.template } : {}),
   });
-  return applyDreamFeedLabel(events, input.settings);
+  return renderProjection(events, input.settings, nowMinutes);
 }
