@@ -123,7 +123,6 @@ export default function ArchivedDayPage() {
         day={day}
         events={events}
         owners={settings.owners}
-        putdownLeadMinutes={settings.putdownLeadMinutes}
         colorMode={settings.timelineColorMode}
       />
     </div>

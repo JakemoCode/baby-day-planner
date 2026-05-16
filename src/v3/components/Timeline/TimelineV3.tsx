@@ -5,14 +5,18 @@ import type { Event, OwnersConfig, TimeMin } from "../../schemas";
 import { Block } from "./Block";
 import { InstantCluster } from "./InstantCluster";
 import { NowBar } from "./NowBar";
-import { PUTDOWN_KIND_TAG, expandPutdownBlocks } from "./expandPutdown";
+import { PUTDOWN_KIND_TAG } from "./expandPutdown";
 import { groupInstants } from "./groupInstants";
 import styles from "./TimelineV2.module.css";
 
 export type TimelineV3Props = {
+  /**
+   * Events ready for render. Callers must apply `renderProjection`
+   * (dream-feed label + putdown expansion) before passing in projected
+   * events. Archived/recorded events pass through unchanged.
+   */
   events: Event[];
   owners: OwnersConfig;
-  putdownLeadMinutes: TimeMin;
   /** Optional: render the now-bar. Omit on non-today screens. */
   nowMinutes?: TimeMin;
   onEventTap?: (event: Event) => void;
@@ -78,7 +82,6 @@ function zOrder(e: Event): number {
 export function TimelineV3({
   events,
   owners,
-  putdownLeadMinutes,
   nowMinutes,
   onEventTap,
   scrollToNowOnMount = false,
@@ -101,22 +104,20 @@ export function TimelineV3({
       };
     }
 
-    const expanded = expandPutdownBlocks(events, putdownLeadMinutes, nowMinutes);
-
-    const starts = expanded.map((e) => e.startTime);
-    const ends = expanded.map((e) => e.endTime ?? e.startTime);
+    const starts = events.map((e) => e.startTime);
+    const ends = events.map((e) => e.endTime ?? e.startTime);
     const minMin = Math.min(...starts, DEFAULT_VIEWPORT.start);
     const maxMin = Math.max(...ends, DEFAULT_VIEWPORT.end);
     const origin = Math.max(0, minMin - VIEWPORT_PADDING_MIN);
     const height = (maxMin + VIEWPORT_PADDING_MIN - origin) * pxPerMin;
 
     return {
-      blocks: expanded.filter((e) => e.kind === "block"),
-      groups: groupInstants(expanded),
+      blocks: events.filter((e) => e.kind === "block"),
+      groups: groupInstants(events),
       originMinutes: origin,
       heightPx: height,
     };
-  }, [events, pxPerMin, putdownLeadMinutes, nowMinutes]);
+  }, [events, pxPerMin]);
 
   useEffect(() => {
     if (hasScrolledRef.current) return;

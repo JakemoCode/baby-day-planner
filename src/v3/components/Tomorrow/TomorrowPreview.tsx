@@ -9,6 +9,7 @@
 import { useMemo } from "react";
 import type { Day, Event, OwnersConfig, OwnershipTemplate, Settings } from "../../schemas";
 import { projectDay } from "../../engine/projectDay";
+import { renderProjection } from "../../ui/renderProjection";
 import { TimelineV3 } from "../Timeline/TimelineV3";
 import styles from "./TomorrowPreview.module.css";
 
@@ -32,12 +33,13 @@ export function TomorrowPreview({
 }: TomorrowPreviewProps) {
   const events = useMemo<Event[]>(() => {
     if (day.wakeTime === undefined) return [];
-    return projectDay({
+    const projected = projectDay({
       day,
       settings,
       actuals: extras ?? [],
       ...(template ? { template } : {}),
     });
+    return renderProjection(projected, settings);
   }, [day, settings, template, extras]);
 
   if (day.wakeTime === undefined) {
@@ -52,7 +54,6 @@ export function TomorrowPreview({
     <TimelineV3
       events={events}
       owners={owners}
-      putdownLeadMinutes={settings.putdownLeadMinutes}
       colorMode={settings.timelineColorMode}
       dimPast={false}
       {...(onEventTap ? { onEventTap } : {})}
