@@ -519,6 +519,35 @@ Worth a full color audit pass while we're at it: every owner-text-on-block pairi
 
 ---
 
+## §F30 — Instant chip vertical alignment
+
+**Source**: Jake, 2026-05-16 dogfooding.
+
+**Status**: `pending`
+
+**What**: instant chips (e.g. "Bottle 3 · 1p") sit vertically below their TimeMin tic line. Visible regression: a 1pm bottle's chip is offset BELOW the 1P axis tic, while adjacent block events (e.g. "Putdown · 1p") align correctly with the 1P line.
+
+Likely cause: `InstantChip` (or its positioning wrapper in `TimelineV3.tsx`) uses the chip's TOP edge for the y-coordinate instead of vertical-center relative to the time axis. Block events use top-edge by design (a 60-min block starts at its startTime, runs downward); chips should use center-vertical because a chip has no duration and its visual anchor is the timestamp.
+
+**Why fast-follow**: cosmetic — engine output is correct, render layer mis-positions one element type. One-file fix in the chip positioning calc.
+
+---
+
+## §F31 — Responsive timeline (drop magic-number widths)
+
+**Source**: Jake, 2026-05-16.
+
+**Status**: `pending`
+
+**What**: TimelineV3 uses fixed-pixel constants (`AXIS_W = 28`, `GUTTER_W = 124`, `BLOCK_LEFT_INSET = AXIS_W + 8`, `BLOCK_RIGHT_INSET = GUTTER_W + 24`, etc.) that don't adapt to viewport width. Two related concerns:
+
+1. **Responsive layout** — switch to percentages or `calc()` so the block/chip column proportions scale with available width. Current fixed-px layout looks fine on a phone-width viewport and bloated on desktop (or vice versa).
+2. **Narrow-screen break** — below a screen-width threshold (TBD; ~360px?), instant chips should break their label to two lines (`Bottle 3` / `1p · Jake`) instead of cramming horizontally. Avoids overflow / truncation on small phones.
+
+**Why fast-follow**: cosmetic UX polish; engine-orthogonal. Sits in `TimelineV3.module.css` + chip components. Worth doing alongside or after §F2 palette refresh and §F29 contrast audit so the visual sweep lands together.
+
+---
+
 ## How items land here
 
 Two paths:
