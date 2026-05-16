@@ -167,29 +167,25 @@ describe("DashboardPage (V3)", () => {
       // gate re-fires on `!settings` after the day write and the user
       // sees no state change.
       expect(saveSettingsMock).toHaveBeenCalledTimes(1);
-      const [, savedChildId, savedSettings] = saveSettingsMock.mock.calls[0] as [
-        unknown,
-        string,
-        Settings,
-      ];
-      expect(savedChildId).toBe("aden");
       // Seeded settings come from `withV3SettingsDefaults({childId})`, which
       // produces the canonical defaults. defaultWakeTime is 7am.
-      expect(savedSettings.defaultWakeTime).toBe(7 * 60);
-      expect(savedSettings.childId).toBe("aden");
+      expect(saveSettingsMock).toHaveBeenCalledWith(
+        expect.anything(),
+        "aden",
+        expect.objectContaining({ defaultWakeTime: 7 * 60, childId: "aden" }),
+      );
 
       expect(startNewDayMock).toHaveBeenCalledTimes(1);
-      const [, childId, input] = startNewDayMock.mock.calls[0] as [
-        unknown,
-        string,
-        { newDayId: string; newDate: string; newWakeTime: number },
-      ];
-      expect(childId).toBe("aden");
-      expect(input.newDayId).toMatch(/^day-\d+$/);
-      expect(typeof input.newDate).toBe("string");
-      expect(input.newDate).toMatch(/^\d{4}-\d{2}-\d{2}$/);
       // No settings → falls back to DEFAULT_WAKE_TIME (7am).
-      expect(input.newWakeTime).toBe(7 * 60);
+      expect(startNewDayMock).toHaveBeenCalledWith(
+        expect.anything(),
+        "aden",
+        expect.objectContaining({
+          newDayId: expect.stringMatching(/^day-\d+$/),
+          newDate: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+          newWakeTime: 7 * 60,
+        }),
+      );
     });
 
     it("when settings already exist: skips the saveSettings call; just archives+creates day", async () => {
@@ -202,12 +198,11 @@ describe("DashboardPage (V3)", () => {
       expect(saveSettingsMock).not.toHaveBeenCalled();
       // Day created with the actual configured wake time, not the default.
       expect(startNewDayMock).toHaveBeenCalledTimes(1);
-      const [, , input] = startNewDayMock.mock.calls[0] as [
-        unknown,
-        string,
-        { newWakeTime: number },
-      ];
-      expect(input.newWakeTime).toBe(8 * 60 + 15);
+      expect(startNewDayMock).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.anything(),
+        expect.objectContaining({ newWakeTime: 8 * 60 + 15 }),
+      );
     });
 
     it("when day exists but wakeTime is undefined: same flow (seeds settings if missing, then archives+creates)", async () => {
@@ -289,16 +284,18 @@ describe("DashboardPage (V3)", () => {
     await Promise.resolve();
 
     expect(updateOptimistic).toHaveBeenCalledTimes(1);
-    const [, patch] = updateOptimistic.mock.calls[0] as [
-      string,
-      { endTime: number; lifecycle: { state: string; committedAt: number } },
-    ];
     // endTime is whatever wall clock the button captured — don't pin it.
-    expect(typeof patch.endTime).toBe("number");
-    expect(patch.lifecycle.state).toBe("completed");
-    // committedAt MUST be the original start (9:00), NOT the end time.
-    expect(patch.lifecycle.committedAt).toBe(9 * 60);
-    expect(patch.lifecycle.committedAt).not.toBe(patch.endTime);
+    // committedAt MUST be the original start (9:00 = 540), NOT the end time
+    // (10:00 = 600). The objectContaining assertion for committedAt: 9 * 60
+    // already implies they differ (nowMinutes is 10 * 60), so no extra
+    // not.toBe guard needed.
+    expect(updateOptimistic).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        endTime: expect.any(Number),
+        lifecycle: expect.objectContaining({ state: "completed", committedAt: 9 * 60 }),
+      }),
+    );
   });
 
   it("uniqueRecordedKeys counts distinct eventKey across recorded actuals only", () => {
@@ -350,9 +347,9 @@ describe("DashboardPage (V3)", () => {
     btn.click();
 
     expect(createOptimistic).toHaveBeenCalledTimes(1);
-    const created = createOptimistic.mock.calls[0]?.[0] as Event;
-    expect(created.eventKey).toBe("bottle_2");
-    expect(created.label).toBe("Bottle 2");
+    expect(createOptimistic).toHaveBeenCalledWith(
+      expect.objectContaining({ eventKey: "bottle_2", label: "Bottle 2" }),
+    );
   });
 
   it("§F22 — bottle recorded at 2 AM next-day routes to a freshly-created planned day, not the active day", async () => {
@@ -384,16 +381,17 @@ describe("DashboardPage (V3)", () => {
     // createEvent called with the bottle docked under tomorrow's id.
     expect(createOptimistic).not.toHaveBeenCalled();
     expect(getOrCreatePlannedDayMock).toHaveBeenCalledTimes(1);
-    const [, , dateArg] = getOrCreatePlannedDayMock.mock.calls[0] as [
-      unknown,
-      string,
-      string,
-      number,
-    ];
-    expect(dateArg).toBe("2026-05-11");
+    expect(getOrCreatePlannedDayMock).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.anything(),
+      "2026-05-11",
+      expect.anything(),
+    );
     expect(createEventMock).toHaveBeenCalledTimes(1);
-    const [, , createdEvent] = createEventMock.mock.calls[0] as [unknown, string, Event];
-    expect(createdEvent.type).toBe("bottle");
-    expect(createdEvent.dayId).toBe("day-tomorrow-id");
+    expect(createEventMock).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.anything(),
+      expect.objectContaining({ type: "bottle", dayId: "day-tomorrow-id" }),
+    );
   });
 });
