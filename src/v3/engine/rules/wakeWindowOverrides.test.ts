@@ -46,7 +46,7 @@ function wakeWindowOverride(eventKey: string, owner: OwnerRef, label?: string): 
     label: label ?? `Wake window override ${eventKey}`,
     owner,
     hasPutdown: false,
-    lifecycle: { state: "overridden", annotatedAt: 0 },
+    lifecycle: { state: "recorded", annotatedAt: 0 },
   };
 }
 

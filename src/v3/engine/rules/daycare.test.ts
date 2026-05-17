@@ -363,7 +363,7 @@ describe("R21 — defensive edge cases", () => {
       endTime: 13 * 60,
       label: "Nap 2",
       hasPutdown: false,
-      lifecycle: { state: "overridden", annotatedAt: 11 * 60 },
+      lifecycle: { state: "recorded", annotatedAt: 11 * 60 },
       // owner omitted — user explicitly cleared
     };
     const ctx = aContext({
@@ -386,7 +386,7 @@ describe("R21 — defensive edge cases", () => {
     const out = run(ctx);
     const napTwo = out.find((e) => e.id === overriddenNap.id);
     expect(napTwo?.owner).toBeUndefined();
-    expect(napTwo?.lifecycle.state).toBe("overridden");
+    expect(napTwo?.lifecycle.state).toBe("recorded");
   });
 });
 

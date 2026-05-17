@@ -193,7 +193,7 @@ describe("R12.1 — clearing is deliberate: cleared owner is not re-stamped", ()
       endTime: 13 * 60,
       label: "Nap 2",
       hasPutdown: false,
-      lifecycle: { state: "overridden", annotatedAt: 11 * 60 },
+      lifecycle: { state: "recorded", annotatedAt: 11 * 60 },
       // owner omitted — user explicitly cleared via drawer
     };
 
@@ -213,7 +213,7 @@ describe("R12.1 — clearing is deliberate: cleared owner is not re-stamped", ()
     const out = run(ctx);
     const napTwo = out.find((e) => e.id === overriddenNap2.id);
     expect(napTwo?.owner).toBeUndefined();
-    expect(napTwo?.lifecycle.state).toBe("overridden");
+    expect(napTwo?.lifecycle.state).toBe("recorded");
   });
 });
 

@@ -8,7 +8,7 @@
  *   String formatting happens at the UI boundary only.
  * - Owner references are slot-based (parent1 / parent2 / other[id]); the
  *   engine never inspects display strings.
- * - Lifecycle is a discriminated union; recorded === state ∈ {started, completed}.
+ * - Lifecycle is a discriminated union; recorded === state ∈ {recorded, completed}.
  */
 
 // ---------------------------------------------------------------------------
@@ -69,22 +69,21 @@ export type EventKind = "block" | "instant";
  * Discriminated union replacing V2's source + status + recorded triplet.
  *
  *   projected   — engine output, never persisted
- *   started     — block-only; user tapped Start, no End yet
- *   completed   — fully recorded (instants jump straight here)
- *   overridden  — user assigned an owner on a still-future projection
+ *   recorded    — user has anchored at least one timestamp; event is real.
+ *                 Placeholder endTime may still auto-extend for in-progress naps.
+ *   completed   — user has anchored both start AND end timestamps
  *
- * Only block-kind events (nap, bedtime, durational extras) reach `started`.
- * Instant events transition `projected → completed` in one step.
+ * Instants jump straight from projected → completed.
+ * Blocks (nap, bedtime) go projected → recorded → completed.
  */
 export type Lifecycle =
   | { state: "projected" }
-  | { state: "started"; committedAt: TimeMin }
-  | { state: "completed"; committedAt: TimeMin }
-  | { state: "overridden"; annotatedAt: TimeMin };
+  | { state: "recorded"; annotatedAt: TimeMin }
+  | { state: "completed"; committedAt: TimeMin };
 
-/** True when the event is a recording of reality (started or completed). */
+/** True when the event is a recording of reality (recorded or completed). */
 export function isRecorded(lifecycle: Lifecycle): boolean {
-  return lifecycle.state === "started" || lifecycle.state === "completed";
+  return lifecycle.state === "recorded" || lifecycle.state === "completed";
 }
 
 // ---------------------------------------------------------------------------
@@ -317,7 +316,7 @@ export type Context = {
   day: Day;
   settings: Settings;
   template?: OwnershipTemplate;
-  /** User-recorded events from Firestore (lifecycle.state ∈ {started, completed}). */
+  /** User-recorded events from Firestore (lifecycle.state ∈ {recorded, completed}). */
   actuals: Event[];
   /** Current time as TimeMin; used for "now"-relative rules (R5.6, R6.7). */
   nowMinutes: TimeMin;

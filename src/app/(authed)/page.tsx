@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import type { Event, OwnershipTemplate } from "@/v3/schemas";
 import { isRecorded } from "@/v3/schemas";
 import { reduceLifecycle } from "@/v3/lifecycle";
+import { effectiveEndOf } from "@/v3/lib/effectiveEnd";
 import {
   currentWakeWindow,
   nextBottle,
@@ -133,7 +134,13 @@ export default function DashboardPage() {
   const nb = nextBottle(projected, nowMinutes);
   const nn = nextNap(projected, nowMinutes);
   const cww = currentWakeWindow(projected, nowMinutes);
-  const inProgressNap = actuals.find((e) => e.type === "nap" && e.lifecycle.state === "started");
+  const inProgressNap = actuals.find(
+    (e) =>
+      e.type === "nap" &&
+      e.lifecycle.state === "recorded" &&
+      e.startTime <= nowMinutes &&
+      nowMinutes < effectiveEndOf(e, settings.defaultNapLengthMinutes, nowMinutes),
+  );
   const bottle1Pending = !actuals.some((e) => e.type === "bottle" && isRecorded(e.lifecycle));
 
   // "Next" ordinals = unique nap/bottle slots that are RECORDED (the
@@ -191,13 +198,12 @@ export default function DashboardPage() {
   };
   const handleEndNap = async (nap: Event, endTime: number) => {
     if (!day || day.id === "") return;
-    // committedAt on a completed nap = the START time (preserved from the
-    // `started` lifecycle), NOT the end time. reduceLifecycle handles this
-    // — END copies committedAt forward from the started state.
+    // TIME_EDIT on a recorded nap → completed. committedAt is the
+    // moment the user confirmed the end time.
     await saveEvent({
       ...nap,
       endTime,
-      lifecycle: reduceLifecycle(nap.lifecycle, { type: "END", at: endTime }),
+      lifecycle: reduceLifecycle(nap.lifecycle, { type: "TIME_EDIT", at: endTime }),
     });
   };
   const handleStartDay = async ({ useTomorrowPlan: _ }: { useTomorrowPlan: boolean }) => {
@@ -247,6 +253,8 @@ export default function DashboardPage() {
             dayId={day.id}
             nowMinutes={nowMinutes}
             bedtimeThreshold={settings.bedtimeThreshold}
+            defaultNapLengthMinutes={settings.defaultNapLengthMinutes}
+            defaultWakeTime={settings.defaultWakeTime}
             {...(nn ? { nextProjectedNap: nn } : {})}
             onStart={handleStartNap}
             onEnd={handleEndNap}

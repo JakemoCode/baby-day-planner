@@ -5,19 +5,19 @@
  *
  * R6.1: putdown is purely predictive — never recorded, never persisted.
  * The engine sets `hasPutdown: true` on naps and bedtimes whose lifecycle
- * still points to a future moment (`projected` or `overridden`). The
+ * still points to a future moment (`projected` or `recorded`). The
  * renderer (`expandPutdownBlocks`) further gates by `nowMinutes` — R6.7
  * suppresses the synthetic when the moment has passed in real time.
  *
- * Why both `projected` AND `overridden`: an owner-only drawer edit
- * promotes a projected event to `overridden` (time-preserving annotation).
- * The putdown window is still relevant. The pre-fix code only allowed
- * `projected`, so owner edits silently killed the putdown block.
+ * Why both `projected` AND `recorded`: a user-anchored nap (e.g. drawer
+ * time-edit, owner annotation) has `lifecycle.state === "recorded"` but
+ * the putdown window may still be in the future. The putdown is still
+ * relevant. The pre-fix code only allowed `projected`, so owner edits
+ * silently killed the putdown block.
  *
- * Why NOT `started`/`completed`: those represent reality, not prediction.
- * On an archived-day read (renderer's `nowMinutes` unavailable), the
- * renderer would otherwise inject phantom putdown visuals around
- * historical recorded events.
+ * Why NOT `completed`: completed events represent past reality. On an
+ * archived-day read (renderer's `nowMinutes` unavailable), the renderer
+ * would otherwise inject phantom putdown visuals around historical events.
  *
  * R6.2: derived from the parent event; no separate Firestore doc.
  */
@@ -41,7 +41,7 @@ const RuleSetHasPutdown: Rule = {
 function deriveHasPutdown(e: Event): boolean {
   if (e.type !== "nap" && e.type !== "bedtime") return false;
   const state = e.lifecycle.state;
-  return state === "projected" || state === "overridden";
+  return state === "projected" || state === "recorded";
 }
 
 export const RULES: Rule[] = [RuleSetHasPutdown];

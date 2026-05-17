@@ -249,12 +249,10 @@ export function EventEditDrawerV3({
       startTime: napCandidate.startTime,
       endTime: nextDayAt(defaultWakeTime),
       hasPutdown: false,
-      // `overridden`, not `started`: putdown.ts derives hasPutdown
-      // from {projected, overridden} only — `started` silently drops
-      // the chip. Cascade's manualBedtime check is `!isProjected`,
-      // so `overridden` remains authoritative and matches the
-      // existing drawer-edit override shape.
-      lifecycle: { state: "overridden", annotatedAt: nowMinutes },
+      // `recorded`: putdown.ts derives hasPutdown from {projected, recorded}.
+      // Cascade's manualBedtime check is `!isProjected`, so `recorded`
+      // remains authoritative and matches the drawer-edit shape.
+      lifecycle: { state: "recorded", annotatedAt: nowMinutes },
       ...(napCandidate.owner ? { owner: napCandidate.owner } : {}),
     };
     // Sequence: delete original FIRST so the dual-doc state can never

@@ -190,7 +190,7 @@ export const v3EventOverriddenDoc: Record<string, unknown> = {
   endTime: 14 * 60 + 30,
   label: "Nap 2",
   hasPutdown: false,
-  lifecycle: { state: "overridden", annotatedAt: 13 * 60 },
+  lifecycle: { state: "recorded", annotatedAt: 13 * 60 },
   owner: { slot: "other", otherId: "daycare" },
 };
 

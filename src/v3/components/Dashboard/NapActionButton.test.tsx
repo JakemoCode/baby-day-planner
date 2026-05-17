@@ -4,16 +4,20 @@ import userEvent from "@testing-library/user-event";
 import type { Event } from "@/v3/schemas";
 import { NapActionButton } from "./NapActionButton";
 
+const DEFAULT_NAP_MINUTES = 90;
+const DEFAULT_WAKE_TIME = 7 * 60; // 7:00 AM
+
 const napInProgress = (): Event => ({
-  id: "nap-in-progress",
+  id: "nap_1",
   dayId: "d1",
   eventKey: "nap_1",
   type: "nap",
   kind: "block",
   label: "Nap 1",
   startTime: 9 * 60,
+  endTime: 9 * 60 + DEFAULT_NAP_MINUTES,
   hasPutdown: false,
-  lifecycle: { state: "started", committedAt: 9 * 60 },
+  lifecycle: { state: "recorded", annotatedAt: 9 * 60 },
 });
 
 const projectedNap = (n: number): Event => ({
@@ -41,6 +45,8 @@ describe("NapActionButton", () => {
         nextProjectedNap={projectedNap(1)}
         nowMinutes={PRE_THRESHOLD}
         bedtimeThreshold={THRESHOLD}
+        defaultNapLengthMinutes={DEFAULT_NAP_MINUTES}
+        defaultWakeTime={DEFAULT_WAKE_TIME}
         onStart={async () => {}}
         onEnd={async () => {}}
         onStartBedtime={async () => {}}
@@ -57,6 +63,8 @@ describe("NapActionButton", () => {
         nextProjectedNap={undefined}
         nowMinutes={POST_THRESHOLD}
         bedtimeThreshold={THRESHOLD}
+        defaultNapLengthMinutes={DEFAULT_NAP_MINUTES}
+        defaultWakeTime={DEFAULT_WAKE_TIME}
         onStart={async () => {}}
         onEnd={async () => {}}
         onStartBedtime={async () => {}}
@@ -65,7 +73,7 @@ describe("NapActionButton", () => {
     expect(screen.getByRole("button", { name: /end nap/i })).toBeVisible();
   });
 
-  it("promotes nextProjectedNap on Start Nap (eventKey + label preserved)", async () => {
+  it("promotes nextProjectedNap on Start Nap — lifecycle recorded with endTime set", async () => {
     const onStart = vi.fn().mockResolvedValue(undefined);
     render(
       <NapActionButton
@@ -74,6 +82,8 @@ describe("NapActionButton", () => {
         nextProjectedNap={projectedNap(2)}
         nowMinutes={PRE_THRESHOLD}
         bedtimeThreshold={THRESHOLD}
+        defaultNapLengthMinutes={DEFAULT_NAP_MINUTES}
+        defaultWakeTime={DEFAULT_WAKE_TIME}
         onStart={onStart}
         onEnd={async () => {}}
         onStartBedtime={async () => {}}
@@ -91,11 +101,16 @@ describe("NapActionButton", () => {
       dayId: "d1",
       hasPutdown: false,
     });
-    expect(arg.lifecycle.state).toBe("started");
-    expect(arg.endTime).toBeUndefined();
+    // endTime must be set (not undefined) — this was the image bug
+    expect(arg.endTime).toBeDefined();
+    expect(typeof arg.endTime).toBe("number");
+    // lifecycle must be recorded (not started)
+    expect(arg.lifecycle.state).toBe("recorded");
+    // endTime should be startTime + defaultNapLengthMinutes
+    expect(arg.endTime).toBe(arg.startTime + DEFAULT_NAP_MINUTES);
   });
 
-  it("calls onEnd with the started nap and current TimeMin endTime", async () => {
+  it("calls onEnd with the in-progress nap and current TimeMin endTime", async () => {
     const onEnd = vi.fn().mockResolvedValue(undefined);
     const nap = napInProgress();
     render(
@@ -105,6 +120,8 @@ describe("NapActionButton", () => {
         nextProjectedNap={undefined}
         nowMinutes={PRE_THRESHOLD}
         bedtimeThreshold={THRESHOLD}
+        defaultNapLengthMinutes={DEFAULT_NAP_MINUTES}
+        defaultWakeTime={DEFAULT_WAKE_TIME}
         onStart={async () => {}}
         onEnd={onEnd}
         onStartBedtime={async () => {}}
@@ -124,7 +141,7 @@ describe("NapActionButton — CTA swap past bedtime threshold (§F8)", () => {
   // Per spec PR #146 R4: when nowMinutes ≥ bedtimeThreshold and no
   // nap is in progress, the dashboard CTA swaps from "Start Nap Now"
   // to "Start Bedtime Now". Tap creates a bedtime doc (eventKey
-  // "bedtime", lifecycle started). Removes a class of late-nap
+  // "bedtime", lifecycle recorded). Removes a class of late-nap
   // weirdness at the source: once it's bedtime o'clock, the primary
   // action IS bedtime.
 
@@ -136,6 +153,8 @@ describe("NapActionButton — CTA swap past bedtime threshold (§F8)", () => {
         nextProjectedNap={undefined}
         nowMinutes={POST_THRESHOLD}
         bedtimeThreshold={THRESHOLD}
+        defaultNapLengthMinutes={DEFAULT_NAP_MINUTES}
+        defaultWakeTime={DEFAULT_WAKE_TIME}
         onStart={async () => {}}
         onEnd={async () => {}}
         onStartBedtime={async () => {}}
@@ -144,7 +163,7 @@ describe("NapActionButton — CTA swap past bedtime threshold (§F8)", () => {
     expect(screen.getByRole("button", { name: /start bedtime now/i })).toBeVisible();
   });
 
-  it("calls onStartBedtime with a bedtime event when tapped past threshold", async () => {
+  it("calls onStartBedtime with a bedtime event with endTime set when tapped past threshold", async () => {
     const onStartBedtime = vi.fn().mockResolvedValue(undefined);
     render(
       <NapActionButton
@@ -153,6 +172,8 @@ describe("NapActionButton — CTA swap past bedtime threshold (§F8)", () => {
         nextProjectedNap={undefined}
         nowMinutes={POST_THRESHOLD}
         bedtimeThreshold={THRESHOLD}
+        defaultNapLengthMinutes={DEFAULT_NAP_MINUTES}
+        defaultWakeTime={DEFAULT_WAKE_TIME}
         onStart={async () => {}}
         onEnd={async () => {}}
         onStartBedtime={onStartBedtime}
@@ -169,6 +190,8 @@ describe("NapActionButton — CTA swap past bedtime threshold (§F8)", () => {
       label: "Bedtime",
       dayId: "d1",
     });
-    expect(arg.lifecycle.state).toBe("started");
+    // endTime must be set for bedtime (nextDayAt(defaultWakeTime) = 7:00 + 1440 = 1860)
+    expect(arg.endTime).toBe(DEFAULT_WAKE_TIME + 24 * 60);
+    expect(arg.lifecycle.state).toBe("recorded");
   });
 });

@@ -1,7 +1,7 @@
 "use client";
 
 import type { Event, TimeMin } from "@/v3/schemas";
-import { currentLocalMinutes } from "@/v3/ui/time";
+import { currentLocalMinutes, nextDayAt } from "@/v3/ui/time";
 import { ActionButton } from "./ActionButton";
 
 export type NapActionButtonProps = {
@@ -19,6 +19,10 @@ export type NapActionButtonProps = {
   nowMinutes: TimeMin;
   /** Settings.bedtimeThreshold — drives the CTA swap. */
   bedtimeThreshold: TimeMin;
+  /** Settings.defaultNapLengthMinutes — used to set the placeholder endTime. */
+  defaultNapLengthMinutes: number;
+  /** Settings.defaultWakeTime — used to set bedtime's endTime. */
+  defaultWakeTime: TimeMin;
   onStart: (nap: Event) => Promise<void>;
   onEnd: (nap: Event, endTime: TimeMin) => Promise<void>;
   onStartBedtime: (bedtime: Event) => Promise<void>;
@@ -30,6 +34,8 @@ export function NapActionButton({
   nextProjectedNap,
   nowMinutes,
   bedtimeThreshold,
+  defaultNapLengthMinutes,
+  defaultWakeTime,
   onStart,
   onEnd,
   onStartBedtime,
@@ -55,8 +61,9 @@ export function NapActionButton({
         kind: "block",
         label: "Bedtime",
         startTime: nowMin,
+        endTime: nextDayAt(defaultWakeTime),
         hasPutdown: false,
-        lifecycle: { state: "started", committedAt: nowMin },
+        lifecycle: { state: "recorded", annotatedAt: nowMin },
       };
       void onStartBedtime(bedtime);
       return;
@@ -75,8 +82,9 @@ export function NapActionButton({
       kind: "block",
       label: nextProjectedNap.label,
       startTime: nowMin,
+      endTime: nowMin + defaultNapLengthMinutes,
       hasPutdown: false,
-      lifecycle: { state: "started", committedAt: nowMin },
+      lifecycle: { state: "recorded", annotatedAt: nowMin },
     };
     void onStart(nap);
   };

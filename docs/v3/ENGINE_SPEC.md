@@ -478,11 +478,10 @@ render it — the reminder window has elapsed.
 
 ### R6.8 Putdown is suppressed if its window overlaps an in-progress sleep block
 
-If the user is already asleep (a nap or bedtime with `lifecycle.state === "started"`),
-suppress the synthetic putdown chip for any event whose window
-`[parent.startTime - putdownLeadMinutes, parent.startTime]` overlaps
-the in-progress sleep block's interval. The in-progress block's end
-is `endTime` when set; `startTime + defaultNapLengthMinutes` otherwise.
+If the user is already asleep (a nap or bedtime with `lifecycle.state === "recorded"`
+AND `startTime ≤ now < effectiveEndOf(event)`), suppress the synthetic putdown chip
+for any event whose window `[parent.startTime - putdownLeadMinutes, parent.startTime]`
+overlaps the in-progress sleep block's effective interval.
 
 **Why**: the engine continues projecting the NEXT nap after the current
 one starts (the cascade runs from the in-progress nap's soft endTime).

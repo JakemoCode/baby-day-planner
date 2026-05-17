@@ -21,7 +21,7 @@
  *   2. hasPutdown derivation (R6.1): the engine's emitted hasPutdown
  *      matches `deriveHasPutdown` for the event's (type, state).
  *      Specifically: `true` iff type ∈ {nap, bedtime} AND state ∈
- *      {projected, overridden}; `false` otherwise.
+ *      {projected, recorded}; `false` otherwise.
  */
 
 import { describe, expect, it } from "vitest";
@@ -41,23 +41,21 @@ type Cell = {
 // R3.1; never recorded directly). Adding it would test an unreachable
 // state.
 const CELLS: Cell[] = [
-  // Naps: putdown applies to projected / overridden only.
+  // Naps: putdown applies to projected / recorded only.
   { type: "nap", state: "projected", expectedHasPutdown: true },
-  { type: "nap", state: "overridden", expectedHasPutdown: true },
-  { type: "nap", state: "started", expectedHasPutdown: false },
+  { type: "nap", state: "recorded", expectedHasPutdown: true },
   { type: "nap", state: "completed", expectedHasPutdown: false },
   // Bedtime: same gate as naps.
   { type: "bedtime", state: "projected", expectedHasPutdown: true },
-  { type: "bedtime", state: "overridden", expectedHasPutdown: true },
-  { type: "bedtime", state: "started", expectedHasPutdown: false },
+  { type: "bedtime", state: "recorded", expectedHasPutdown: true },
   { type: "bedtime", state: "completed", expectedHasPutdown: false },
   // Bottles never have putdown.
   { type: "bottle", state: "projected", expectedHasPutdown: false },
-  { type: "bottle", state: "overridden", expectedHasPutdown: false },
+  { type: "bottle", state: "recorded", expectedHasPutdown: false },
   { type: "bottle", state: "completed", expectedHasPutdown: false },
   // Extras never have putdown (no nap/bedtime semantics).
   { type: "extra", state: "projected", expectedHasPutdown: false },
-  { type: "extra", state: "overridden", expectedHasPutdown: false },
+  { type: "extra", state: "recorded", expectedHasPutdown: false },
   { type: "extra", state: "completed", expectedHasPutdown: false },
 ];
 
@@ -65,12 +63,10 @@ function lifecycleOf(state: Lifecycle["state"], when: number): Lifecycle {
   switch (state) {
     case "projected":
       return { state: "projected" };
-    case "started":
-      return { state: "started", committedAt: when };
+    case "recorded":
+      return { state: "recorded", annotatedAt: when };
     case "completed":
       return { state: "completed", committedAt: when };
-    case "overridden":
-      return { state: "overridden", annotatedAt: when };
   }
 }
 

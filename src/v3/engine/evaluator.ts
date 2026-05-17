@@ -12,7 +12,7 @@
  *
  * The reality-wins axiom (§2.0):
  *   No rule may add, remove, or mutate any event whose lifecycle.state is
- *   `started` or `completed`. The safeProduces wrapper enforces this by
+ *   `recorded` or `completed`. The safeProduces wrapper enforces this by
  *   diffing recorded events before/after each rule run.
  */
 
@@ -112,11 +112,13 @@ export function topoSort(rules: Rule[]): Rule[] {
  * that the set of recorded events emerges from a rule unchanged: same ids,
  * same lifecycle state for each, no removals, no rewrites of recorded fields.
  *
- * Owner edits on projected events transition them to `overridden` — that's
- * NOT a recorded state, so this guard doesn't fire.
+ * wake_window events are excluded from this guard even when their lifecycle is
+ * `recorded` — they are engine projection artifacts used to carry scheduling
+ * metadata (owner annotations). R4.2 intentionally drops them after merging
+ * their metadata onto the cascade-derived projection.
  */
 function checkRealityWins(ruleId: string, before: Event[], after: Event[]): void {
-  const beforeRecorded = before.filter((e) => isRecorded(e.lifecycle));
+  const beforeRecorded = before.filter((e) => isRecorded(e.lifecycle) && e.type !== "wake_window");
   const afterById = new Map(after.map((e) => [e.id, e]));
 
   for (const recorded of beforeRecorded) {
@@ -170,11 +172,11 @@ function sameOwner(a: Event["owner"], b: Event["owner"]): boolean {
 
 function sameLifecycle(a: Lifecycle, b: Lifecycle): boolean {
   if (a.state !== b.state) return false;
-  if (
-    (a.state === "started" && b.state === "started") ||
-    (a.state === "completed" && b.state === "completed")
-  ) {
+  if (a.state === "completed" && b.state === "completed") {
     return a.committedAt === b.committedAt;
+  }
+  if (a.state === "recorded" && b.state === "recorded") {
+    return a.annotatedAt === b.annotatedAt;
   }
   return true;
 }

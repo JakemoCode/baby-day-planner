@@ -176,7 +176,7 @@ describe("R3.4/R3.5 — wake_window(N).endTime always tracks nap(N).startTime", 
       eventKey: "nap_2",
       start: 14 * 60,
       end: 15 * 60 + 30,
-      lifecycle: { state: "overridden", annotatedAt: 13 * 60 },
+      lifecycle: { state: "recorded", annotatedAt: 13 * 60 },
     });
 
     const ctx = aContext({
@@ -208,7 +208,7 @@ describe("R3.4/R3.5 — wake_window(N).endTime always tracks nap(N).startTime", 
 
     const nap2 = out.find((e) => e.eventKey === "nap_2");
     expect(nap2?.startTime).toBe(14 * 60); // preserved from override
-    expect(nap2?.lifecycle.state).toBe("overridden"); // not promoted
+    expect(nap2?.lifecycle.state).toBe("recorded"); // not promoted
   });
 
   it("overridden nap_1 at a NON-natural time → ww_1 ends at the override, ww_2 starts at the override's end", () => {
@@ -219,7 +219,7 @@ describe("R3.4/R3.5 — wake_window(N).endTime always tracks nap(N).startTime", 
       eventKey: "nap_1",
       start: 9 * 60 + 30,
       end: 9 * 60 + 50,
-      lifecycle: { state: "overridden", annotatedAt: 8 * 60 },
+      lifecycle: { state: "recorded", annotatedAt: 8 * 60 },
     });
 
     const ctx = aContext({
@@ -255,7 +255,7 @@ describe("R3.4/R3.5 — wake_window(N).endTime always tracks nap(N).startTime", 
     // The overridden event itself is preserved in events (carries owner forward).
     const napOne = out.find((e) => e.id === overriddenNap1.id);
     expect(napOne).toBeDefined();
-    expect(napOne!.lifecycle.state).toBe("overridden");
+    expect(napOne!.lifecycle.state).toBe("recorded");
 
     // R3.8: overridden's apparent 20-min duration does NOT trigger
     // short-nap-adjust on ww_2 (only RECORDED short naps do).
@@ -454,7 +454,7 @@ describe("Cascade invariant — wake_window/nap boundaries (Jake 2026-05-12)", (
       eventKey: "nap_2",
       start: 14 * 60,
       end: 15 * 60 + 30,
-      lifecycle: { state: "overridden", annotatedAt: 13 * 60 },
+      lifecycle: { state: "recorded", annotatedAt: 13 * 60 },
     });
     const ctx = aContext({
       day: aDay({ wakeTime: 7 * 60 }),
@@ -502,7 +502,7 @@ describe("Cascade invariant — wake_window/nap boundaries (Jake 2026-05-12)", (
       eventKey: "nap_2",
       start: 13 * 60 + 30,
       end: 15 * 60,
-      lifecycle: { state: "overridden", annotatedAt: 12 * 60 },
+      lifecycle: { state: "recorded", annotatedAt: 12 * 60 },
     });
     const ctx = aContext({
       day: aDay({ wakeTime: 7 * 60 }),
@@ -747,7 +747,7 @@ describe("Overridden bedtime gets putdown synth (regression: 2026-05-15 conversi
       eventKey: "bedtime",
       start: 19 * 60 + 5,
       end: 31 * 60,
-      lifecycle: { state: "overridden", annotatedAt: 19 * 60 },
+      lifecycle: { state: "recorded", annotatedAt: 19 * 60 },
     });
 
     const ctx = aContext({
