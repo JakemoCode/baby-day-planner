@@ -1,8 +1,8 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { Event } from "@/v3/schemas";
-import { NapActionButton } from "./NapActionButton";
+import type { Event, TimeMin } from "@/v3/schemas";
+import { NapActionButton, type NapActionButtonProps } from "./NapActionButton";
 
 const DEFAULT_NAP_MINUTES = 90;
 const DEFAULT_WAKE_TIME = 7 * 60; // 7:00 AM
@@ -18,6 +18,19 @@ const napInProgress = (): Event => ({
   endTime: 9 * 60 + DEFAULT_NAP_MINUTES,
   hasPutdown: false,
   lifecycle: { state: "recorded", annotatedAt: 9 * 60 },
+});
+
+const bedtimeInProgress = (): Event => ({
+  id: "bedtime",
+  dayId: "d1",
+  eventKey: "bedtime",
+  type: "bedtime",
+  kind: "block",
+  label: "Bedtime",
+  startTime: 19 * 60 + 30,
+  endTime: DEFAULT_WAKE_TIME + 24 * 60,
+  hasPutdown: false,
+  lifecycle: { state: "recorded", annotatedAt: 19 * 60 + 30 },
 });
 
 const projectedNap = (n: number): Event => ({
@@ -36,38 +49,35 @@ const PRE_THRESHOLD = 10 * 60; // 10:00 AM
 const POST_THRESHOLD = 19 * 60 + 30; // 7:30 PM
 const THRESHOLD = 19 * 60; // 7:00 PM
 
+/** Helper: all required props with safe defaults — tests override what they care about. */
+function makeProps(overrides: Partial<NapActionButtonProps> = {}): NapActionButtonProps {
+  return {
+    inProgressNap: undefined,
+    inProgressBedtime: undefined,
+    dayId: "d1",
+    nextProjectedNap: undefined,
+    nowMinutes: PRE_THRESHOLD as TimeMin,
+    bedtimeThreshold: THRESHOLD as TimeMin,
+    defaultNapLengthMinutes: DEFAULT_NAP_MINUTES,
+    defaultWakeTime: DEFAULT_WAKE_TIME as TimeMin,
+    onStart: vi.fn().mockResolvedValue(undefined) as NapActionButtonProps["onStart"],
+    onEnd: vi.fn().mockResolvedValue(undefined) as NapActionButtonProps["onEnd"],
+    onStartBedtime: vi.fn().mockResolvedValue(undefined) as NapActionButtonProps["onStartBedtime"],
+    onEndBedtime: vi.fn().mockResolvedValue(undefined) as NapActionButtonProps["onEndBedtime"],
+    ...overrides,
+  };
+}
+
 describe("NapActionButton", () => {
   it("renders 'Start Nap Now' before threshold when no nap is in progress", () => {
-    render(
-      <NapActionButton
-        inProgressNap={undefined}
-        dayId="d1"
-        nextProjectedNap={projectedNap(1)}
-        nowMinutes={PRE_THRESHOLD}
-        bedtimeThreshold={THRESHOLD}
-        defaultNapLengthMinutes={DEFAULT_NAP_MINUTES}
-        defaultWakeTime={DEFAULT_WAKE_TIME}
-        onStart={async () => {}}
-        onEnd={async () => {}}
-        onStartBedtime={async () => {}}
-      />,
-    );
+    render(<NapActionButton {...makeProps({ nextProjectedNap: projectedNap(1) })} />);
     expect(screen.getByRole("button", { name: /start nap now/i })).toBeVisible();
   });
 
   it("renders 'End Nap' when a nap is in progress (regardless of threshold)", () => {
     render(
       <NapActionButton
-        inProgressNap={napInProgress()}
-        dayId="d1"
-        nextProjectedNap={undefined}
-        nowMinutes={POST_THRESHOLD}
-        bedtimeThreshold={THRESHOLD}
-        defaultNapLengthMinutes={DEFAULT_NAP_MINUTES}
-        defaultWakeTime={DEFAULT_WAKE_TIME}
-        onStart={async () => {}}
-        onEnd={async () => {}}
-        onStartBedtime={async () => {}}
+        {...makeProps({ inProgressNap: napInProgress(), nowMinutes: POST_THRESHOLD as TimeMin })}
       />,
     );
     expect(screen.getByRole("button", { name: /end nap/i })).toBeVisible();
@@ -75,20 +85,7 @@ describe("NapActionButton", () => {
 
   it("promotes nextProjectedNap on Start Nap — lifecycle recorded with endTime set", async () => {
     const onStart = vi.fn().mockResolvedValue(undefined);
-    render(
-      <NapActionButton
-        inProgressNap={undefined}
-        dayId="d1"
-        nextProjectedNap={projectedNap(2)}
-        nowMinutes={PRE_THRESHOLD}
-        bedtimeThreshold={THRESHOLD}
-        defaultNapLengthMinutes={DEFAULT_NAP_MINUTES}
-        defaultWakeTime={DEFAULT_WAKE_TIME}
-        onStart={onStart}
-        onEnd={async () => {}}
-        onStartBedtime={async () => {}}
-      />,
-    );
+    render(<NapActionButton {...makeProps({ nextProjectedNap: projectedNap(2), onStart })} />);
     await userEvent.click(screen.getByRole("button"));
     expect(onStart).toHaveBeenCalledTimes(1);
     const arg = onStart.mock.calls[0]?.[0] as Event;
@@ -113,20 +110,7 @@ describe("NapActionButton", () => {
   it("calls onEnd with the in-progress nap and current TimeMin endTime", async () => {
     const onEnd = vi.fn().mockResolvedValue(undefined);
     const nap = napInProgress();
-    render(
-      <NapActionButton
-        inProgressNap={nap}
-        dayId="d1"
-        nextProjectedNap={undefined}
-        nowMinutes={PRE_THRESHOLD}
-        bedtimeThreshold={THRESHOLD}
-        defaultNapLengthMinutes={DEFAULT_NAP_MINUTES}
-        defaultWakeTime={DEFAULT_WAKE_TIME}
-        onStart={async () => {}}
-        onEnd={onEnd}
-        onStartBedtime={async () => {}}
-      />,
-    );
+    render(<NapActionButton {...makeProps({ inProgressNap: nap, onEnd })} />);
     await userEvent.click(screen.getByRole("button"));
     expect(onEnd).toHaveBeenCalledTimes(1);
     const [calledNap, endTime] = onEnd.mock.calls[0] ?? [];
@@ -134,6 +118,22 @@ describe("NapActionButton", () => {
     expect(typeof endTime).toBe("number");
     expect(endTime).toBeGreaterThanOrEqual(0);
     expect(endTime).toBeLessThan(24 * 60);
+  });
+
+  it("renders 'Day Complete' and is disabled when no in-progress sleep, not past threshold, no nextProjectedNap", () => {
+    render(
+      <NapActionButton
+        {...makeProps({
+          inProgressNap: undefined,
+          inProgressBedtime: undefined,
+          nextProjectedNap: undefined,
+          nowMinutes: PRE_THRESHOLD as TimeMin,
+        })}
+      />,
+    );
+    const btn = screen.getByRole("button", { name: /day complete/i });
+    expect(btn).toBeVisible();
+    expect(btn).toBeDisabled();
   });
 });
 
@@ -146,38 +146,14 @@ describe("NapActionButton — CTA swap past bedtime threshold (§F8)", () => {
   // action IS bedtime.
 
   it("renders 'Start Bedtime Now' when nowMinutes ≥ bedtimeThreshold", () => {
-    render(
-      <NapActionButton
-        inProgressNap={undefined}
-        dayId="d1"
-        nextProjectedNap={undefined}
-        nowMinutes={POST_THRESHOLD}
-        bedtimeThreshold={THRESHOLD}
-        defaultNapLengthMinutes={DEFAULT_NAP_MINUTES}
-        defaultWakeTime={DEFAULT_WAKE_TIME}
-        onStart={async () => {}}
-        onEnd={async () => {}}
-        onStartBedtime={async () => {}}
-      />,
-    );
+    render(<NapActionButton {...makeProps({ nowMinutes: POST_THRESHOLD as TimeMin })} />);
     expect(screen.getByRole("button", { name: /start bedtime now/i })).toBeVisible();
   });
 
   it("calls onStartBedtime with a bedtime event with endTime set when tapped past threshold", async () => {
     const onStartBedtime = vi.fn().mockResolvedValue(undefined);
     render(
-      <NapActionButton
-        inProgressNap={undefined}
-        dayId="d1"
-        nextProjectedNap={undefined}
-        nowMinutes={POST_THRESHOLD}
-        bedtimeThreshold={THRESHOLD}
-        defaultNapLengthMinutes={DEFAULT_NAP_MINUTES}
-        defaultWakeTime={DEFAULT_WAKE_TIME}
-        onStart={async () => {}}
-        onEnd={async () => {}}
-        onStartBedtime={onStartBedtime}
-      />,
+      <NapActionButton {...makeProps({ nowMinutes: POST_THRESHOLD as TimeMin, onStartBedtime })} />,
     );
     await userEvent.click(screen.getByRole("button"));
     expect(onStartBedtime).toHaveBeenCalledTimes(1);
@@ -193,5 +169,57 @@ describe("NapActionButton — CTA swap past bedtime threshold (§F8)", () => {
     // endTime must be set for bedtime (nextDayAt(defaultWakeTime) = 7:00 + 1440 = 1860)
     expect(arg.endTime).toBe(DEFAULT_WAKE_TIME + 24 * 60);
     expect(arg.lifecycle.state).toBe("recorded");
+  });
+});
+
+describe("NapActionButton — in-progress bedtime detection (Bug A from PR #166 dogfooding)", () => {
+  it("renders 'End Bedtime' when a bedtime is in progress", () => {
+    // After Start Bedtime Now creates a recorded bedtime, the CTA must
+    // switch to 'End Bedtime' — not stay on 'Start Bedtime Now'.
+    render(
+      <NapActionButton
+        {...makeProps({
+          inProgressBedtime: bedtimeInProgress(),
+          nowMinutes: POST_THRESHOLD as TimeMin,
+        })}
+      />,
+    );
+    expect(screen.getByRole("button", { name: /end bedtime/i })).toBeVisible();
+  });
+
+  it("calls onEndBedtime with the in-progress bedtime and current TimeMin on click", async () => {
+    const onEndBedtime = vi.fn().mockResolvedValue(undefined);
+    const bedtime = bedtimeInProgress();
+    render(
+      <NapActionButton
+        {...makeProps({
+          inProgressBedtime: bedtime,
+          nowMinutes: POST_THRESHOLD as TimeMin,
+          onEndBedtime,
+        })}
+      />,
+    );
+    await userEvent.click(screen.getByRole("button"));
+    expect(onEndBedtime).toHaveBeenCalledTimes(1);
+    const [calledBedtime, endTime] = onEndBedtime.mock.calls[0] ?? [];
+    expect(calledBedtime).toEqual(bedtime);
+    expect(typeof endTime).toBe("number");
+    expect(endTime).toBeGreaterThanOrEqual(0);
+    expect(endTime).toBeLessThan(24 * 60 * 2); // bedtime endTime can be next-day
+  });
+
+  it("in-progress nap takes precedence over in-progress bedtime (impossible in practice, but deterministic)", () => {
+    // The cascade prevents simultaneous in-progress nap + bedtime, but if
+    // data is corrupted, nap wins (was most recently user-initiated).
+    render(
+      <NapActionButton
+        {...makeProps({
+          inProgressNap: napInProgress(),
+          inProgressBedtime: bedtimeInProgress(),
+          nowMinutes: POST_THRESHOLD as TimeMin,
+        })}
+      />,
+    );
+    expect(screen.getByRole("button", { name: /end nap/i })).toBeVisible();
   });
 });

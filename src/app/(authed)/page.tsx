@@ -137,6 +137,9 @@ export default function DashboardPage() {
   const inProgressNap = actuals.find(
     (e) => e.type === "nap" && isInProgress(e, settings.defaultNapLengthMinutes, nowMinutes),
   );
+  const inProgressBedtime = actuals.find(
+    (e) => e.type === "bedtime" && isInProgress(e, settings.defaultNapLengthMinutes, nowMinutes),
+  );
   const bottle1Pending = !actuals.some((e) => e.type === "bottle" && isRecorded(e.lifecycle));
 
   // "Next" ordinals = unique nap/bottle slots that are RECORDED (the
@@ -202,6 +205,15 @@ export default function DashboardPage() {
       lifecycle: reduceLifecycle(nap.lifecycle, { type: "TIME_EDIT", at: endTime }),
     });
   };
+  const handleEndBedtime = async (bedtime: Event, endTime: number) => {
+    if (!day || day.id === "") return;
+    // TIME_EDIT on a recorded bedtime → completed. Same pattern as nap.
+    await saveEvent({
+      ...bedtime,
+      endTime,
+      lifecycle: reduceLifecycle(bedtime.lifecycle, { type: "TIME_EDIT", at: endTime }),
+    });
+  };
   const handleStartDay = async ({ useTomorrowPlan: _ }: { useTomorrowPlan: boolean }) => {
     // See note above — anchor the new day at `settings.defaultWakeTime`,
     // not wall-clock. `settings` is always non-null here (past the loading
@@ -246,6 +258,7 @@ export default function DashboardPage() {
         <div className={styles.actionsRow}>
           <NapActionButton
             inProgressNap={inProgressNap}
+            {...(inProgressBedtime ? { inProgressBedtime } : {})}
             dayId={day.id}
             nowMinutes={nowMinutes}
             bedtimeThreshold={settings.bedtimeThreshold}
@@ -255,6 +268,7 @@ export default function DashboardPage() {
             onStart={handleStartNap}
             onEnd={handleEndNap}
             onStartBedtime={handleStartBedtime}
+            onEndBedtime={handleEndBedtime}
           />
           <StartDayButton hasTomorrowPlan={false} onStart={handleStartDay} />
         </div>
