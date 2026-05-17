@@ -73,7 +73,7 @@ const RuleApplyWakeWindowOverrides: Rule = {
   assertAfter: (events) => {
     const orphan = events.find((e) => e.type === "wake_window" && e.lifecycle.state === "recorded");
     if (orphan) {
-      return `R4.2 invariant violated: recorded wake_window ${orphan.id} (eventKey ${orphan.eventKey}) survived R4.2 merge. R3.1's matches predicate assumes these are dropped after R4.2 runs.`;
+      return `R4.2 invariant violated: recorded wake_window (eventKey ${orphan.eventKey}) survived R4.2 merge. R3.1's matches predicate assumes these are dropped after R4.2 runs.`;
     }
     return null;
   },

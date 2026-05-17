@@ -153,11 +153,10 @@ describe("R4.2 — wake_window owner overrides survive recompute", () => {
       hasPutdown: false,
       lifecycle: { state: "recorded", annotatedAt: 7 * 60 },
     };
-    const rule = R4_2_RULES[0]!;
+    const rule = R4_2_RULES[0];
+    if (!rule?.assertAfter) throw new Error("R4.2 rule must define assertAfter");
     const ctx = aContext({});
-    // assertAfter is defined on the rule
-    expect(rule.assertAfter).toBeDefined();
-    const result = rule.assertAfter!([orphan], ctx);
+    const result = rule.assertAfter([orphan], ctx);
     expect(result).toContain("R4.2 invariant violated");
     expect(result).toContain("wake_window_1");
   });
@@ -175,9 +174,10 @@ describe("R4.2 — wake_window owner overrides survive recompute", () => {
       hasPutdown: false,
       lifecycle: { state: "projected" },
     };
-    const rule = R4_2_RULES[0]!;
+    const rule = R4_2_RULES[0];
+    if (!rule?.assertAfter) throw new Error("R4.2 rule must define assertAfter");
     const ctx = aContext({});
-    expect(rule.assertAfter!([projected], ctx)).toBeNull();
+    expect(rule.assertAfter([projected], ctx)).toBeNull();
   });
 
   it("no overrides → cascade output is unchanged (regression guard)", () => {
