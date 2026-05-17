@@ -137,6 +137,9 @@ export default function DashboardPage() {
   const inProgressNap = actuals.find(
     (e) => e.type === "nap" && isInProgress(e, settings.defaultNapLengthMinutes, nowMinutes),
   );
+  const inProgressBedtime = actuals.find(
+    (e) => e.type === "bedtime" && isInProgress(e, settings.defaultNapLengthMinutes, nowMinutes),
+  );
   const bottle1Pending = !actuals.some((e) => e.type === "bottle" && isRecorded(e.lifecycle));
 
   // "Next" ordinals = unique nap/bottle slots that are RECORDED (the
@@ -192,14 +195,14 @@ export default function DashboardPage() {
   const handleStartBedtime = async (bedtime: Event) => {
     await saveEvent(bedtime);
   };
-  const handleEndNap = async (nap: Event, endTime: number) => {
+  // TIME_EDIT on a recorded nap or bedtime → completed. Handles both —
+  // they're structurally identical (spread, replace endTime, reduce).
+  const handleEndSleep = async (event: Event, endTime: number) => {
     if (!day || day.id === "") return;
-    // TIME_EDIT on a recorded nap → completed. committedAt is the
-    // moment the user confirmed the end time.
     await saveEvent({
-      ...nap,
+      ...event,
       endTime,
-      lifecycle: reduceLifecycle(nap.lifecycle, { type: "TIME_EDIT", at: endTime }),
+      lifecycle: reduceLifecycle(event.lifecycle, { type: "TIME_EDIT", at: endTime }),
     });
   };
   const handleStartDay = async ({ useTomorrowPlan: _ }: { useTomorrowPlan: boolean }) => {
@@ -246,6 +249,7 @@ export default function DashboardPage() {
         <div className={styles.actionsRow}>
           <NapActionButton
             inProgressNap={inProgressNap}
+            inProgressBedtime={inProgressBedtime}
             dayId={day.id}
             nowMinutes={nowMinutes}
             bedtimeThreshold={settings.bedtimeThreshold}
@@ -253,8 +257,9 @@ export default function DashboardPage() {
             defaultWakeTime={settings.defaultWakeTime}
             {...(nn ? { nextProjectedNap: nn } : {})}
             onStart={handleStartNap}
-            onEnd={handleEndNap}
+            onEnd={handleEndSleep}
             onStartBedtime={handleStartBedtime}
+            onEndBedtime={handleEndSleep}
           />
           <StartDayButton hasTomorrowPlan={false} onStart={handleStartDay} />
         </div>
