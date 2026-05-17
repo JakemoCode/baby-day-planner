@@ -28,7 +28,7 @@ export const DEFAULT_OWNER_COLORS = {
 
 const DEFAULTS: Omit<Settings, "childId"> = {
   defaultWakeTime: DEFAULT_WAKE_TIME,
-  bedtimeThreshold: 17.5 * 60,
+  bedtimeThreshold: 17 * 60 + 30,
   defaultNapLengthMinutes: 45,
   shortNapThresholdMinutes: 25,
   shortNapAdjustmentMinutes: 10,
