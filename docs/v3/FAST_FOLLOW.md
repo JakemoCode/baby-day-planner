@@ -548,6 +548,34 @@ Likely cause: `InstantChip` (or its positioning wrapper in `TimelineV3.tsx`) use
 
 ---
 
+## §F32 — Retire `EndOfDayCard`; dashboard always shows stats
+
+**Source**: Jake, 2026-05-16 dogfooding (post-PR #168).
+
+**Status**: `pending`
+
+**What**: `EndOfDayCard` currently replaces the entire dashboard in two cases:
+1. Wake gate — no day yet (line ~111 of `src/app/(authed)/page.tsx`)
+2. End-of-day — `!nextEvent && nowMinutes >= bedtimeThreshold` (line ~120)
+
+In both cases the dashboard hides everything else (next-event cards, action buttons, stats). Jake's complaint: he always wants to see day-level stats (cumulative bottle intake, nap totals, last-event times, etc.), not a dead-end "the day is over" card.
+
+Two changes:
+- **Stats panel**: design + add a per-day stats summary surface on the dashboard. Probably renders alongside the action row OR as its own card above the FAB. Content TBD — likely: bottles total (oz + count), nap total (count + minutes), pumps total (minutes), last-event-of-each-type timestamps. Should be visible regardless of where the user is in the day.
+- **Retire `EndOfDayCard`**:
+  - Wake gate: replace with a smaller "Start New Day" CTA inline (still need the gate behavior — can't show event cards before a day exists — but the framing shouldn't be a full-bleed dead-end card).
+  - End-of-day: drop the early-return. Dashboard renders normally; the action row falls back to "Start Bedtime Now" (already actionable post-PR #168) and stats remain visible.
+
+**Why fast-follow**: UX polish that needs design thought (what's on the stats panel?). Engine-orthogonal. Worth pairing with the §F3 onboarding work since both touch the dashboard's empty-state framing.
+
+**Acceptance**:
+- Dashboard renders stats panel on every state of the day (active, end-of-day, fresh).
+- No `EndOfDayCard` import remains in `src/app/(authed)/page.tsx`.
+- The wake-gate "no day yet" flow still gates writes until a Day exists, but UI is inline (not a full-bleed card).
+- Click test: at 11 PM with bedtime completed, dashboard shows stats + Start Bedtime Now (re-anchor) + start-day controls; no "Day Complete" or "End of Day" lockout.
+
+---
+
 ## How items land here
 
 Two paths:
