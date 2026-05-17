@@ -1,6 +1,6 @@
 # Build Status
 
-> Last refresh: 2026-05-15
+> Last refresh: 2026-05-16
 > Repo: `github.com/JakemoCode/baby-day-planner`
 
 ## Where we are
@@ -21,8 +21,83 @@ past-threshold nap edits to bedtime; dashboard CTA swaps to "Start
 Bedtime Now" past threshold; pumps render in front of sleep blocks.
 See `docs/superpowers/specs/2026-05-15-physiology-cascade-design.md`.
 
+**Lifecycle simplification + slot ids landed (2026-05-16 campaign,
+PRs #165 → #168)** — major reshape of how naps + bedtime persist:
+
+- Slot events use deterministic ids (`id === eventKey === "nap_1"`,
+  `"nap_2"`, `"bedtime"`). Eliminates the §F22/F24/F25 bug class.
+- Lifecycle vocabulary: `projected | recorded | completed`. `started`
+  dropped; `overridden` renamed to `recorded`. "In progress" is now
+  a TIME property (`startTime ≤ now < effectiveEnd`), not a state.
+- Auto-extend: `effectiveEndOf(event, napLen, now)` extends an
+  in-progress recorded nap past its placeholder endTime, capped at
+  3 extensions (= `startTime + 4 × napLen`). Render-only — cascade
+  cursor uses raw endTime.
+- "Start Nap Now" / "Start Bedtime Now" mint full events with
+  endTime placeholders (`now + napLen` and `nextDayAt(defaultWakeTime)`
+  respectively); "End Nap" / "End Bedtime" do `TIME_EDIT → completed`.
+- Render pipeline (`src/v3/ui/renderProjection.ts`) has three passes:
+  dream-feed-label → effectiveEnd-bake → putdown-expand. R6.8 gate
+  suppresses putdown chips inside in-progress sleep blocks.
+- Legacy lifecycle migration at the read seam: pre-#166 `started`
+  and `overridden` docs auto-rewrite to `recorded` on load.
+- `inProgressNap` / `inProgressBedtime` selectors detect via shared
+  `isInProgress` predicate from `src/v3/lib/effectiveEnd.ts`.
+- NapActionButton CTA always actionable (defaults to "Start Bedtime
+  Now" when nothing else applies); `primary` variant for visibility.
+
 Wave 9 (PWA manifest + service worker + E2E + design audit) is the
 last build wave on the original Plan C roadmap. Not yet started.
+
+## Tomorrow's resume notes (2026-05-17)
+
+**Confirmed merged today (2026-05-16):** #165, #166, #167, #168. All
+on `main`. 639 unit + 35 integration tests passing.
+
+**PR open awaiting merge:** #169 (docs-only: adds §F32 to FAST_FOLLOW).
+
+**Things to be aware of:**
+
+- The 2026-05-16 lifecycle simplification reshaped the data model.
+  Wipe the local emulator before testing (or trust the migration at
+  the read seam). Pre-#166 fixtures still in the codebase will be
+  auto-migrated on read.
+- `feedback_seam_coverage_required.md` memory: two bugs shipped
+  through the unit suite today (PR #166 + the bedtime CTA bug). The
+  Playwright E2E tier (deferred for V1) is the right safety net;
+  until then, when implementing a CTA-driven flow, add a seam test
+  using REAL projectDay + REAL renderProjection.
+- `feedback_parallel_agent_workspace.md` memory: parallel agents
+  share the working tree. WIP edits in one agent can break unrelated
+  branches' pre-push typecheck. Defer cross-branch ops until in-flight
+  agents finish (or use distinct branch names; or worktree per agent).
+
+**Likely next priorities (in roughly the order Jake last weighed
+them):**
+
+1. **§F32 — retire `EndOfDayCard`, dashboard always shows stats**
+   (Jake's request today; will need design call on the stats panel
+   content + the wake-gate replacement UI)
+2. **§F2 palette refresh** (🔥 flagged twice; surface contrast
+   ~1.05 right now → secondary buttons visually invisible against
+   page background; today's NapActionButton fix was a quick variant
+   swap, the systemic fix is still pending)
+3. **§F3 onboarding + §F10 child name/DOB** (first-time user UX;
+   blocks any non-Jake user)
+4. **Deploy to dogfood** (production Firebase + Vercel + smoke test
+   → ~1-2 evenings; see earlier session for the minimum-deploy plan)
+
+**Things that came up but weren't scoped:**
+
+- Bedtime soft-end uses `napLen` (per `effectiveEnd.ts` JSDoc) —
+  technically wrong for bedtime which extends to next-day wake. Not
+  observable today (cascade emits no putdown-eligible events past
+  bedtime) but flagged in code comments for a future change.
+- NapActionButton name is stale (handles naps + bedtimes + default
+  bedtime mode). Renaming considered + deferred.
+- Pre-existing clock-skew between NapActionButton prop `nowMinutes`
+  and inline `currentLocalMinutes()` (PR #162 reviewer note I5);
+  not pursued.
 
 ## Active backlog
 
