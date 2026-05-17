@@ -82,16 +82,16 @@ describe("v3 events repository", () => {
       database,
       "child-1",
       ev({
-        id: "e-started",
+        id: "e-recorded",
         type: "nap",
         kind: "block",
         startTime: 9 * 60,
-        lifecycle: { state: "started", committedAt: 9 * 60 + 2 },
+        lifecycle: { state: "recorded", annotatedAt: 9 * 60 + 2 },
       }),
     );
     const listed = await listEvents(database, "child-1", "day-1");
-    const got = listed.find((e) => e.id === "e-started");
-    expect(got?.lifecycle).toEqual({ state: "started", committedAt: 9 * 60 + 2 });
+    const got = listed.find((e) => e.id === "e-recorded");
+    expect(got?.lifecycle).toEqual({ state: "recorded", annotatedAt: 9 * 60 + 2 });
   });
 
   it("watches events ordered by startTime", async () => {

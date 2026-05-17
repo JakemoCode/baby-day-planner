@@ -137,7 +137,7 @@ describe("expandPutdownBlocks", () => {
         id: "nap-ov",
         hasPutdown: true,
         startTime: 14 * 60,
-        lifecycle: { state: "overridden", annotatedAt: 10 * 60 },
+        lifecycle: { state: "recorded", annotatedAt: 10 * 60 },
       });
       const out = expandPutdownBlocks([overridden], {
         putdownLeadMinutes: 15,
@@ -172,11 +172,10 @@ describe("expandPutdownBlocks", () => {
     });
 
     it("suppresses putdown when its window overlaps an in-progress nap with no endTime", () => {
-      // nap_1 started at 9:00, no endTime → soft-end at 9:00 + 60 = 10:00.
-      // nap_2 projected at 13:00 → putdown window [12:45, 13:00].
-      // No overlap between [12:45,13:00] and [9:00,10:00] — so let's use a
-      // tighter scenario: nap_1 started at 9:00, nap_2 at 9:45 (putdown [9:30,9:45]).
-      // Both [9:30,9:45] and [9:00,10:00] overlap.
+      // nap_1 recorded at 9:00, no endTime → soft-end at 9:00 + 60 = 10:00
+      // (effectiveEndOf fallback: startTime + napLen for recorded+no-endTime).
+      // nap_2 projected at 9:45 → putdown window [9:30, 9:45].
+      // [9:30,9:45] overlaps [9:00,10:00] → putdown suppressed.
       const startedNap1: Event = {
         id: "nap-1",
         dayId: "d-1",
@@ -186,7 +185,7 @@ describe("expandPutdownBlocks", () => {
         startTime: 9 * 60,
         label: "Nap 1",
         hasPutdown: false,
-        lifecycle: { state: "started", committedAt: 9 * 60 },
+        lifecycle: { state: "recorded", annotatedAt: 9 * 60 },
       };
       const projNap2 = ev({
         id: "nap-2",
@@ -215,7 +214,7 @@ describe("expandPutdownBlocks", () => {
         startTime: 9 * 60,
         endTime: 9 * 60 + 20,
         hasPutdown: false,
-        lifecycle: { state: "started", committedAt: 9 * 60 },
+        lifecycle: { state: "recorded", annotatedAt: 9 * 60 },
       });
       const projNap2 = ev({
         id: "nap-2",

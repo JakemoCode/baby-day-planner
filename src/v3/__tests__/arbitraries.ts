@@ -48,19 +48,14 @@ export const arbCompletedLifecycle: fc.Arbitrary<Lifecycle> = arbDayTime.map(
   (committedAt) => ({ state: "completed", committedAt }) satisfies Lifecycle,
 );
 
-export const arbStartedLifecycle: fc.Arbitrary<Lifecycle> = arbDayTime.map(
-  (committedAt) => ({ state: "started", committedAt }) satisfies Lifecycle,
-);
-
-export const arbOverriddenLifecycle: fc.Arbitrary<Lifecycle> = arbDayTime.map(
-  (annotatedAt) => ({ state: "overridden", annotatedAt }) satisfies Lifecycle,
+export const arbRecordedLifecycle: fc.Arbitrary<Lifecycle> = arbDayTime.map(
+  (annotatedAt) => ({ state: "recorded", annotatedAt }) satisfies Lifecycle,
 );
 
 export const arbAnyLifecycle: fc.Arbitrary<Lifecycle> = fc.oneof(
   arbProjectedLifecycle,
-  arbStartedLifecycle,
+  arbRecordedLifecycle,
   arbCompletedLifecycle,
-  arbOverriddenLifecycle,
 );
 
 // ---------------------------------------------------------------------------

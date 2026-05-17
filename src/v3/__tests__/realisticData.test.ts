@@ -113,6 +113,6 @@ describe("engine end-to-end with realistic fixtures", () => {
     });
     const nap2Events = result.filter((e) => e.eventKey === "nap_2");
     expect(nap2Events).toHaveLength(1);
-    expect(nap2Events[0]!.lifecycle.state).toBe("overridden");
+    expect(nap2Events[0]!.lifecycle.state).toBe("recorded");
   });
 });

@@ -180,9 +180,9 @@ describe("R12.1 — clearing is deliberate: cleared owner is not re-stamped", ()
   });
 
   it("overridden projection is NOT re-stamped (deliberate user-edit choice persists)", () => {
-    // An `overridden` lifecycle is a user owner-edit on a still-future
+    // An `recorded` lifecycle is a user owner-edit on a still-future
     // projection. If the user explicitly cleared owner on a projection
-    // (overridden + owner: undefined), the template must not re-stamp.
+    // (recorded + owner: undefined), the template must not re-stamp.
     const overriddenNap2: Event = {
       id: "overridden_nap_2",
       dayId: "day_test",
@@ -193,7 +193,7 @@ describe("R12.1 — clearing is deliberate: cleared owner is not re-stamped", ()
       endTime: 13 * 60,
       label: "Nap 2",
       hasPutdown: false,
-      lifecycle: { state: "overridden", annotatedAt: 11 * 60 },
+      lifecycle: { state: "recorded", annotatedAt: 11 * 60 },
       // owner omitted — user explicitly cleared via drawer
     };
 
@@ -213,7 +213,7 @@ describe("R12.1 — clearing is deliberate: cleared owner is not re-stamped", ()
     const out = run(ctx);
     const napTwo = out.find((e) => e.id === overriddenNap2.id);
     expect(napTwo?.owner).toBeUndefined();
-    expect(napTwo?.lifecycle.state).toBe("overridden");
+    expect(napTwo?.lifecycle.state).toBe("recorded");
   });
 });
 

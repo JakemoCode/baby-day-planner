@@ -123,7 +123,7 @@ describe("EventEditDrawerV3", () => {
     expect(onSave).toHaveBeenCalledTimes(1);
     const next: Event = onSave.mock.calls[0]![0];
     expect(next.owner).toEqual({ slot: "parent1" });
-    expect(next.lifecycle).toEqual({ state: "overridden", annotatedAt: NOW });
+    expect(next.lifecycle).toEqual({ state: "recorded", annotatedAt: NOW });
   });
 
   it("saves nap time edit as overridden lifecycle (predict-don't-prescribe: drawer is scheduling intent, not reality)", async () => {
@@ -147,7 +147,7 @@ describe("EventEditDrawerV3", () => {
     await userEvent.click(screen.getByRole("button", { name: "Save" }));
     const next: Event = onSave.mock.calls[0]![0];
     expect(next.startTime).toBe(9 * 60 + 5);
-    expect(next.lifecycle).toEqual({ state: "overridden", annotatedAt: NOW });
+    expect(next.lifecycle).toEqual({ state: "recorded", annotatedAt: NOW });
   });
 
   it("blocks save when end time is not after start time", async () => {
@@ -268,7 +268,7 @@ describe("EventEditDrawerV3", () => {
     expect(screen.queryByRole("button", { name: "Delete" })).not.toBeInTheDocument();
   });
 
-  // PR-A0.4: re-edits of an already-overridden event must update the
+  // PR-A0.4: re-edits of an already-recorded event must update the
   // existing Firestore doc, not create a duplicate. The timeline page's
   // onSave routes via `actuals.some(a => a.id === drawer.event.id)` —
   // this wrapper mirrors that logic so we can verify the routing
@@ -284,7 +284,7 @@ describe("EventEditDrawerV3", () => {
       endTime: 12 * 60,
       label: "Nap 2",
       hasPutdown: false,
-      lifecycle: { state: "overridden", annotatedAt: 10 * 60 },
+      lifecycle: { state: "recorded", annotatedAt: 10 * 60 },
     };
     const actuals: Event[] = [overriddenNap];
     const createOptimistic = vi.fn();
@@ -319,10 +319,10 @@ describe("EventEditDrawerV3", () => {
     const next: Event = updateOptimistic.mock.calls[0]![1];
     expect(next.id).toBe("manual-X");
     expect(next.owner).toEqual({ slot: "parent2" });
-    // Already-overridden source keeps its original annotatedAt — only
-    // projected→overridden transitions stamp NOW. The contract under
+    // Already-recorded source keeps its original annotatedAt — only
+    // projected→recorded transitions stamp NOW. The contract under
     // test here is the create-vs-update routing, not the lifecycle math.
-    expect(next.lifecycle).toEqual({ state: "overridden", annotatedAt: 10 * 60 });
+    expect(next.lifecycle).toEqual({ state: "recorded", annotatedAt: 10 * 60 });
     expect(createOptimistic).not.toHaveBeenCalled();
   });
 
@@ -497,12 +497,11 @@ describe("Past-threshold prompt when editing a nap (physiology cascade)", () => 
         // Source nap's endTime (10:00) is dropped; bedtime endTime
         // = defaultWakeTime + 24h = 7:00 + 1440 = 1860.
         endTime: DEFAULT_WAKE_TIME + 24 * 60,
-        // `overridden` lifecycle: the user dragged a projected chip
+        // `recorded` lifecycle: the user dragged a projected chip
         // to declare "the projected bedtime is at this time."
-        // `overridden` triggers putdown synthesis (putdown.ts:42) AND
+        // `recorded` triggers putdown synthesis (putdown.ts:42) AND
         // is treated as manualBedtime by the cascade (!isProjected).
-        // `started` would silently lose the putdown chip.
-        lifecycle: expect.objectContaining({ state: "overridden" }),
+        lifecycle: expect.objectContaining({ state: "recorded" }),
       }),
     );
   });

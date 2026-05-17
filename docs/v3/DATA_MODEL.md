@@ -170,58 +170,53 @@ re-edits cannot un-record.
 
 ## §2 Event Lifecycle & Status
 
-### R2.1 The four valid statuses are `projected | actual | overridden | completed`
+### R2.1 The three valid states are `projected | recorded | completed`
 
 - `projected` — engine output, never persisted to Firestore.
-- `actual` — recording in progress (Start Nap pressed, no endTime yet).
-- `completed` — recording finished (End Nap, FAB-create, drawer
-  time-edit on a previously projected event).
-- `overridden` — owner-only annotation on a previously projected event;
-  no time commitment.
+- `recorded` — user annotation: in-progress sleep (NapActionButton),
+  owner-only drawer edit, or scheduling intent. Carries `annotatedAt: TimeMin`.
+- `completed` — time-committed recording: FAB-create, drawer time-edit,
+  or End Nap (TIME_EDIT action). Carries `committedAt: TimeMin`.
+
+"In progress" is a **time property**, not a state: a `recorded` event is
+in-progress when `startTime ≤ now < effectiveEndOf(event)`. No separate
+`started` state is needed.
 
 ### R2.2 Allowed status transitions
 
 ```
-projected → actual           (Start Nap on dashboard)
+projected → recorded         (NapActionButton "Start Nap Now", or drawer owner-only edit)
 projected → completed        (FAB-create OR drawer time-edit)
-projected → overridden       (drawer owner-only edit)
-actual    → completed        (End Nap on dashboard)
-overridden → completed       (subsequent drawer time-edit)
-overridden → overridden      (subsequent drawer owner-only edit)
-completed → completed        (drawer re-edit; status idempotent)
+recorded  → completed        (TIME_EDIT action — End Nap, or drawer time commit)
+recorded  → recorded         (subsequent drawer owner-only edit — annotatedAt unchanged)
+completed → completed        (drawer re-edit; idempotent)
 ```
 
 `projected` never enters Firestore. Other transitions create OR update a
 Firestore doc.
 
-- **Why**: a state machine eliminates the "what status should this be?"
-  decisions scattered across drawer/button code. V3 enforces transitions
-  in a central reducer.
-- **Edge case it prevents**: same event saved with `status: "actual"`
-  and `recorded: false` (an impossible combo that V2 nearly produced).
+- **Why**: dropping `started` removes a redundant state — "in progress"
+  is computable from time, not from lifecycle. Dropping `overridden`
+  removes a misleading name — the user is *recording* intent, not
+  overriding the engine.
 
-### R2.3 `recorded` is a derived view of status
+### R2.3 `isRecorded()` predicate
 
-`recorded === true` iff `status ∈ {actual, completed}` OR the doc was
-created by the dashboard buttons (`source: "actual"`).
-`overridden` and `projected` events have `recorded === false`.
+`isRecorded(lifecycle) === true` iff `state ∈ {recorded, completed}`.
+The engine's reality-wins guard (`checkRealityWins`) protects these events
+from mutation by rules, except `wake_window` events which carry owner
+metadata and are intentionally merged-and-dropped by R4.2.
 
-- **Why**: in V2, `recorded` was added as an explicit field because
-  `status`/`source` together couldn't always answer the question. In V3,
-  with a clean state machine, `recorded` is a computed predicate, not a
-  stored field.
-- **Edge case it prevents**: `recorded`/`status` mismatch in a Firestore
-  doc, forcing reconciliation logic.
+### R2.4 `effectiveEndOf(event, napLen, now)` for in-progress detection
 
-### R2.4 Source values: `"actual" | "projected" | "manual" | "template"`
+For `recorded` sleep events, the effective end auto-extends past `endTime`
+when `now > endTime`, capped at 3 extensions (startTime + 4×napLen).
+Used by:
+- `inProgressNap` selector (dashboard)
+- `expandPutdown` R6.8 gate (render)
 
-- `actual` — dashboard button-created.
-- `projected` — engine output.
-- `manual` — drawer or FAB created.
-- `template` — legacy; not used in V2; V3 may drop entirely.
-
-V3 collapses to `{actual, projected, manual}` if `template` is
-confirmed unused.
+The CASCADE cursor uses `endTime` directly (not effectiveEndOf) so that
+past naps don't stretch future wake-windows.
 
 ---
 

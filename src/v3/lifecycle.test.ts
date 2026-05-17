@@ -1,30 +1,10 @@
 import { describe, expect, it } from "vitest";
-import {
-  LifecycleTransitionError,
-  isSchedulingType,
-  reduceLifecycle,
-  type LifecycleAction,
-} from "./lifecycle";
+import { isSchedulingType, reduceLifecycle } from "./lifecycle";
 import type { Lifecycle } from "./schemas";
 
 const projected: Lifecycle = { state: "projected" };
 
 describe("reduceLifecycle — valid transitions", () => {
-  it("projected → started via START on a block event", () => {
-    const next = reduceLifecycle(projected, {
-      type: "START",
-      at: 13 * 60,
-      eventKind: "block",
-    });
-    expect(next).toEqual({ state: "started", committedAt: 13 * 60 });
-  });
-
-  it("started → completed via END preserves the original committedAt", () => {
-    const started: Lifecycle = { state: "started", committedAt: 13 * 60 };
-    const next = reduceLifecycle(started, { type: "END", at: 14 * 60 });
-    expect(next).toEqual({ state: "completed", committedAt: 13 * 60 });
-  });
-
   it("projected → completed via RECORD_INSTANT for instant events", () => {
     const next = reduceLifecycle(projected, {
       type: "RECORD_INSTANT",
@@ -34,55 +14,39 @@ describe("reduceLifecycle — valid transitions", () => {
     expect(next).toEqual({ state: "completed", committedAt: 9 * 60 });
   });
 
-  it("projected → overridden via OWNER_EDIT", () => {
+  it("projected → recorded via OWNER_EDIT (annotates with no time change)", () => {
     const next = reduceLifecycle(projected, {
       type: "OWNER_EDIT",
       at: 8 * 60,
     });
-    expect(next).toEqual({ state: "overridden", annotatedAt: 8 * 60 });
+    expect(next).toEqual({ state: "recorded", annotatedAt: 8 * 60 });
   });
 
-  it("overridden → completed via TIME_EDIT", () => {
-    const overridden: Lifecycle = { state: "overridden", annotatedAt: 8 * 60 };
-    const next = reduceLifecycle(overridden, { type: "TIME_EDIT", at: 12 * 60 });
+  it("recorded → completed via TIME_EDIT", () => {
+    const recorded: Lifecycle = { state: "recorded", annotatedAt: 8 * 60 };
+    const next = reduceLifecycle(recorded, { type: "TIME_EDIT", at: 12 * 60 });
     expect(next).toEqual({ state: "completed", committedAt: 12 * 60 });
   });
 
-  it("OWNER_EDIT on a recorded event is a no-op (returns same state)", () => {
+  it("projected → completed via TIME_EDIT", () => {
+    const next = reduceLifecycle(projected, { type: "TIME_EDIT", at: 12 * 60 });
+    expect(next).toEqual({ state: "completed", committedAt: 12 * 60 });
+  });
+
+  it("OWNER_EDIT on a completed event is a no-op (returns same state)", () => {
     const completed: Lifecycle = { state: "completed", committedAt: 13 * 60 };
     const next = reduceLifecycle(completed, { type: "OWNER_EDIT", at: 14 * 60 });
     expect(next).toBe(completed);
   });
+
+  it("OWNER_EDIT on a recorded event is a no-op (stays recorded)", () => {
+    const recorded: Lifecycle = { state: "recorded", annotatedAt: 8 * 60 };
+    const next = reduceLifecycle(recorded, { type: "OWNER_EDIT", at: 14 * 60 });
+    expect(next).toBe(recorded);
+  });
 });
 
 describe("reduceLifecycle — invalid transitions", () => {
-  it("throws if START is called with kind=instant", () => {
-    expect(() =>
-      reduceLifecycle(projected, {
-        type: "START",
-        at: 9 * 60,
-        eventKind: "instant",
-      } satisfies LifecycleAction),
-    ).toThrow(LifecycleTransitionError);
-  });
-
-  it("throws if START is called from non-projected state", () => {
-    const completed: Lifecycle = { state: "completed", committedAt: 13 * 60 };
-    expect(() =>
-      reduceLifecycle(completed, {
-        type: "START",
-        at: 14 * 60,
-        eventKind: "block",
-      }),
-    ).toThrow(/requires projected state/);
-  });
-
-  it("throws if END is called from non-started state", () => {
-    expect(() => reduceLifecycle(projected, { type: "END", at: 14 * 60 })).toThrow(
-      /requires started state/,
-    );
-  });
-
   it("throws if RECORD_INSTANT is called with kind=block", () => {
     expect(() =>
       reduceLifecycle(projected, {
@@ -91,11 +55,6 @@ describe("reduceLifecycle — invalid transitions", () => {
         eventKind: "block",
       }),
     ).toThrow(/instant-only/);
-  });
-
-  it("throws if TIME_EDIT is called on a started block (must use END)", () => {
-    const started: Lifecycle = { state: "started", committedAt: 13 * 60 };
-    expect(() => reduceLifecycle(started, { type: "TIME_EDIT", at: 14 * 60 })).toThrow(/use END/);
   });
 });
 
@@ -114,7 +73,7 @@ describe("reduceLifecycle — DRAWER_SAVE", () => {
 
   // ── projected source ──────────────────────────────────────────────────────
 
-  it("projected nap + time changed + endTime present → overridden (scheduling type)", () => {
+  it("projected nap + time changed + endTime present → recorded (scheduling type)", () => {
     const next = reduceLifecycle(
       { state: "projected" },
       {
@@ -126,10 +85,10 @@ describe("reduceLifecycle — DRAWER_SAVE", () => {
         nowMinutes: NOW,
       },
     );
-    expect(next).toEqual({ state: "overridden", annotatedAt: NOW });
+    expect(next).toEqual({ state: "recorded", annotatedAt: NOW });
   });
 
-  it("projected bedtime + time changed → overridden (scheduling type)", () => {
+  it("projected bedtime + time changed → recorded (scheduling type)", () => {
     const next = reduceLifecycle(
       { state: "projected" },
       {
@@ -141,10 +100,10 @@ describe("reduceLifecycle — DRAWER_SAVE", () => {
         nowMinutes: NOW,
       },
     );
-    expect(next).toEqual({ state: "overridden", annotatedAt: NOW });
+    expect(next).toEqual({ state: "recorded", annotatedAt: NOW });
   });
 
-  it("projected daily_recurring + time changed → overridden (scheduling type)", () => {
+  it("projected daily_recurring + time changed → recorded (scheduling type)", () => {
     const next = reduceLifecycle(
       { state: "projected" },
       {
@@ -156,7 +115,7 @@ describe("reduceLifecycle — DRAWER_SAVE", () => {
         nowMinutes: NOW,
       },
     );
-    expect(next).toEqual({ state: "overridden", annotatedAt: NOW });
+    expect(next).toEqual({ state: "recorded", annotatedAt: NOW });
   });
 
   it("projected bottle (instant) + time changed → completed (recording type)", () => {
@@ -189,7 +148,7 @@ describe("reduceLifecycle — DRAWER_SAVE", () => {
     expect(next).toEqual({ state: "completed", committedAt: NOW });
   });
 
-  it("projected extra (block) + time changed + no endTime → started (in-progress block)", () => {
+  it("projected extra (block) + time changed + no endTime → recorded (in-progress block)", () => {
     const next = reduceLifecycle(
       { state: "projected" },
       {
@@ -201,10 +160,10 @@ describe("reduceLifecycle — DRAWER_SAVE", () => {
         nowMinutes: NOW,
       },
     );
-    expect(next).toEqual({ state: "started", committedAt: NOW });
+    expect(next).toEqual({ state: "recorded", annotatedAt: NOW });
   });
 
-  it("projected + no time change (owner/amount only) → overridden", () => {
+  it("projected + no time change (owner/amount only) → recorded", () => {
     const next = reduceLifecycle(
       { state: "projected" },
       {
@@ -216,14 +175,14 @@ describe("reduceLifecycle — DRAWER_SAVE", () => {
         nowMinutes: NOW,
       },
     );
-    expect(next).toEqual({ state: "overridden", annotatedAt: NOW });
+    expect(next).toEqual({ state: "recorded", annotatedAt: NOW });
   });
 
-  // ── overridden source ─────────────────────────────────────────────────────
+  // ── recorded source ─────────────────────────────────────────────────────
 
-  it("overridden nap + time changed → overridden (idempotent re-scheduling)", () => {
+  it("recorded nap + time changed → recorded (idempotent re-scheduling)", () => {
     const next = reduceLifecycle(
-      { state: "overridden", annotatedAt: 8 * 60 },
+      { state: "recorded", annotatedAt: 8 * 60 },
       {
         type: "DRAWER_SAVE",
         eventType: "nap",
@@ -233,12 +192,12 @@ describe("reduceLifecycle — DRAWER_SAVE", () => {
         nowMinutes: NOW,
       },
     );
-    expect(next).toEqual({ state: "overridden", annotatedAt: NOW });
+    expect(next).toEqual({ state: "recorded", annotatedAt: NOW });
   });
 
-  it("overridden bottle + time changed → completed (locks in the time)", () => {
+  it("recorded bottle + time changed → completed (locks in the time)", () => {
     const next = reduceLifecycle(
-      { state: "overridden", annotatedAt: 7 * 60 },
+      { state: "recorded", annotatedAt: 7 * 60 },
       {
         type: "DRAWER_SAVE",
         eventType: "bottle",
@@ -251,9 +210,9 @@ describe("reduceLifecycle — DRAWER_SAVE", () => {
     expect(next).toEqual({ state: "completed", committedAt: NOW });
   });
 
-  it("overridden + no time change (field edit only) → lifecycle unchanged", () => {
-    const overridden: Lifecycle = { state: "overridden", annotatedAt: 7 * 60 };
-    const next = reduceLifecycle(overridden, {
+  it("recorded + no time change (field edit only) → lifecycle unchanged", () => {
+    const recorded: Lifecycle = { state: "recorded", annotatedAt: 7 * 60 };
+    const next = reduceLifecycle(recorded, {
       type: "DRAWER_SAVE",
       eventType: "nap",
       eventKind: "block",
@@ -261,23 +220,10 @@ describe("reduceLifecycle — DRAWER_SAVE", () => {
       hasEndTime: true,
       nowMinutes: NOW,
     });
-    expect(next).toBe(overridden);
+    expect(next).toBe(recorded);
   });
 
-  // ── already-recorded sources stay frozen ─────────────────────────────────
-
-  it("started block stays started regardless of edits", () => {
-    const started: Lifecycle = { state: "started", committedAt: 9 * 60 };
-    const next = reduceLifecycle(started, {
-      type: "DRAWER_SAVE",
-      eventType: "nap",
-      eventKind: "block",
-      timeChanged: true,
-      hasEndTime: false,
-      nowMinutes: NOW,
-    });
-    expect(next).toBe(started);
-  });
+  // ── already-completed stays frozen ─────────────────────────────────────
 
   it("completed event stays completed; committedAt is unchanged", () => {
     const completed: Lifecycle = { state: "completed", committedAt: 10 * 60 };

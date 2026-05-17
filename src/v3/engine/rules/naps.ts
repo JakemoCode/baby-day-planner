@@ -15,9 +15,9 @@
  *   wake_window(N).endTime   === nap(N).startTime
  *
  * Reality wins:
- *   - recorded/overridden naps anchor their slot (their startTime/endTime
+ *   - recorded/completed naps anchor their slot (their startTime/endTime
  *     drive the cascade past them)
- *   - a recorded/overridden bedtime in `actuals` short-circuits the
+ *   - a recorded/completed bedtime in `actuals` short-circuits the
  *     cascade at its startTime (no further nap/WW emitted past it)
  *
  * Source: docs/v3/ENGINE_SPEC.md §3 (nap rules) + §7 (bedtime rules).
@@ -25,7 +25,7 @@
 
 import type { Context, Event, Settings } from "../../schemas";
 import type { Rule } from "../evaluator";
-import { hasType, isProjected, isRecordedEvent, projectedEvent } from "../helpers";
+import { hasType, isProjected, projectedEvent } from "../helpers";
 import { nextDayAt } from "../../ui/time";
 
 const isNap = hasType("nap");
@@ -35,13 +35,13 @@ const isBedtime = hasType("bedtime");
 const RuleSleepCascade: Rule = {
   id: "R3.1",
   description: "Sleep cascade: alternate wake_window/nap, substitute bedtime at threshold",
-  // Fire as long as no PROJECTED or RECORDED wake_window exists yet.
-  // User-tapped overrides (lifecycle.state: 'overridden') sit in
-  // ctx.actuals as metadata carriers — they don't block the cascade;
-  // R4.2 merges them onto the projection emitted below.
+  // Fire as long as no PROJECTED wake_window exists yet.
+  // Owner-annotation events (wake_window docs with lifecycle.state: 'recorded'
+  // from ctx.actuals) are scheduling metadata carriers — they must NOT block
+  // the cascade. R4.2 merges them onto the projected wake_windows emitted here.
+  // Only a completed or projected wake_window means the cascade already ran.
   matches: (events, ctx) =>
-    ctx.day.wakeTime !== undefined &&
-    !events.some((e) => isWakeWindow(e) && (isProjected(e) || isRecordedEvent(e))),
+    ctx.day.wakeTime !== undefined && !events.some((e) => isWakeWindow(e) && isProjected(e)),
   produces: (events, ctx) => projectSleepCascade(ctx, events),
 };
 
@@ -67,7 +67,7 @@ function projectSleepCascade(ctx: Context, existing: Event[]): Event[] {
     }
   }
 
-  // A manual bedtime (recorded/overridden) in actuals is authoritative.
+  // A manual bedtime (recorded) in actuals is authoritative.
   // It pins the cascade's terminator at its startTime — no projected
   // bedtime is emitted, and nothing is emitted past it.
   const manualBedtime = existing.find((e) => isBedtime(e) && !isProjected(e));
@@ -87,7 +87,7 @@ function projectSleepCascade(ctx: Context, existing: Event[]): Event[] {
     const baseWw = wws[Math.min(n - 1, wws.length - 1)]!;
     // Short-nap adjustment: if the previous nap is RECORDED (lifecycle
     // 'completed') and shorter than shortNapThresholdMinutes, shrink THIS
-    // wake window by shortNapAdjustmentMinutes. Annotations (overridden)
+    // wake window by shortNapAdjustmentMinutes. Annotations (recorded)
     // carry intent, not measurement, and don't trigger the adjustment.
     const prevRecordedShort =
       n > 1 && isShortRecordedNap(existingNapByKey.get(`nap_${n - 1}`), ctx);
@@ -106,9 +106,9 @@ function projectSleepCascade(ctx: Context, existing: Event[]): Event[] {
     const existingNap = existingNapByKey.get(napKey);
 
     // The nap's startTime is whichever the cascade lands on: reality
-    // wins (recorded/overridden) over projection.
+    // wins (recorded) over projection.
     //
-    // R3.6 inversion guard: an overridden start earlier than wwStart
+    // R3.6 inversion guard: an recorded start earlier than wwStart
     // (e.g. user shifted it before the previous nap ended) clamps to
     // wwStart so the WW renders zero-length rather than negative.
     const napStart = existingNap ? Math.max(wwStart, existingNap.startTime) : wwStart + wwMinutes;
@@ -116,7 +116,7 @@ function projectSleepCascade(ctx: Context, existing: Event[]): Event[] {
     // Bedtime substitution (R7.5 / R7.6 / R7.11): if no manual bedtime
     // exists AND this slot's PROJECTED nap would reach the threshold
     // (start ≥ threshold OR its interval crosses it), emit bedtime at
-    // napStart and stop the cascade. Reality wins: a recorded/overridden
+    // napStart and stop the cascade. Reality wins: a recorded
     // nap at this slot is NOT substituted — it stays as a nap.
     const wouldCrossThreshold = napStart >= threshold || napStart + napLen > threshold;
     if (!manualBedtime && !existingNap && wouldCrossThreshold) {
@@ -140,7 +140,10 @@ function projectSleepCascade(ctx: Context, existing: Event[]): Event[] {
     projected.push(buildWakeWindow(ctx, n, wwStart, napStart));
 
     if (existingNap) {
-      // Cursor advances from reality's endTime.
+      // Cascade cursor advances from the nap's actual endTime (or startTime +
+      // napLen if endTime is absent). Auto-extension (effectiveEndOf) is a
+      // RENDER-TIME concern — the cascade uses the recorded endTime so that
+      // past naps don't stretch future wake-windows into the current hour.
       cursor = existingNap.endTime ?? existingNap.startTime + napLen;
     } else {
       const napEnd = napStart + napLen;

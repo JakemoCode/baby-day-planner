@@ -9,22 +9,17 @@
  */
 
 import type { Event, EventType, TimeMin } from "../../schemas";
+import { effectiveEndOf } from "../../lib/effectiveEnd";
 
 export const PUTDOWN_KIND_TAG = "__putdown__";
 
 export type ExpandPutdownOptions = {
   putdownLeadMinutes: TimeMin;
   /**
-   * Soft-end for started naps with no recorded endTime. Used by the
-   * R6.8 in-progress overlap check. NOTE: also used for in-progress
-   * BEDTIME blocks today, where the right soft-end would be
-   * `nextDayAt(defaultWakeTime)`. The cascade doesn't project any
-   * putdown-eligible events after bedtime starts, so the mismatch
-   * isn't observable — but if a future change emits putdowns past
-   * bedtime, this becomes a real bug. Worth a dedicated soft-end
-   * helper at that point.
+   * Default nap length in minutes. Used by the R6.8 in-progress overlap
+   * check to compute effectiveEndOf for recorded naps.
    */
-  defaultNapLengthMinutes: TimeMin;
+  defaultNapLengthMinutes: number;
   /**
    * Wall-clock TimeMin. Undefined means "no clock provided, render
    * every hasPutdown event" — the read-only archived-day path.
@@ -34,7 +29,13 @@ export type ExpandPutdownOptions = {
 
 export function expandPutdownBlocks(events: Event[], options: ExpandPutdownOptions): Event[] {
   const { putdownLeadMinutes, defaultNapLengthMinutes, nowMinutes } = options;
-  const startedSleeps = events.filter(isInProgressSleep);
+  // In-progress sleeps are identified time-based (not by `started` state).
+  // When nowMinutes is undefined (archived-day path), this list is empty
+  // and the overlap gate is a no-op — every hasPutdown event passes.
+  const inProgressSleeps =
+    nowMinutes !== undefined
+      ? events.filter((e) => isInProgressSleep(e, defaultNapLengthMinutes, nowMinutes))
+      : [];
   const out: Event[] = [];
   for (const e of events) {
     out.push(e);
@@ -42,10 +43,11 @@ export function expandPutdownBlocks(events: Event[], options: ExpandPutdownOptio
       e.hasPutdown &&
       isStillFuture(e, nowMinutes) &&
       !windowOverlapsInProgressSleep(
-        startedSleeps,
+        inProgressSleeps,
         e.startTime - putdownLeadMinutes,
         e.startTime,
         defaultNapLengthMinutes,
+        nowMinutes,
       )
     ) {
       out.push(syntheticPutdown(e, putdownLeadMinutes));
@@ -63,21 +65,28 @@ function isStillFuture(parent: Event, nowMinutes: TimeMin | undefined): boolean 
 }
 
 // R6.8 — suppress a putdown chip whose window overlaps any in-progress
-// sleep block (started, no endTime). Once the user is already asleep,
-// the wind-down chip for the NEXT sleep is irrelevant and confusing.
-function isInProgressSleep(e: Event): boolean {
-  return (e.type === "nap" || e.type === "bedtime") && e.lifecycle.state === "started";
+// sleep block. "In progress" is a time property: lifecycle.state === "recorded"
+// AND startTime <= now AND now < effectiveEnd.
+function isInProgressSleep(e: Event, napLen: number, now: TimeMin): boolean {
+  if (e.type !== "nap" && e.type !== "bedtime") return false;
+  if (e.lifecycle.state !== "recorded") return false;
+  if (e.startTime > now) return false;
+  return now < effectiveEndOf(e, napLen, now);
 }
 
 function windowOverlapsInProgressSleep(
-  startedSleeps: Event[],
+  inProgressSleeps: Event[],
   windowStart: TimeMin,
   windowEnd: TimeMin,
-  defaultNapLengthMinutes: TimeMin,
+  napLen: number,
+  now: TimeMin | undefined,
 ): boolean {
-  return startedSleeps.some((s) => {
+  // No now → inProgressSleeps is already [] (see expandPutdownBlocks), so
+  // .some never iterates. The `now` arg is unused in that case.
+  if (inProgressSleeps.length === 0 || now === undefined) return false;
+  return inProgressSleeps.some((s) => {
     const sStart = s.startTime;
-    const sEnd = s.endTime ?? s.startTime + defaultNapLengthMinutes;
+    const sEnd = effectiveEndOf(s, napLen, now);
     return windowStart < sEnd && windowEnd > sStart;
   });
 }

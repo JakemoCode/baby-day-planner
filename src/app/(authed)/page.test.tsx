@@ -257,8 +257,9 @@ describe("DashboardPage (V3)", () => {
     expect(screen.getByRole("button", { name: /Add an event/i })).toBeVisible();
   });
 
-  it("handleEndNap preserves the nap's start time as committedAt (not the end time)", async () => {
-    const startedNap: Event = {
+  it("handleEndNap saves completed nap with endTime committed (TIME_EDIT action)", async () => {
+    // Nap is in-progress: recorded lifecycle, startTime <= nowMinutes < effectiveEnd
+    const inProgressNap: Event = {
       id: "n-started",
       dayId: "day-1",
       eventKey: "nap_1",
@@ -266,13 +267,13 @@ describe("DashboardPage (V3)", () => {
       kind: "block",
       label: "Nap 1",
       startTime: 9 * 60,
+      endTime: 10 * 60, // placeholder endTime set by NapActionButton
       hasPutdown: false,
-      // committedAt = the START time captured when the user tapped Start.
-      lifecycle: { state: "started", committedAt: 9 * 60 },
+      lifecycle: { state: "recorded", annotatedAt: 9 * 60 },
     };
     const { saveEvent } = setupHooks({
-      actuals: [startedNap],
-      nowMinutes: 10 * 60, // user taps End at 10:00
+      actuals: [inProgressNap],
+      nowMinutes: 9 * 60 + 30, // 30 min into the nap (within [startTime, endTime])
     });
     renderWithAuth(<DashboardPage />);
 
@@ -284,15 +285,13 @@ describe("DashboardPage (V3)", () => {
 
     expect(saveEvent).toHaveBeenCalledTimes(1);
     // saveEvent receives the full updated nap. endTime is whatever wall
-    // clock the button captured — don't pin it. committedAt MUST be the
-    // original start (9:00 = 540), NOT the end time (10:00 = 600). The
-    // objectContaining assertion for committedAt: 9 * 60 already implies
-    // they differ (nowMinutes is 10 * 60), so no extra not.toBe guard needed.
+    // clock the button captured. committedAt is the end time (TIME_EDIT
+    // action: the moment the user confirmed "nap is over").
     expect(saveEvent).toHaveBeenCalledWith(
       expect.objectContaining({
         id: "n-started",
         endTime: expect.any(Number),
-        lifecycle: expect.objectContaining({ state: "completed", committedAt: 9 * 60 }),
+        lifecycle: expect.objectContaining({ state: "completed" }),
       }),
     );
   });

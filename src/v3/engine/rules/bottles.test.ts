@@ -653,31 +653,31 @@ describe("R5.1 — cascade interval honors bottleIntervalRules", () => {
 });
 
 // ---------------------------------------------------------------------------
-// R5.1 / R5.11 — overridden bottles anchor the cascade
+// R5.1 / R5.11 — recorded (user-annotated) bottles anchor the cascade
 // ---------------------------------------------------------------------------
 //
 // Click-test bug (Jake, 2026-05-12): tapping a projected bottle in the
-// drawer and assigning an "other" owner produces an `overridden` doc
-// (formToEvent: projected + no time change → overridden, preserving the
+// drawer and assigning an "other" owner produces a `recorded` doc
+// (formToEvent: projected + no time change → recorded, preserving the
 // predicted slot as scheduling intent). The engine then stopped cascading:
-//   - R5.11 saw the overridden bottle exist → did NOT fire (gated on
+//   - R5.11 saw the recorded bottle exist → did NOT fire (gated on
 //     `!events.some(isBottle)`).
-//   - R5.1 saw the overridden bottle but it isn't `isRecordedEvent` →
+//   - R5.1 saw the recorded bottle but it isn't `isRecordedEvent` →
 //     did NOT fire (gated on `bottles.some(isRecordedEvent)`).
-// Result: the engine output only the single overridden bottle, no
+// Result: the engine output only the single recorded bottle, no
 // downstream projections.
 //
 // Predict-don't-prescribe: the user's owner assignment IS a commitment
-// to that slot — the engine should treat overridden bottles like other
-// non-projected bottles for cascade-anchoring purposes (same as
-// recorded). Only `projected` is "the engine made this up."
-describe("R5.1 — overridden bottles anchor the cascade", () => {
-  it("with one overridden bottle at 8:30, projects the remaining bottles_per_day at interval", () => {
+// to that slot — the engine should treat recorded bottles like other
+// non-projected bottles for cascade-anchoring purposes.
+// Only `projected` is "the engine made this up."
+describe("R5.1 — recorded bottles anchor the cascade", () => {
+  it("with one recorded bottle at 8:30, projects the remaining bottles_per_day at interval", () => {
     const overridden: Event = aProjectedBottle({
       id: "manual_bottle_1",
       eventKey: "bottle_1",
       start: 8 * 60 + 30,
-      lifecycle: { state: "overridden", annotatedAt: 8 * 60 + 30 },
+      lifecycle: { state: "recorded", annotatedAt: 8 * 60 + 30 },
     });
 
     const ctx = aContext({
@@ -712,15 +712,14 @@ describe("R5.1 — overridden bottles anchor the cascade", () => {
       20 * 60 + 30,
       23 * 60 + 30,
     ]);
-    // Overridden anchor preserved (§0 reality-wins extended to user
-    // commitment).
+    // Recorded anchor preserved (§0 reality-wins: user committed to this slot).
     expect(bottles[0]?.id).toBe(overridden.id);
-    expect(bottles[0]?.lifecycle.state).toBe("overridden");
+    expect(bottles[0]?.lifecycle.state).toBe("recorded");
     expect(bottles.slice(1).every((b) => b.lifecycle.state === "projected")).toBe(true);
   });
 
-  it("R5.8 + backfill together fill the morning when overridden anchor is late-day", () => {
-    // Mirrors Jake's 2026-05-12 screenshot: overridden bottle at 19:10
+  it("R5.8 + backfill together fill the morning when recorded anchor is late-day", () => {
+    // Mirrors Jake's 2026-05-12 screenshot: recorded bottle at 19:10
     // (post-bedtime threshold), bottlesPerDay=5, defaultWakeTime=7:00.
     //
     // With bidirectional sequential cascade + midnight rule (cascade
@@ -746,7 +745,7 @@ describe("R5.1 — overridden bottles anchor the cascade", () => {
       id: "manual_bottle_1",
       eventKey: "bottle_1",
       start: 19 * 60 + 10,
-      lifecycle: { state: "overridden", annotatedAt: 19 * 60 + 10 },
+      lifecycle: { state: "recorded", annotatedAt: 19 * 60 + 10 },
     });
 
     const ctx = aContext({
@@ -787,13 +786,13 @@ describe("R5.1 — overridden bottles anchor the cascade", () => {
     expect(uniqueStarts.size).toBe(bottles.length);
     // Anchor preserved.
     const anchor = bottles.find((b) => b.id === overridden.id);
-    expect(anchor?.lifecycle.state).toBe("overridden");
+    expect(anchor?.lifecycle.state).toBe("recorded");
   });
 
-  it("with both an overridden AND a recorded bottle, cascade anchors from the LATER one", () => {
+  it("with two recorded bottles, cascade anchors from the LATER one", () => {
     // Reality-wins still applies: the latest non-projected bottle (by
-    // startTime) is the anchor, regardless of which lifecycle state it's
-    // in. A recorded bottle at 10:00 and an overridden bottle at 13:00
+    // startTime) is the anchor, regardless of when it was annotated.
+    // A recorded bottle at 10:00 and another recorded bottle at 13:00
     // → cascade resumes from 13:00.
     const recorded = aRecordedBottle({
       id: "actual_bottle_1",
@@ -805,7 +804,7 @@ describe("R5.1 — overridden bottles anchor the cascade", () => {
       id: "manual_bottle_2",
       eventKey: "bottle_2",
       start: 13 * 60,
-      lifecycle: { state: "overridden", annotatedAt: 13 * 60 },
+      lifecycle: { state: "recorded", annotatedAt: 13 * 60 },
     });
 
     const ctx = aContext({
@@ -832,7 +831,7 @@ describe("R5.1 — overridden bottles anchor the cascade", () => {
       .sort((a, b) => a.startTime - b.startTime);
 
     // Anchored cascade extends to midnight:
-    //   10:00 (recorded), 13:00 (overridden) — anchors.
+    //   10:00 (recorded), 13:00 (recorded) — both anchors.
     //   Backfill from earliest (10:00): 10:00 - 180 = 7:00 < 7:10 → stop.
     //   Forward from latest (13:00): 16:00, 19:00, 22:00, then 25:00 ≥ 1440 → stop.
     expect(bottles.map((b) => b.startTime)).toEqual([10 * 60, 13 * 60, 16 * 60, 19 * 60, 22 * 60]);

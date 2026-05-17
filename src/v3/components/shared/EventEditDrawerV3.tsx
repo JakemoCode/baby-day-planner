@@ -237,8 +237,8 @@ export function EventEditDrawerV3({
     // is the next morning's wake (defaultWakeTime + 24h), NOT the
     // source nap's endTime — the nap's recorded endTime represents
     // a within-day sleep, but bedtime extends through the night.
-    // Lifecycle is `started` (bedtime is in progress; the user is
-    // declaring the day's bedtime begins here).
+    // Lifecycle is `recorded` (user is anchoring bedtime in reality;
+    // "in progress" is a time property, not a lifecycle state).
     const bedtimeBase: Event = {
       id: "bedtime",
       dayId: napCandidate.dayId,
@@ -249,12 +249,10 @@ export function EventEditDrawerV3({
       startTime: napCandidate.startTime,
       endTime: nextDayAt(defaultWakeTime),
       hasPutdown: false,
-      // `overridden`, not `started`: putdown.ts derives hasPutdown
-      // from {projected, overridden} only — `started` silently drops
-      // the chip. Cascade's manualBedtime check is `!isProjected`,
-      // so `overridden` remains authoritative and matches the
-      // existing drawer-edit override shape.
-      lifecycle: { state: "overridden", annotatedAt: nowMinutes },
+      // `recorded`: putdown.ts derives hasPutdown from {projected, recorded}.
+      // Cascade's manualBedtime check is `!isProjected`, so `recorded`
+      // remains authoritative and matches the drawer-edit shape.
+      lifecycle: { state: "recorded", annotatedAt: nowMinutes },
       ...(napCandidate.owner ? { owner: napCandidate.owner } : {}),
     };
     // Sequence: delete original FIRST so the dual-doc state can never

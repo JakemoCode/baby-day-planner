@@ -10,7 +10,7 @@
  * Mechanics:
  * - UI persists an Event doc when the user picks an owner on a projected
  *   wake_window: `{ type: 'wake_window', eventKey: 'wake_window_2',
- *   lifecycle.state: 'overridden', owner, label? }`.
+ *   lifecycle.state: 'recorded', owner, label? }`.
  * - That doc lives in `ctx.actuals` and seeds the events array.
  * - R3.1 emits a fresh PROJECTED wake_window_2 from the nap cascade
  *   (R3.1's match was loosened to ignore non-projected wake_windows).
@@ -35,7 +35,7 @@ import { hasType, isProjected } from "../helpers";
 const isWakeWindow = hasType("wake_window");
 
 function isWakeWindowOverride(e: Event): boolean {
-  return isWakeWindow(e) && e.lifecycle.state === "overridden";
+  return isWakeWindow(e) && e.lifecycle.state === "recorded";
 }
 
 const RuleApplyWakeWindowOverrides: Rule = {

@@ -2,7 +2,7 @@
  * createEventTemplate seeds a projected V3 Event for the FAB-driven
  * "add event" flow. The drawer then promotes it to the right lifecycle
  * state at save (formToEvent decides — projected → completed/started/
- * overridden based on what the user changes).
+ * recorded based on what the user changes).
  *
  * Sequential eventKeys (`bottle_N`, `nap_N`) anchor the engine's
  * cascade so chained types continue forecasting from the new event.
