@@ -35,9 +35,18 @@ type ButtonMode =
   | { kind: "end-nap"; nap: Event }
   | { kind: "end-bedtime"; bedtime: Event }
   | { kind: "start-bedtime" }
-  | { kind: "start-nap"; projected: Event }
-  | { kind: "disabled" };
+  | { kind: "start-nap"; projected: Event };
 
+// Priority chain:
+//  - End an in-progress sleep first (nap wins over bedtime if both somehow
+//    coexist; cascade prevents that in practice).
+//  - Past threshold → start bedtime (DOMAIN.md §3 — bedtime is bedtime).
+//  - Else if cascade projected a next nap → start that nap.
+//  - Else → fall back to start-bedtime. The genuine "day is over" UX is
+//    `EndOfDayCard` (rendered earlier in the dashboard), not this button.
+//    Defaulting to start-bedtime keeps the CTA always actionable; the user
+//    can always anchor bedtime since saveEvent's deterministic id="bedtime"
+//    just updates the existing doc.
 function decideMode(
   inProgressNap: Event | undefined,
   inProgressBedtime: Event | undefined,
@@ -48,8 +57,7 @@ function decideMode(
   if (inProgressBedtime) return { kind: "end-bedtime", bedtime: inProgressBedtime };
   if (pastThreshold) return { kind: "start-bedtime" };
   if (nextProjectedNap) return { kind: "start-nap", projected: nextProjectedNap };
-  // No in-progress sleep, no upcoming nap, not past threshold — day is done.
-  return { kind: "disabled" };
+  return { kind: "start-bedtime" };
 }
 
 const MODE_LABEL: Record<ButtonMode["kind"], string> = {
@@ -57,7 +65,6 @@ const MODE_LABEL: Record<ButtonMode["kind"], string> = {
   "end-bedtime": "End Bedtime",
   "start-bedtime": "Start Bedtime Now",
   "start-nap": "Start Nap Now",
-  disabled: "Day Complete",
 };
 
 export function NapActionButton({
@@ -111,9 +118,10 @@ export function NapActionButton({
     }
 
     // Standard path: promote nextProjectedNap. Under the physiology
-    // cascade nextProjectedNap is always defined within-day; if a
-    // caller invokes this without one (e.g. settings misconfigured),
-    // mode.kind will be "disabled" and the button is non-interactive.
+    // cascade nextProjectedNap is always defined within-day; if it's
+    // absent (e.g. completed bedtime suppresses all subsequent naps),
+    // decideMode would have returned "start-bedtime" instead, so this
+    // branch is reachable only when nextProjectedNap exists.
     if (mode.kind === "start-nap") {
       const nap: Event = {
         id: mode.projected.eventKey,
@@ -132,10 +140,9 @@ export function NapActionButton({
   };
 
   const label = MODE_LABEL[mode.kind];
-  const isDisabled = mode.kind === "disabled";
 
   return (
-    <ActionButton variant="secondary" onClick={handleClick} disabled={isDisabled}>
+    <ActionButton variant="secondary" onClick={handleClick}>
       {label}
     </ActionButton>
   );

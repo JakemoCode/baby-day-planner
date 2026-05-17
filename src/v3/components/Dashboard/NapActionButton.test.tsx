@@ -120,7 +120,12 @@ describe("NapActionButton", () => {
     expect(endTime).toBeLessThan(24 * 60);
   });
 
-  it("renders 'Day Complete' and is disabled when no in-progress sleep, not past threshold, no nextProjectedNap", () => {
+  it("falls back to 'Start Bedtime Now' when no in-progress sleep + not past threshold + no nextProjectedNap", () => {
+    // Edge case: bedtime already completed earlier and the cascade has
+    // suppressed all subsequent naps. The button stays actionable —
+    // saveEvent's deterministic id="bedtime" lets a re-tap update the
+    // existing bedtime doc with a fresh startTime. The true "day is
+    // over" UX is EndOfDayCard (rendered elsewhere on the dashboard).
     render(
       <NapActionButton
         {...makeProps({
@@ -131,9 +136,9 @@ describe("NapActionButton", () => {
         })}
       />,
     );
-    const btn = screen.getByRole("button", { name: /day complete/i });
+    const btn = screen.getByRole("button", { name: /start bedtime now/i });
     expect(btn).toBeVisible();
-    expect(btn).toBeDisabled();
+    expect(btn).not.toBeDisabled();
   });
 });
 
