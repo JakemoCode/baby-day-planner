@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Event } from "../schemas";
-import { effectiveEndOf } from "./effectiveEnd";
+import { effectiveEndOf, isInProgress } from "./effectiveEnd";
 
 const napLen = 60; // minutes
 
@@ -127,5 +127,46 @@ describe("effectiveEndOf", () => {
       lifecycle: { state: "recorded", annotatedAt: 9 * 60 },
     };
     expect(effectiveEndOf(nap, napLen, 18 * 60)).toBe(13 * 60);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// isInProgress
+// ---------------------------------------------------------------------------
+
+describe("isInProgress", () => {
+  it("returns true for a recorded event with startTime <= now < effectiveEnd", () => {
+    const nap = recordedNap(9 * 60, 10 * 60);
+    // now = 9:30, effectiveEnd = 10:00 — in progress
+    expect(isInProgress(nap, napLen, 9 * 60 + 30)).toBe(true);
+  });
+
+  it("returns false when lifecycle.state !== 'recorded'", () => {
+    const projected: Event = {
+      id: "nap_1",
+      dayId: "day_test",
+      eventKey: "nap_1",
+      type: "nap",
+      kind: "block",
+      label: "Nap 1",
+      startTime: 9 * 60,
+      endTime: 10 * 60,
+      hasPutdown: false,
+      lifecycle: { state: "projected" },
+    };
+    expect(isInProgress(projected, napLen, 9 * 60 + 30)).toBe(false);
+  });
+
+  it("returns false when now is past the effectiveEnd (nap is over)", () => {
+    const nap = recordedNap(9 * 60, 10 * 60);
+    // now = 10:01 → effectiveEnd auto-extends to 11:00, still > now? No:
+    // now (10:01) >= effectiveEnd (11:00) is false — still in-progress.
+    // Use far-past-cap now instead:
+    expect(isInProgress(nap, napLen, 14 * 60)).toBe(false);
+  });
+
+  it("returns false when startTime > now (not started yet)", () => {
+    const nap = recordedNap(10 * 60, 11 * 60);
+    expect(isInProgress(nap, napLen, 9 * 60)).toBe(false);
   });
 });

@@ -67,6 +67,16 @@ const RuleApplyWakeWindowOverrides: Rule = {
       return [next];
     });
   },
+  // R3.1's matches predicate ("no PROJECTED wake_window") works because R4.2
+  // reliably drops every recorded wake_window annotation doc after merging.
+  // If any survive, R3.1 would misfire and produce a double-projection.
+  assertAfter: (events) => {
+    const orphan = events.find((e) => e.type === "wake_window" && e.lifecycle.state === "recorded");
+    if (orphan) {
+      return `R4.2 invariant violated: recorded wake_window ${orphan.id} (eventKey ${orphan.eventKey}) survived R4.2 merge. R3.1's matches predicate assumes these are dropped after R4.2 runs.`;
+    }
+    return null;
+  },
 };
 
 export const RULES: Rule[] = [RuleApplyWakeWindowOverrides];

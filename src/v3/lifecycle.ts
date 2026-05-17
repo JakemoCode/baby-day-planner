@@ -21,6 +21,44 @@
 
 import type { EventKind, EventType, Lifecycle, TimeMin } from "./schemas";
 
+// ---------------------------------------------------------------------------
+// Legacy lifecycle migration
+// ---------------------------------------------------------------------------
+
+/**
+ * Migrates pre-PR-#166 Firestore lifecycle shapes to the current vocabulary.
+ *
+ * "started" + "overridden" both meant "user-anchored event"; the post-#166
+ * vocabulary collapses them into "recorded". `committedAt` (from started)
+ * becomes the new `annotatedAt` since both mark the moment the user touched
+ * the event.
+ *
+ * Returns `null` when no migration is needed (lifecycle is already valid or
+ * unrecognized).
+ */
+export function migrateLegacyLifecycle(
+  lifecycle: unknown,
+  fallbackTime: TimeMin,
+): Lifecycle | null {
+  if (!lifecycle || typeof lifecycle !== "object") return null;
+  const state = (lifecycle as { state?: unknown }).state;
+  if (state === "started") {
+    const committedAt = (lifecycle as { committedAt?: unknown }).committedAt;
+    return {
+      state: "recorded",
+      annotatedAt: typeof committedAt === "number" ? committedAt : fallbackTime,
+    };
+  }
+  if (state === "overridden") {
+    const annotatedAt = (lifecycle as { annotatedAt?: unknown }).annotatedAt;
+    return {
+      state: "recorded",
+      annotatedAt: typeof annotatedAt === "number" ? annotatedAt : fallbackTime,
+    };
+  }
+  return null;
+}
+
 /**
  * Event types for which drawer time-edits are scheduling intent, not
  * recordings of reality.

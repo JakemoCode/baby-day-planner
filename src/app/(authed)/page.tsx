@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import type { Event, OwnershipTemplate } from "@/v3/schemas";
 import { isRecorded } from "@/v3/schemas";
 import { reduceLifecycle } from "@/v3/lifecycle";
-import { effectiveEndOf } from "@/v3/lib/effectiveEnd";
+import { isInProgress } from "@/v3/lib/effectiveEnd";
 import {
   currentWakeWindow,
   nextBottle,
@@ -135,11 +135,7 @@ export default function DashboardPage() {
   const nn = nextNap(projected, nowMinutes);
   const cww = currentWakeWindow(projected, nowMinutes);
   const inProgressNap = actuals.find(
-    (e) =>
-      e.type === "nap" &&
-      e.lifecycle.state === "recorded" &&
-      e.startTime <= nowMinutes &&
-      nowMinutes < effectiveEndOf(e, settings.defaultNapLengthMinutes, nowMinutes),
+    (e) => e.type === "nap" && isInProgress(e, settings.defaultNapLengthMinutes, nowMinutes),
   );
   const bottle1Pending = !actuals.some((e) => e.type === "bottle" && isRecorded(e.lifecycle));
 
