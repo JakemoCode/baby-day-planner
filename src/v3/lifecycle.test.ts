@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isSchedulingType, reduceLifecycle } from "./lifecycle";
+import { isSchedulingType, migrateLegacyLifecycle, reduceLifecycle } from "./lifecycle";
 import type { Lifecycle } from "./schemas";
 
 const projected: Lifecycle = { state: "projected" };
@@ -236,5 +236,41 @@ describe("reduceLifecycle — DRAWER_SAVE", () => {
       nowMinutes: NOW,
     });
     expect(next).toBe(completed);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// migrateLegacyLifecycle
+// ---------------------------------------------------------------------------
+
+describe("migrateLegacyLifecycle", () => {
+  it("migrates state: 'started' → 'recorded' (committedAt → annotatedAt)", () => {
+    const result = migrateLegacyLifecycle({ state: "started", committedAt: 9 * 60 + 2 }, 9 * 60);
+    expect(result).toEqual({ state: "recorded", annotatedAt: 9 * 60 + 2 });
+  });
+
+  it("migrates state: 'overridden' → 'recorded' (annotatedAt preserved)", () => {
+    const result = migrateLegacyLifecycle(
+      { state: "overridden", annotatedAt: 13 * 60 + 5 },
+      13 * 60,
+    );
+    expect(result).toEqual({ state: "recorded", annotatedAt: 13 * 60 + 5 });
+  });
+
+  it("uses fallbackTime as annotatedAt when legacy committedAt/annotatedAt is missing", () => {
+    const result = migrateLegacyLifecycle({ state: "started" }, 9 * 60);
+    expect(result).toEqual({ state: "recorded", annotatedAt: 9 * 60 });
+  });
+
+  it("returns null for modern lifecycle states (no migration needed)", () => {
+    expect(migrateLegacyLifecycle({ state: "completed", committedAt: 9 * 60 }, 9 * 60)).toBeNull();
+    expect(migrateLegacyLifecycle({ state: "recorded", annotatedAt: 9 * 60 }, 9 * 60)).toBeNull();
+    expect(migrateLegacyLifecycle({ state: "projected" }, 9 * 60)).toBeNull();
+  });
+
+  it("returns null for null/non-object input", () => {
+    expect(migrateLegacyLifecycle(null, 0)).toBeNull();
+    expect(migrateLegacyLifecycle(undefined, 0)).toBeNull();
+    expect(migrateLegacyLifecycle("started", 0)).toBeNull();
   });
 });

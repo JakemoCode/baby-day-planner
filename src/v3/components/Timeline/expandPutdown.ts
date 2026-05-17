@@ -9,7 +9,7 @@
  */
 
 import type { Event, EventType, TimeMin } from "../../schemas";
-import { effectiveEndOf } from "../../lib/effectiveEnd";
+import { effectiveEndOf, isInProgress } from "../../lib/effectiveEnd";
 
 export const PUTDOWN_KIND_TAG = "__putdown__";
 
@@ -68,10 +68,7 @@ function isStillFuture(parent: Event, nowMinutes: TimeMin | undefined): boolean 
 // sleep block. "In progress" is a time property: lifecycle.state === "recorded"
 // AND startTime <= now AND now < effectiveEnd.
 function isInProgressSleep(e: Event, napLen: number, now: TimeMin): boolean {
-  if (e.type !== "nap" && e.type !== "bedtime") return false;
-  if (e.lifecycle.state !== "recorded") return false;
-  if (e.startTime > now) return false;
-  return now < effectiveEndOf(e, napLen, now);
+  return (e.type === "nap" || e.type === "bedtime") && isInProgress(e, napLen, now);
 }
 
 function windowOverlapsInProgressSleep(

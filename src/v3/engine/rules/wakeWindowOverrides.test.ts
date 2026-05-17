@@ -20,6 +20,7 @@ import { PARENT1, PARENT2, aContext, aDay, aSettings, aTemplate } from "../../__
 import type { Context, Event, OwnerRef } from "../../schemas";
 import { projectDay } from "../projectDay";
 import { ALL_RULES } from "./index";
+import { RULES as R4_2_RULES } from "./wakeWindowOverrides";
 
 function run(ctx: Context): Event[] {
   return projectDay(
@@ -134,6 +135,49 @@ describe("R4.2 — wake_window owner overrides survive recompute", () => {
     // Cascade still produces wake_window_1 and wake_window_2.
     expect(out.find((e) => e.eventKey === "wake_window_1")).toBeDefined();
     expect(out.find((e) => e.eventKey === "wake_window_2")).toBeDefined();
+  });
+
+  it("assertAfter fires when a recorded wake_window survives R4.2 (regression guard)", () => {
+    // Simulate a scenario where a recorded wake_window somehow ends up in the
+    // output (e.g., a future bug in produces or a rule ordering change).
+    // assertAfter should catch it immediately rather than letting it corrupt R3.1.
+    const orphan: Event = {
+      id: "orphan_ww",
+      dayId: "day_test",
+      eventKey: "wake_window_1",
+      type: "wake_window",
+      kind: "block",
+      startTime: 7 * 60,
+      endTime: 9 * 60,
+      label: "Wake window 1",
+      hasPutdown: false,
+      lifecycle: { state: "recorded", annotatedAt: 7 * 60 },
+    };
+    const rule = R4_2_RULES[0];
+    if (!rule?.assertAfter) throw new Error("R4.2 rule must define assertAfter");
+    const ctx = aContext({});
+    const result = rule.assertAfter([orphan], ctx);
+    expect(result).toContain("R4.2 invariant violated");
+    expect(result).toContain("wake_window_1");
+  });
+
+  it("assertAfter passes when no recorded wake_windows remain", () => {
+    const projected: Event = {
+      id: "ww_proj",
+      dayId: "day_test",
+      eventKey: "wake_window_1",
+      type: "wake_window",
+      kind: "block",
+      startTime: 7 * 60,
+      endTime: 9 * 60,
+      label: "Wake window 1",
+      hasPutdown: false,
+      lifecycle: { state: "projected" },
+    };
+    const rule = R4_2_RULES[0];
+    if (!rule?.assertAfter) throw new Error("R4.2 rule must define assertAfter");
+    const ctx = aContext({});
+    expect(rule.assertAfter([projected], ctx)).toBeNull();
   });
 
   it("no overrides → cascade output is unchanged (regression guard)", () => {

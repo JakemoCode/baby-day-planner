@@ -24,6 +24,25 @@
 
 import type { Event, TimeMin } from "../schemas";
 
+/**
+ * True when an event is currently in its in-progress window:
+ * - lifecycle.state === "recorded" (user-anchored but not yet done)
+ * - startTime <= now (it has started)
+ * - now < effectiveEnd (it hasn't auto-extended past its cap)
+ *
+ * Callers are responsible for pre-filtering by event type (e.g. nap,
+ * bedtime) — this predicate only checks timing and lifecycle.
+ *
+ * Used by:
+ *   - inProgressNap selector (page.tsx) — End Nap button visibility
+ *   - expandPutdown.ts — R6.8 in-progress overlap gate
+ */
+export function isInProgress(e: Event, napLen: number, now: TimeMin): boolean {
+  if (e.lifecycle.state !== "recorded") return false;
+  if (e.startTime > now) return false;
+  return now < effectiveEndOf(e, napLen, now);
+}
+
 export function effectiveEndOf(event: Event, napLen: number, now: TimeMin): TimeMin {
   const { lifecycle, startTime, endTime } = event;
 
