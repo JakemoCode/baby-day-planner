@@ -67,7 +67,7 @@ function projectSleepCascade(ctx: Context, existing: Event[]): Event[] {
     }
   }
 
-  // A manual bedtime (recorded/overridden) in actuals is authoritative.
+  // A manual bedtime (recorded) in actuals is authoritative.
   // It pins the cascade's terminator at its startTime — no projected
   // bedtime is emitted, and nothing is emitted past it.
   const manualBedtime = existing.find((e) => isBedtime(e) && !isProjected(e));
@@ -87,7 +87,7 @@ function projectSleepCascade(ctx: Context, existing: Event[]): Event[] {
     const baseWw = wws[Math.min(n - 1, wws.length - 1)]!;
     // Short-nap adjustment: if the previous nap is RECORDED (lifecycle
     // 'completed') and shorter than shortNapThresholdMinutes, shrink THIS
-    // wake window by shortNapAdjustmentMinutes. Annotations (overridden)
+    // wake window by shortNapAdjustmentMinutes. Annotations (recorded)
     // carry intent, not measurement, and don't trigger the adjustment.
     const prevRecordedShort =
       n > 1 && isShortRecordedNap(existingNapByKey.get(`nap_${n - 1}`), ctx);
@@ -106,9 +106,9 @@ function projectSleepCascade(ctx: Context, existing: Event[]): Event[] {
     const existingNap = existingNapByKey.get(napKey);
 
     // The nap's startTime is whichever the cascade lands on: reality
-    // wins (recorded/overridden) over projection.
+    // wins (recorded) over projection.
     //
-    // R3.6 inversion guard: an overridden start earlier than wwStart
+    // R3.6 inversion guard: an recorded start earlier than wwStart
     // (e.g. user shifted it before the previous nap ended) clamps to
     // wwStart so the WW renders zero-length rather than negative.
     const napStart = existingNap ? Math.max(wwStart, existingNap.startTime) : wwStart + wwMinutes;
@@ -116,7 +116,7 @@ function projectSleepCascade(ctx: Context, existing: Event[]): Event[] {
     // Bedtime substitution (R7.5 / R7.6 / R7.11): if no manual bedtime
     // exists AND this slot's PROJECTED nap would reach the threshold
     // (start ≥ threshold OR its interval crosses it), emit bedtime at
-    // napStart and stop the cascade. Reality wins: a recorded/overridden
+    // napStart and stop the cascade. Reality wins: a recorded
     // nap at this slot is NOT substituted — it stays as a nap.
     const wouldCrossThreshold = napStart >= threshold || napStart + napLen > threshold;
     if (!manualBedtime && !existingNap && wouldCrossThreshold) {

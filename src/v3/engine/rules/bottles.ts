@@ -241,7 +241,7 @@ function projectBottleChain(events: Event[], ctx: Context): Event[] {
   // Step 1: trim projected bottles outside the rhythm chain
   // [wakeTime, cap). These are stale pass-1 projections that became
   // past-bedtime (or overnight, defensively) once R7.6 emitted a
-  // bedtime event. Recorded / overridden bottles are NEVER trimmed —
+  // bedtime event. Recorded / recorded bottles are NEVER trimmed —
   // they're protected by the reality-wins axiom and represent passive
   // members of the day (overnight feeds, dream feeds, etc.).
   const trimmedEvents = events.filter((e) => {
@@ -321,7 +321,7 @@ function projectBottleChain(events: Event[], ctx: Context): Event[] {
   }
 
   // === Forward cascade ===
-  // Uses the LATEST chain bottle (recorded, overridden, OR projected
+  // Uses the LATEST chain bottle (recorded, recorded, OR projected
   // from a prior pass) as the walker's `prev`. Idempotency: subsequent
   // evaluator passes extend the chain instead of re-emitting it.
   // Cap = bedtime.startTime if a bedtime exists, else MIDNIGHT — the

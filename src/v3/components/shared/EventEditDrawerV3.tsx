@@ -237,8 +237,8 @@ export function EventEditDrawerV3({
     // is the next morning's wake (defaultWakeTime + 24h), NOT the
     // source nap's endTime — the nap's recorded endTime represents
     // a within-day sleep, but bedtime extends through the night.
-    // Lifecycle is `started` (bedtime is in progress; the user is
-    // declaring the day's bedtime begins here).
+    // Lifecycle is `recorded` (user is anchoring bedtime in reality;
+    // "in progress" is a time property, not a lifecycle state).
     const bedtimeBase: Event = {
       id: "bedtime",
       dayId: napCandidate.dayId,

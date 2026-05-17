@@ -14,7 +14,7 @@
  * The screenshot scenario therefore implies either:
  *   - stale persisted data (a previously-projected bottle written
  *     to Firestore by a now-removed code path), OR
- *   - a recorded/overridden bottle past bedtime (reality wins;
+ *   - a recorded bottle past bedtime (reality wins;
  *     these are intentionally NOT relabeled — see unit tests), OR
  *   - dreamFeedEnabled didn't actually persist.
  */

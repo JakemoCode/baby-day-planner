@@ -6,10 +6,15 @@
  * else is passed through. V3 docs are already fully shaped; this is
  * insurance against partial writes / hand-edited docs.
  *
+ * Also handles a one-time lifecycle migration: legacy docs with
+ * `state: "started"` or `state: "overridden"` are rewritten to the
+ * post-PR-#166 vocabulary (`recorded`). Both legacy states map to
+ * `recorded` because both meant "user has anchored this event."
+ *
  * Used by `v3EventConverter.fromFirestore` — the single canonical seam.
  */
 
-import type { Event, EventKind, EventType } from "../schemas";
+import type { Event, EventKind, EventType, Lifecycle, TimeMin } from "../schemas";
 
 function deriveKind(input: Partial<Event>): EventKind {
   if (input.kind) return input.kind;
@@ -20,7 +25,33 @@ function deriveKind(input: Partial<Event>): EventKind {
   return "instant";
 }
 
+// Legacy lifecycle shapes that may still exist in older Firestore docs.
+// "started" + "overridden" both meant "user-anchored event"; the post-#166
+// vocabulary collapses them into "recorded". `committedAt` (from started)
+// becomes the new `annotatedAt` since both mark the moment the user touched
+// the event. Returns `null` to mean "no migration needed" (already valid).
+function migrateLegacyLifecycle(lifecycle: unknown, fallbackTime: TimeMin): Lifecycle | null {
+  if (!lifecycle || typeof lifecycle !== "object") return null;
+  const state = (lifecycle as { state?: unknown }).state;
+  if (state === "started") {
+    const committedAt = (lifecycle as { committedAt?: unknown }).committedAt;
+    return {
+      state: "recorded",
+      annotatedAt: typeof committedAt === "number" ? committedAt : fallbackTime,
+    };
+  }
+  if (state === "overridden") {
+    const annotatedAt = (lifecycle as { annotatedAt?: unknown }).annotatedAt;
+    return {
+      state: "recorded",
+      annotatedAt: typeof annotatedAt === "number" ? annotatedAt : fallbackTime,
+    };
+  }
+  return null;
+}
+
 export function withV3EventDefaults(input: Partial<Event>): Event {
+  const migratedLifecycle = migrateLegacyLifecycle(input.lifecycle, input.startTime ?? 0);
   const out: Event = {
     id: input.id ?? "",
     dayId: input.dayId ?? "",
@@ -30,7 +61,7 @@ export function withV3EventDefaults(input: Partial<Event>): Event {
     startTime: input.startTime ?? 0,
     label: input.label ?? "",
     hasPutdown: input.hasPutdown ?? false,
-    lifecycle: input.lifecycle ?? { state: "projected" },
+    lifecycle: migratedLifecycle ?? input.lifecycle ?? { state: "projected" },
   };
 
   if (input.endTime !== undefined) out.endTime = input.endTime;

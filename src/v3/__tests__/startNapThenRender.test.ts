@@ -123,6 +123,121 @@ describe("seam: Start Nap Now → renderProjection", () => {
     expect(putdownChips.length).toBeGreaterThan(0);
   });
 
+  // The original Jake bug (2026-05-16): renderer reads event.endTime, so an
+  // in-progress recorded nap whose `now > endTime` rendered clipped at the
+  // placeholder. renderProjection now bakes effectiveEnd into the event so
+  // the renderer naturally draws the extended block.
+  it("renderProjection rewrites in-progress recorded nap endTime to effectiveEnd (R6.8 visual fix)", () => {
+    const wakeTime = 7 * 60;
+    const napLen = 60;
+    // nap_1 recorded at 9:00, placeholder endTime = 10:00. Now = 10:30 (30 min past).
+    // Expected: rendered nap_1 has endTime rewritten to 11:00 (1 extension).
+    const nap1 = recordedNapSlot(1, 9 * 60, napLen);
+
+    const settings = aSettings({
+      defaultNapLengthMinutes: napLen,
+      putdownLeadMinutes: 15,
+      wakeWindowsMinutes: [120, 135],
+      bedtimeThreshold: 19 * 60,
+      defaultWakeTime: wakeTime,
+    });
+    const day = aDay({ wakeTime });
+    const ctx = aContext({
+      day,
+      settings,
+      actuals: [nap1],
+      nowMinutes: 10 * 60 + 30, // 30 min past placeholder
+    });
+
+    const projected = projectDay({
+      day: ctx.day,
+      settings: ctx.settings,
+      actuals: ctx.actuals,
+      nowMinutes: ctx.nowMinutes,
+    });
+
+    const rendered = renderProjection(projected, settings, ctx.nowMinutes);
+    const renderedNap1 = rendered.find((e) => e.id === "nap_1");
+    // endTime is rewritten to effectiveEnd. baseEnd=10:00, now=10:30, 1 extension → 11:00.
+    expect(renderedNap1?.endTime).toBe(11 * 60);
+  });
+
+  it("renderProjection bakes cap when nap is far past extensions", () => {
+    const wakeTime = 7 * 60;
+    const napLen = 60;
+    const nap1 = recordedNapSlot(1, 9 * 60, napLen);
+
+    const settings = aSettings({
+      defaultNapLengthMinutes: napLen,
+      putdownLeadMinutes: 15,
+      wakeWindowsMinutes: [120, 135],
+      bedtimeThreshold: 23 * 60,
+      defaultWakeTime: wakeTime,
+    });
+    const day = aDay({ wakeTime });
+    const ctx = aContext({
+      day,
+      settings,
+      actuals: [nap1],
+      nowMinutes: 18 * 60, // way past cap (cap = 9:00 + 4*60 = 13:00)
+    });
+
+    const projected = projectDay({
+      day: ctx.day,
+      settings: ctx.settings,
+      actuals: ctx.actuals,
+      nowMinutes: ctx.nowMinutes,
+    });
+
+    const rendered = renderProjection(projected, settings, ctx.nowMinutes);
+    const renderedNap1 = rendered.find((e) => e.id === "nap_1");
+    // Capped at startTime + 4*napLen = 13:00.
+    expect(renderedNap1?.endTime).toBe(13 * 60);
+  });
+
+  it("renderProjection does NOT rewrite endTime for completed naps", () => {
+    const wakeTime = 7 * 60;
+    const napLen = 60;
+    const settings = aSettings({
+      defaultNapLengthMinutes: napLen,
+      putdownLeadMinutes: 15,
+      wakeWindowsMinutes: [120, 135],
+      bedtimeThreshold: 19 * 60,
+      defaultWakeTime: wakeTime,
+    });
+    const day = aDay({ wakeTime });
+    // Completed nap with explicit endTime; never auto-extended.
+    const completedNap: Event = {
+      id: "nap_1",
+      dayId: "day_test",
+      eventKey: "nap_1",
+      type: "nap",
+      kind: "block",
+      label: "Nap 1",
+      startTime: 9 * 60,
+      endTime: 9 * 60 + 30, // user explicitly ended early
+      hasPutdown: false,
+      lifecycle: { state: "completed", committedAt: 9 * 60 },
+    };
+    const ctx = aContext({
+      day,
+      settings,
+      actuals: [completedNap],
+      nowMinutes: 14 * 60, // long after
+    });
+
+    const projected = projectDay({
+      day: ctx.day,
+      settings: ctx.settings,
+      actuals: ctx.actuals,
+      nowMinutes: ctx.nowMinutes,
+    });
+
+    const rendered = renderProjection(projected, settings, ctx.nowMinutes);
+    const renderedNap1 = rendered.find((e) => e.id === "nap_1");
+    expect(renderedNap1?.endTime).toBe(9 * 60 + 30); // unchanged
+  });
+
   it("effectiveEnd caps at startTime + 4×napLen — applies at render time (expandPutdown), not cascade", () => {
     const wakeTime = 7 * 60;
     const napLen = 60;

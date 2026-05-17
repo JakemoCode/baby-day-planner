@@ -4,7 +4,7 @@
  * Returns a fully-shaped V3 Event in `lifecycle: { state: "projected" }`
  * — the drawer's `formToEvent` transform decides the final lifecycle
  * state based on what the user changes (time edit → completed/started,
- * owner-only edit → overridden).
+ * owner-only edit → recorded).
  *
  * Sequential `eventKey`s for chained types (`bottle_N`, `nap_N`)
  * anchor the engine's cascade so chained projections continue from

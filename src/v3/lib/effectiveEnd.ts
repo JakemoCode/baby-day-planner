@@ -9,11 +9,14 @@
  * When a recorded nap has no endTime (legacy data or edge case), the soft end
  * is `startTime + napLen` — same placeholder the cascade uses.
  *
- * Used by:
- *   - cascade cursor advancement (naps.ts)
- *   - inProgressNap selector (page.tsx)
- *   - putdown overlap gate (expandPutdown.ts)
- *   - timeline renderer end computation
+ * Used by (render-layer only):
+ *   - inProgressNap selector (page.tsx) — End Nap button visibility
+ *   - putdown overlap gate (expandPutdown.ts) — R6.8
+ *   - renderProjection — bakes effective endTime into rendered event
+ *
+ * NOT used by the cascade cursor in naps.ts: past naps shouldn't stretch
+ * future wake-windows, so the cascade advances by the recorded endTime
+ * directly. Auto-extend is a render-only concern.
  *
  * Only extends for `lifecycle.state === "recorded"`. All other states
  * (projected, completed) pass through `event.endTime ?? event.startTime`.

@@ -733,7 +733,7 @@ describe("R7.7 — manual bedtime is the user's authoritative declaration", () =
   });
 });
 
-describe("Overridden bedtime gets putdown synth (regression: 2026-05-15 conversion-loses-putdown bug)", () => {
+describe("Recorded bedtime gets putdown synth (regression: 2026-05-15 conversion-loses-putdown bug; post-#166 lifecycle rename)", () => {
   // When the past-threshold "Change to bedtime?" prompt converts a
   // nap to bedtime, the bedtime doc has lifecycle `overridden`. The
   // putdown rule (R6.1) derives hasPutdown from {projected,overridden}

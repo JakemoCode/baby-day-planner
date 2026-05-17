@@ -166,6 +166,11 @@ export const v3EventBottleDoc: Record<string, unknown> = {
   owner: { slot: "parent1" },
 };
 
+// Recorded in-progress nap fixture. Pre-#166 this was named "Started" with
+// lifecycle.state === "started" and no endTime; the post-#166 model is that
+// every nap has an endTime (set on Start Nap Now to startTime + napLen),
+// and "in progress" is a time property — `recorded` + now within
+// [startTime, effectiveEnd).
 export const v3EventNapStartedDoc: Record<string, unknown> = {
   id: "nap-aaaa-bbbb",
   dayId: "day-2026-05-09",
@@ -173,10 +178,10 @@ export const v3EventNapStartedDoc: Record<string, unknown> = {
   type: "nap",
   kind: "block",
   startTime: 9 * 60, // 540
-  // no endTime — started
+  endTime: 9 * 60 + 90, // placeholder = startTime + defaultNapLengthMinutes
   label: "Nap 1",
   hasPutdown: false,
-  lifecycle: { state: "started", committedAt: 9 * 60 + 2 },
+  lifecycle: { state: "recorded", annotatedAt: 9 * 60 + 2 },
   owner: { slot: "parent2" },
 };
 

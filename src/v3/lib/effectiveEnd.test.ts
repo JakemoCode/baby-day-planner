@@ -97,4 +97,35 @@ describe("effectiveEndOf", () => {
     };
     expect(effectiveEndOf(nap, napLen, 9 * 60 + 30)).toBe(10 * 60);
   });
+
+  // Boundary tests for the cap (regression guard against off-by-one in the
+  // Math.min(3, ...) clamp).
+  it("at exactly 3 extensions away (now = baseEnd + 3*napLen): caps at 4*napLen total", () => {
+    const nap = recordedNap(9 * 60, 10 * 60);
+    // baseEnd = 10:00, +3*napLen = 13:00. now = 13:00 → cap.
+    expect(effectiveEndOf(nap, napLen, 13 * 60)).toBe(13 * 60);
+  });
+
+  it("just past the cap (now = baseEnd + 4*napLen): still capped at 4*napLen total", () => {
+    const nap = recordedNap(9 * 60, 10 * 60);
+    // baseEnd = 10:00, +4*napLen = 14:00. now = 14:00 → still capped at 13:00.
+    expect(effectiveEndOf(nap, napLen, 14 * 60)).toBe(13 * 60);
+  });
+
+  it("recorded nap with no endTime, overrun + cap: base = startTime+napLen, capped at startTime+4*napLen", () => {
+    // No endTime: base = 9:00 + 60 = 10:00. Cap = base + 3*napLen = 13:00.
+    // now = 18:00 (way past cap) → capped at 13:00.
+    const nap: Event = {
+      id: "nap_1",
+      dayId: "day_test",
+      eventKey: "nap_1",
+      type: "nap",
+      kind: "block",
+      label: "Nap 1",
+      startTime: 9 * 60,
+      hasPutdown: false,
+      lifecycle: { state: "recorded", annotatedAt: 9 * 60 },
+    };
+    expect(effectiveEndOf(nap, napLen, 18 * 60)).toBe(13 * 60);
+  });
 });

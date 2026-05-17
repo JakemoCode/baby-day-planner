@@ -29,24 +29,25 @@ export type ExpandPutdownOptions = {
 
 export function expandPutdownBlocks(events: Event[], options: ExpandPutdownOptions): Event[] {
   const { putdownLeadMinutes, defaultNapLengthMinutes, nowMinutes } = options;
-  const now = nowMinutes;
   // In-progress sleeps are identified time-based (not by `started` state).
+  // When nowMinutes is undefined (archived-day path), this list is empty
+  // and the overlap gate is a no-op — every hasPutdown event passes.
   const inProgressSleeps =
-    now !== undefined
-      ? events.filter((e) => isInProgressSleep(e, defaultNapLengthMinutes, now))
+    nowMinutes !== undefined
+      ? events.filter((e) => isInProgressSleep(e, defaultNapLengthMinutes, nowMinutes))
       : [];
   const out: Event[] = [];
   for (const e of events) {
     out.push(e);
     if (
       e.hasPutdown &&
-      isStillFuture(e, now) &&
+      isStillFuture(e, nowMinutes) &&
       !windowOverlapsInProgressSleep(
         inProgressSleeps,
         e.startTime - putdownLeadMinutes,
         e.startTime,
         defaultNapLengthMinutes,
-        now ?? 0,
+        nowMinutes,
       )
     ) {
       out.push(syntheticPutdown(e, putdownLeadMinutes));
@@ -78,8 +79,11 @@ function windowOverlapsInProgressSleep(
   windowStart: TimeMin,
   windowEnd: TimeMin,
   napLen: number,
-  now: TimeMin,
+  now: TimeMin | undefined,
 ): boolean {
+  // No now → inProgressSleeps is already [] (see expandPutdownBlocks), so
+  // .some never iterates. The `now` arg is unused in that case.
+  if (inProgressSleeps.length === 0 || now === undefined) return false;
   return inProgressSleeps.some((s) => {
     const sStart = s.startTime;
     const sEnd = effectiveEndOf(s, napLen, now);

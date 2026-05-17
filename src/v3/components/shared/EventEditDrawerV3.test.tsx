@@ -268,7 +268,7 @@ describe("EventEditDrawerV3", () => {
     expect(screen.queryByRole("button", { name: "Delete" })).not.toBeInTheDocument();
   });
 
-  // PR-A0.4: re-edits of an already-overridden event must update the
+  // PR-A0.4: re-edits of an already-recorded event must update the
   // existing Firestore doc, not create a duplicate. The timeline page's
   // onSave routes via `actuals.some(a => a.id === drawer.event.id)` —
   // this wrapper mirrors that logic so we can verify the routing
