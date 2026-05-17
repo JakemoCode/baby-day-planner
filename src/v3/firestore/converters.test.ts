@@ -61,7 +61,7 @@ describe("v3SettingsConverter", () => {
     expect(back.bottleChain).toEqual({ bottlesPerDay: 5, bufferAfterWakeMinutes: 10 });
     expect(back.daycare.enabled).toBe(false);
     expect(back.owners.parent1.displayName).toBe("");
-    expect(back.wakeWindowsMinutes).toEqual([120, 150, 180, 180, 180, 180]);
+    expect(back.wakeWindowsMinutes).toEqual([95, 100, 110, 120, 120, 120]);
   });
 
   it("toFirestore is a passthrough", () => {

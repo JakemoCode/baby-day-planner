@@ -19,7 +19,7 @@ describe("withV3SettingsDefaults", () => {
     // `false` is "defined" so the old `toBeDefined()` passed trivially.
     expect(out.daycare.weekdays.mon).toBe(false);
     // Default chain has six entries; the exact shape is the contract.
-    expect(out.wakeWindowsMinutes).toEqual([120, 150, 180, 180, 180, 180]);
+    expect(out.wakeWindowsMinutes).toEqual([95, 100, 110, 120, 120, 120]);
   });
 
   it("preserves caller-supplied values over defaults", () => {
