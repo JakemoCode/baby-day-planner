@@ -142,7 +142,7 @@ export function NapActionButton({
   const label = MODE_LABEL[mode.kind];
 
   return (
-    <ActionButton variant="secondary" onClick={handleClick}>
+    <ActionButton variant="primary" onClick={handleClick}>
       {label}
     </ActionButton>
   );
