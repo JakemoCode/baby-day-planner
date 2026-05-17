@@ -58,7 +58,7 @@ selector (no change to data source — vocabulary is the only filter).
 
 **Putdown rendering**: when next event is `nap` or `bedtime`, render
 a derived sub-line `Putdown HH:MM` where putdown =
-`startTime − putdownWindowMinutes`. Computed inline in the component;
+`startTime − putdownLeadMinutes`. Computed inline in the component;
 no engine change.
 
 **In-progress sleep handling**: when an in-progress nap or bedtime
@@ -114,7 +114,7 @@ Lines (in order, each may be hidden independently):
 
 1. **Next sleep (paired)**: `Putdown {time} → Nap {time} {OwnerPill}`.
    - Hide if no next projected nap.
-   - Putdown computed inline (nap.startTime − putdownWindowMinutes).
+   - Putdown computed inline (nap.startTime − putdownLeadMinutes).
 2. **Based on last nap**: `Based on last nap: {duration}, {minutesAgo}
    min ago ({endTime as TimeShort})`.
    - Hide if no completed nap today.
