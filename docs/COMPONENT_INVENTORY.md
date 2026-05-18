@@ -1,732 +1,135 @@
-# Baby Day Planner — Component Inventory
-
-> Per-component build spec. Build order respects Dependencies. Pages last.
-> "GraphQL" replaced with "Hook" since this app uses Firestore via custom hooks (`@/hooks/*`) and the engine selectors (`@/domain/selectors`).
-
----
-
-## Foundation (build first; tokens.css update precedes any component)
-
-### tokens.css update (palette swap, not a component)
-- **File:** `src/styles/tokens.css`
-- **Action:** Replace placeholder hex with Theme A earth-tone palette (sage / terracotta / warm cream / dusty blue) + light/dark mode CSS-variable structure. Owner colors per UI_REQUIREMENTS.
-- **Build status:** [ ] not started
-
-## SyncStatusIcon
-- Page: shared
-- Dependencies: none
-- Hook: useSyncStatus
-- Complexity: low
-- Build config:
-  - File: src/components/shared/SyncStatusIcon.tsx
-  - Test: src/components/shared/SyncStatusIcon.test.tsx
-  - Styles: src/components/shared/SyncStatusIcon.module.css
-  - Test utilities: src/test-utils.ts
-  - Hook imports: @/hooks/useSyncStatus
-  - Test runner: vitest
-  - CSS approach: CSS Modules
-  - Token file: src/styles/tokens.css
-- Build status: [ ] not started
-
-## OwnerPicker
-- Page: shared
-- Dependencies: none
-- Hook: none
-- Complexity: low
-- Build config:
-  - File: src/components/shared/OwnerPicker.tsx
-  - Test: src/components/shared/OwnerPicker.test.tsx
-  - Styles: src/components/shared/OwnerPicker.module.css
-  - Test utilities: src/test-utils.ts
-  - Hook imports: none
-  - Test runner: vitest
-  - CSS approach: CSS Modules
-  - Token file: src/styles/tokens.css
-- Build status: [ ] not started
-
-## ConfirmDialog
-- Page: shared
-- Dependencies: none
-- Hook: none
-- Complexity: low
-- Build config:
-  - File: src/components/shared/ConfirmDialog.tsx
-  - Test: src/components/shared/ConfirmDialog.test.tsx
-  - Styles: src/components/shared/ConfirmDialog.module.css
-  - Test utilities: src/test-utils.ts
-  - Hook imports: none
-  - Test runner: vitest
-  - CSS approach: CSS Modules
-  - Token file: src/styles/tokens.css
-- Build status: [ ] not started
-
-## EmptyState
-- Page: shared
-- Dependencies: none
-- Hook: none
-- Complexity: low
-- Build config:
-  - File: src/components/shared/EmptyState.tsx
-  - Test: src/components/shared/EmptyState.test.tsx
-  - Styles: src/components/shared/EmptyState.module.css
-  - Test utilities: src/test-utils.ts
-  - Hook imports: none
-  - Test runner: vitest
-  - CSS approach: CSS Modules
-  - Token file: src/styles/tokens.css
-- Build status: [ ] not started
-
-## LoadingState
-- Page: shared
-- Dependencies: none
-- Hook: none
-- Complexity: low
-- Build config:
-  - File: src/components/shared/LoadingState.tsx
-  - Test: src/components/shared/LoadingState.test.tsx
-  - Styles: src/components/shared/LoadingState.module.css
-  - Test utilities: src/test-utils.ts
-  - Hook imports: none
-  - Test runner: vitest
-  - CSS approach: CSS Modules
-  - Token file: src/styles/tokens.css
-- Build status: [ ] not started
-
-## FAB
-- Page: shared
-- Dependencies: none
-- Hook: none
-- Complexity: low
-- Build config:
-  - File: src/components/shared/FAB.tsx
-  - Test: src/components/shared/FAB.test.tsx
-  - Styles: src/components/shared/FAB.module.css
-  - Test utilities: src/test-utils.ts
-  - Hook imports: none
-  - Test runner: vitest
-  - CSS approach: CSS Modules
-  - Token file: src/styles/tokens.css
-- Build status: [ ] not started
-
-## Header
-- Page: shared
-- Dependencies: SyncStatusIcon
-- Hook: useDay (for date display)
-- Complexity: low
-- Build config:
-  - File: src/components/shared/Header.tsx
-  - Test: src/components/shared/Header.test.tsx
-  - Styles: src/components/shared/Header.module.css
-  - Test utilities: src/test-utils.ts
-  - Hook imports: @/hooks/useDay
-  - Test runner: vitest
-  - CSS approach: CSS Modules
-  - Token file: src/styles/tokens.css
-- Build status: [ ] not started
-
-## BottomTabs
-- Page: shared
-- Dependencies: none
-- Hook: none
-- Complexity: low
-- Build config:
-  - File: src/components/shared/BottomTabs.tsx
-  - Test: src/components/shared/BottomTabs.test.tsx
-  - Styles: src/components/shared/BottomTabs.module.css
-  - Test utilities: src/test-utils.ts
-  - Hook imports: none (uses next/navigation usePathname)
-  - Test runner: vitest
-  - CSS approach: CSS Modules
-  - Token file: src/styles/tokens.css
-- Build status: [ ] not started
-
-## KebabMenu
-- Page: shared
-- Dependencies: none
-- Hook: useAuth (for sign out)
-- Complexity: low
-- Build config:
-  - File: src/components/shared/KebabMenu.tsx
-  - Test: src/components/shared/KebabMenu.test.tsx
-  - Styles: src/components/shared/KebabMenu.module.css
-  - Test utilities: src/test-utils.ts
-  - Hook imports: @/lib/auth/useAuth
-  - Test runner: vitest
-  - CSS approach: CSS Modules
-  - Token file: src/styles/tokens.css
-- Build status: [ ] not started
-
-## AppShell
-- Page: shared
-- Dependencies: Header, BottomTabs, KebabMenu
-- Hook: none
-- Complexity: low
-- Build config:
-  - File: src/components/shared/AppShell.tsx
-  - Test: src/components/shared/AppShell.test.tsx
-  - Styles: src/components/shared/AppShell.module.css
-  - Test utilities: src/test-utils.ts
-  - Hook imports: none
-  - Test runner: vitest
-  - CSS approach: CSS Modules
-  - Token file: src/styles/tokens.css
-- Build status: [ ] not started
-
-## CurrentTimeIndicator
-- Page: shared
-- Dependencies: none
-- Hook: none (uses useEffect + setInterval + Date.now)
-- Complexity: low
-- Build config:
-  - File: src/components/shared/CurrentTimeIndicator.tsx
-  - Test: src/components/shared/CurrentTimeIndicator.test.tsx
-  - Styles: src/components/shared/CurrentTimeIndicator.module.css
-  - Test utilities: src/test-utils.ts
-  - Hook imports: none
-  - Test runner: vitest
-  - CSS approach: CSS Modules
-  - Token file: src/styles/tokens.css
-- Build status: [ ] not started
-
-## EventEditDrawer
-- Page: shared
-- Dependencies: OwnerPicker, ConfirmDialog
-- Hook: useEvents
-- Complexity: high
-- Build config:
-  - File: src/components/shared/EventEditDrawer.tsx
-  - Test: src/components/shared/EventEditDrawer.test.tsx
-  - Styles: src/components/shared/EventEditDrawer.module.css
-  - Test utilities: src/test-utils.ts
-  - Hook imports: @/hooks/useEvents
-  - Test runner: vitest
-  - CSS approach: CSS Modules
-  - Token file: src/styles/tokens.css
-- Build status: [ ] not started
-
----
-
-## Dashboard
-
-## NextEventCard
-- Page: Dashboard
-- Dependencies: none
-- Hook: useDay, useEvents, useSettings (composes engine selector `nextEvent`)
-- Complexity: medium
-- Build config:
-  - File: src/components/Dashboard/NextEventCard.tsx
-  - Test: src/components/Dashboard/NextEventCard.test.tsx
-  - Styles: src/components/Dashboard/NextEventCard.module.css
-  - Test utilities: src/test-utils.ts
-  - Hook imports: @/hooks/useDay, @/hooks/useEvents, @/hooks/useSettings, @/domain
-  - Test runner: vitest
-  - CSS approach: CSS Modules
-  - Token file: src/styles/tokens.css
-- Build status: [ ] not started
-
-## NextBottlePanel
-> Renamed from `NextBottlePreview` in §F32 (2026-05-17). Adds per-day bottle totals (recorded events only).
-- Page: Dashboard
-- Dependencies: EmptyState
-- Hook: useEvents (engine selector `nextBottle`)
-- Complexity: low
-- Build config:
-  - File: src/v3/components/Dashboard/NextBottlePanel.tsx
-  - Test: src/v3/components/Dashboard/NextBottlePanel.test.tsx
-  - Styles: src/v3/components/Dashboard/NextBottlePanel.module.css
-  - Test runner: vitest
-  - CSS approach: CSS Modules
-  - Token file: src/styles/tokens.css
-- Build status: [x] shipped §F32
-
-## NextSleepPanel
-> Renamed from `NextNapPreview` in §F32 (2026-05-17). Adds per-day nap totals (recorded events only).
-- Page: Dashboard
-- Dependencies: none
-- Hook: useEvents (engine selector `nextNap`)
-- Complexity: low
-- Build config:
-  - File: src/v3/components/Dashboard/NextSleepPanel.tsx
-  - Test: src/v3/components/Dashboard/NextSleepPanel.test.tsx
-  - Styles: src/v3/components/Dashboard/NextSleepPanel.module.css
-  - Test runner: vitest
-  - CSS approach: CSS Modules
-  - Token file: src/styles/tokens.css
-- Build status: [x] shipped §F32
-
-## NowBanner
-> Renamed from `CurrentWakeWindowStatus` in §F32 (2026-05-17). Unifies wake-window indicator + in-progress sleep banner (priority: bedtime > nap > wake-window).
-- Page: Dashboard
-- Dependencies: none
-- Hook: useEvents (engine selectors `currentWakeWindow`, in-progress sleep)
-- Complexity: low
-- Build config:
-  - File: src/v3/components/Dashboard/NowBanner.tsx
-  - Test: src/v3/components/Dashboard/NowBanner.test.tsx
-  - Styles: src/v3/components/Dashboard/NowBanner.module.css
-  - Test runner: vitest
-  - CSS approach: CSS Modules
-  - Token file: src/styles/tokens.css
-- Build status: [x] shipped §F32
-
-## StartBottleButton
-- Page: Dashboard
-- Dependencies: none
-- Hook: useEvents (createOptimistic), useSettings, useDay
-- Complexity: low
-- Build config:
-  - File: src/components/Dashboard/StartBottleButton.tsx
-  - Test: src/components/Dashboard/StartBottleButton.test.tsx
-  - Styles: src/components/Dashboard/StartBottleButton.module.css
-  - Test utilities: src/test-utils.ts
-  - Hook imports: @/hooks/useEvents, @/hooks/useSettings, @/hooks/useDay
-  - Test runner: vitest
-  - CSS approach: CSS Modules
-  - Token file: src/styles/tokens.css
-- Build status: [ ] not started
-
-## NapActionButton
-- Page: Dashboard
-- Dependencies: none
-- Hook: useEvents (create+update), useDay
-- Complexity: low
-- Build config:
-  - File: src/components/Dashboard/NapActionButton.tsx
-  - Test: src/components/Dashboard/NapActionButton.test.tsx
-  - Styles: src/components/Dashboard/NapActionButton.module.css
-  - Test utilities: src/test-utils.ts
-  - Hook imports: @/hooks/useEvents, @/hooks/useDay
-  - Test runner: vitest
-  - CSS approach: CSS Modules
-  - Token file: src/styles/tokens.css
-- Build status: [ ] not started
-
-## StartDayButton
-- Page: Dashboard
-- Dependencies: ConfirmDialog
-- Hook: useDay, useTemplates, useSettings (uses startNewDay repo)
-- Complexity: medium
-- Build config:
-  - File: src/components/Dashboard/StartDayButton.tsx
-  - Test: src/components/Dashboard/StartDayButton.test.tsx
-  - Styles: src/components/Dashboard/StartDayButton.module.css
-  - Test utilities: src/test-utils.ts
-  - Hook imports: @/hooks/useDay, @/hooks/useTemplates, @/hooks/useSettings, @/repositories/startNewDay
-  - Test runner: vitest
-  - CSS approach: CSS Modules
-  - Token file: src/styles/tokens.css
-- Build status: [ ] not started
-
-## EndOfDayCard
-> **Retired in §F32 (2026-05-17).** Both early-return branches removed from
-> `src/app/(authed)/page.tsx`; all `EndOfDayCard.*` files deleted. Dashboard
-> now always shows stats. See `docs/v3/FAST_FOLLOW_COMPLETED.md` §F32.
-
----
-
-## Timeline
-
-## DurationBlock
-- Page: Timeline
-- Dependencies: none
-- Hook: none (props in)
-- Complexity: medium
-- Build config:
-  - File: src/components/Timeline/DurationBlock.tsx
-  - Test: src/components/Timeline/DurationBlock.test.tsx
-  - Styles: src/components/Timeline/DurationBlock.module.css
-  - Test utilities: src/test-utils.ts
-  - Hook imports: @/domain (formatTimeForDisplay)
-  - Test runner: vitest
-  - CSS approach: CSS Modules
-  - Token file: src/styles/tokens.css
-- Build status: [ ] not started
-
-## PointMarker
-- Page: Timeline
-- Dependencies: none
-- Hook: none (props in)
-- Complexity: medium
-- Build config:
-  - File: src/components/Timeline/PointMarker.tsx
-  - Test: src/components/Timeline/PointMarker.test.tsx
-  - Styles: src/components/Timeline/PointMarker.module.css
-  - Test utilities: src/test-utils.ts
-  - Hook imports: @/domain (formatTimeForDisplay)
-  - Test runner: vitest
-  - CSS approach: CSS Modules
-  - Token file: src/styles/tokens.css
-- Build status: [ ] not started
-
-## TimelineList
-- Page: Timeline
-- Dependencies: DurationBlock, PointMarker, CurrentTimeIndicator
-- Hook: useEvents (composes engine `projectDay`)
-- Complexity: medium
-- Build config:
-  - File: src/components/Timeline/TimelineList.tsx
-  - Test: src/components/Timeline/TimelineList.test.tsx
-  - Styles: src/components/Timeline/TimelineList.module.css
-  - Test utilities: src/test-utils.ts
-  - Hook imports: @/hooks/useEvents, @/hooks/useDay, @/hooks/useSettings, @/hooks/useTemplates, @/domain
-  - Test runner: vitest
-  - CSS approach: CSS Modules
-  - Token file: src/styles/tokens.css
-- Build status: [ ] not started
-
----
-
-## Tomorrow Plan
-
-## TomorrowForm
-- Page: Tomorrow
-- Dependencies: OwnerPicker, EventEditDrawer (for extras)
-- Hook: useDay, useTemplates, useSettings, useEvents
-- Complexity: high
-- Build config:
-  - File: src/components/Tomorrow/TomorrowForm.tsx
-  - Test: src/components/Tomorrow/TomorrowForm.test.tsx
-  - Styles: src/components/Tomorrow/TomorrowForm.module.css
-  - Test utilities: src/test-utils.ts
-  - Hook imports: @/hooks/useDay, @/hooks/useTemplates, @/hooks/useSettings, @/hooks/useEvents
-  - Test runner: vitest
-  - CSS approach: CSS Modules
-  - Token file: src/styles/tokens.css
-- Build status: [ ] not started
-
-## TomorrowPreview
-- Page: Tomorrow
-- Dependencies: TimelineList
-- Hook: useSettings, useTemplates (calls `projectDay` against tomorrow's planned data)
-- Complexity: medium
-- Build config:
-  - File: src/components/Tomorrow/TomorrowPreview.tsx
-  - Test: src/components/Tomorrow/TomorrowPreview.test.tsx
-  - Styles: src/components/Tomorrow/TomorrowPreview.module.css
-  - Test utilities: src/test-utils.ts
-  - Hook imports: @/hooks/useSettings, @/hooks/useTemplates, @/domain
-  - Test runner: vitest
-  - CSS approach: CSS Modules
-  - Token file: src/styles/tokens.css
-- Build status: [ ] not started
-
-## PromoteTomorrowButton
-- Page: Tomorrow
-- Dependencies: ConfirmDialog
-- Hook: uses startNewDay repo + useDay
-- Complexity: low
-- Build config:
-  - File: src/components/Tomorrow/PromoteTomorrowButton.tsx
-  - Test: src/components/Tomorrow/PromoteTomorrowButton.test.tsx
-  - Styles: src/components/Tomorrow/PromoteTomorrowButton.module.css
-  - Test utilities: src/test-utils.ts
-  - Hook imports: @/repositories/startNewDay, @/hooks/useDay
-  - Test runner: vitest
-  - CSS approach: CSS Modules
-  - Token file: src/styles/tokens.css
-- Build status: [ ] not started
-
----
-
-## History
-
-## HistoryDayCard
-- Page: History
-- Dependencies: none
-- Hook: none (props in)
-- Complexity: low
-- Build config:
-  - File: src/components/History/HistoryDayCard.tsx
-  - Test: src/components/History/HistoryDayCard.test.tsx
-  - Styles: src/components/History/HistoryDayCard.module.css
-  - Test utilities: src/test-utils.ts
-  - Hook imports: @/domain (formatTimeForDisplay)
-  - Test runner: vitest
-  - CSS approach: CSS Modules
-  - Token file: src/styles/tokens.css
-- Build status: [ ] not started
-
-## HistoryList
-- Page: History
-- Dependencies: HistoryDayCard, EmptyState
-- Hook: archived-days repository call (new helper to add: `listArchivedDays(db, childId, limit=7)`)
-- Complexity: low
-- Build config:
-  - File: src/components/History/HistoryList.tsx
-  - Test: src/components/History/HistoryList.test.tsx
-  - Styles: src/components/History/HistoryList.module.css
-  - Test utilities: src/test-utils.ts
-  - Hook imports: @/repositories/days
-  - Test runner: vitest
-  - CSS approach: CSS Modules
-  - Token file: src/styles/tokens.css
-- Build status: [ ] not started
-
-## ArchivedDayView
-- Page: History
-- Dependencies: TimelineList
-- Hook: useEvents (read-only mode)
-- Complexity: low
-- Build config:
-  - File: src/components/History/ArchivedDayView.tsx
-  - Test: src/components/History/ArchivedDayView.test.tsx
-  - Styles: src/components/History/ArchivedDayView.module.css
-  - Test utilities: src/test-utils.ts
-  - Hook imports: @/hooks/useEvents
-  - Test runner: vitest
-  - CSS approach: CSS Modules
-  - Token file: src/styles/tokens.css
-- Build status: [ ] not started
-
----
-
-## Settings
-
-## WakeWindowsEditor
-- Page: Settings
-- Dependencies: none
-- Hook: useSettings (read+save)
-- Complexity: medium
-- Build config:
-  - File: src/components/Settings/WakeWindowsEditor.tsx
-  - Test: src/components/Settings/WakeWindowsEditor.test.tsx
-  - Styles: src/components/Settings/WakeWindowsEditor.module.css
-  - Test utilities: src/test-utils.ts
-  - Hook imports: @/hooks/useSettings, @/repositories/settings
-  - Test runner: vitest
-  - CSS approach: CSS Modules
-  - Token file: src/styles/tokens.css
-- Build status: [ ] not started
-
-## NapDefaultsEditor
-- Page: Settings
-- Dependencies: none
-- Hook: useSettings
-- Complexity: low
-- Build config:
-  - File: src/components/Settings/NapDefaultsEditor.tsx
-  - Test: src/components/Settings/NapDefaultsEditor.test.tsx
-  - Styles: src/components/Settings/NapDefaultsEditor.module.css
-  - Test utilities: src/test-utils.ts
-  - Hook imports: @/hooks/useSettings, @/repositories/settings
-  - Test runner: vitest
-  - CSS approach: CSS Modules
-  - Token file: src/styles/tokens.css
-- Build status: [ ] not started
-
-## BottleRulesEditor
-- Page: Settings
-- Dependencies: ConfirmDialog
-- Hook: useSettings
-- Complexity: medium
-- Build config:
-  - File: src/components/Settings/BottleRulesEditor.tsx
-  - Test: src/components/Settings/BottleRulesEditor.test.tsx
-  - Styles: src/components/Settings/BottleRulesEditor.module.css
-  - Test utilities: src/test-utils.ts
-  - Hook imports: @/hooks/useSettings, @/repositories/settings
-  - Test runner: vitest
-  - CSS approach: CSS Modules
-  - Token file: src/styles/tokens.css
-- Build status: [ ] not started
-
-## DreamFeedEditor
-- Page: Settings
-- Dependencies: none
-- Hook: useSettings
-- Complexity: low
-- Build config:
-  - File: src/components/Settings/DreamFeedEditor.tsx
-  - Test: src/components/Settings/DreamFeedEditor.test.tsx
-  - Styles: src/components/Settings/DreamFeedEditor.module.css
-  - Test utilities: src/test-utils.ts
-  - Hook imports: @/hooks/useSettings, @/repositories/settings
-  - Test runner: vitest
-  - CSS approach: CSS Modules
-  - Token file: src/styles/tokens.css
-- Build status: [ ] not started
-
-## PumpTimesEditor
-- Page: Settings
-- Dependencies: none
-- Hook: useSettings
-- Complexity: low
-- Build config:
-  - File: src/components/Settings/PumpTimesEditor.tsx
-  - Test: src/components/Settings/PumpTimesEditor.test.tsx
-  - Styles: src/components/Settings/PumpTimesEditor.module.css
-  - Test utilities: src/test-utils.ts
-  - Hook imports: @/hooks/useSettings, @/repositories/settings
-  - Test runner: vitest
-  - CSS approach: CSS Modules
-  - Token file: src/styles/tokens.css
-- Build status: [ ] not started
-
-## WeekendTemplateEditor
-- Page: Settings
-- Dependencies: OwnerPicker, ConfirmDialog
-- Hook: useTemplates (+ saveTemplate from repo)
-- Complexity: medium
-- Build config:
-  - File: src/components/Settings/WeekendTemplateEditor.tsx
-  - Test: src/components/Settings/WeekendTemplateEditor.test.tsx
-  - Styles: src/components/Settings/WeekendTemplateEditor.module.css
-  - Test utilities: src/test-utils.ts
-  - Hook imports: @/hooks/useTemplates, @/repositories/templates, @/domain (flipTemplate, copyToOtherDay)
-  - Test runner: vitest
-  - CSS approach: CSS Modules
-  - Token file: src/styles/tokens.css
-- Build status: [ ] not started
-
-## SettingsAccount
-- Page: Settings
-- Dependencies: none
-- Hook: useAuth
-- Complexity: low
-- Build config:
-  - File: src/components/Settings/SettingsAccount.tsx
-  - Test: src/components/Settings/SettingsAccount.test.tsx
-  - Styles: src/components/Settings/SettingsAccount.module.css
-  - Test utilities: src/test-utils.ts
-  - Hook imports: @/lib/auth/useAuth
-  - Test runner: vitest
-  - CSS approach: CSS Modules
-  - Token file: src/styles/tokens.css
-- Build status: [ ] not started
-
----
-
-## Pages (compose components into routes)
-
-Build pages last after all their components ship.
-
-## DashboardPage
-- Page: Dashboard
-- Dependencies: AppShell, NextEventCard, NextBottlePanel, NextSleepPanel, NowBanner, StartBottleButton, NapActionButton, StartDayButton, FAB, EventEditDrawer
-- Hook: useDay, useEvents, useSettings, useTemplates
-- Complexity: medium
-- Build config:
-  - File: src/app/(authed)/page.tsx
-  - Test: src/app/(authed)/page.test.tsx
-  - Styles: src/app/(authed)/page.module.css
-  - Test utilities: src/test-utils.ts
-  - Hook imports: @/hooks/*, @/domain
-  - Test runner: vitest
-  - CSS approach: CSS Modules
-  - Token file: src/styles/tokens.css
-- Build status: [ ] not started
-
-## TimelinePage
-- Page: Timeline
-- Dependencies: AppShell, TimelineList, FAB, EventEditDrawer
-- Hook: useEvents, useDay, useSettings, useTemplates
-- Complexity: low
-- Build config:
-  - File: src/app/(authed)/timeline/page.tsx
-  - Test: src/app/(authed)/timeline/page.test.tsx
-  - Styles: src/app/(authed)/timeline/page.module.css
-  - Test utilities: src/test-utils.ts
-  - Hook imports: @/hooks/*
-  - Test runner: vitest
-  - CSS approach: CSS Modules
-  - Token file: src/styles/tokens.css
-- Build status: [ ] not started
-
-## TomorrowPage
-- Page: Tomorrow
-- Dependencies: AppShell, TomorrowForm, TomorrowPreview, PromoteTomorrowButton
-- Hook: useDay, useEvents, useTemplates, useSettings
-- Complexity: low
-- Build config:
-  - File: src/app/(authed)/tomorrow/page.tsx
-  - Test: src/app/(authed)/tomorrow/page.test.tsx
-  - Styles: src/app/(authed)/tomorrow/page.module.css
-  - Test utilities: src/test-utils.ts
-  - Hook imports: @/hooks/*
-  - Test runner: vitest
-  - CSS approach: CSS Modules
-  - Token file: src/styles/tokens.css
-- Build status: [ ] not started
-
-## HistoryPage
-- Page: History
-- Dependencies: AppShell, HistoryList
-- Hook: archived-days fetch
-- Complexity: low
-- Build config:
-  - File: src/app/(authed)/history/page.tsx
-  - Test: src/app/(authed)/history/page.test.tsx
-  - Styles: src/app/(authed)/history/page.module.css
-  - Test utilities: src/test-utils.ts
-  - Hook imports: @/repositories/days
-  - Test runner: vitest
-  - CSS approach: CSS Modules
-  - Token file: src/styles/tokens.css
-- Build status: [ ] not started
-
-## ArchivedDayPage
-- Page: History
-- Dependencies: AppShell, ArchivedDayView
-- Hook: useEvents (with day-specific dayId from route param)
-- Complexity: low
-- Build config:
-  - File: src/app/(authed)/history/[date]/page.tsx
-  - Test: src/app/(authed)/history/[date]/page.test.tsx
-  - Styles: src/app/(authed)/history/[date]/page.module.css
-  - Test utilities: src/test-utils.ts
-  - Hook imports: @/hooks/useEvents, @/repositories/days
-  - Test runner: vitest
-  - CSS approach: CSS Modules
-  - Token file: src/styles/tokens.css
-- Build status: [ ] not started
-
-## SettingsPage
-- Page: Settings
-- Dependencies: AppShell, WakeWindowsEditor, NapDefaultsEditor, BottleRulesEditor, DreamFeedEditor, PumpTimesEditor, WeekendTemplateEditor, SettingsAccount
-- Hook: useSettings, useTemplates, useAuth
-- Complexity: low
-- Build config:
-  - File: src/app/(authed)/settings/page.tsx
-  - Test: src/app/(authed)/settings/page.test.tsx
-  - Styles: src/app/(authed)/settings/page.module.css
-  - Test utilities: src/test-utils.ts
-  - Hook imports: @/hooks/*, @/lib/auth/useAuth
-  - Test runner: vitest
-  - CSS approach: CSS Modules
-  - Token file: src/styles/tokens.css
-- Build status: [ ] not started
-
----
-
-## Build wave dependency order (suggested for /build-pipeline)
-
-**Wave 0 — palette + test utils**
-- `tokens.css` rewrite (Theme A earth-tone palette + dark mode CSS-variable structure)
-- `src/test-utils.ts` (RTL render with mocked AuthProvider + hook mocks)
-
-**Wave 1 — leaf shared components (no deps)**
-SyncStatusIcon, OwnerPicker, ConfirmDialog, EmptyState, LoadingState, FAB, BottomTabs, CurrentTimeIndicator, KebabMenu
-
-**Wave 2 — composed shared**
-Header (uses SyncStatusIcon), AppShell (uses Header + BottomTabs + KebabMenu), EventEditDrawer (uses OwnerPicker + ConfirmDialog)
-
-**Wave 3 — Dashboard leaves**
-NextEventCard, NextBottlePanel, NextSleepPanel, NowBanner, StartBottleButton, NapActionButton, StartDayButton
-
-**Wave 4 — Timeline**
-DurationBlock, PointMarker, TimelineList (uses DurationBlock + PointMarker + CurrentTimeIndicator)
-
-**Wave 5 — Tomorrow**
-TomorrowPreview (uses TimelineList), TomorrowForm (uses OwnerPicker + EventEditDrawer), PromoteTomorrowButton
-
-**Wave 6 — History**
-HistoryDayCard, HistoryList, ArchivedDayView (uses TimelineList)
-
-**Wave 7 — Settings**
-WakeWindowsEditor, NapDefaultsEditor, BottleRulesEditor, DreamFeedEditor, PumpTimesEditor, WeekendTemplateEditor, SettingsAccount
-
-**Wave 8 — Pages**
-DashboardPage, TimelinePage, TomorrowPage, HistoryPage, ArchivedDayPage, SettingsPage
-
-**Wave 9 — Integration**
-PWA manifest + service worker, E2E tests for critical flows (Start Bottle Now, Start Nap/End Nap, Start New Day, Promote Tomorrow), `/design-audit` + `/visual-qa` passes.
+# Component Inventory
+
+> Living map of the V3 component tree. Pre-V3 build-config detail
+> (test paths, hook imports, build status) is archived at
+> `_archive/v3/COMPONENT_INVENTORY_BUILD_PLAN.md`.
+
+## Routes
+
+| Route | File | Notes |
+|---|---|---|
+| `/sign-in` | `src/app/sign-in/page.tsx` | Public; Google OAuth via Firebase |
+| `/` | `src/app/(authed)/page.tsx` | Dashboard (default after sign-in) |
+| `/timeline` | `src/app/(authed)/timeline/page.tsx` | Today's vertical timeline |
+| `/tomorrow` | `src/app/(authed)/tomorrow/page.tsx` | Tomorrow Plan editor + preview |
+| `/day-templates` | `src/app/(authed)/day-templates/page.tsx` | Weekend / named templates |
+| `/history` | `src/app/(authed)/history/page.tsx` | Last 7 archived days |
+| `/history/[date]` | `src/app/(authed)/history/[date]/page.tsx` | Read-only archived day |
+| `/settings` | `src/app/(authed)/settings/page.tsx` | All settings inline |
+| Authed layout | `src/app/(authed)/layout.tsx` | Wraps in `AppShell` |
+
+## App shell — `src/components/shared/`
+
+Framework-agnostic chrome; survived the PR-C1 V2 wipe.
+
+| Component | Purpose |
+|---|---|
+| `AppShell` | Header + main + BottomTabs frame |
+| `Header` | Title, date, sync icon |
+| `BottomTabs` | 3 tabs + kebab |
+| `KebabMenu` | Overflow menu (history, settings, sign out) |
+| `FAB` | Floating + button → opens `FABTypePicker` |
+| `FABTypePicker` | Event-type picker; uses `BottomSheet` chrome |
+| `BottomSheet` | Reusable bottom-sheet primitive |
+| `ConfirmDialog` | Destructive-action confirmation |
+| `EmptyState` / `LoadingState` | Generic fallback panels |
+| `SyncStatusIcon` | Firestore sync indicator |
+
+## Dashboard — `src/v3/components/Dashboard/`
+
+| Component | Purpose |
+|---|---|
+| `NextEventCard` | Primary card — next non-WW event with owner |
+| `NextBottlePanel` | Secondary — next bottle + per-day totals |
+| `NextSleepPanel` | Secondary — next nap/bedtime + per-day totals |
+| `NowBanner` | Wake-window + in-progress sleep banner |
+| `OwnerPill` | Compact owner display |
+| `PreviewCard` | Card scaffold reused across panels |
+| `ActionButton` | Base CTA button used by sleep/bottle/day actions |
+| `StartBottleButton` | "Start Bottle Now" |
+| `NapActionButton` | Context-aware: Start Nap / End Nap / Start Bedtime |
+| `StartDayButton` | Dev-only — see §F17 fast-follow for auto-anchor plan |
+| `dashboardStats.ts` | Selector helpers (totals, last-X, next-event filtering) |
+
+`EndOfDayCard` was retired in §F32 (PR #173); dashboard always shows
+stats now.
+
+## Timeline — `src/v3/components/Timeline/`
+
+| Component | Purpose |
+|---|---|
+| `TimelineV3` | The vertical timeline; root |
+| `Block` | Duration block (naps, bedtime, pump, duration extras) |
+| `InstantChip` | Point-in-time chip (bottles, instant extras, daycare) |
+| `InstantCluster` | 2–3 chips at same time, shared timestamp |
+| `NowBar` | Current-time indicator line |
+| `groupInstants.ts` | Chip-clustering logic |
+| `expandPutdown.ts` | Putdown render-expansion pass |
+| `ownerSlotKey.ts` | Owner-slot key helper |
+
+## Tomorrow — `src/v3/components/Tomorrow/`
+
+| Component | Purpose |
+|---|---|
+| `TomorrowForm` | Wake time + template + extras editor |
+| `TomorrowPreview` | Projected-day preview using the same engine |
+| `PromoteTomorrowButton` | Promote plan → today (or auto-fires next morning if setting on) |
+
+## Day templates — `src/v3/components/DayTemplates/`
+
+| Component | Purpose |
+|---|---|
+| `TemplateOwnerPicker` | Per-event owner picker; owns its chrome (§F13 PR #175) |
+| `setOwnerInTemplate.ts` / `templateSlot.ts` | Template helpers |
+
+## History — `src/v3/components/History/`
+
+| Component | Purpose |
+|---|---|
+| `HistoryList` | Last 7 archived days |
+| `HistoryDayCard` | Single archived-day summary row |
+| `ArchivedDayView` | Read-only archived timeline |
+
+## Settings — `src/v3/components/Settings/`
+
+The Settings page is mostly inline in `src/app/(authed)/settings/page.tsx`
+(row helpers — `Section`, `TimeRow`, `NumberRow`, `WakeWindowsRow`,
+`PumpTimesRow`, `OwnerSlotRow`, `ColorModeRow`, `CheckboxRow`).
+The one extracted component:
+
+| Component | Purpose |
+|---|---|
+| `OwnersConfigEditor` | Owners block with names + colors + add-other |
+
+## Shared V3 — `src/v3/components/shared/`
+
+| Component | Purpose |
+|---|---|
+| `EventEditDrawerV3` | Edit drawer for all event types |
+| `OwnerPickerV3` | Owner picker for the drawer |
+| `SettingsAccount` | Account row (current user + sign-out) |
+| `createEventTemplate.ts` / `formToEvent.ts` | Event conversion helpers |
+
+## Auth — `src/lib/auth/`
+
+| Component | Purpose |
+|---|---|
+| `AuthProvider` | Firebase Auth context |
+| `SignIn` | Google sign-in screen |
+
+## Tokens & styles
+
+| File | Purpose |
+|---|---|
+| `src/styles/tokens.css` | All design tokens (palette, spacing, owner colors, type) |
+| Per-component `*.module.css` | Co-located CSS Modules — no runtime CSS-in-JS |
+
+## Engine + data (referenced by components, not components themselves)
+
+| Layer | Path |
+|---|---|
+| Engine | `src/v3/engine/` (rules in `engine/rules/`) |
+| Rendering | `src/v3/ui/renderProjection.ts` |
+| Schemas | `src/v3/schemas.ts` |
+| Repositories | `src/v3/repositories/` |
+| Hooks | `src/v3/hooks/` |
