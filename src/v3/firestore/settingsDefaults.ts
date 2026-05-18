@@ -116,7 +116,11 @@ function normalizePumpTimes(raw: unknown): PumpSession[] {
   return raw
     .map((entry) => {
       if (typeof entry === "number") return { time: entry };
-      if (entry && typeof entry === "object" && typeof (entry as { time?: unknown }).time === "number") {
+      if (
+        entry &&
+        typeof entry === "object" &&
+        typeof (entry as { time?: unknown }).time === "number"
+      ) {
         const t = (entry as { time: number }).time;
         const d = (entry as { durationMinutes?: unknown }).durationMinutes;
         return typeof d === "number" ? { time: t, durationMinutes: d } : { time: t };
@@ -132,7 +136,9 @@ export function withV3SettingsDefaults(input: Partial<Settings> | null): Setting
     ...DEFAULTS,
     ...input,
     childId: input.childId ?? "",
-    pumpTimes: normalizePumpTimes((input as { pumpTimes?: unknown }).pumpTimes ?? DEFAULTS.pumpTimes),
+    pumpTimes: normalizePumpTimes(
+      (input as { pumpTimes?: unknown }).pumpTimes ?? DEFAULTS.pumpTimes,
+    ),
     bottleChain: { ...DEFAULTS.bottleChain, ...input.bottleChain },
     daycare: {
       ...DEFAULTS.daycare,

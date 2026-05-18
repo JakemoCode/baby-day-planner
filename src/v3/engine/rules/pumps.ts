@@ -30,7 +30,10 @@ const RuleProjectPumps: Rule = {
   produces: (events, ctx) => {
     const missing = missingPumps(events, ctx);
     if (missing.length === 0) return events;
-    return [...events, ...missing.map((t) => buildProjectedPump(ctx, t.startTime, t.eventKey, t.durationMinutes))];
+    return [
+      ...events,
+      ...missing.map((t) => buildProjectedPump(ctx, t.startTime, t.eventKey, t.durationMinutes)),
+    ];
   },
 };
 

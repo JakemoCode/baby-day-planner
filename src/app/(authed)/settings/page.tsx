@@ -175,7 +175,11 @@ export default function SettingsPage() {
       </Section>
 
       <Section title="Pumps" isOpen={openSlug === "pumps"} onToggle={handleToggle}>
-        <PumpTimesRow value={value.pumpTimes} defaultDuration={value.defaultPumpDurationMinutes} onChange={(v) => set("pumpTimes", v)} />
+        <PumpTimesRow
+          value={value.pumpTimes}
+          defaultDuration={value.defaultPumpDurationMinutes}
+          onChange={(v) => set("pumpTimes", v)}
+        />
         <NumberRow
           id="defaultPumpDurationMinutes"
           label="Default pump duration (min)"
