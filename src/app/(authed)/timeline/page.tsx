@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import type { Event, OwnershipTemplate } from "@/v3/schemas";
 import { useNowMinutes } from "@/hooks/useNowMinutes";
-import { newEventId } from "@/v3/lib/newEventId";
 import { useV3Day } from "@/v3/hooks/useV3Day";
 import { useV3Events } from "@/v3/hooks/useV3Events";
 import { useV3Projection } from "@/v3/hooks/useV3Projection";
@@ -136,7 +135,14 @@ export default function TimelinePage() {
           ) {
             // Editing a projected (non-persisted) event: re-ID so it lands
             // as a new actual rather than colliding with the projected slot.
-            await saveEvent({ ...event, id: newEventId("manual") });
+            // §F37 follow-up: use a DETERMINISTIC id derived from eventKey
+            // (was random `newEventId("manual")`). Random ids meant each
+            // subsequent edit of the same projection created ANOTHER override
+            // doc — wake_window owners changed "intermittently" because R4.2
+            // picked the survivor by Map iteration order over the accumulated
+            // duplicates. Stable id → 2nd+ edit routes through `updateOptimistic`
+            // on the same doc.
+            await saveEvent({ ...event, id: `recorded_${event.eventKey}` });
           } else {
             await saveEvent(event);
           }
