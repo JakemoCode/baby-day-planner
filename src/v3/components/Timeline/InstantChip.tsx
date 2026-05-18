@@ -57,12 +57,12 @@ export function InstantChip({ event, owners, colorMode, onClick }: InstantChipPr
       <span className={styles.body}>
         <span className={styles.label}>{label}</span>
         <span className={styles.secondRow}>
+          <span className={styles.time}>{time}</span>
           {ownerName && (
             <span className={styles.ownerName} {...(slotKey ? { "data-owner": slotKey } : {})}>
               {ownerName}
             </span>
           )}
-          <span className={styles.time}>{time}</span>
         </span>
       </span>
     </Tag>
