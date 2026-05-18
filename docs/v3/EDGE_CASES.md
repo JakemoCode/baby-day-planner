@@ -1,13 +1,7 @@
 # V3 Edge Cases — Property-Test Seed Data
 
 > Inventory of (input scenario × expected output) for V3's regression
-> suite. Every entry is sourced from a fix commit on V2 main or a
-> decision in [`ENGINE_SPEC.md`](ENGINE_SPEC.md) /
-> [`DATA_MODEL.md`](DATA_MODEL.md). Each row is property-test ready.
-
-> **How to use**: V3's test suite (likely fast-check) feeds these
-> scenarios as concrete examples that must hold, alongside randomly
-> generated inputs. The format is intentionally machine-extractable.
+> suite. Every entry is property-test ready and grouped by domain.
 
 > Format:
 > ```
@@ -15,12 +9,21 @@
 > - **Given**: input state
 > - **When**: action
 > - **Then**: expected outcome
-> - **Rule(s)**: REQUIREMENTS.md ref(s)
+> - **Rule(s)**: rule ref(s) — see ENGINE_SPEC.md
 > - **Source**: commit hash + date OR "rule-derived"
 > ```
 
-> Counts: ~120 entries. Comprehensiveness > brevity. Group by
-> domain area.
+> **R-number citations**: most R-numbers carried over from the original
+> REQUIREMENTS.md into `ENGINE_SPEC.md` (e.g. R3.5 still resolves), but
+> some were renamed or merged during the simplification campaign
+> (PRs #156 → #166). When a citation doesn't resolve, search
+> `ENGINE_SPEC.md` by behavior keyword instead.
+
+> **Lifecycle vocabulary**: as of PR #166, events carry a
+> `lifecycle: "projected" | "recorded" | "completed"` discriminator.
+> Older `recorded: boolean` + `status: "overridden" | "completed" | "started"`
+> fields are gone. "In progress" is now a time-derived property, not
+> a stored state. See `DATA_MODEL.md`.
 
 ---
 
@@ -55,14 +58,14 @@
 - **Source**: 97d7471 (2026-05-07)
 
 ### EC-N5: Drawer blocks overlap with recorded naps
-- **Given**: nap_2 with `recorded: true`, range 13:00–13:45
+- **Given**: nap_2 with `lifecycle: "completed"`, range 13:00–13:45
 - **When**: user creates nap with start=13:20, end=14:00 via drawer
 - **Then**: drawer shows error "Overlaps Nap 2 (1:00 PM – 1:45 PM)"; save disabled
 - **Rule(s)**: R3.9, R17.7
 - **Source**: 818dd3e (2026-05-07), d77b739 (2026-05-07)
 
-### EC-N6: Drawer ignores overlap against `recorded:false` annotations
-- **Given**: nap_3 with status="overridden", recorded=false (owner-only edit)
+### EC-N6: Drawer ignores overlap against `recorded` annotations (owner-only edits)
+- **Given**: nap_3 with `lifecycle: "recorded"` (owner-only edit, no time pin)
 - **When**: user creates new nap overlapping nap_3's stored time
 - **Then**: drawer accepts save (annotation gets recomputed)
 - **Rule(s)**: R3.9
@@ -90,21 +93,21 @@
 - **Source**: f17428f (2026-05-07)
 
 ### EC-N10: Recorded nap cannot be un-recorded by owner edit
-- **Given**: nap_2 with recorded=true (started+ended via dashboard)
+- **Given**: nap_2 with `lifecycle: "completed"` (started+ended via dashboard)
 - **When**: user edits owner via drawer, no time change
-- **Then**: recorded stays true; status stays "completed"
+- **Then**: `lifecycle` stays `"completed"` (owner-only edits never demote a completed event)
 - **Rule(s)**: R1.8, R17.5
 - **Source**: f17428f (2026-05-07)
 
 ### EC-N11: Short nap triggers WW shrink
 - **Given**: settings.shortNapThresholdMinutes=35, shortNapAdjustmentMinutes=10
-- **When**: actual nap_1 duration is 30 min (under threshold) AND recorded=true
+- **When**: actual nap_1 duration is 30 min (under threshold) AND `lifecycle: "completed"`
 - **Then**: WW2 length = base WW2 - 10 min
 - **Rule(s)**: R3.7
 - **Source**: rule-derived
 
 ### EC-N12: Unrecorded short-duration nap doesn't trigger WW shrink
-- **Given**: nap_1 with stored duration 30 min but recorded=false
+- **Given**: nap_1 with stored duration 30 min but `lifecycle: "projected"` (or `"recorded"` — owner-only)
 - **When**: WW2 length is computed
 - **Then**: WW2 = base length (no adjustment)
 - **Rule(s)**: R3.8
@@ -430,8 +433,8 @@
 - **Rule(s)**: R6.2
 - **Source**: 85eade2 (2026-05-07)
 
-### EC-P4: Putdown emits for unrecorded annotations
-- **Given**: nap_3 with status="overridden", recorded=false
+### EC-P4: Putdown emits for owner-only annotations
+- **Given**: nap_3 with `lifecycle: "recorded"` (owner-only override, no time pin)
 - **When**: addPutdownEvents runs
 - **Then**: putdown for nap_3 still emitted
 - **Rule(s)**: R6.2
@@ -812,23 +815,23 @@
 - **Source**: 4d09576 (2026-05-07)
 
 ### EC-DR6: Drawer save of projected event with time change marks completed
-- **Given**: projected nap_2 (status="projected"); user changes start time and saves
+- **Given**: nap_2 with `lifecycle: "projected"`; user changes start time and saves
 - **When**: formToEvent runs
-- **Then**: status="completed", recorded=true, source="manual"
+- **Then**: `lifecycle: "completed"`, `source: "manual"`
 - **Rule(s)**: R2.2, R17.4
 - **Source**: 9c608fd (2026-05-07)
 
-### EC-DR7: Drawer save of projected event with owner-only change marks overridden
-- **Given**: projected nap_2; user changes only owner and saves
+### EC-DR7: Drawer save of projected event with owner-only change marks recorded
+- **Given**: nap_2 with `lifecycle: "projected"`; user changes only owner and saves
 - **When**: formToEvent runs
-- **Then**: status="overridden", recorded=false, source="manual"
+- **Then**: `lifecycle: "recorded"`, `source: "manual"` (no time pin)
 - **Rule(s)**: R2.2, R17.4
 - **Source**: f17428f (2026-05-07)
 
-### EC-DR8: Already-recorded event re-edit keeps recorded=true
-- **Given**: nap with recorded=true; user changes only owner
+### EC-DR8: Completed event re-edit keeps lifecycle completed
+- **Given**: nap with `lifecycle: "completed"`; user changes only owner
 - **When**: formToEvent runs
-- **Then**: recorded stays true (R1.8)
+- **Then**: `lifecycle` stays `"completed"` (owner-only edits never demote)
 - **Rule(s)**: R1.8, R17.5
 - **Source**: f17428f (2026-05-07)
 
@@ -872,14 +875,14 @@
 ## Dashboard
 
 ### EC-DA1: Next nap ordinal from recorded count
-- **Given**: nap_1 recorded (status="completed"), nap_2 projected
+- **Given**: nap_1 with `lifecycle: "completed"`, nap_2 with `lifecycle: "projected"`
 - **When**: dashboard renders
 - **Then**: button shows "Start Nap" with nextNumber=2 (V2 — V3 will label "Start Nap 2")
 - **Rule(s)**: R18.1
 - **Source**: f17428f (2026-05-07)
 
 ### EC-DA2: Owner-edited annotation doesn't bump ordinal
-- **Given**: nap_1 has only owner-only override (status="overridden", recorded=false)
+- **Given**: nap_1 has only owner-only override (`lifecycle: "recorded"`, no time pin)
 - **When**: dashboard renders
 - **Then**: nextNapNumber=1 (annotation doesn't count)
 - **Rule(s)**: R18.1, R1.4
@@ -1218,66 +1221,6 @@
 
 ## Coverage Summary
 
-- Naps & wake windows: 19 cases
-- Bottles: 16 cases
-- Bedtime: 13 cases
-- Putdown: 12 cases
-- Dream feed: 8 cases
-- Pumps: 5 cases
-- Custom events: 5 cases
-- Cook dinner: 3 cases
-- Owner inheritance: 9 cases
-- Drawer / form validation: 13 cases
-- Dashboard: 7 cases
-- Timeline display: 17 cases
-- Day lifecycle: 3 cases
-- Pipeline ordering: 5 cases
-- Schema / persistence: 4 cases
-- Settings: 4 cases
-- Cross-cutting: 2 cases
-- Punted: 3 cases
-
-**Total: 148 cases.** All property-test ready. Rules they enforce
-referenced from [`ENGINE_SPEC.md`](ENGINE_SPEC.md).
-
----
-
-## Source References
-
-- V2 source code as of `main` (2026-05-07).
-- Git fix history: 32 fix commits between 2026-05-02 and 2026-05-07.
-- Locked decisions: `~/.claude/projects/.../memory/project_decisions.md`.
-- Rules they enforce: [`ENGINE_SPEC.md`](ENGINE_SPEC.md).
-- Architecture they will be tested against: [`ARCHITECTURE_V3.md`](ARCHITECTURE_V3.md).
-
----
-
-## Review Log
-
-### Review 2 (Jake, 2026-05-08) — Bedtime threshold semantics
-
-- **EC-BD7 → EC-BD7d**: split into 4 cases covering threshold-driven
-  vs. manual bedtime. Threshold-driven preserves WW length; manual
-  bedtime acts as a hard wall and clips. R7.6 vs R7.7 distinction
-  enforced.
-
-### Review 1 (Jake, 2026-05-08) — Synced with ENGINE_SPEC.md changes
-
-- **EC-N17**: revised — wake window owner from template only
-  (no nap inheritance).
-- **EC-B8/B9/B10**: revised — overnight bottles supported via
-  `bottleChain.{maxBottlesPerDay, latestProjectedStart}`.
-- **EC-BD2/BD4**: revised — bedtime endTime from
-  `settings.defaultWakeTime + 24h`.
-- **EC-BD7**: revised — bedtime starts at WW's natural end; WW NOT
-  shortened to fit a fixed bedtime time. EC-BD7b added.
-- **EC-CD1–CD3 → EC-DR1–DR7**: replaced — Cook Dinner generalized to
-  Daily Recurring Events with multiple entries, optional duration,
-  per-day suppression, V2 migration on read.
-- **EC-OW3/OW4**: revised — wake window owner template-driven, no
-  fallback to nap owner.
-- **EC-OW6/OW6b**: revised — bedtime + bedtime_putdown owner
-  template-driven only; no lastNapOwner fallback.
-- **EC-OW8**: revised — pump owner from `Settings.pumpOwnerSlot`.
-- **EC-OW9/OW9b/OW10**: revised — dream feed owner = opposite of
-  bedtime owner; explicit "other" handling; manual override wins.
+**160 entries** across 22 domain sections (run `grep -c "^### EC-" EDGE_CASES.md`
+for the live count). Rules they enforce live in `ENGINE_SPEC.md`;
+architecture they test against in `ARCHITECTURE_V3.md`.
