@@ -9,19 +9,14 @@
  * see the new selection without waiting for owner-aware events to
  * re-resolve.
  *
- * V3 differences from V2:
- *   - Owners are slot-based OwnerRef values (not "Jake" / "Kelly" /
- *     "Daycare" display strings).
- *   - The option list is derived from settings.owners at render time
- *     by OwnerPickerV3.
- *   - onSelect emits `OwnerRef | undefined`; undefined ("None") is the
- *     valid signal to clear the slot.
- *
- * The actual template mutation lives in setOwnerInTemplate (PR-A0.3) —
- * this component is purely about reading the current value and emitting
- * the picked one.
+ * Chrome is opt-in. When `title` or `onCancel` is passed, the picker
+ * wraps itself in a `BottomSheet` (the same drawer chrome the FAB type
+ * picker uses). When neither is passed, the picker renders bare —
+ * preserving the original headless behavior for callers that supply
+ * their own wrapper.
  */
 
+import { BottomSheet } from "@/components/shared/BottomSheet";
 import type { Event, OwnerRef, OwnershipTemplate, OwnersConfig } from "../../schemas";
 import { OwnerPickerV3 } from "../shared/OwnerPickerV3";
 import { getOwnerAt, templateSlotForEvent } from "./templateSlot";
@@ -31,6 +26,10 @@ export type TemplateOwnerPickerProps = {
   template: OwnershipTemplate;
   owners: OwnersConfig;
   onSelect: (owner: OwnerRef | undefined) => void;
+  /** Title shown in the BottomSheet chrome. */
+  title?: string;
+  /** Dismiss handler. When set, the picker renders inside a BottomSheet. */
+  onCancel?: () => void;
 };
 
 export function TemplateOwnerPicker({
@@ -38,8 +37,21 @@ export function TemplateOwnerPicker({
   template,
   owners,
   onSelect,
+  title,
+  onCancel,
 }: TemplateOwnerPickerProps) {
   const slot = templateSlotForEvent(event);
   const current = slot === undefined ? undefined : getOwnerAt(template, slot);
-  return <OwnerPickerV3 owners={owners} value={current} onChange={onSelect} label={event.label} />;
+  const picker = (
+    <OwnerPickerV3 owners={owners} value={current} onChange={onSelect} label={event.label} />
+  );
+
+  // No chrome requested → bare picker (preserves the original API).
+  if (title === undefined && onCancel === undefined) return picker;
+
+  return (
+    <BottomSheet open={true} title={title ?? "Owner"} onCancel={onCancel ?? (() => undefined)}>
+      {picker}
+    </BottomSheet>
+  );
 }

@@ -158,6 +158,8 @@ export default function TomorrowPage() {
           event={pickedEvent}
           template={selectedTemplate}
           owners={settings.owners}
+          title={`Owner for ${pickedEvent.label}`}
+          onCancel={() => setPickedEvent(null)}
           onSelect={(owner: OwnerRef | undefined) => {
             const next = setOwnerInTemplate(selectedTemplate, pickedEvent, owner);
             setTemplateOverride(next);
