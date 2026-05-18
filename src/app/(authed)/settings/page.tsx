@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
 import { db } from "@/lib/firebase/client";
 import { LoadingState } from "@/components/shared/LoadingState";
 import { SettingsAccount } from "@/v3/components/shared/SettingsAccount";
@@ -15,10 +15,32 @@ import styles from "./page.module.css";
 const CHILD_ID = process.env.NEXT_PUBLIC_DEFAULT_CHILD_ID ?? "aden";
 
 const ACCORDION_STORAGE_KEY = "bdp.settings.accordion.openSlug";
+const ACCORDION_LOCAL_EVENT = "bdp:accordion-change";
 const DEFAULT_OPEN_SLUG = "default-times";
 
 function slugify(title: string): string {
   return title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+}
+
+function subscribeToAccordion(callback: () => void): () => void {
+  window.addEventListener("storage", callback);
+  window.addEventListener(ACCORDION_LOCAL_EVENT, callback);
+  return () => {
+    window.removeEventListener("storage", callback);
+    window.removeEventListener(ACCORDION_LOCAL_EVENT, callback);
+  };
+}
+
+function getAccordionSnapshot(): string {
+  try {
+    return localStorage.getItem(ACCORDION_STORAGE_KEY) ?? DEFAULT_OPEN_SLUG;
+  } catch {
+    return DEFAULT_OPEN_SLUG;
+  }
+}
+
+function getAccordionServerSnapshot(): string {
+  return DEFAULT_OPEN_SLUG;
 }
 
 function parseTime(s: string): TimeMin {
@@ -29,24 +51,21 @@ function parseTime(s: string): TimeMin {
 
 export default function SettingsPage() {
   const { settings, loading } = useV3Settings(CHILD_ID);
-  const [openSlug, setOpenSlug] = useState<string>(DEFAULT_OPEN_SLUG);
-
-  useEffect(() => {
-    try {
-      const stored = localStorage.getItem(ACCORDION_STORAGE_KEY);
-      if (stored) setOpenSlug(stored);
-    } catch {
-      // localStorage unavailable (private mode) — fall through to default.
-    }
-  }, []);
+  const openSlug = useSyncExternalStore(
+    subscribeToAccordion,
+    getAccordionSnapshot,
+    getAccordionServerSnapshot,
+  );
 
   const handleToggle = (slug: string) => {
     const next = openSlug === slug ? "" : slug;
-    setOpenSlug(next);
     try {
       localStorage.setItem(ACCORDION_STORAGE_KEY, next);
+      // storage events don't fire in the originating tab; broadcast manually
+      // so other useSyncExternalStore subscribers (and this one) re-read.
+      window.dispatchEvent(new Event(ACCORDION_LOCAL_EVENT));
     } catch {
-      // localStorage unavailable — state still updates in-memory.
+      // localStorage unavailable (private mode) — toggle has no effect.
     }
   };
 
