@@ -2,6 +2,7 @@ import type { Event, OwnersConfig, TimeMin } from "@/v3/schemas";
 import { formatHoursMinutes, formatTimeForDisplay, formatTimeShort } from "@/v3/ui/time";
 import { OwnerPill } from "./OwnerPill";
 import { lastCompletedNap, napTotals } from "./dashboardStats";
+import styles from "./NextSleepPanel.module.css";
 
 export type NextSleepPanelProps = {
   nextNap: Event | undefined;
@@ -28,10 +29,10 @@ export function NextSleepPanel({
   const totals = napTotals(actuals);
 
   return (
-    <section aria-label="Sleep stats">
-      <h3>Next sleep</h3>
+    <section className={styles.card} aria-label="Sleep stats">
+      <p className={styles.heading}>Next sleep</p>
       {nextNap && (
-        <p>
+        <p className={styles.line}>
           Putdown{" "}
           {formatTimeForDisplay(Math.max(0, nextNap.startTime - putdownLeadMinutes) as TimeMin)} →
           Nap {formatTimeForDisplay(nextNap.startTime)}{" "}
@@ -39,15 +40,19 @@ export function NextSleepPanel({
         </p>
       )}
       {last && last.endTime !== undefined && (
-        <p>
+        <p className={`${styles.line} ${styles.muted}`}>
           Based on last nap: {formatHoursMinutes(last.endTime - last.startTime)},{" "}
           {Math.max(0, nowMinutes - last.endTime)} min ago ({formatTimeShort(last.endTime)})
         </p>
       )}
-      <p>
+      <p className={`${styles.line} ${styles.muted}`}>
         Today: {totals.count} {pluralNaps(totals.count)}, {formatHoursMinutes(totals.totalMinutes)}
       </p>
-      {bedtime && <p>Projected bedtime: {formatTimeForDisplay(bedtime.startTime)}</p>}
+      {bedtime && (
+        <p className={`${styles.line} ${styles.muted}`}>
+          Projected bedtime: {formatTimeForDisplay(bedtime.startTime)}
+        </p>
+      )}
     </section>
   );
 }

@@ -50,7 +50,7 @@ describe("NextBottlePanel", () => {
         owners={owners}
       />,
     );
-    expect(screen.getByRole("heading", { name: /next bottle/i })).toBeVisible();
+    expect(screen.getByLabelText("Bottle stats")).toBeVisible();
     expect(screen.getByText(/1:00 PM/)).toBeVisible();
     expect(screen.getByText(/based on last bottle: 5oz, 60 min ago \(10a\)/i)).toBeVisible();
     expect(screen.getByText(/today: 2 bottles, 9oz/i)).toBeVisible();

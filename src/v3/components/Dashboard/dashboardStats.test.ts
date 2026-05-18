@@ -121,6 +121,30 @@ describe("nextDashboardEvent", () => {
     expect(next?.type).toBe("bottle");
   });
 
+  it("skips synthetic putdown render-blocks (carry parent type, but eventKey === PUTDOWN_KIND_TAG)", () => {
+    const realNap = nap({
+      startTime: (11 * 60) as TimeMin,
+      endTime: (12 * 60) as TimeMin,
+    });
+    // Synthetic putdown matches engine putdown shape: parent's type,
+    // sentinel eventKey, startTime = parent.startTime - leadMinutes.
+    const syntheticPutdown: Event = {
+      id: `putdown:${realNap.id}`,
+      dayId: "d1",
+      eventKey: "__putdown__",
+      type: "nap",
+      kind: "block",
+      label: "Putdown",
+      startTime: (10 * 60 + 45) as TimeMin,
+      endTime: (11 * 60) as TimeMin,
+      hasPutdown: false,
+      lifecycle: { state: "projected" },
+    };
+    const next = nextDashboardEvent([syntheticPutdown, realNap], (10 * 60 + 30) as TimeMin);
+    expect(next?.id).toBe(realNap.id);
+    expect(next?.label).not.toBe("Putdown");
+  });
+
   it("skips an in-progress nap and returns the event AFTER its endTime", () => {
     const events: Event[] = [
       nap({ startTime: (13 * 60) as TimeMin, endTime: (14 * 60) as TimeMin }),

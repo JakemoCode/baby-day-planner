@@ -8,6 +8,7 @@
 
 import type { Event, TimeMin } from "@/v3/schemas";
 import { isRecorded } from "@/v3/schemas";
+import { PUTDOWN_KIND_TAG } from "@/v3/components/Timeline/expandPutdown";
 
 const DASHBOARD_NEXT_TYPES = new Set<Event["type"]>(["bottle", "nap", "bedtime"]);
 
@@ -58,14 +59,17 @@ export function lastCompletedNap(events: Event[]): Event | undefined {
 }
 
 /**
- * Next bottle/nap/bedtime at or after `now`. Skips any nap or bedtime
- * that is currently in progress (startTime ≤ now < endTime) — the
- * NowBanner already announces it, and the dashboard's "what's next"
- * card should look past it.
+ * Next bottle/nap/bedtime at or after `now`. Skips:
+ *   - synthetic putdown render-blocks (eventKey === PUTDOWN_KIND_TAG)
+ *     which carry their parent's type but aren't standalone engine
+ *     events — the parent nap/bedtime is the real "next"
+ *   - any nap or bedtime currently in progress (startTime ≤ now <
+ *     endTime); NowBanner already announces it
  */
 export function nextDashboardEvent(events: Event[], now: TimeMin): Event | undefined {
   const sorted = [...events].sort((a, b) => a.startTime - b.startTime);
   for (const e of sorted) {
+    if (e.eventKey === PUTDOWN_KIND_TAG) continue;
     if (!DASHBOARD_NEXT_TYPES.has(e.type)) continue;
     if (
       (e.type === "nap" || e.type === "bedtime") &&
