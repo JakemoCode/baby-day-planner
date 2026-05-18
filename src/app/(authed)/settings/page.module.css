@@ -151,7 +151,7 @@
 .section[open] > .sectionSummary {
   border-bottom-left-radius: 0;
   border-bottom-right-radius: 0;
-  border-bottom-color: transparent;
+  border-bottom: none;
 }
 
 .sectionSummary::-webkit-details-marker {
@@ -185,6 +185,7 @@
 
 .section[open] > .sectionBody {
   padding: var(--space-3);
+  background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-top: none;
   border-bottom-left-radius: var(--radius-md);
