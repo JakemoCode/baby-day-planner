@@ -155,7 +155,7 @@ export function aSettings(overrides: Partial<Settings> = {}): Settings {
     bottleChain: { bottlesPerDay: 4, bufferAfterWakeMinutes: 10 },
     minBottleIntervalMinutes: 20,
     putdownLeadMinutes: 15,
-    pumpTimes: [10 * 60 + 30, 14 * 60 + 30],
+    pumpTimes: [{ time: 10 * 60 + 30 }, { time: 14 * 60 + 30 }],
     pumpOwnerSlot: "parent2",
     defaultPumpDurationMinutes: 25,
     dreamFeedEnabled: true,

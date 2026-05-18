@@ -33,7 +33,7 @@ describe("R9.1 / R9.3 — pumps from settings.pumpTimes, first anchored to wakeT
     const ctx = aContext({
       day: aDay({ wakeTime: 7 * 60 }),
       settings: aSettings({
-        pumpTimes: [10 * 60 + 30, 14 * 60 + 30],
+        pumpTimes: [{ time: 10 * 60 + 30 }, { time: 14 * 60 + 30 }],
         pumpOwnerSlot: "parent2",
       }),
       actuals: [],
@@ -74,7 +74,7 @@ describe("R9.4 — actual pump replaces projected at same eventKey", () => {
     const ctx = aContext({
       day: aDay({ wakeTime: 7 * 60 }),
       settings: aSettings({
-        pumpTimes: [10 * 60 + 30, 14 * 60 + 30],
+        pumpTimes: [{ time: 10 * 60 + 30 }, { time: 14 * 60 + 30 }],
         pumpOwnerSlot: "parent2",
       }),
       actuals: [recorded],
@@ -108,7 +108,7 @@ describe("R9.1 — eventKey deduplication across collisions", () => {
     const ctx = aContext({
       day: aDay({ wakeTime: 9 * 60 }),
       settings: aSettings({
-        pumpTimes: [9 * 60, 14 * 60 + 30, 14 * 60 + 30],
+        pumpTimes: [{ time: 9 * 60 }, { time: 14 * 60 + 30 }, { time: 14 * 60 + 30 }],
         pumpOwnerSlot: "parent2",
       }),
       actuals: [],

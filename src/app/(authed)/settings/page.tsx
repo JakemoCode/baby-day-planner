@@ -8,7 +8,7 @@ import { withV3SettingsDefaults } from "@/v3/firestore/settingsDefaults";
 import { useLocalStorageString } from "@/v3/hooks/useLocalStorageString";
 import { useV3Settings } from "@/v3/hooks/useV3Settings";
 import { saveSettings } from "@/v3/repositories/settings";
-import type { BottleIntervalRule, OwnerSlot, Settings, TimeMin } from "@/v3/schemas";
+import type { BottleIntervalRule, OwnerSlot, PumpSession, Settings, TimeMin } from "@/v3/schemas";
 import { formatHM24 } from "@/v3/ui/time";
 import styles from "./page.module.css";
 
@@ -175,7 +175,7 @@ export default function SettingsPage() {
       </Section>
 
       <Section title="Pumps" isOpen={openSlug === "pumps"} onToggle={handleToggle}>
-        <PumpTimesRow value={value.pumpTimes} onChange={(v) => set("pumpTimes", v)} />
+        <PumpTimesRow value={value.pumpTimes} defaultDuration={value.defaultPumpDurationMinutes} onChange={(v) => set("pumpTimes", v)} />
         <NumberRow
           id="defaultPumpDurationMinutes"
           label="Default pump duration (min)"
@@ -384,14 +384,34 @@ function WakeWindowsRow({
 
 function PumpTimesRow({
   value,
+  defaultDuration,
   onChange,
 }: {
-  value: TimeMin[];
-  onChange: (next: TimeMin[]) => void;
+  value: PumpSession[];
+  defaultDuration: number;
+  onChange: (next: PumpSession[]) => void;
 }) {
+  const setTime = (i: number, t: TimeMin) => {
+    const next = value.map((s, j) => (j === i ? { ...s, time: t } : s));
+    onChange(next);
+  };
+  const setDuration = (i: number, raw: string) => {
+    const next = value.map((s, j) => {
+      if (j !== i) return s;
+      if (raw === "") {
+        // Clear override — omit the key so the engine falls back to default.
+        const { durationMinutes: _omit, ...rest } = s;
+        return rest;
+      }
+      const n = Number(raw);
+      if (!Number.isFinite(n) || n <= 0) return s;
+      return { ...s, durationMinutes: n };
+    });
+    onChange(next);
+  };
   return (
     <div className={styles.repeater}>
-      {value.map((t, i) => (
+      {value.map((s, i) => (
         <div key={i} className={styles.repeaterRow}>
           <label htmlFor={`pump-${i}`} className={styles.repeaterLabelNarrow}>
             Pump {i + 1}
@@ -399,14 +419,20 @@ function PumpTimesRow({
           <input
             id={`pump-${i}`}
             type="time"
-            value={formatHM24(t)}
-            onChange={(e) => {
-              const next = [...value];
-              next[i] = parseTime(e.target.value);
-              onChange(next);
-            }}
+            value={formatHM24(s.time)}
+            onChange={(e) => setTime(i, parseTime(e.target.value))}
             className={styles.repeaterInputFlex}
           />
+          <input
+            type="number"
+            min={1}
+            placeholder={String(defaultDuration)}
+            value={s.durationMinutes ?? ""}
+            onChange={(e) => setDuration(i, e.target.value)}
+            aria-label={`Pump ${i + 1} duration (min) — leave blank for default`}
+            className={styles.repeaterInputSm}
+          />
+          <span className={styles.repeaterText}>min</span>
           <button
             type="button"
             onClick={() => onChange(value.filter((_, j) => j !== i))}
@@ -419,7 +445,7 @@ function PumpTimesRow({
       ))}
       <button
         type="button"
-        onClick={() => onChange([...value, 12 * 60])}
+        onClick={() => onChange([...value, { time: 12 * 60 }])}
         className={styles.addButton}
       >
         + Add pump time

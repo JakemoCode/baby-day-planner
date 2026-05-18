@@ -30,11 +30,11 @@ const RuleProjectPumps: Rule = {
   produces: (events, ctx) => {
     const missing = missingPumps(events, ctx);
     if (missing.length === 0) return events;
-    return [...events, ...missing.map((t) => buildProjectedPump(ctx, t.startTime, t.eventKey))];
+    return [...events, ...missing.map((t) => buildProjectedPump(ctx, t.startTime, t.eventKey, t.durationMinutes))];
   },
 };
 
-type PumpTarget = { startTime: TimeMin; eventKey: string };
+type PumpTarget = { startTime: TimeMin; eventKey: string; durationMinutes?: number };
 
 /**
  * R9.3: first pump anchored to day.wakeTime when present. The remaining
@@ -49,20 +49,30 @@ type PumpTarget = { startTime: TimeMin; eventKey: string };
  * project two events with identical ids.
  */
 function missingPumps(events: readonly Event[], ctx: Context): PumpTarget[] {
-  const times = ctx.settings.pumpTimes;
-  if (times.length === 0) return [];
-  const anchored: TimeMin[] =
-    ctx.day.wakeTime !== undefined ? [ctx.day.wakeTime, ...times.slice(1)] : [...times];
+  const sessions = ctx.settings.pumpTimes;
+  if (sessions.length === 0) return [];
+  // Anchor: if today's wakeTime is known, the first scheduled pump's TIME is
+  // replaced by wakeTime (its duration override, if any, is preserved).
+  const anchored = sessions.map((s, i) => {
+    if (i === 0 && ctx.day.wakeTime !== undefined) {
+      return { ...s, time: ctx.day.wakeTime };
+    }
+    return s;
+  });
   // Internally dedup by eventKey: two settings entries with the same time,
   // or a wake-anchored first entry colliding with a later setting, would
   // otherwise produce duplicate ids (first occurrence wins).
   const seen = new Set<string>();
   const candidates: PumpTarget[] = [];
-  for (const t of anchored) {
-    const eventKey = pumpEventKey(t);
+  for (const s of anchored) {
+    const eventKey = pumpEventKey(s.time);
     if (seen.has(eventKey)) continue;
     seen.add(eventKey);
-    candidates.push({ startTime: t, eventKey });
+    candidates.push({
+      startTime: s.time,
+      eventKey,
+      ...(s.durationMinutes !== undefined ? { durationMinutes: s.durationMinutes } : {}),
+    });
   }
   // R9.4: filter out candidates whose eventKey already exists on a pump event.
   return missingScheduledEvents(candidates, events.filter(isPump));
@@ -79,7 +89,13 @@ function pad2(n: number): string {
   return n < 10 ? `0${n}` : String(n);
 }
 
-function buildProjectedPump(ctx: Context, startTime: TimeMin, eventKey: string): Event {
+function buildProjectedPump(
+  ctx: Context,
+  startTime: TimeMin,
+  eventKey: string,
+  durationOverride?: number,
+): Event {
+  const duration = durationOverride ?? ctx.settings.defaultPumpDurationMinutes;
   return projectedEvent({
     ctx,
     id: `proj_${eventKey}`,
@@ -87,7 +103,7 @@ function buildProjectedPump(ctx: Context, startTime: TimeMin, eventKey: string):
     type: "pump",
     kind: "block",
     startTime,
-    endTime: startTime + ctx.settings.defaultPumpDurationMinutes,
+    endTime: startTime + duration,
     label: "Pump",
     owner: { slot: ctx.settings.pumpOwnerSlot },
   });
