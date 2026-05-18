@@ -59,7 +59,7 @@ Sign-in flow + `(authed)` layout already shipped in Plan B.
 - **EndOfDayCard** — _(retired in §F32 2026-05-17; see `docs/v3/FAST_FOLLOW_COMPLETED.md` §F32)_ Previously replaced primary card after dream feed completes. Dashboard now always shows stats; wake gate replaced with a slim "Wake up" CTA.
 
 **Empty states:**
-- No Bottle 1 logged: NextBottlePreview shows "Start first bottle for schedule"
+- No Bottle 1 logged: NextBottlePanel shows totals at 0 ("Today: 0 bottles, 0oz") with no "based on last" line
 - Wake time not set: header instructs "Set wake time to start the day"
 
 ### Timeline (`/timeline`)
