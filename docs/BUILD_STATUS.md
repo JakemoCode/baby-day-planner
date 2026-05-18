@@ -1,6 +1,6 @@
 # Build Status
 
-> Last refresh: 2026-05-17
+> Last refresh: 2026-05-18 (evening)
 > Repo: `github.com/JakemoCode/baby-day-planner`
 
 ## Where we are
@@ -57,34 +57,90 @@ Spec/plan at `docs/_archive/superpowers/{specs,plans}/2026-05-17-f32-retire-eod*
 Wave 9 (PWA manifest + service worker + E2E + design audit) is the
 last build wave on the original Plan C roadmap. Not yet started.
 
-## Tomorrow's resume notes (2026-05-18)
+## Tomorrow's resume notes (2026-05-19)
 
-**Confirmed merged today (2026-05-17):** §F32 (branch `worktree-f32-retire-eod`).
-Test count post-merge: ~639 unit + 35 integration.
+**Confirmed merged today (2026-05-18) by this session:**
 
-**Likely next priorities** (carrying forward from yesterday's notes):
+- **§F2a** — PR #176. Dashboard surface contrast lift (`--color-bg`
+  deepened to oat `#f2ebde`; white cards now visibly pop). Stat panels
+  got a sage `border-left` per Variant A. Hero times use
+  `--color-success` (deeper sage) for stronger read. Eyebrow headings
+  bumped to weight-semibold across all three cards.
+- **§F2b** — PR #178. Timeline palette: chip dots indicate event type
+  (bottle=rust, extra=honey/goldenrod, pump=purple, bedtime=sage-deep);
+  honey fills for duration extras; bolder hour-tick labels; 2px owner
+  border on chips. Plus mid-flight chip layout fixes (label phase
+  switching, cluster right-anchoring, vertical-center via
+  `translateY(-50%)`), goldenrod hue tuning, `body { overflow-x:
+  hidden }` viewport backstop.
+- **§F36** *(was §F37 in commit messages — renumbered during merge)*
+  — PR #186. **Owner can now be unassigned.** Root cause was Firestore
+  `updateDoc` field-merge dropping the owner-clearing patch. Schema
+  migrated: `Event.owner` is now REQUIRED, `{ slot: "none" }` (exported
+  as `NO_OWNER`) replaces `undefined` as absence-of-owner. Read-seam
+  defaulter auto-promotes pre-F36 docs. Bonus: deterministic id on
+  projected→recorded transitions (`recorded_${eventKey}`) fixes the
+  wake_window "intermittent owner change" symptom that surfaced during
+  click-test. Two new seam tests (PARENT1→NO_OWNER→PARENT2 round-trip
+  + two-edit-collapse).
 
-1. **§F2 palette refresh** (flagged twice; secondary buttons are
-   ~1.05 contrast against page background → visually invisible.
-   Yesterday's NapActionButton fix was a variant swap; systemic fix
-   still pending.)
-2. **§F3 onboarding + §F10 child name/DOB** (first-time user UX; blocks
-   any non-Jake user).
-3. **Deploy to dogfood** (production Firebase + Vercel + smoke test).
+Test count post-merge: ~650 unit + 37 integration.
 
-**Things to be aware of:**
+**Open verification before next code change:**
 
-- Dashboard now has more vertical real estate — keep an eye on
-  iPhone-viewport scroll behavior; F32 deferred a density tweak until
-  measured in real use.
-- `NowBanner` priority is bedtime > nap > wake-window; mutually
-  exclusive in normal flow.
+- **§F2c** *(needs repro check)*: Jake reported earlier today that
+  the §F2b chip phase-switch + BottomTab regressed (long labels
+  truncate eagerly OR just overflow; bottom nav scrolls off screen).
+  Later click-testing on the §F36 dev server showed neither symptom
+  — likely a stale-server artifact from a parallel worktree.
+  **First action next session**: kill all other `next-server`
+  processes, open `main` on a clean port, repro the symptoms. If they
+  don't repro → drop the §F2c entry from `FAST_FOLLOW.md`. If they
+  do → ~1–2 hour scope fix.
+
+**Likely next priorities** (post-F2c-verify):
+
+1. **§F37 (current numbering) — Smarter chip-label truncation**:
+   tiny labels ellipsing-when-they'd-fit-without-the-dots. CSS-standard
+   behavior; wants a `ResizeObserver` near-fit suppression. ~30 lines.
+2. **§F3 onboarding + §F10 child name/DOB**: blocks any non-Jake
+   user. Has not moved.
+3. **§F11** (Settings explicit Save button + success feedback) and
+   **§F17** (auto-anchor day at `defaultWakeTime`, retire
+   `StartDayButton`) — both small, both leverage groundwork laid in
+   §F32.
+4. **Day-templates page doesn't show putdowns** *(unfiled)* — Jake
+   noticed during F36 click-test. Page probably bypasses
+   `renderProjection`. Worth filing as a new F-item before working it.
+5. **Deploy to dogfood**: Firebase prod + Vercel + smoke. 1–2 evenings.
+
+**Coverage gap worth noting:**
+
+- The timeline page (`src/app/(authed)/timeline/page.tsx`) has ZERO
+  RTL test coverage. The PR #186 seam test for the wake_window edit
+  flow is repo-layer (Firestore round-trip), not page-handler-layer.
+  A real RTL test for the timeline edit flow is a larger lift —
+  worth filing when the next edit-flow bug bites.
+
+**Things to be aware of (carrying forward + new):**
+
+- `Event.owner` is now required; `{ slot: "none" }` (`NO_OWNER`)
+  is the unassigned representation. Never use `undefined`. Engine
+  rules check `isNoOwner(owner)`. `OwnerSlot` (parent1/parent2)
+  is unchanged — `defaultOwnerSlot` / `pumpOwnerSlot` in Settings
+  still can't be "none".
 - `nextDashboardEvent` filters vocab to {bottle, nap, bedtime} and
-  skips in-progress sleep — if a new event type is added (e.g.,
-  daycare drop-off), it won't auto-appear on NextEventCard.
+  skips in-progress sleep + synthetic putdown render-blocks.
 - `StartDayButton` is gated on `process.env.NODE_ENV === "development"`.
-  Tests that want to assert the dev affordance need to inspect the
-  `.actionsRow` grid behavior carefully.
+- `body { overflow-x: hidden; max-width: 100vw }` is a §F2b backstop;
+  any new fixed/sticky elements should be verified against it.
+- Timeline projected→recorded saves use deterministic id
+  `recorded_${eventKey}` to avoid duplicate override docs.
+- Many parallel worktrees still exist (`f1-settings-accordion`,
+  `f13-template-owner-picker-chrome`, `f16-settings-css-modules`,
+  `f39-pr1-tomorrowplan-schema`, `tomorrow-fab`, etc.). Worth a
+  `git worktree list` sweep before starting fresh work — multiple
+  dev servers on the same port caused real confusion this session.
 
 ## Active backlog
 
