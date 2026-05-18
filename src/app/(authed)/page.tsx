@@ -5,12 +5,7 @@ import type { Event, OwnershipTemplate } from "@/v3/schemas";
 import { isRecorded } from "@/v3/schemas";
 import { reduceLifecycle } from "@/v3/lifecycle";
 import { isInProgress } from "@/v3/lib/effectiveEnd";
-import {
-  currentWakeWindow,
-  nextBottle,
-  nextNap,
-  projectedBedtime,
-} from "@/v3/selectors";
+import { currentWakeWindow, nextBottle, nextNap, projectedBedtime } from "@/v3/selectors";
 import { nextDashboardEvent } from "@/v3/components/Dashboard/dashboardStats";
 import { useNowMinutes } from "@/hooks/useNowMinutes";
 import { newEventId } from "@/v3/lib/newEventId";

@@ -44,9 +44,7 @@ export function NextEventCard({
         </span>
         <OwnerPill owner={event.owner} owners={owners} className={styles.owner} />
       </div>
-      {showPutdown && (
-        <p className={styles.putdown}>Putdown {formatTimeForDisplay(putdownTime)}</p>
-      )}
+      {showPutdown && <p className={styles.putdown}>Putdown {formatTimeForDisplay(putdownTime)}</p>}
     </article>
   );
 }

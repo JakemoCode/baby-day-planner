@@ -23,11 +23,7 @@ import { aDay, aSettings } from "@/v3/__tests__/factories";
 import { projectDay } from "@/v3/engine/projectDay";
 import { isInProgress } from "@/v3/lib/effectiveEnd";
 import { currentWakeWindow, projectedBedtime, nextBottle, nextNap } from "@/v3/selectors";
-import {
-  nextDashboardEvent,
-  bottleTotals,
-  napTotals,
-} from "./dashboardStats";
+import { nextDashboardEvent, bottleTotals, napTotals } from "./dashboardStats";
 import { NowBanner } from "./NowBanner";
 import { NextEventCard } from "./NextEventCard";
 import { NextBottlePanel } from "./NextBottlePanel";
@@ -153,12 +149,7 @@ describe("Dashboard seam — real projectDay + new panels", () => {
           owners={owners}
           putdownLeadMinutes={settings.putdownLeadMinutes}
         />
-        <NextBottlePanel
-          nextBottle={nb}
-          actuals={actuals}
-          nowMinutes={now}
-          owners={owners}
-        />
+        <NextBottlePanel nextBottle={nb} actuals={actuals} nowMinutes={now} owners={owners} />
         <NextSleepPanel
           nextNap={nn}
           bedtime={bedtime}

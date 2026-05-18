@@ -25,14 +25,28 @@ const ev = (overrides: Partial<Event> = {}): Event => ({
 
 describe("NextEventCard", () => {
   it("renders the next event label, time and 'in N min' delta", () => {
-    render(<NextEventCard event={ev()} nowMinutes={9 * 60 + 18} owners={owners} putdownLeadMinutes={20} />);
+    render(
+      <NextEventCard
+        event={ev()}
+        nowMinutes={9 * 60 + 18}
+        owners={owners}
+        putdownLeadMinutes={20}
+      />,
+    );
     expect(screen.getByText("Nap 2")).toBeVisible();
     expect(screen.getByText("9:30 AM")).toBeVisible();
     expect(screen.getByText(/in 12m/i)).toBeVisible();
   });
 
   it("shows 'now' when delta is 0", () => {
-    render(<NextEventCard event={ev()} nowMinutes={9 * 60 + 30} owners={owners} putdownLeadMinutes={20} />);
+    render(
+      <NextEventCard
+        event={ev()}
+        nowMinutes={9 * 60 + 30}
+        owners={owners}
+        putdownLeadMinutes={20}
+      />,
+    );
     expect(screen.getByText(/now/i)).toBeVisible();
   });
 
@@ -50,7 +64,12 @@ describe("NextEventCard", () => {
 
   it("displays owner display name from OwnersConfig when set", () => {
     render(
-      <NextEventCard event={ev({ owner: { slot: "parent1" } })} nowMinutes={500} owners={owners} putdownLeadMinutes={20} />,
+      <NextEventCard
+        event={ev({ owner: { slot: "parent1" } })}
+        nowMinutes={500}
+        owners={owners}
+        putdownLeadMinutes={20}
+      />,
     );
     expect(screen.getByText("Jake")).toBeVisible();
   });
@@ -68,7 +87,9 @@ describe("NextEventCard", () => {
   });
 
   it("renders a calm empty state when event is undefined", () => {
-    render(<NextEventCard event={undefined} nowMinutes={500} owners={owners} putdownLeadMinutes={20} />);
+    render(
+      <NextEventCard event={undefined} nowMinutes={500} owners={owners} putdownLeadMinutes={20} />,
+    );
     expect(screen.getByText(/no more events — have a good night/i)).toBeVisible();
   });
 });

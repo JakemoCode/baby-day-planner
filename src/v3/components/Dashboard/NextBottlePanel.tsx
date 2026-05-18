@@ -14,12 +14,7 @@ function pluralBottles(n: number): string {
   return n === 1 ? "bottle" : "bottles";
 }
 
-export function NextBottlePanel({
-  nextBottle,
-  actuals,
-  nowMinutes,
-  owners,
-}: NextBottlePanelProps) {
+export function NextBottlePanel({ nextBottle, actuals, nowMinutes, owners }: NextBottlePanelProps) {
   const last = lastBottle(actuals);
   const totals = bottleTotals(actuals);
 
@@ -34,8 +29,8 @@ export function NextBottlePanel({
       )}
       {last && (
         <p>
-          Based on last bottle: {last.amountOz ?? 0}oz, {Math.max(0, nowMinutes - last.startTime)} min ago (
-          {formatTimeShort(last.startTime)})
+          Based on last bottle: {last.amountOz ?? 0}oz, {Math.max(0, nowMinutes - last.startTime)}{" "}
+          min ago ({formatTimeShort(last.startTime)})
         </p>
       )}
       <p>

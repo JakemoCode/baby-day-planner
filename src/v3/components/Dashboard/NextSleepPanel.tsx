@@ -32,8 +32,9 @@ export function NextSleepPanel({
       <h3>Next sleep</h3>
       {nextNap && (
         <p>
-          Putdown {formatTimeForDisplay(Math.max(0, nextNap.startTime - putdownLeadMinutes) as TimeMin)} → Nap{" "}
-          {formatTimeForDisplay(nextNap.startTime)}{" "}
+          Putdown{" "}
+          {formatTimeForDisplay(Math.max(0, nextNap.startTime - putdownLeadMinutes) as TimeMin)} →
+          Nap {formatTimeForDisplay(nextNap.startTime)}{" "}
           {nextNap.owner && <OwnerPill owner={nextNap.owner} owners={owners} />}
         </p>
       )}
