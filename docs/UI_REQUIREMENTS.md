@@ -48,20 +48,18 @@ Sign-in flow + `(authed)` layout already shipped in Plan B.
 - **NextEventCard** — primary card showing next non-wake-window event with current owner if assigned
   - Hook: `useDay`, `useEvents`, `useSettings`. Engine selector: `nextEvent(events, nowMinutes)`
   - Display: label + time (e.g., `Start putting down for Nap 2 · 9:30 AM · in 12 min`)
-- **NextBottlePreview** — secondary card. Selector: `nextBottle`
-- **NextNapPreview** — secondary card. Selector: `nextNap`
-- **CurrentWakeWindowStatus** — small "in wake window N · ends 10:00 AM" indicator. Selector: `currentWakeWindow`
+- **NextBottlePanel** _(was `NextBottlePreview`; renamed + reshaped in §F32 2026-05-17)_ — secondary card. Selector: `nextBottle`; adds per-day bottle totals.
+- **NextSleepPanel** _(was `NextNapPreview`; renamed + reshaped in §F32 2026-05-17)_ — secondary card. Selector: `nextNap`; adds per-day nap totals.
+- **NowBanner** _(was `CurrentWakeWindowStatus`; renamed + extended in §F32 2026-05-17)_ — wake-window + in-progress sleep banner. Priority: bedtime > nap > wake-window.
 - **Action buttons (context-aware):**
   - **StartBottleButton** ("Start Bottle Now") — always visible during the day
   - **NapActionButton** — "Start Nap Now" outside a nap, "End Nap" during one
   - **StartDayButton** — context-aware label: "Start New Day" if no Tomorrow Plan, "Start Day from Plan" if one exists. Kebab override: "Start blank instead". Settings toggle: "Always promote Tomorrow Plan if one exists".
   - **FAB (+)** — opens EventEditDrawer in "create extra" mode
-- **EndOfDayCard** — replaces primary card after dream feed completes:
-  - Before midnight: "Have a good night"
-  - After midnight (no events left): "Tap to start <Day/Plan>" → triggers StartDayButton flow
+- **EndOfDayCard** — _(retired in §F32 2026-05-17; see `docs/v3/FAST_FOLLOW_COMPLETED.md` §F32)_ Previously replaced primary card after dream feed completes. Dashboard now always shows stats; wake gate replaced with a slim "Wake up" CTA.
 
 **Empty states:**
-- No Bottle 1 logged: NextBottlePreview shows "Start first bottle for schedule"
+- No Bottle 1 logged: NextBottlePanel shows totals at 0 ("Today: 0 bottles, 0oz") with no "based on last" line
 - Wake time not set: header instructs "Set wake time to start the day"
 
 ### Timeline (`/timeline`)

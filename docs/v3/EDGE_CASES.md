@@ -895,14 +895,14 @@
 ### EC-DA4: NextEventCard suppresses overlapping previews
 - **Given**: nextEvent.type === "bottle"
 - **When**: dashboard renders
-- **Then**: NextBottlePreview is hidden (smart suppression)
+- **Then**: NextBottlePanel is hidden (smart suppression) _(component renamed from `NextBottlePreview` in §F32 2026-05-17)_
 - **Rule(s)**: R18.5
 - **Source**: rule-derived
 
-### EC-DA5: End-of-day card after bedtime threshold
+### EC-DA5: End-of-day view after bedtime threshold
 - **Given**: nowMinutes >= bedtimeThreshold; no upcoming events
 - **When**: dashboard mounts
-- **Then**: shows EndOfDayCard
+- **Then**: dashboard shows stats + "Start Bedtime Now" CTA — `EndOfDayCard` retired in §F32 (2026-05-17); no early-return branch.
 - **Rule(s)**: R18.6
 - **Source**: rule-derived
 

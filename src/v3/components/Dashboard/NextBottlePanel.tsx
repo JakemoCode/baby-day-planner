@@ -1,0 +1,48 @@
+import type { Event, OwnersConfig, TimeMin } from "@/v3/schemas";
+import { formatHoursMinutes, formatTimeForDisplay, formatTimeShort } from "@/v3/ui/time";
+import { OwnerPill } from "./OwnerPill";
+import { bottleTotals, lastBottle } from "./dashboardStats";
+import styles from "./NextBottlePanel.module.css";
+
+export type NextBottlePanelProps = {
+  nextBottle: Event | undefined;
+  actuals: Event[];
+  nowMinutes: TimeMin;
+  owners: OwnersConfig;
+};
+
+function pluralBottles(n: number): string {
+  return n === 1 ? "bottle" : "bottles";
+}
+
+function formatDelta(deltaMinutes: number): string {
+  if (deltaMinutes <= 0) return "now";
+  return `in ${formatHoursMinutes(deltaMinutes)}`;
+}
+
+export function NextBottlePanel({ nextBottle, actuals, nowMinutes, owners }: NextBottlePanelProps) {
+  const last = lastBottle(actuals);
+  const totals = bottleTotals(actuals);
+
+  return (
+    <section className={styles.card} aria-label="Bottle stats">
+      <p className={styles.heading}>Next bottle</p>
+      {nextBottle && (
+        <div className={styles.timeRow}>
+          <span className={styles.time}>{formatTimeForDisplay(nextBottle.startTime)}</span>
+          <span className={styles.delta}>{formatDelta(nextBottle.startTime - nowMinutes)}</span>
+          {nextBottle.owner && <OwnerPill owner={nextBottle.owner} owners={owners} />}
+        </div>
+      )}
+      {last && (
+        <p className={styles.line}>
+          Last: {last.amountOz ?? 0}oz, {Math.max(0, nowMinutes - last.startTime)} min ago (
+          {formatTimeShort(last.startTime)})
+        </p>
+      )}
+      <p className={styles.footer}>
+        Today: {totals.count} {pluralBottles(totals.count)} · {totals.oz}oz
+      </p>
+    </section>
+  );
+}

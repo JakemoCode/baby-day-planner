@@ -124,8 +124,7 @@ describe("NapActionButton", () => {
     // Edge case: bedtime already completed earlier and the cascade has
     // suppressed all subsequent naps. The button stays actionable —
     // saveEvent's deterministic id="bedtime" lets a re-tap update the
-    // existing bedtime doc with a fresh startTime. The true "day is
-    // over" UX is EndOfDayCard (rendered elsewhere on the dashboard).
+    // existing bedtime doc with a fresh startTime.
     render(
       <NapActionButton
         {...makeProps({

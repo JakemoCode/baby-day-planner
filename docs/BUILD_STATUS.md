@@ -1,6 +1,6 @@
 # Build Status
 
-> Last refresh: 2026-05-16
+> Last refresh: 2026-05-17
 > Repo: `github.com/JakemoCode/baby-day-planner`
 
 ## Where we are
@@ -46,58 +46,45 @@ PRs #165 → #168)** — major reshape of how naps + bedtime persist:
 - NapActionButton CTA always actionable (defaults to "Start Bedtime
   Now" when nothing else applies); `primary` variant for visibility.
 
+**§F32 landed (2026-05-17)** — `EndOfDayCard` retired; dashboard
+always shows stats. `NowBanner` unifies wake-window + in-progress
+sleep banners; `NextBottlePanel` and `NextSleepPanel` carry per-day
+totals (recorded events only); `NextEventCard` filters vocab to
+bottle/nap/bedtime and renders a putdown sub-line on sleep events;
+wake gate is a slim `Wake up` CTA; `StartDayButton` is dev-only.
+Spec/plan at `docs/superpowers/{specs,plans}/2026-05-17-f32-retire-eod*.md`.
+
 Wave 9 (PWA manifest + service worker + E2E + design audit) is the
 last build wave on the original Plan C roadmap. Not yet started.
 
-## Tomorrow's resume notes (2026-05-17)
+## Tomorrow's resume notes (2026-05-18)
 
-**Confirmed merged today (2026-05-16):** #165, #166, #167, #168. All
-on `main`. 639 unit + 35 integration tests passing.
+**Confirmed merged today (2026-05-17):** §F32 (branch `worktree-f32-retire-eod`).
+Test count post-merge: ~639 unit + 35 integration.
 
-**PR open awaiting merge:** #169 (docs-only: adds §F32 to FAST_FOLLOW).
+**Likely next priorities** (carrying forward from yesterday's notes):
+
+1. **§F2 palette refresh** (flagged twice; secondary buttons are
+   ~1.05 contrast against page background → visually invisible.
+   Yesterday's NapActionButton fix was a variant swap; systemic fix
+   still pending.)
+2. **§F3 onboarding + §F10 child name/DOB** (first-time user UX; blocks
+   any non-Jake user).
+3. **Deploy to dogfood** (production Firebase + Vercel + smoke test).
 
 **Things to be aware of:**
 
-- The 2026-05-16 lifecycle simplification reshaped the data model.
-  Wipe the local emulator before testing (or trust the migration at
-  the read seam). Pre-#166 fixtures still in the codebase will be
-  auto-migrated on read.
-- `feedback_seam_coverage_required.md` memory: two bugs shipped
-  through the unit suite today (PR #166 + the bedtime CTA bug). The
-  Playwright E2E tier (deferred for V1) is the right safety net;
-  until then, when implementing a CTA-driven flow, add a seam test
-  using REAL projectDay + REAL renderProjection.
-- `feedback_parallel_agent_workspace.md` memory: parallel agents
-  share the working tree. WIP edits in one agent can break unrelated
-  branches' pre-push typecheck. Defer cross-branch ops until in-flight
-  agents finish (or use distinct branch names; or worktree per agent).
-
-**Likely next priorities (in roughly the order Jake last weighed
-them):**
-
-1. **§F32 — retire `EndOfDayCard`, dashboard always shows stats**
-   (Jake's request today; will need design call on the stats panel
-   content + the wake-gate replacement UI)
-2. **§F2 palette refresh** (🔥 flagged twice; surface contrast
-   ~1.05 right now → secondary buttons visually invisible against
-   page background; today's NapActionButton fix was a quick variant
-   swap, the systemic fix is still pending)
-3. **§F3 onboarding + §F10 child name/DOB** (first-time user UX;
-   blocks any non-Jake user)
-4. **Deploy to dogfood** (production Firebase + Vercel + smoke test
-   → ~1-2 evenings; see earlier session for the minimum-deploy plan)
-
-**Things that came up but weren't scoped:**
-
-- Bedtime soft-end uses `napLen` (per `effectiveEnd.ts` JSDoc) —
-  technically wrong for bedtime which extends to next-day wake. Not
-  observable today (cascade emits no putdown-eligible events past
-  bedtime) but flagged in code comments for a future change.
-- NapActionButton name is stale (handles naps + bedtimes + default
-  bedtime mode). Renaming considered + deferred.
-- Pre-existing clock-skew between NapActionButton prop `nowMinutes`
-  and inline `currentLocalMinutes()` (PR #162 reviewer note I5);
-  not pursued.
+- Dashboard now has more vertical real estate — keep an eye on
+  iPhone-viewport scroll behavior; F32 deferred a density tweak until
+  measured in real use.
+- `NowBanner` priority is bedtime > nap > wake-window; mutually
+  exclusive in normal flow.
+- `nextDashboardEvent` filters vocab to {bottle, nap, bedtime} and
+  skips in-progress sleep — if a new event type is added (e.g.,
+  daycare drop-off), it won't auto-appear on NextEventCard.
+- `StartDayButton` is gated on `process.env.NODE_ENV === "development"`.
+  Tests that want to assert the dev affordance need to inspect the
+  `.actionsRow` grid behavior carefully.
 
 ## Active backlog
 

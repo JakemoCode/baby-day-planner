@@ -137,17 +137,16 @@ describe("DashboardPage (V3)", () => {
     expect(screen.getByText(/Loading today/i)).toBeVisible();
   });
 
-  it("shows EndOfDayCard with start when there is no active day", () => {
+  it("shows Wake up button when there is no active day", () => {
     setupHooks({ day: null, settings: null });
     renderWithAuth(<DashboardPage />);
-    // EndOfDayCard with afterMidnight=true exposes the start-day region.
-    expect(screen.getByLabelText(/Start the new day/i)).toBeVisible();
+    expect(screen.getByRole("button", { name: /Wake up/i })).toBeVisible();
   });
 
   it("wake-gate: Day with wakeTime undefined is treated as no active day", () => {
     setupHooks({ day: makeDay({ wakeTime: undefined as unknown as number }) });
     renderWithAuth(<DashboardPage />);
-    expect(screen.getByLabelText(/Start the new day/i)).toBeVisible();
+    expect(screen.getByRole("button", { name: /Wake up/i })).toBeVisible();
   });
 
   describe("Start New Day flow from the wake-gate", () => {
@@ -156,11 +155,13 @@ describe("DashboardPage (V3)", () => {
     // handler was completely uncovered. The "Start New Day → no
     // settings doc → silent failure" bug that shipped during
     // click-test would have been caught here.
-    it("clicks through Start → Confirm → seeds default settings AND archives+creates day when no settings exist", async () => {
+    //
+    // F32: The "Wake up" button fires handleStart directly (no confirm
+    // dialog). One click → settings seed + day creation.
+    it("clicks Wake up → seeds default settings AND creates day when no settings exist", async () => {
       setupHooks({ day: null, settings: null });
       renderWithAuth(<DashboardPage />);
-      await userEvent.click(screen.getByRole("button", { name: /Start New Day/i }));
-      await userEvent.click(screen.getByRole("button", { name: /^Confirm$/i }));
+      await userEvent.click(screen.getByRole("button", { name: /Wake up/i }));
 
       // Settings doc must be seeded BEFORE the day, otherwise the wake-
       // gate re-fires on `!settings` after the day write and the user
@@ -187,11 +188,10 @@ describe("DashboardPage (V3)", () => {
       );
     });
 
-    it("when settings already exist: skips the saveSettings call; just archives+creates day", async () => {
+    it("when settings already exist: skips the saveSettings call; just creates day", async () => {
       setupHooks({ day: null, settings: makeSettings({ defaultWakeTime: 8 * 60 + 15 }) });
       renderWithAuth(<DashboardPage />);
-      await userEvent.click(screen.getByRole("button", { name: /Start New Day/i }));
-      await userEvent.click(screen.getByRole("button", { name: /^Confirm$/i }));
+      await userEvent.click(screen.getByRole("button", { name: /Wake up/i }));
 
       // Settings already present → no bootstrap write.
       expect(saveSettingsMock).not.toHaveBeenCalled();
@@ -204,14 +204,13 @@ describe("DashboardPage (V3)", () => {
       );
     });
 
-    it("when day exists but wakeTime is undefined: same flow (seeds settings if missing, then archives+creates)", async () => {
+    it("when day exists but wakeTime is undefined: same flow (seeds settings if missing, then creates)", async () => {
       setupHooks({
         day: makeDay({ wakeTime: undefined as unknown as number }),
         settings: null,
       });
       renderWithAuth(<DashboardPage />);
-      await userEvent.click(screen.getByRole("button", { name: /Start New Day/i }));
-      await userEvent.click(screen.getByRole("button", { name: /^Confirm$/i }));
+      await userEvent.click(screen.getByRole("button", { name: /Wake up/i }));
 
       expect(saveSettingsMock).toHaveBeenCalledTimes(1);
       expect(startNewDayMock).toHaveBeenCalledTimes(1);
@@ -221,22 +220,23 @@ describe("DashboardPage (V3)", () => {
   it("wake-gate: Day with wakeTime === 0 (midnight) is a valid active day", () => {
     setupHooks({ day: makeDay({ wakeTime: 0 }), nowMinutes: 8 * 60 });
     renderWithAuth(<DashboardPage />);
-    // Must NOT show the start-day card; should show the dashboard surface
+    // Must NOT show the Wake up button; should show the dashboard surface
     // with at least the "add an event" FAB.
-    expect(screen.queryByLabelText(/Start the new day/i)).toBeNull();
+    expect(screen.queryByRole("button", { name: /Wake up/i })).toBeNull();
     expect(screen.getByRole("button", { name: /Add an event/i })).toBeVisible();
   });
 
-  it("renders end-of-day card when past bedtimeThreshold and no upcoming event", () => {
+  it("renders dashboard normally past bedtimeThreshold with no upcoming event (F32: no EOD card)", () => {
     setupHooks({
       nowMinutes: 20 * 60, // 8pm, past 19:00 bedtime
       projected: [], // no upcoming event
     });
     renderWithAuth(<DashboardPage />);
-    expect(screen.getByLabelText(/End of day/i)).toBeVisible();
+    expect(screen.queryByRole("button", { name: /Wake up/i })).toBeNull();
+    expect(screen.getByRole("button", { name: /Add an event/i })).toBeVisible();
   });
 
-  it("does NOT show end-of-day when there is still an upcoming event after bedtime", () => {
+  it("shows dashboard normally when there is still an upcoming event after bedtime", () => {
     // A post-bedtime bottle (this is how a dream feed manifests in the
     // new render-only-label model — a regular bottle whose label happens
     // to be "Dream Feed").
@@ -253,7 +253,7 @@ describe("DashboardPage (V3)", () => {
     };
     setupHooks({ nowMinutes: 20 * 60, projected: [upcoming] });
     renderWithAuth(<DashboardPage />);
-    expect(screen.queryByLabelText(/End of day/i)).toBeNull();
+    expect(screen.queryByRole("button", { name: /Wake up/i })).toBeNull();
     expect(screen.getByRole("button", { name: /Add an event/i })).toBeVisible();
   });
 

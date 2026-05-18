@@ -5,13 +5,8 @@ import type { Event, OwnershipTemplate } from "@/v3/schemas";
 import { isRecorded } from "@/v3/schemas";
 import { reduceLifecycle } from "@/v3/lifecycle";
 import { isInProgress } from "@/v3/lib/effectiveEnd";
-import {
-  currentWakeWindow,
-  nextBottle,
-  nextEvent,
-  nextNap,
-  projectedBedtime,
-} from "@/v3/selectors";
+import { currentWakeWindow, nextBottle, nextNap, projectedBedtime } from "@/v3/selectors";
+import { nextDashboardEvent } from "@/v3/components/Dashboard/dashboardStats";
 import { useNowMinutes } from "@/hooks/useNowMinutes";
 import { newEventId } from "@/v3/lib/newEventId";
 import { useV3Day } from "@/v3/hooks/useV3Day";
@@ -30,12 +25,12 @@ import { FABTypePicker } from "@/components/shared/FABTypePicker";
 import type { CreatableType } from "@/v3/components/shared/createEventTemplate";
 import { buildCreateTemplate } from "@/v3/components/shared/createEventTemplate";
 import { EventEditDrawerV3 } from "@/v3/components/shared/EventEditDrawerV3";
-import { CurrentWakeWindowStatus } from "@/v3/components/Dashboard/CurrentWakeWindowStatus";
-import { EndOfDayCard } from "@/v3/components/Dashboard/EndOfDayCard";
+import { NowBanner } from "@/v3/components/Dashboard/NowBanner";
+import { ActionButton } from "@/v3/components/Dashboard/ActionButton";
 import { NapActionButton } from "@/v3/components/Dashboard/NapActionButton";
-import { NextBottlePreview } from "@/v3/components/Dashboard/NextBottlePreview";
+import { NextBottlePanel } from "@/v3/components/Dashboard/NextBottlePanel";
 import { NextEventCard } from "@/v3/components/Dashboard/NextEventCard";
-import { NextNapPreview } from "@/v3/components/Dashboard/NextNapPreview";
+import { NextSleepPanel } from "@/v3/components/Dashboard/NextSleepPanel";
 import { StartBottleButton } from "@/v3/components/Dashboard/StartBottleButton";
 import { StartDayButton } from "@/v3/components/Dashboard/StartDayButton";
 import styles from "./page.module.css";
@@ -108,28 +103,14 @@ export default function DashboardPage() {
     };
     return (
       <div className={styles.page}>
-        <EndOfDayCard afterMidnight hasTomorrowPlan={false} onStart={handleStart} />
+        <ActionButton variant="primary" onClick={() => void handleStart()}>
+          Wake up
+        </ActionButton>
       </div>
     );
   }
 
-  const next = nextEvent(projected, nowMinutes);
-  const afterBedtime = nowMinutes >= settings.bedtimeThreshold;
-  const isEndOfDay = !next && afterBedtime;
-
-  if (isEndOfDay) {
-    return (
-      <div className={styles.page}>
-        <EndOfDayCard
-          afterMidnight={false}
-          hasTomorrowPlan={false}
-          onStart={async () => {
-            // Won't fire pre-midnight, but kept for type safety
-          }}
-        />
-      </div>
-    );
-  }
+  const next = nextDashboardEvent(projected, nowMinutes);
 
   const nb = nextBottle(projected, nowMinutes);
   const nn = nextNap(projected, nowMinutes);
@@ -140,8 +121,6 @@ export default function DashboardPage() {
   const inProgressBedtime = actuals.find(
     (e) => e.type === "bedtime" && isInProgress(e, settings.defaultNapLengthMinutes, nowMinutes),
   );
-  const bottle1Pending = !actuals.some((e) => e.type === "bottle" && isRecorded(e.lifecycle));
-
   // "Next" ordinals = unique nap/bottle slots that are RECORDED (the
   // user committed a specific time). Owner-only annotations have a
   // non-recorded lifecycle and don't bump the ordinal. Dedupe by
@@ -157,18 +136,8 @@ export default function DashboardPage() {
   };
   const nextBottleNumber = uniqueRecordedKeys("bottle") + 1;
   const lastBottle = lastEventOfType(actuals, "bottle");
-  const lastNap = lastEventOfType(actuals, "nap");
   const lastBottleTime = lastBottle?.startTime;
   const bedtime = projectedBedtime(projected);
-
-  // Smart suppression: when NextEventCard already announces the same fact a
-  // preview card would, hide the preview to avoid redundancy.
-  const nextType = next?.type;
-  const hideBottlePreview = nextType === "bottle";
-  // V3 has no top-level "putdown" EventType; putdowns are render-only,
-  // injected by `expandPutdown` in TimelineV3 and never surface through
-  // `nextEvent(projected, ...)`. So nap + bedtime cover the suppression.
-  const hideNapPreview = nextType === "nap" || nextType === "bedtime";
 
   const handleLogBottle = async (bottle: Event) => {
     // §F22 / midnight rule (DOMAIN.md §2): a bottle recorded at 2 AM
@@ -218,24 +187,33 @@ export default function DashboardPage() {
 
   return (
     <div className={styles.page}>
-      <NextEventCard event={next} nowMinutes={nowMinutes} owners={settings.owners} />
-      {!hideBottlePreview && (
-        <NextBottlePreview
-          bottle={nb}
-          bottle1Pending={bottle1Pending}
-          owners={settings.owners}
-          {...(lastBottle ? { lastBottle } : {})}
-        />
-      )}
-      {!hideNapPreview && (
-        <NextNapPreview
-          nap={nn}
-          owners={settings.owners}
-          {...(lastNap ? { lastNap } : {})}
-          {...(bedtime ? { bedtime } : {})}
-        />
-      )}
-      <CurrentWakeWindowStatus wakeWindow={cww} owners={settings.owners} />
+      <NowBanner
+        {...(cww ? { wakeWindow: cww } : {})}
+        {...(inProgressNap ? { inProgressNap } : {})}
+        {...(inProgressBedtime ? { inProgressBedtime } : {})}
+        owners={settings.owners}
+        nowMinutes={nowMinutes}
+      />
+      <NextEventCard
+        event={next}
+        nowMinutes={nowMinutes}
+        owners={settings.owners}
+        putdownLeadMinutes={settings.putdownLeadMinutes}
+      />
+      <NextBottlePanel
+        nextBottle={nb}
+        actuals={actuals}
+        nowMinutes={nowMinutes}
+        owners={settings.owners}
+      />
+      <NextSleepPanel
+        nextNap={nn}
+        bedtime={bedtime}
+        actuals={actuals}
+        nowMinutes={nowMinutes}
+        putdownLeadMinutes={settings.putdownLeadMinutes}
+        owners={settings.owners}
+      />
 
       <div className={styles.actions}>
         <StartBottleButton
@@ -261,7 +239,9 @@ export default function DashboardPage() {
             onStartBedtime={handleStartBedtime}
             onEndBedtime={handleEndSleep}
           />
-          <StartDayButton hasTomorrowPlan={false} onStart={handleStartDay} />
+          {process.env.NODE_ENV === "development" && (
+            <StartDayButton hasTomorrowPlan={false} onStart={handleStartDay} />
+          )}
         </div>
       </div>
 
