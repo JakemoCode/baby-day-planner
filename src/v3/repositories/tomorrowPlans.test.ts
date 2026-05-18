@@ -77,6 +77,7 @@ describe("v3 tomorrowPlans repository", () => {
           kind: "instant",
           startTime: 13 * 60 + 30,
           label: "Grocery run",
+          owner: { slot: "none" },
           hasPutdown: false,
           lifecycle: { state: "projected" },
         },
