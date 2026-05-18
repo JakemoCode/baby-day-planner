@@ -192,6 +192,13 @@ export default function DashboardPage() {
 
   return (
     <div className={styles.page}>
+      <NowBanner
+        {...(cww ? { wakeWindow: cww } : {})}
+        {...(inProgressNap ? { inProgressNap } : {})}
+        {...(inProgressBedtime ? { inProgressBedtime } : {})}
+        owners={settings.owners}
+        nowMinutes={nowMinutes}
+      />
       <NextEventCard
         event={next}
         nowMinutes={nowMinutes}
@@ -211,13 +218,6 @@ export default function DashboardPage() {
         nowMinutes={nowMinutes}
         putdownLeadMinutes={settings.putdownLeadMinutes}
         owners={settings.owners}
-      />
-      <NowBanner
-        {...(cww ? { wakeWindow: cww } : {})}
-        {...(inProgressNap ? { inProgressNap } : {})}
-        {...(inProgressBedtime ? { inProgressBedtime } : {})}
-        owners={settings.owners}
-        nowMinutes={nowMinutes}
       />
 
       <div className={styles.actions}>
