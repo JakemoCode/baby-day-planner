@@ -206,9 +206,9 @@ export default function SettingsPage() {
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className={styles.section ?? ""}>
-      <h2 style={{ margin: "0 0 8px 0", fontSize: 18 }}>{title}</h2>
-      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>{children}</div>
+    <section className={styles.section}>
+      <h2 className={styles.sectionTitle}>{title}</h2>
+      <div className={styles.sectionBody}>{children}</div>
     </section>
   );
 }
@@ -227,8 +227,8 @@ function TimeRow({
   help?: string;
 }) {
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-      <label htmlFor={id} style={{ fontSize: 14 }}>
+    <div className={styles.field}>
+      <label htmlFor={id} className={styles.fieldLabel}>
         {label}
       </label>
       <input
@@ -236,9 +236,9 @@ function TimeRow({
         type="time"
         value={formatHM24(value)}
         onChange={(e) => onChange(parseTime(e.target.value))}
-        style={{ padding: 8, fontSize: 16, minHeight: 40 }}
+        className={styles.input}
       />
-      {help && <span style={{ fontSize: 12, color: "#666" }}>{help}</span>}
+      {help && <span className={styles.fieldHelp}>{help}</span>}
     </div>
   );
 }
@@ -259,8 +259,8 @@ function NumberRow({
   help?: string;
 }) {
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-      <label htmlFor={id} style={{ fontSize: 14 }}>
+    <div className={styles.field}>
+      <label htmlFor={id} className={styles.fieldLabel}>
         {label}
       </label>
       <input
@@ -273,9 +273,9 @@ function NumberRow({
           const n = Number(e.target.value);
           if (Number.isFinite(n)) onChange(n);
         }}
-        style={{ padding: 8, fontSize: 16, minHeight: 40 }}
+        className={styles.input}
       />
-      {help && <span style={{ fontSize: 12, color: "#666" }}>{help}</span>}
+      {help && <span className={styles.fieldHelp}>{help}</span>}
     </div>
   );
 }
@@ -288,10 +288,10 @@ function WakeWindowsRow({
   onChange: (next: number[]) => void;
 }) {
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+    <div className={styles.repeater}>
       {value.map((mins, i) => (
-        <div key={i} style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          <label htmlFor={`ww-${i}`} style={{ fontSize: 14, minWidth: 100 }}>
+        <div key={i} className={styles.repeaterRow}>
+          <label htmlFor={`ww-${i}`} className={styles.repeaterLabelWide}>
             {i === 0 ? "After wake-up" : `After nap ${i}`}
           </label>
           <input
@@ -307,13 +307,13 @@ function WakeWindowsRow({
                 onChange(next);
               }
             }}
-            style={{ padding: 8, fontSize: 16, minHeight: 40, flex: 1 }}
+            className={styles.repeaterInputFlex}
           />
           <button
             type="button"
             onClick={() => onChange(value.filter((_, j) => j !== i))}
             aria-label={`Remove wake window ${i + 1}`}
-            style={{ padding: "8px 12px", minHeight: 40 }}
+            className={styles.iconButton}
           >
             ×
           </button>
@@ -322,7 +322,7 @@ function WakeWindowsRow({
       <button
         type="button"
         onClick={() => onChange([...value, value[value.length - 1] ?? 180])}
-        style={{ padding: "8px 12px", minHeight: 40, alignSelf: "flex-start" }}
+        className={styles.addButton}
       >
         + Add wake window
       </button>
@@ -338,10 +338,10 @@ function PumpTimesRow({
   onChange: (next: TimeMin[]) => void;
 }) {
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+    <div className={styles.repeater}>
       {value.map((t, i) => (
-        <div key={i} style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          <label htmlFor={`pump-${i}`} style={{ fontSize: 14, minWidth: 70 }}>
+        <div key={i} className={styles.repeaterRow}>
+          <label htmlFor={`pump-${i}`} className={styles.repeaterLabelNarrow}>
             Pump {i + 1}
           </label>
           <input
@@ -353,13 +353,13 @@ function PumpTimesRow({
               next[i] = parseTime(e.target.value);
               onChange(next);
             }}
-            style={{ padding: 8, fontSize: 16, minHeight: 40, flex: 1 }}
+            className={styles.repeaterInputFlex}
           />
           <button
             type="button"
             onClick={() => onChange(value.filter((_, j) => j !== i))}
             aria-label={`Remove pump ${i + 1}`}
-            style={{ padding: "8px 12px", minHeight: 40 }}
+            className={styles.iconButton}
           >
             ×
           </button>
@@ -368,7 +368,7 @@ function PumpTimesRow({
       <button
         type="button"
         onClick={() => onChange([...value, 12 * 60])}
-        style={{ padding: "8px 12px", minHeight: 40, alignSelf: "flex-start" }}
+        className={styles.addButton}
       >
         + Add pump time
       </button>
@@ -388,14 +388,14 @@ function BottleIntervalRulesRow({
     onChange(next);
   };
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-      <label style={{ fontSize: 14 }}>Amount → interval rules</label>
-      <small style={{ color: "var(--color-muted)", fontSize: 12 }}>
+    <div className={styles.repeater}>
+      <label className={styles.fieldLabel}>Amount → interval rules</label>
+      <small className={styles.fieldHelp}>
         After a bottle of N oz, expect the next bottle in M minutes. Most-specific (narrowest) range
         wins on overlap. Falls back to default interval when no rule matches.
       </small>
       {value.map((rule, i) => (
-        <div key={i} style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+        <div key={i} className={styles.repeaterRowWrap}>
           <input
             type="number"
             step={0.5}
@@ -403,9 +403,9 @@ function BottleIntervalRulesRow({
             value={rule.minOz}
             onChange={(e) => update(i, { minOz: Math.max(0, Number(e.target.value)) })}
             aria-label={`Rule ${i + 1} min oz`}
-            style={{ padding: 8, fontSize: 16, minHeight: 40, width: 72 }}
+            className={styles.repeaterInputSm}
           />
-          <span style={{ fontSize: 14 }}>–</span>
+          <span className={styles.repeaterText}>–</span>
           <input
             type="number"
             step={0.5}
@@ -428,9 +428,9 @@ function BottleIntervalRulesRow({
               onChange(value.map((r, j) => (j === i ? { ...rule, maxOz: next } : r)));
             }}
             aria-label={`Rule ${i + 1} max oz`}
-            style={{ padding: 8, fontSize: 16, minHeight: 40, width: 80 }}
+            className={styles.repeaterInputMd}
           />
-          <span style={{ fontSize: 14 }}>oz →</span>
+          <span className={styles.repeaterText}>oz →</span>
           <input
             type="number"
             step={5}
@@ -439,14 +439,14 @@ function BottleIntervalRulesRow({
             // Engine math would loop tight or cascade backwards on ≤0.
             onChange={(e) => update(i, { intervalMinutes: Math.max(1, Number(e.target.value)) })}
             aria-label={`Rule ${i + 1} interval minutes`}
-            style={{ padding: 8, fontSize: 16, minHeight: 40, width: 80 }}
+            className={styles.repeaterInputMd}
           />
-          <span style={{ fontSize: 14 }}>min</span>
+          <span className={styles.repeaterText}>min</span>
           <button
             type="button"
             onClick={() => onChange(value.filter((_, j) => j !== i))}
             aria-label={`Remove rule ${i + 1}`}
-            style={{ padding: "8px 12px", minHeight: 40 }}
+            className={styles.iconButton}
           >
             ×
           </button>
@@ -455,7 +455,7 @@ function BottleIntervalRulesRow({
       <button
         type="button"
         onClick={() => onChange([...value, { minOz: 0, intervalMinutes: 180 }])}
-        style={{ padding: "8px 12px", minHeight: 40, alignSelf: "flex-start" }}
+        className={styles.addButton}
       >
         + Add rule
       </button>
@@ -477,20 +477,20 @@ function ColorModeRow({
   help?: string;
 }) {
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-      <label htmlFor={id} style={{ fontSize: 14 }}>
+    <div className={styles.field}>
+      <label htmlFor={id} className={styles.fieldLabel}>
         {label}
       </label>
       <select
         id={id}
         value={value}
         onChange={(e) => onChange(e.target.value as "type" | "owner")}
-        style={{ padding: 8, fontSize: 16, minHeight: 40 }}
+        className={styles.input}
       >
         <option value="type">Event type (recommended)</option>
         <option value="owner">Owner</option>
       </select>
-      {help && <small style={{ color: "var(--color-muted)", fontSize: 12 }}>{help}</small>}
+      {help && <small className={styles.fieldHelp}>{help}</small>}
     </div>
   );
 }
@@ -509,18 +509,18 @@ function CheckboxRow({
   help?: string;
 }) {
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-      <label htmlFor={id} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14 }}>
+    <div className={styles.field}>
+      <label htmlFor={id} className={styles.checkboxLabel}>
         <input
           id={id}
           type="checkbox"
           checked={value}
           onChange={(e) => onChange(e.target.checked)}
-          style={{ width: 18, height: 18 }}
+          className={styles.checkboxInput}
         />
         {label}
       </label>
-      {help && <small style={{ color: "var(--color-muted)", fontSize: 12 }}>{help}</small>}
+      {help && <small className={styles.fieldHelp}>{help}</small>}
     </div>
   );
 }
@@ -537,15 +537,15 @@ function OwnerSlotRow({
   onChange: (next: OwnerSlot) => void;
 }) {
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-      <label htmlFor={id} style={{ fontSize: 14 }}>
+    <div className={styles.field}>
+      <label htmlFor={id} className={styles.fieldLabel}>
         {label}
       </label>
       <select
         id={id}
         value={value}
         onChange={(e) => onChange(e.target.value as OwnerSlot)}
-        style={{ padding: 8, fontSize: 16, minHeight: 40 }}
+        className={styles.input}
       >
         <option value="parent1">Parent 1</option>
         <option value="parent2">Parent 2</option>
