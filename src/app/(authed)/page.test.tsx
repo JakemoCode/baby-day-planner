@@ -140,7 +140,6 @@ describe("DashboardPage (V3)", () => {
   it("shows Wake up button when there is no active day", () => {
     setupHooks({ day: null, settings: null });
     renderWithAuth(<DashboardPage />);
-    // Wake gate now renders a slim ActionButton instead of the full EndOfDayCard.
     expect(screen.getByRole("button", { name: /Wake up/i })).toBeVisible();
   });
 
@@ -233,8 +232,6 @@ describe("DashboardPage (V3)", () => {
       projected: [], // no upcoming event
     });
     renderWithAuth(<DashboardPage />);
-    // F32: EndOfDayCard is retired. Dashboard stays up showing today's
-    // totals. The NextEventCard empty state renders instead.
     expect(screen.queryByRole("button", { name: /Wake up/i })).toBeNull();
     expect(screen.getByRole("button", { name: /Add an event/i })).toBeVisible();
   });

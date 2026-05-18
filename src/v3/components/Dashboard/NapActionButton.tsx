@@ -42,11 +42,9 @@ type ButtonMode =
 //    coexist; cascade prevents that in practice).
 //  - Past threshold → start bedtime (DOMAIN.md §3 — bedtime is bedtime).
 //  - Else if cascade projected a next nap → start that nap.
-//  - Else → fall back to start-bedtime. The genuine "day is over" UX is
-//    `EndOfDayCard` (rendered earlier in the dashboard), not this button.
-//    Defaulting to start-bedtime keeps the CTA always actionable; the user
-//    can always anchor bedtime since saveEvent's deterministic id="bedtime"
-//    just updates the existing doc.
+//  - Else → fall back to start-bedtime. Defaulting to start-bedtime keeps
+//    the CTA always actionable; the user can always anchor bedtime since
+//    saveEvent's deterministic id="bedtime" just updates the existing doc.
 function decideMode(
   inProgressNap: Event | undefined,
   inProgressBedtime: Event | undefined,
