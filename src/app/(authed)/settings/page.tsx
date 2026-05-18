@@ -175,11 +175,6 @@ export default function SettingsPage() {
       </Section>
 
       <Section title="Pumps" isOpen={openSlug === "pumps"} onToggle={handleToggle}>
-        <PumpTimesRow
-          value={value.pumpTimes}
-          defaultDuration={value.defaultPumpDurationMinutes}
-          onChange={(v) => set("pumpTimes", v)}
-        />
         <NumberRow
           id="defaultPumpDurationMinutes"
           label="Default pump duration (min)"
@@ -192,6 +187,11 @@ export default function SettingsPage() {
           label="Pump owner"
           value={value.pumpOwnerSlot}
           onChange={(v) => set("pumpOwnerSlot", v)}
+        />
+        <PumpTimesRow
+          value={value.pumpTimes}
+          defaultDuration={value.defaultPumpDurationMinutes}
+          onChange={(v) => set("pumpTimes", v)}
         />
       </Section>
 
@@ -471,7 +471,7 @@ function BottleIntervalRulesRow({
   };
   return (
     <div className={styles.repeater}>
-      <label className={styles.fieldLabel}>Amount → interval rules</label>
+      <label className={styles.subSectionHeading}>Amount → interval rules</label>
       <small className={styles.fieldHelp}>
         After a bottle of N oz, expect the next bottle in M minutes. Most-specific (narrowest) range
         wins on overlap. Falls back to default interval when no rule matches.
