@@ -34,7 +34,7 @@ export function NextBottlePanel({
       )}
       {last && (
         <p>
-          Based on last bottle: {last.amountOz ?? 0}oz, {nowMinutes - last.startTime} min ago (
+          Based on last bottle: {last.amountOz ?? 0}oz, {Math.max(0, nowMinutes - last.startTime)} min ago (
           {formatTimeShort(last.startTime)})
         </p>
       )}

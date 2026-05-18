@@ -35,7 +35,7 @@ import { EndOfDayCard } from "@/v3/components/Dashboard/EndOfDayCard";
 import { NapActionButton } from "@/v3/components/Dashboard/NapActionButton";
 import { NextBottlePanel } from "@/v3/components/Dashboard/NextBottlePanel";
 import { NextEventCard } from "@/v3/components/Dashboard/NextEventCard";
-import { NextNapPreview } from "@/v3/components/Dashboard/NextNapPreview";
+import { NextSleepPanel } from "@/v3/components/Dashboard/NextSleepPanel";
 import { StartBottleButton } from "@/v3/components/Dashboard/StartBottleButton";
 import { StartDayButton } from "@/v3/components/Dashboard/StartDayButton";
 import styles from "./page.module.css";
@@ -155,17 +155,8 @@ export default function DashboardPage() {
   };
   const nextBottleNumber = uniqueRecordedKeys("bottle") + 1;
   const lastBottle = lastEventOfType(actuals, "bottle");
-  const lastNap = lastEventOfType(actuals, "nap");
   const lastBottleTime = lastBottle?.startTime;
   const bedtime = projectedBedtime(projected);
-
-  // Smart suppression: when NextEventCard already announces the same fact a
-  // preview card would, hide the preview to avoid redundancy.
-  const nextType = next?.type;
-  // V3 has no top-level "putdown" EventType; putdowns are render-only,
-  // injected by `expandPutdown` in TimelineV3 and never surface through
-  // `nextEvent(projected, ...)`. So nap + bedtime cover the suppression.
-  const hideNapPreview = nextType === "nap" || nextType === "bedtime";
 
   const handleLogBottle = async (bottle: Event) => {
     // §F22 / midnight rule (DOMAIN.md §2): a bottle recorded at 2 AM
@@ -222,14 +213,14 @@ export default function DashboardPage() {
         nowMinutes={nowMinutes}
         owners={settings.owners}
       />
-      {!hideNapPreview && (
-        <NextNapPreview
-          nap={nn}
-          owners={settings.owners}
-          {...(lastNap ? { lastNap } : {})}
-          {...(bedtime ? { bedtime } : {})}
-        />
-      )}
+      <NextSleepPanel
+        nextNap={nn}
+        {...(bedtime ? { bedtime } : {})}
+        actuals={actuals}
+        nowMinutes={nowMinutes}
+        putdownLeadMinutes={settings.putdownLeadMinutes}
+        owners={settings.owners}
+      />
       <NowBanner
         {...(cww ? { wakeWindow: cww } : {})}
         {...(inProgressNap ? { inProgressNap } : {})}
