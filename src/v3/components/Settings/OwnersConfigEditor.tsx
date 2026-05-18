@@ -51,7 +51,7 @@ export function OwnersConfigEditor({ value, onChange }: OwnersConfigEditorProps)
         </div>
         <div className={styles.field}>
           <label className={styles.label} htmlFor="parent1-color">
-            Parent 1 color
+            Color
           </label>
           <input
             id="parent1-color"
@@ -81,7 +81,7 @@ export function OwnersConfigEditor({ value, onChange }: OwnersConfigEditorProps)
         </div>
         <div className={styles.field}>
           <label className={styles.label} htmlFor="parent2-color">
-            Parent 2 color
+            Color
           </label>
           <input
             id="parent2-color"

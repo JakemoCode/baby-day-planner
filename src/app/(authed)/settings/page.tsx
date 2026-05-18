@@ -91,12 +91,14 @@ export default function SettingsPage() {
           label="Short nap threshold (min)"
           value={value.shortNapThresholdMinutes}
           onChange={(v) => set("shortNapThresholdMinutes", v)}
+          help="A recorded nap shorter than this counts as 'short' and triggers the adjustment below for the next wake window."
         />
         <NumberRow
           id="shortNapAdjustmentMinutes"
           label="Short nap adjustment (min)"
           value={value.shortNapAdjustmentMinutes}
           onChange={(v) => set("shortNapAdjustmentMinutes", v)}
+          help="How many minutes to shrink the next wake window when the previous nap was short."
         />
         <NumberRow
           id="putdownLeadMinutes"
@@ -110,12 +112,14 @@ export default function SettingsPage() {
           label="Min nap duration (min)"
           value={value.napDurationMin}
           onChange={(v) => set("napDurationMin", v)}
+          help="Soft lower bound for nap duration inputs (e.g. the edit drawer)."
         />
         <NumberRow
           id="napDurationMax"
           label="Max nap duration (min)"
           value={value.napDurationMax}
           onChange={(v) => set("napDurationMax", v)}
+          help="Soft upper bound for nap duration inputs (e.g. the edit drawer)."
         />
       </Section>
 
@@ -204,14 +208,14 @@ export default function SettingsPage() {
       >
         <ColorModeRow
           id="timelineColorMode"
-          label="Color encodes"
+          label="Block color mode"
           value={value.timelineColorMode}
           onChange={(v) => set("timelineColorMode", v)}
           help="Blocks can color-code by event type or by who owns the slot."
         />
         <NumberRow
           id="timelinePxPerHour"
-          label="Pixels per hour"
+          label="Timeline space — px per hour"
           value={value.timelinePxPerHour}
           onChange={(v) => set("timelinePxPerHour", v)}
           help="Vertical scale of the daily timeline. Higher = larger blocks. 70–220 recommended."
