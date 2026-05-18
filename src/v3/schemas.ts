@@ -232,6 +232,16 @@ export type BottleIntervalRule = {
   intervalMinutes: number;
 };
 
+/**
+ * One pump session in the daily pump schedule. The optional
+ * `durationMinutes` is a per-session override; when absent, the engine
+ * uses `Settings.defaultPumpDurationMinutes`.
+ */
+export type PumpSession = {
+  time: TimeMin;
+  durationMinutes?: number;
+};
+
 export type Settings = {
   childId: string;
 
@@ -266,7 +276,7 @@ export type Settings = {
   putdownLeadMinutes: number;
 
   // Pumps
-  pumpTimes: TimeMin[];
+  pumpTimes: PumpSession[];
   pumpOwnerSlot: OwnerSlot;
   /** Default duration of a pump session; pumps render as blocks of this length. */
   defaultPumpDurationMinutes: number;

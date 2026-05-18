@@ -34,9 +34,7 @@ export function OwnersConfigEditor({ value, onChange }: OwnersConfigEditorProps)
   };
 
   return (
-    <section className={styles.section}>
-      <h2 className={styles.heading}>Owners</h2>
-
+    <div className={styles.section}>
       <div className={styles.row}>
         <div className={styles.field}>
           <label className={styles.label} htmlFor="parent1-name">
@@ -53,7 +51,7 @@ export function OwnersConfigEditor({ value, onChange }: OwnersConfigEditorProps)
         </div>
         <div className={styles.field}>
           <label className={styles.label} htmlFor="parent1-color">
-            Parent 1 color
+            Color
           </label>
           <input
             id="parent1-color"
@@ -78,12 +76,12 @@ export function OwnersConfigEditor({ value, onChange }: OwnersConfigEditorProps)
             type="text"
             value={value.parent2.displayName}
             onChange={(e) => updateParent("parent2", { displayName: e.target.value })}
-            placeholder="e.g. Sam"
+            placeholder="e.g. Kelly"
           />
         </div>
         <div className={styles.field}>
           <label className={styles.label} htmlFor="parent2-color">
-            Parent 2 color
+            Color
           </label>
           <input
             id="parent2-color"
@@ -138,6 +136,6 @@ export function OwnersConfigEditor({ value, onChange }: OwnersConfigEditorProps)
       <button type="button" className={styles.addButton} onClick={addOther}>
         + Add other owner
       </button>
-    </section>
+    </div>
   );
 }

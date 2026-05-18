@@ -9,7 +9,7 @@
  * displayNames so the UI prompts the user to set them.
  */
 
-import type { Settings } from "../schemas";
+import type { PumpSession, Settings } from "../schemas";
 
 /** Schema fallback for `Settings.defaultWakeTime` — 7:00 AM as TimeMin.
  * Re-exported so consumers that need to construct day docs before the
@@ -105,12 +105,40 @@ function migrateOwnerSlot(
   return slot;
 }
 
+/**
+ * Older settings docs persisted `pumpTimes` as `number[]` (TimeMin array).
+ * The current shape is `PumpSession[]` with an optional per-session
+ * duration override. Normalize legacy entries on read so callers always
+ * see the object shape.
+ */
+function normalizePumpTimes(raw: unknown): PumpSession[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((entry) => {
+      if (typeof entry === "number") return { time: entry };
+      if (
+        entry &&
+        typeof entry === "object" &&
+        typeof (entry as { time?: unknown }).time === "number"
+      ) {
+        const t = (entry as { time: number }).time;
+        const d = (entry as { durationMinutes?: unknown }).durationMinutes;
+        return typeof d === "number" ? { time: t, durationMinutes: d } : { time: t };
+      }
+      return null;
+    })
+    .filter((p): p is PumpSession => p !== null);
+}
+
 export function withV3SettingsDefaults(input: Partial<Settings> | null): Settings | null {
   if (input === null) return null;
   const merged: Settings = {
     ...DEFAULTS,
     ...input,
     childId: input.childId ?? "",
+    pumpTimes: normalizePumpTimes(
+      (input as { pumpTimes?: unknown }).pumpTimes ?? DEFAULTS.pumpTimes,
+    ),
     bottleChain: { ...DEFAULTS.bottleChain, ...input.bottleChain },
     daycare: {
       ...DEFAULTS.daycare,

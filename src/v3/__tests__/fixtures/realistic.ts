@@ -67,7 +67,7 @@ export const v3SettingsDoc: Record<string, unknown> = {
   bottleChain: { bottlesPerDay: 5, bufferAfterWakeMinutes: 10 },
   minBottleIntervalMinutes: 90,
   putdownLeadMinutes: 15,
-  pumpTimes: [10 * 60 + 30, 14 * 60 + 30], // [630, 870]
+  pumpTimes: [{ time: 10 * 60 + 30 }, { time: 14 * 60 + 30 }], // PumpSession[]
   pumpOwnerSlot: "parent2",
   dreamFeedEnabled: true,
   dailyRecurring: [{ id: "cook-dinner", label: "Cook Dinner", time: 17 * 60, enabled: true }],

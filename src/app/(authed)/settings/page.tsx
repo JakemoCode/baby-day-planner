@@ -5,13 +5,24 @@ import { LoadingState } from "@/components/shared/LoadingState";
 import { SettingsAccount } from "@/v3/components/shared/SettingsAccount";
 import { OwnersConfigEditor } from "@/v3/components/Settings/OwnersConfigEditor";
 import { withV3SettingsDefaults } from "@/v3/firestore/settingsDefaults";
+import { useLocalStorageString } from "@/v3/hooks/useLocalStorageString";
 import { useV3Settings } from "@/v3/hooks/useV3Settings";
 import { saveSettings } from "@/v3/repositories/settings";
-import type { BottleIntervalRule, OwnerSlot, Settings, TimeMin } from "@/v3/schemas";
+import type { BottleIntervalRule, OwnerSlot, PumpSession, Settings, TimeMin } from "@/v3/schemas";
 import { formatHM24 } from "@/v3/ui/time";
 import styles from "./page.module.css";
 
 const CHILD_ID = process.env.NEXT_PUBLIC_DEFAULT_CHILD_ID ?? "aden";
+
+const ACCORDION_STORAGE_KEY = "bdp.settings.accordion.openSlug";
+const DEFAULT_OPEN_SLUG = "default-times";
+
+function slugify(title: string): string {
+  return title
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "");
+}
 
 function parseTime(s: string): TimeMin {
   const m = /^(\d{1,2}):(\d{2})$/.exec(s);
@@ -21,6 +32,11 @@ function parseTime(s: string): TimeMin {
 
 export default function SettingsPage() {
   const { settings, loading } = useV3Settings(CHILD_ID);
+  const [openSlug, setOpenSlug] = useLocalStorageString(ACCORDION_STORAGE_KEY, DEFAULT_OPEN_SLUG);
+
+  function handleToggle(slug: string): void {
+    setOpenSlug(openSlug === slug ? "" : slug);
+  }
 
   if (loading) {
     return (
@@ -43,9 +59,11 @@ export default function SettingsPage() {
     <main className={styles.page}>
       <h1 className={styles.heading}>Settings</h1>
 
-      <OwnersConfigEditor value={value.owners} onChange={(owners) => set("owners", owners)} />
+      <Section title="Owners" isOpen={openSlug === "owners"} onToggle={handleToggle}>
+        <OwnersConfigEditor value={value.owners} onChange={(owners) => set("owners", owners)} />
+      </Section>
 
-      <Section title="Default times">
+      <Section title="Default times" isOpen={openSlug === "default-times"} onToggle={handleToggle}>
         <TimeRow
           id="defaultWakeTime"
           label="Default wake time"
@@ -61,7 +79,7 @@ export default function SettingsPage() {
         />
       </Section>
 
-      <Section title="Naps">
+      <Section title="Naps" isOpen={openSlug === "naps"} onToggle={handleToggle}>
         <NumberRow
           id="defaultNapLengthMinutes"
           label="Default nap length (min)"
@@ -73,12 +91,14 @@ export default function SettingsPage() {
           label="Short nap threshold (min)"
           value={value.shortNapThresholdMinutes}
           onChange={(v) => set("shortNapThresholdMinutes", v)}
+          help="A recorded nap shorter than this counts as 'short' and triggers the adjustment below for the next wake window."
         />
         <NumberRow
           id="shortNapAdjustmentMinutes"
           label="Short nap adjustment (min)"
           value={value.shortNapAdjustmentMinutes}
           onChange={(v) => set("shortNapAdjustmentMinutes", v)}
+          help="How many minutes to shrink the next wake window when the previous nap was short."
         />
         <NumberRow
           id="putdownLeadMinutes"
@@ -92,23 +112,29 @@ export default function SettingsPage() {
           label="Min nap duration (min)"
           value={value.napDurationMin}
           onChange={(v) => set("napDurationMin", v)}
+          help="Soft lower bound for nap duration inputs (e.g. the edit drawer)."
         />
         <NumberRow
           id="napDurationMax"
           label="Max nap duration (min)"
           value={value.napDurationMax}
           onChange={(v) => set("napDurationMax", v)}
+          help="Soft upper bound for nap duration inputs (e.g. the edit drawer)."
         />
       </Section>
 
-      <Section title="Wake windows (per nap N)">
+      <Section
+        title="Wake windows by nap"
+        isOpen={openSlug === "wake-windows-by-nap"}
+        onToggle={handleToggle}
+      >
         <WakeWindowsRow
           value={value.wakeWindowsMinutes}
           onChange={(v) => set("wakeWindowsMinutes", v)}
         />
       </Section>
 
-      <Section title="Bottles">
+      <Section title="Bottles" isOpen={openSlug === "bottles"} onToggle={handleToggle}>
         <NumberRow
           id="defaultBottleAmountOz"
           label="Default amount (oz)"
@@ -148,8 +174,14 @@ export default function SettingsPage() {
         />
       </Section>
 
-      <Section title="Pumps">
-        <PumpTimesRow value={value.pumpTimes} onChange={(v) => set("pumpTimes", v)} />
+      <Section title="Pumps" isOpen={openSlug === "pumps"} onToggle={handleToggle}>
+        <OwnerSlotRow
+          id="pumpOwnerSlot"
+          label="Pump owner"
+          value={value.pumpOwnerSlot}
+          owners={value.owners}
+          onChange={(v) => set("pumpOwnerSlot", v)}
+        />
         <NumberRow
           id="defaultPumpDurationMinutes"
           label="Default pump duration (min)"
@@ -157,15 +189,15 @@ export default function SettingsPage() {
           onChange={(v) => set("defaultPumpDurationMinutes", v)}
           help="How long a pump session typically takes; pumps render as duration blocks of this length."
         />
-        <OwnerSlotRow
-          id="pumpOwnerSlot"
-          label="Pump owner"
-          value={value.pumpOwnerSlot}
-          onChange={(v) => set("pumpOwnerSlot", v)}
+        <div className={styles.subSectionHeading}>Pump times</div>
+        <PumpTimesRow
+          value={value.pumpTimes}
+          defaultDuration={value.defaultPumpDurationMinutes}
+          onChange={(v) => set("pumpTimes", v)}
         />
       </Section>
 
-      <Section title="Dream feed">
+      <Section title="Dream feed" isOpen={openSlug === "dream-feed"} onToggle={handleToggle}>
         <CheckboxRow
           id="dreamFeedEnabled"
           label="Label first post-bedtime bottle as Dream Feed"
@@ -175,17 +207,21 @@ export default function SettingsPage() {
         />
       </Section>
 
-      <Section title="Timeline display">
+      <Section
+        title="Timeline display"
+        isOpen={openSlug === "timeline-display"}
+        onToggle={handleToggle}
+      >
         <ColorModeRow
           id="timelineColorMode"
-          label="Color encodes"
+          label="Block color mode"
           value={value.timelineColorMode}
           onChange={(v) => set("timelineColorMode", v)}
           help="Blocks can color-code by event type or by who owns the slot."
         />
         <NumberRow
           id="timelinePxPerHour"
-          label="Pixels per hour"
+          label="Timeline space — px per hour"
           value={value.timelinePxPerHour}
           onChange={(v) => set("timelinePxPerHour", v)}
           help="Vertical scale of the daily timeline. Higher = larger blocks. 70–220 recommended."
@@ -204,12 +240,34 @@ export default function SettingsPage() {
   );
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({
+  title,
+  isOpen,
+  onToggle,
+  children,
+}: {
+  title: string;
+  isOpen: boolean;
+  onToggle: (slug: string) => void;
+  children: React.ReactNode;
+}) {
+  const slug = slugify(title);
   return (
-    <section className={styles.section}>
-      <h2 className={styles.sectionTitle}>{title}</h2>
+    <details className={styles.section} open={isOpen}>
+      <summary
+        className={styles.sectionSummary}
+        onClick={(e) => {
+          e.preventDefault();
+          onToggle(slug);
+        }}
+      >
+        <span className={styles.sectionChevron} aria-hidden="true">
+          ▶
+        </span>
+        <h2 className={styles.sectionTitle}>{title}</h2>
+      </summary>
       <div className={styles.sectionBody}>{children}</div>
-    </section>
+    </details>
   );
 }
 
@@ -332,14 +390,34 @@ function WakeWindowsRow({
 
 function PumpTimesRow({
   value,
+  defaultDuration,
   onChange,
 }: {
-  value: TimeMin[];
-  onChange: (next: TimeMin[]) => void;
+  value: PumpSession[];
+  defaultDuration: number;
+  onChange: (next: PumpSession[]) => void;
 }) {
+  const setTime = (i: number, t: TimeMin) => {
+    const next = value.map((s, j) => (j === i ? { ...s, time: t } : s));
+    onChange(next);
+  };
+  const setDuration = (i: number, raw: string) => {
+    const next = value.map((s, j) => {
+      if (j !== i) return s;
+      if (raw === "") {
+        // Clear override — omit the key so the engine falls back to default.
+        const { durationMinutes: _omit, ...rest } = s;
+        return rest;
+      }
+      const n = Number(raw);
+      if (!Number.isFinite(n) || n <= 0) return s;
+      return { ...s, durationMinutes: n };
+    });
+    onChange(next);
+  };
   return (
     <div className={styles.repeater}>
-      {value.map((t, i) => (
+      {value.map((s, i) => (
         <div key={i} className={styles.repeaterRow}>
           <label htmlFor={`pump-${i}`} className={styles.repeaterLabelNarrow}>
             Pump {i + 1}
@@ -347,14 +425,20 @@ function PumpTimesRow({
           <input
             id={`pump-${i}`}
             type="time"
-            value={formatHM24(t)}
-            onChange={(e) => {
-              const next = [...value];
-              next[i] = parseTime(e.target.value);
-              onChange(next);
-            }}
+            value={formatHM24(s.time)}
+            onChange={(e) => setTime(i, parseTime(e.target.value))}
             className={styles.repeaterInputFlex}
           />
+          <input
+            type="number"
+            min={1}
+            placeholder={String(defaultDuration)}
+            value={s.durationMinutes ?? ""}
+            onChange={(e) => setDuration(i, e.target.value)}
+            aria-label={`Pump ${i + 1} duration (min) — leave blank for default`}
+            className={styles.repeaterInputSm}
+          />
+          <span className={styles.repeaterText}>min</span>
           <button
             type="button"
             onClick={() => onChange(value.filter((_, j) => j !== i))}
@@ -367,7 +451,7 @@ function PumpTimesRow({
       ))}
       <button
         type="button"
-        onClick={() => onChange([...value, 12 * 60])}
+        onClick={() => onChange([...value, { time: 12 * 60 }])}
         className={styles.addButton}
       >
         + Add pump time
@@ -389,7 +473,7 @@ function BottleIntervalRulesRow({
   };
   return (
     <div className={styles.repeater}>
-      <label className={styles.fieldLabel}>Amount → interval rules</label>
+      <label className={styles.subSectionHeading}>Amount → interval rules</label>
       <small className={styles.fieldHelp}>
         After a bottle of N oz, expect the next bottle in M minutes. Most-specific (narrowest) range
         wins on overlap. Falls back to default interval when no rule matches.
@@ -529,13 +613,19 @@ function OwnerSlotRow({
   id,
   label,
   value,
+  owners,
   onChange,
 }: {
   id: string;
   label: string;
   value: OwnerSlot;
+  owners: Settings["owners"];
   onChange: (next: OwnerSlot) => void;
 }) {
+  const labelFor = (slot: "parent1" | "parent2", fallback: string): string => {
+    const name = owners[slot].displayName.trim();
+    return name.length > 0 ? name : fallback;
+  };
   return (
     <div className={styles.field}>
       <label htmlFor={id} className={styles.fieldLabel}>
@@ -547,8 +637,8 @@ function OwnerSlotRow({
         onChange={(e) => onChange(e.target.value as OwnerSlot)}
         className={styles.input}
       >
-        <option value="parent1">Parent 1</option>
-        <option value="parent2">Parent 2</option>
+        <option value="parent1">{labelFor("parent1", "Parent 1")}</option>
+        <option value="parent2">{labelFor("parent2", "Parent 2")}</option>
       </select>
     </div>
   );

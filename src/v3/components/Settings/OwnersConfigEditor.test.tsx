@@ -42,9 +42,9 @@ describe("OwnersConfigEditor", () => {
   it("renders parent1 and parent2 displayName + color inputs", () => {
     render(<OwnersConfigEditor value={owners()} onChange={() => {}} />);
     expect(screen.getByLabelText("Parent 1 name")).toHaveValue("Jake");
-    expect(screen.getByLabelText("Parent 1 color")).toHaveValue("#0af");
+    expect(document.getElementById("parent1-color")).toHaveValue("#0af");
     expect(screen.getByLabelText("Parent 2 name")).toHaveValue("Sam");
-    expect(screen.getByLabelText("Parent 2 color")).toHaveValue("#f0a");
+    expect(document.getElementById("parent2-color")).toHaveValue("#f0a");
   });
 
   it("emits the updated config when parent1 name changes", async () => {
@@ -61,7 +61,7 @@ describe("OwnersConfigEditor", () => {
   it("emits the updated config when parent2 color changes", async () => {
     const onChange = vi.fn();
     render(<Harness initial={owners()} onChange={onChange} />);
-    const input = screen.getByLabelText("Parent 2 color");
+    const input = document.getElementById("parent2-color")!;
     await userEvent.clear(input);
     await userEvent.type(input, "#abc");
     expect(onChange).toHaveBeenLastCalledWith(
