@@ -18,69 +18,6 @@
 
 ---
 
-## §F1 — Settings page collapsible accordion
-
-**Source**: OUT_OF_SCOPE §11 (V2 backlog item).
-
-**Status**: `pending`
-
-**What**: convert the Settings page sections (Times, Bottle, Naps,
-Owners, Daycare, Members, …) into a collapsible accordion. Only one
-section open at a time; remembered selection persists per-device
-(localStorage).
-
-**Why fast-follow, not in V3**: pure UI; engine-orthogonal. Doesn't
-need any V3 plumbing.
-
-**Estimated effort**: 1 day. Single PR against `main` after V3 stable.
-
-**Acceptance**:
-- Each section header collapses/expands on tap.
-- Open section persists across page navigations.
-- Keyboard accessible (Tab to header, Enter/Space to toggle).
-- No regression in the existing form behavior.
-
----
-
-## §F2 — Palette refresh
-
-**Source**: OUT_OF_SCOPE §12 (V2 backlog item, 🔥 flagged twice).
-
-**Status**: split into F2a + F2b (2026-05-18 after Variant A pick
-in palette-explore mockup).
-
-**§F2a — Dashboard surface contrast lift + sage side-band**: `in-progress`
-(this PR). One token + two component changes:
-- `--color-bg` from `#fbf8f3` to deeper cream `#f2ebde` (cards stay
-  pure white; raised stays `#fefcf7` for timeline-block warmth)
-- `NextBottlePanel` + `NextSleepPanel` get a 4px sage side-band on
-  the left (`border-left: 4px solid var(--color-accent-soft)`) per
-  Variant A of the palette-explore mockup
-
-Bg→surface contrast goes from 1.06 → 1.19. Spec asked for ≥1.4 but
-matching that requires a noticeably darker oat bg (`#e3d7be`) which
-Jake vetoed as too sandy — the wedding palette is intentionally
-close-tone.
-
-**§F2b — Timeline palette pass**: `pending`. After F2a ships, build
-a timeline-focused HTML mockup (3 chip-treatment variants exploring
-owner stripe vs event fill emphasis + density) for Jake to react to
-before touching real timeline CSS.
-
-**Why fast-follow, not pre-V3**: ARCHITECTURE_V3 §6.4 differential
-testing checks engine *output* (event arrays), not rendered pixels.
-Palette can shift independently.
-
-**Acceptance**:
-- ✅ Surface visibly lifts off bg (1.06 → 1.19 in F2a; original ≥1.4
-  target relaxed — see F2a entry for the wedding-palette reason).
-- Owner stripes readable as colored bands at chip-thumbnail size (F2b).
-- Existing tokens stay token-named (no inline colors anywhere).
-- `/design-audit` run on `/timeline`, `/dashboard`, `/settings`
-  reports zero new critical or major issues.
-
----
-
 ## §F3 — First-time user onboarding (dashboard)
 
 **Source**: cutover dogfooding, 2026-05-09 — Jake noted the dashboard
@@ -252,7 +189,6 @@ in `src/v3/components/shared/`, then call sites swap in.
 - **Start Bottle button needs owner**: the current "Start" action commits without prompting for owner — add inline owner pick or default to last-used
 - **Edit nap start time from dashboard**: naps usually get "Started" 5+ min after actual start (busy putting baby down). Need an easy retro-edit affordance on the dashboard, not just in the drawer
 - **"In wake window" banner — show "asleep?"**: clarify state when baby's already napping but the WW projection is still active
-- ~~**"Start bedtime" CTA after bedtime threshold**: dashboard should switch primary action to bedtime once `nowMinutes ≥ settings.bedtimeThreshold`~~ — **delivered** in the physiology cascade campaign (PR for `feat/v3-physiology-cascade`).
 - **Button hierarchy**: Primary = start next event, Secondary = edit last event, Tertiary = skip event
 
 **Why fast-follow**: UX polish on a working dashboard; engine-orthogonal.
@@ -323,20 +259,6 @@ Replace with: explicit **Save** button at section or page level + a transient su
 - Confirm vs save — one-tap commit or preview-then-lock?
 - Edits after confirmation: re-confirm, or auto-update?
 - If user manually taps Start Day with a confirmed plan present, prompt or apply silently?
-
----
-
-## §F13 — TemplateOwnerPicker should own its own chrome (onCancel + section header)
-
-**Source**: code-simplifier review of PR-B5, 2026-05-10.
-
-**Status**: `pending`
-
-**What**: V3 `TemplateOwnerPicker` (in `src/v3/components/DayTemplates/`) has no `onCancel` prop. PR-B5 had to recreate sticky-card chrome around it: `.pickerWrap`, `.pickerHeader`, `.pickerLabel`, `.pickerCancel` plus header markup like `Owner for {selectedEvent.label}`. Any other consumer would have to duplicate this.
-
-**Fix**: add `onCancel?: () => void` and an optional title slot/label prop to `TemplateOwnerPicker`. The DayTemplates page can then drop the four `.picker*` CSS classes plus the wrapper div.
-
-**Why fast-follow**: small focused refactor; one component + one consumer. PR-B5 already shipped with the workaround so no rush, but the longer it sits the more callers might copy it.
 
 ---
 
@@ -656,9 +578,7 @@ need to ship before F2b — could be folded into the same PR.
 
 ---
 
----
-
-## §F35 — Owner cannot be unassigned from blocks or instant chips
+## §F36 — Owner cannot be unassigned from blocks or instant chips
 
 **Source**: Jake, 2026-05-18 (click-test of §F2b timeline).
 
@@ -685,7 +605,7 @@ walks tap-None → save → re-read → owner gone from projected event.
 
 ---
 
-## §F36 — Smarter chip-label truncation (avoid ellipsis-makes-it-worse)
+## §F37 — Smarter chip-label truncation (avoid ellipsis-makes-it-worse)
 
 **Source**: Jake, 2026-05-18 (click-test of §F2b timeline).
 

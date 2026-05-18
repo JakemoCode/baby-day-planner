@@ -9,6 +9,32 @@ description + the PR that shipped it. Drop the "Why fast-follow" and
 
 ---
 
+## §F1 — Settings page collapsible accordion
+
+Shipped in **PR #172** (`feat/settings-accordion`). Settings sections
+(Times, Bottle, Naps, Owners, Daycare, Members, …) collapse to one
+open at a time; selection persists per-device via localStorage.
+
+## §F2 — Palette refresh
+
+Shipped in two coordinated PRs after the palette-explore Variant A pick:
+- **PR #176** (`worktree-f2a-surface-contrast`) — §F2a: `--color-bg`
+  cream→deeper cream (`#fbf8f3` → `#f2ebde`); `NextBottlePanel` +
+  `NextSleepPanel` gain a 4px sage `--color-accent-soft` side-band.
+  Bg→surface contrast 1.06 → 1.19.
+- **PR #178** (`worktree-f2b-timeline-palette`) — §F2b: timeline
+  type-coded chip dots, honey-tinted extras, bolder hour ticks,
+  phased chip layout (short keeps time inline; long drops time to
+  row 2). Closed by `fc81519` chip-cluster centering follow-up.
+
+## §F13 — TemplateOwnerPicker owns its own chrome
+
+Shipped in **PR #175** (`feat/template-owner-picker-chrome`).
+`TemplateOwnerPicker` gained `onCancel` + a title slot; DayTemplates
+page dropped its `.pickerWrap` / `.pickerHeader` / `.pickerLabel` /
+`.pickerCancel` workaround. Companion refactor extracted `BottomSheet`
+from `FABTypePicker` so the picker reuses it.
+
 ## §F7 — Delete the V2 ← V3 back-compat shim
 
 Shipped in **PR-C1** (commit `bacebe4`, merged 2026-05-11). Removed

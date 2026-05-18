@@ -236,29 +236,15 @@ scenario system.
 
 ## §11 — Settings collapsible accordion
 
-**What it is**: from the V2 backlog. Make the settings page sections
-collapsible.
-
-**Status**: `fast-follow` ✓ (Jake review 5, 2026-05-08).
-
-**Rationale**: not engine-related; pure UI polish. Tracked in
-`docs/v3/FAST_FOLLOW.md` to land after V3 engine ships. Not blocking
-V3 Phase 1.
+**Status**: `shipped` — fast-follow §F1, PR #172. See
+`FAST_FOLLOW_COMPLETED.md`.
 
 ---
 
 ## §12 — Palette refresh (the 🔥 bumped twice item)
 
-**What it is**: from V2 backlog: too much white, owner tints invisible.
-
-**Status**: `fast-follow` ✓ (Jake review 5, 2026-05-08).
-
-**Rationale**: not engine-related. Originally recommended as
-pre-V3 to lock the visual baseline for Phase 2 differential testing
-— but the philosophy carve-out table (ARCHITECTURE §6.4) means
-Phase 2 is testing engine-output equivalence, not pixel parity, so
-palette can shift safely during/after V3 build. Tracked in
-`docs/v3/FAST_FOLLOW.md`.
+**Status**: `shipped` — fast-follow §F2, PRs #176 (F2a surface contrast)
+and #178 (F2b timeline). See `FAST_FOLLOW_COMPLETED.md`.
 
 ---
 
@@ -508,34 +494,8 @@ from external apps.
 
 ## Summary
 
-V3's job: replace the engine. Everything else listed here is
-**deliberately deferred**.
-
-If Jake disagrees with any item: change `Status` to `moved-in` and
-add it to V3's scope. The line items below the (recommended)
-**moved-in** ones must then move to OUT_OF_SCOPE-confirmed or be
-explicitly punted to v4+.
-
----
-
-## Action — Jake's review
-
-For each item, change one of:
-
-- `proposed-out` → `confirmed-out` (no V3, on v4+ backlog).
-- `proposed-out` → `moved-in` (add to V3 scope).
-- `proposed-out` → `revisit-later` (decide mid-V3).
-
-Items resolved during review:
-
-- **§2** — Sharing with non-allowlisted users: `confirmed-out`
-- **§2.5** — Settings-managed allowlist: `moved-in` (REQUIREMENTS §22)
-- **§3** — Per-day suppression: `moved-in` (R11.6)
-- **§10** — Scenarios: `confirmed-out` (covered by daycare weekdays
-  + manual templates)
-- **§11** — Settings accordion: `fast-follow` (FAST_FOLLOW.md §F1)
-- **§12** — Palette refresh: `fast-follow` (FAST_FOLLOW.md §F2)
-- **§25** — New event types: scoped to daycare + daily_recurring
-  (others remain `confirmed-out`)
+V3's job was to replace the engine. Everything else listed here is
+**deliberately deferred**. Items that escape via fast-follow track
+their shipped state in `FAST_FOLLOW_COMPLETED.md`.
 
 V3 Phase 1 is unblocked.
