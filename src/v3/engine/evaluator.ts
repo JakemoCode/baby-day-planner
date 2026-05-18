@@ -16,7 +16,7 @@
  *   diffing recorded events before/after each rule run.
  */
 
-import { isRecorded, type Context, type Event, type Lifecycle } from "../schemas";
+import { isRecorded, NO_OWNER, type Context, type Event, type Lifecycle } from "../schemas";
 
 // ---------------------------------------------------------------------------
 // Rule shape
@@ -164,14 +164,14 @@ function recordedFieldsMatch(a: Event, b: Event): boolean {
 
 function sameOwner(a: Event["owner"], b: Event["owner"]): boolean {
   // §F37: owner is required and uses { slot: "none" } for unassigned.
-  // Belt-and-suspenders: also treat `undefined` (legacy data, untyped
-  // fixtures) as equivalent to NO_OWNER so a pre-F37 in-memory event
-  // doesn't crash the evaluator before the read-seam defaulter runs.
-  const aSlot = a?.slot ?? "none";
-  const bSlot = b?.slot ?? "none";
-  if (aSlot !== bSlot) return false;
-  if (aSlot === "other" && bSlot === "other") {
-    return (a as { otherId: string }).otherId === (b as { otherId: string }).otherId;
+  // Belt-and-suspenders: coerce `undefined` (legacy data, untyped
+  // fixtures) to NO_OWNER so a pre-F37 in-memory event doesn't crash
+  // the evaluator before the read-seam defaulter runs.
+  const aRef = a ?? NO_OWNER;
+  const bRef = b ?? NO_OWNER;
+  if (aRef.slot !== bRef.slot) return false;
+  if (aRef.slot === "other" && bRef.slot === "other") {
+    return aRef.otherId === bRef.otherId;
   }
   return true;
 }

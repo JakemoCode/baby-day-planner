@@ -89,9 +89,9 @@ const RuleAssignDaycareWindowOwner: Rule = {
   // Run after R3.1 so nap times are settled, after R5.4 so bottle order
   // is chronological, after R21.1 so the daycare events are present, and
   // after the template-owner rules so template precedence works via
-  // `owner === undefined` gating. R5.4 is reachable transitively through
-  // R12.6 and R3.1 through R12.2, but listing them explicitly makes the
-  // intent visible to a future reader.
+  // `isNoOwner(owner)` gating (§F37). R5.4 is reachable transitively
+  // through R12.6 and R3.1 through R12.2, but listing them explicitly
+  // makes the intent visible to a future reader.
   dependsOn: ["R3.1", "R5.4", "R21.1", "R12.2", "R12.6"],
   matches: (events, ctx) => {
     const window = activeDaycareWindow(events, ctx);
