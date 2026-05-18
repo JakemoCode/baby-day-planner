@@ -53,8 +53,8 @@ tasks from this doc — it's a compass.
 
 ## §5 Signals to begin v4
 
-- v3 simplification execution plan (`SIMPLIFICATION_SCOPE.md` §8)
-  complete.
+- v3 simplification execution plan
+  (`../_archive/v3/SIMPLIFICATION_SCOPE.md` §8) complete.
 - `FAST_FOLLOW.md` meaningfully drained.
 - Wave 9 (PWA + E2E + design audit) done.
 - Jake and Kelly using the app daily long enough to feel where

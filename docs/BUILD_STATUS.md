@@ -19,7 +19,7 @@ is now a cadence sequence (cascade extends to bedtime threshold using
 the last WW value); FAB drops the nap option; drawer prompt converts
 past-threshold nap edits to bedtime; dashboard CTA swaps to "Start
 Bedtime Now" past threshold; pumps render in front of sleep blocks.
-See `docs/superpowers/specs/2026-05-15-physiology-cascade-design.md`.
+See `docs/_archive/superpowers/specs/2026-05-15-physiology-cascade-design.md`.
 
 **Lifecycle simplification + slot ids landed (2026-05-16 campaign,
 PRs #165 → #168)** — major reshape of how naps + bedtime persist:
@@ -52,7 +52,7 @@ sleep banners; `NextBottlePanel` and `NextSleepPanel` carry per-day
 totals (recorded events only); `NextEventCard` filters vocab to
 bottle/nap/bedtime and renders a putdown sub-line on sleep events;
 wake gate is a slim `Wake up` CTA; `StartDayButton` is dev-only.
-Spec/plan at `docs/superpowers/{specs,plans}/2026-05-17-f32-retire-eod*.md`.
+Spec/plan at `docs/_archive/superpowers/{specs,plans}/2026-05-17-f32-retire-eod*.md`.
 
 Wave 9 (PWA manifest + service worker + E2E + design audit) is the
 last build wave on the original Plan C roadmap. Not yet started.

@@ -307,7 +307,7 @@ Existing fields:
   `dreamFeedEnd`, and `dreamFeedOffsetAfterBedtimeMinutes` have been
   removed post-simplification; dream feed is now a render-only label
   with no engine-side time math. See [RENDER_SPEC.md](RENDER_SPEC.md)
-  and `SIMPLIFICATION_SCOPE.md §3`.
+  and `../_archive/v3/SIMPLIFICATION_SCOPE.md §3`.
 - `pumpTimes`: ["10:30", "14:30"]
 - `minBottleIntervalMinutes`: 20
 - `timelineColorMode`: "type"
