@@ -121,6 +121,66 @@ describe("v3 events repository", () => {
     expect(got2?.owner).toEqual({ slot: "parent2" });
   });
 
+  it("§F37 wake_window seam: two edits of the same projection collapse to ONE doc, last write wins", async () => {
+    // Regression test for the wake_window "intermittent owner change" symptom
+    // Jake hit during F37 click-test. timeline/page.tsx onSave used to re-ID
+    // every projected→recorded transition with a fresh random id; each save
+    // created a new override doc. With multiple docs at same eventKey, R4.2's
+    // Map iteration order (sorted by startTime, tiebroken by random doc id)
+    // picked the survivor nondeterministically.
+    //
+    // Fix: use a DETERMINISTIC id (`recorded_${eventKey}`) so the 2nd+ edit
+    // routes through updateOptimistic on the SAME doc.
+    //
+    // This test simulates the page handler's save flow at the repository
+    // layer — two `createEvent`-then-`updateEvent` cycles with the deterministic
+    // id pattern — and asserts the final state is ONE doc with the latest owner.
+    const database = db();
+    const ww2Id = "recorded_wake_window_2";
+
+    // Save 1: user picks parent1 on projected wake_window_2.
+    await createEvent(
+      database,
+      "child-1",
+      ev({
+        id: ww2Id,
+        type: "wake_window",
+        kind: "block",
+        eventKey: "wake_window_2",
+        startTime: 0, // override docs carry sentinel startTime — R3.1 owns time
+        endTime: 0,
+        label: "Wake window 2",
+        owner: { slot: "parent1" },
+        lifecycle: { state: "recorded", annotatedAt: 8 * 60 },
+      }),
+    );
+
+    // Save 2: user re-opens and switches to parent2. With the fix, this lands
+    // on the SAME doc id via updateEvent — not a new random doc.
+    await updateEvent(database, "child-1", "day-1", ww2Id, {
+      owner: { slot: "parent2" },
+    });
+
+    const listed = await listEvents(database, "child-1", "day-1");
+    const ww2Docs = listed.filter(
+      (e) => e.type === "wake_window" && e.eventKey === "wake_window_2",
+    );
+    // The crux: exactly ONE override doc, not two.
+    expect(ww2Docs).toHaveLength(1);
+    expect(ww2Docs[0]!.owner).toEqual({ slot: "parent2" });
+
+    // Save 3: user picks None. Same doc updated again.
+    await updateEvent(database, "child-1", "day-1", ww2Id, {
+      owner: NO_OWNER,
+    });
+    const listed2 = await listEvents(database, "child-1", "day-1");
+    const ww2Docs2 = listed2.filter(
+      (e) => e.type === "wake_window" && e.eventKey === "wake_window_2",
+    );
+    expect(ww2Docs2).toHaveLength(1);
+    expect(ww2Docs2[0]!.owner).toEqual(NO_OWNER);
+  });
+
   it("watches events ordered by startTime", async () => {
     const database = db();
     await createEvent(database, "child-1", ev({ id: "e-1", startTime: 10 * 60 }));
