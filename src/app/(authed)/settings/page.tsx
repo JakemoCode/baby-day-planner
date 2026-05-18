@@ -120,8 +120,8 @@ export default function SettingsPage() {
       </Section>
 
       <Section
-        title="Wake windows (per nap N)"
-        isOpen={openSlug === "wake-windows-per-nap-n"}
+        title="Wake windows by nap"
+        isOpen={openSlug === "wake-windows-by-nap"}
         onToggle={handleToggle}
       >
         <WakeWindowsRow
