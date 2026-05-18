@@ -48,8 +48,27 @@
   height: 8px;
   border-radius: 50%;
   flex-shrink: 0;
-  /* Owner color drives the dot; sage accent is the no-owner default. */
-  background: var(--owner-color, var(--color-accent));
+  /* §F2b: in type-mode the dot indicates event type (rules below); in
+   * owner-mode it keeps the existing owner-color behavior. Fallback is
+   * muted neutral for any type without an explicit assignment. */
+  background: var(--color-muted);
+}
+
+.chip[data-color-mode="owner"] .dot {
+  background: var(--owner-color, var(--color-muted));
+}
+
+.chip[data-color-mode="type"][data-type="bottle"] .dot {
+  background: var(--color-rust);
+}
+.chip[data-color-mode="type"][data-type="extra"] .dot {
+  background: var(--color-honey);
+}
+.chip[data-color-mode="type"][data-type="pump"] .dot {
+  background: var(--color-pump);
+}
+.chip[data-color-mode="type"][data-type="bedtime"] .dot {
+  background: var(--color-success);
 }
 
 /* === Content layout ================================================ */

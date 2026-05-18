@@ -104,8 +104,8 @@
 }
 
 .block[data-type="extra"][data-color-mode="type"] {
-  background: transparent;
-  border-color: var(--color-muted);
+  background: var(--color-honey-soft);
+  border-color: var(--color-honey);
 }
 
 /* Pump: distinct dusty-lavender fill so pumps read as their own
