@@ -57,6 +57,7 @@ export function TomorrowPreview({
       colorMode={settings.timelineColorMode}
       dimPast={false}
       {...(onEventTap ? { onEventTap } : {})}
+      viewportPaddingMin={0}
     />
   );
 }

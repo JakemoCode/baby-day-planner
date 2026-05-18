@@ -25,6 +25,13 @@ export type TimelineV3Props = {
   /** Past events render at 0.45 opacity. Only meaningful with nowMinutes. */
   dimPast?: boolean;
   colorMode?: "type" | "owner";
+  /**
+   * Minutes of empty space added before the earliest event and after the
+   * latest. Defaults to 30. Pages that always start at a known boundary
+   * (e.g. Tomorrow preview always begins at the planned wake time) can
+   * pass 0 to drop the gap.
+   */
+  viewportPaddingMin?: number;
 };
 
 const AXIS_W = 28;
@@ -88,6 +95,7 @@ export function TimelineV3({
   pxPerHour = DEFAULT_PX_PER_HOUR,
   dimPast = false,
   colorMode = "type",
+  viewportPaddingMin = VIEWPORT_PADDING_MIN,
 }: TimelineV3Props) {
   const rootRef = useRef<HTMLDivElement>(null);
   const hasScrolledRef = useRef(false);
@@ -108,8 +116,8 @@ export function TimelineV3({
     const ends = events.map((e) => e.endTime ?? e.startTime);
     const minMin = Math.min(...starts, DEFAULT_VIEWPORT.start);
     const maxMin = Math.max(...ends, DEFAULT_VIEWPORT.end);
-    const origin = Math.max(0, minMin - VIEWPORT_PADDING_MIN);
-    const height = (maxMin + VIEWPORT_PADDING_MIN - origin) * pxPerMin;
+    const origin = Math.max(0, minMin - viewportPaddingMin);
+    const height = (maxMin + viewportPaddingMin - origin) * pxPerMin;
 
     return {
       blocks: events.filter((e) => e.kind === "block"),
@@ -117,7 +125,7 @@ export function TimelineV3({
       originMinutes: origin,
       heightPx: height,
     };
-  }, [events, pxPerMin]);
+  }, [events, pxPerMin, viewportPaddingMin]);
 
   useEffect(() => {
     if (hasScrolledRef.current) return;
