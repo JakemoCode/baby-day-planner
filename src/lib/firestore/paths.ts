@@ -31,3 +31,11 @@ export function templatesCollectionPath(childId: string): string {
 export function templatePath(childId: string, templateId: string): string {
   return `${templatesCollectionPath(childId)}/${templateId}`;
 }
+
+export function tomorrowPlansCollectionPath(childId: string): string {
+  return `${childPath(childId)}/tomorrowPlans`;
+}
+
+export function tomorrowPlanPath(childId: string, date: string): string {
+  return `${tomorrowPlansCollectionPath(childId)}/${date}`;
+}

@@ -369,3 +369,26 @@ export type ProjectInput = {
   actuals: Event[];
   nowMinutes?: TimeMin;
 };
+
+/**
+ * §F39 TomorrowPlan — the user's per-date plan for "tomorrow". Persisted
+ * only on first edit (page-idle → no doc). Auto-promoted when the first
+ * wake event is recorded for `date`.
+ *
+ * - `ownerOverrides` is keyed by eventKey (e.g. `"nap_1"`, `"bottle_2"`).
+ *   `null` = explicit "None" (user unassigned); missing key = no override
+ *   (fall back to template-projected default).
+ * - `extras` are custom events the user added via the FAB on `/tomorrow`.
+ *   They land on the new day as recorded events at promote time.
+ * - `startTemplateId` is the template that was used as one-shot prefill,
+ *   stored for traceability. Template edits do NOT propagate (snapshot
+ *   semantics).
+ */
+export type TomorrowPlan = {
+  childId: string;
+  /** ISO "YYYY-MM-DD" — matches `Day.date`. */
+  date: string;
+  ownerOverrides: Record<string, OwnerRef | null>;
+  extras: Event[];
+  startTemplateId?: string;
+};
