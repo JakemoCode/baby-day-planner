@@ -43,6 +43,10 @@ service cloud.firestore {
       match /templates/{templateId} {
         allow read, write: if isAllowlisted();
       }
+
+      match /tomorrowPlans/{date} {
+        allow read, write: if isAllowlisted();
+      }
     }
   }
 }
