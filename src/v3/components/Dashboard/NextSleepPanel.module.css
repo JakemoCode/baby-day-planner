@@ -28,7 +28,7 @@
 .time {
   font-size: var(--text-xl);
   font-weight: var(--weight-semibold);
-  color: var(--color-accent);
+  color: var(--color-success);
   line-height: 1;
 }
 
