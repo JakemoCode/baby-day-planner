@@ -46,26 +46,31 @@ need any V3 plumbing.
 
 **Source**: OUT_OF_SCOPE §12 (V2 backlog item, 🔥 flagged twice).
 
-**Status**: `pending`
+**Status**: split into F2a + F2b (2026-05-18 after Variant A pick
+in palette-explore mockup).
 
-**What**: rework `src/styles/tokens.css` to address two longstanding
-issues:
-1. Too much white (cards/surfaces blend into background).
-2. Owner tints (sage, terracotta, dusty blue, coral) too pale to
-   reliably distinguish on small chips and stripe overlays.
+**§F2a — Dashboard surface contrast lift**: `in-progress` (this PR).
+Two-token change: `--color-bg` from `#fbf8f3` to deeper cream `#f2ebde`,
+`--color-surface` from `#ffffff` to soft ivory `#fcf8ee` (raised stays
+white). Bg→surface contrast goes from 1.06 → 1.12. Spec asked for ≥1.4
+but matching that requires a noticeably darker oat bg (`#e3d7be`) which
+Jake vetoed in the palette-explore mockup as too sandy — the wedding
+palette is intentionally close-tone. Cards now visibly lift off the bg
+without losing the warm-cream feel.
+
+**§F2b — Timeline palette pass**: `pending`. After F2a ships, build
+a timeline-focused HTML mockup (3 chip-treatment variants exploring
+owner stripe vs event fill emphasis + density) for Jake to react to
+before touching real timeline CSS.
 
 **Why fast-follow, not pre-V3**: ARCHITECTURE_V3 §6.4 differential
 testing checks engine *output* (event arrays), not rendered pixels.
-Palette can shift independently. Doing it pre-V3 would burn the
-"awaiting plan ratification" window we no longer have.
-
-**Estimated effort**: 2–3 days. Includes a `/design-audit` pass at
-the end to verify contrast and visual hierarchy on the existing V3
-timeline.
+Palette can shift independently.
 
 **Acceptance**:
-- Owner stripes readable as colored bands at chip-thumbnail size.
-- Surface vs. background contrast ratio ≥ 1.4 (currently ~1.05).
+- ✅ Surface visibly lifts off bg (1.06 → 1.12 in F2a; original ≥1.4
+  target relaxed — see F2a entry for the wedding-palette reason).
+- Owner stripes readable as colored bands at chip-thumbnail size (F2b).
 - Existing tokens stay token-named (no inline colors anywhere).
 - `/design-audit` run on `/timeline`, `/dashboard`, `/settings`
   reports zero new critical or major issues.
@@ -548,6 +553,58 @@ Likely cause: `InstantChip` (or its positioning wrapper in `TimelineV3.tsx`) use
 
 ---
 
+## §F33 — User-selectable color themes
+
+**Source**: Jake, 2026-05-18 (during F2 palette explore).
+
+**Status**: `pending`
+
+**What**: let the user pick from several themed palettes in Settings.
+`tokens.css` already supports manual override via `[data-theme="dark"]`
+on `<html>`; extend that mechanism to named light themes (e.g.
+"Sage" (current), "Coastal" (blue-leaning), "Sunset" (rust-leaning),
+plus the existing dark mode).
+
+**Why fast-follow**: pure UI/UX; no engine impact. Worth waiting until
+the F2 palette work settles so the "default" theme is stable before
+adding alternatives.
+
+**Estimated effort**: 2–3 days. ~3 hand-tuned palettes + a Settings
+picker + localStorage persistence (mirror existing accordion
+remembered-section pattern).
+
+---
+
+## §F34 — Expose explicit hue tokens beside semantic ones
+
+**Source**: Jake, 2026-05-18 (during F2 palette explore).
+
+**Status**: `pending`
+
+**What**: today the wedding-mood hues live behind semantic names —
+`--color-warning` is the terracotta/rust, `--color-owner-jake` is
+the dusty blue. Per-event-type styling (potentially landing in §F2b)
+benefits from named hue tokens like `--color-rust`, `--color-blue`,
+`--color-sage`, `--color-purple` that components can reference directly
+without overloading the semantic tokens.
+
+Add hue tokens as the source of truth; redefine the existing semantic
+tokens in terms of them so nothing changes visually:
+
+```css
+--color-rust:   #bc5b2e;
+--color-blue:   #649ec3;
+--color-sage:   #7d9a7a;
+--color-purple: #9b7bb3;
+--color-warning: var(--color-rust);    /* alias */
+--color-accent:  var(--color-sage);    /* alias */
+```
+
+**Why fast-follow**: enables §F2b (timeline event-type fills) without
+forcing per-event styles to import the awkward semantic names. Doesn't
+need to ship before F2b — could be folded into the same PR.
+
+---
 
 ## How items land here
 

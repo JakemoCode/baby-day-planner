@@ -14,9 +14,14 @@
   color-scheme: light;
 
   /* ─────── Surfaces ─────── */
-  --color-bg: #fbf8f3; /* warm cream */
-  --color-surface: #ffffff; /* card surface */
-  --color-surface-raised: #fefcf7; /* slight warm tint for elevation */
+  /* §F2a (2026-05-18): bg darkened to deepen cream, surface to soft ivory.
+     Lifts bg→surface contrast from 1.06 → 1.12 — modest but visibly
+     pulls cards off the page. Spec asked for 1.4; matching that would
+     require a noticeably darker oat-toned bg (#e3d7be), which Jake
+     vetoed in the palette-explore mockup as too sandy. */
+  --color-bg: #f2ebde; /* deeper warm cream */
+  --color-surface: #fcf8ee; /* soft ivory — cards lift off bg */
+  --color-surface-raised: #ffffff; /* pure white for max elevation */
 
   /* ─────── Foreground ─────── */
   --color-fg: #2a2520; /* warm near-black */
