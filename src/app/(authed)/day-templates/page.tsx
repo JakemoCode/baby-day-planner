@@ -154,26 +154,16 @@ export default function DayTemplatesPage() {
       />
 
       {selectedEvent && (
-        <div className={styles.pickerWrap}>
-          <div className={styles.pickerHeader}>
-            <span className={styles.pickerLabel}>Owner for {selectedEvent.label}</span>
-            <button
-              type="button"
-              className={styles.pickerCancel}
-              onClick={() => setSelectedEventId(null)}
-            >
-              Cancel
-            </button>
-          </div>
-          <TemplateOwnerPicker
-            event={selectedEvent}
-            template={activeTemplate}
-            owners={settings.owners}
-            onSelect={(owner) => {
-              void handleOwnerChange(owner);
-            }}
-          />
-        </div>
+        <TemplateOwnerPicker
+          event={selectedEvent}
+          template={activeTemplate}
+          owners={settings.owners}
+          title={`Owner for ${selectedEvent.label}`}
+          onCancel={() => setSelectedEventId(null)}
+          onSelect={(owner) => {
+            void handleOwnerChange(owner);
+          }}
+        />
       )}
     </div>
   );

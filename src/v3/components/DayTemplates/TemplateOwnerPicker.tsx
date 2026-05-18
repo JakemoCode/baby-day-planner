@@ -9,28 +9,26 @@
  * see the new selection without waiting for owner-aware events to
  * re-resolve.
  *
- * V3 differences from V2:
- *   - Owners are slot-based OwnerRef values (not "Jake" / "Kelly" /
- *     "Daycare" display strings).
- *   - The option list is derived from settings.owners at render time
- *     by OwnerPickerV3.
- *   - onSelect emits `OwnerRef | undefined`; undefined ("None") is the
- *     valid signal to clear the slot.
- *
- * The actual template mutation lives in setOwnerInTemplate (PR-A0.3) —
- * this component is purely about reading the current value and emitting
- * the picked one.
+ * Chrome is opt-in. When `title` or `onCancel` is passed, the picker
+ * wraps itself in a sticky-bottom card with a header (label + Cancel).
+ * When neither is passed, the picker renders bare — preserving the
+ * original headless behavior for callers that supply their own chrome.
  */
 
 import type { Event, OwnerRef, OwnershipTemplate, OwnersConfig } from "../../schemas";
 import { OwnerPickerV3 } from "../shared/OwnerPickerV3";
 import { getOwnerAt, templateSlotForEvent } from "./templateSlot";
+import styles from "./TemplateOwnerPicker.module.css";
 
 export type TemplateOwnerPickerProps = {
   event: Event;
   template: OwnershipTemplate;
   owners: OwnersConfig;
   onSelect: (owner: OwnerRef | undefined) => void;
+  /** Header label rendered inside the picker's card chrome. */
+  title?: string;
+  /** Dismiss handler. When set, renders a Cancel button alongside the title. */
+  onCancel?: () => void;
 };
 
 export function TemplateOwnerPicker({
@@ -38,8 +36,30 @@ export function TemplateOwnerPicker({
   template,
   owners,
   onSelect,
+  title,
+  onCancel,
 }: TemplateOwnerPickerProps) {
   const slot = templateSlotForEvent(event);
   const current = slot === undefined ? undefined : getOwnerAt(template, slot);
-  return <OwnerPickerV3 owners={owners} value={current} onChange={onSelect} label={event.label} />;
+  const picker = (
+    <OwnerPickerV3 owners={owners} value={current} onChange={onSelect} label={event.label} />
+  );
+
+  // No chrome requested → behave like a bare picker (preserves existing
+  // tests and callers that supply their own wrapper).
+  if (title === undefined && onCancel === undefined) return picker;
+
+  return (
+    <div className={styles.card}>
+      <div className={styles.header}>
+        {title !== undefined && <span className={styles.title}>{title}</span>}
+        {onCancel !== undefined && (
+          <button type="button" className={styles.cancel} onClick={onCancel}>
+            Cancel
+          </button>
+        )}
+      </div>
+      {picker}
+    </div>
+  );
 }
