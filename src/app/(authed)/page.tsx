@@ -8,10 +8,10 @@ import { isInProgress } from "@/v3/lib/effectiveEnd";
 import {
   currentWakeWindow,
   nextBottle,
-  nextEvent,
   nextNap,
   projectedBedtime,
 } from "@/v3/selectors";
+import { nextDashboardEvent } from "@/v3/components/Dashboard/dashboardStats";
 import { useNowMinutes } from "@/hooks/useNowMinutes";
 import { newEventId } from "@/v3/lib/newEventId";
 import { useV3Day } from "@/v3/hooks/useV3Day";
@@ -31,7 +31,7 @@ import type { CreatableType } from "@/v3/components/shared/createEventTemplate";
 import { buildCreateTemplate } from "@/v3/components/shared/createEventTemplate";
 import { EventEditDrawerV3 } from "@/v3/components/shared/EventEditDrawerV3";
 import { NowBanner } from "@/v3/components/Dashboard/NowBanner";
-import { EndOfDayCard } from "@/v3/components/Dashboard/EndOfDayCard";
+import { ActionButton } from "@/v3/components/Dashboard/ActionButton";
 import { NapActionButton } from "@/v3/components/Dashboard/NapActionButton";
 import { NextBottlePanel } from "@/v3/components/Dashboard/NextBottlePanel";
 import { NextEventCard } from "@/v3/components/Dashboard/NextEventCard";
@@ -108,28 +108,14 @@ export default function DashboardPage() {
     };
     return (
       <div className={styles.page}>
-        <EndOfDayCard afterMidnight hasTomorrowPlan={false} onStart={handleStart} />
+        <ActionButton variant="primary" onClick={() => void handleStart()}>
+          Wake up
+        </ActionButton>
       </div>
     );
   }
 
-  const next = nextEvent(projected, nowMinutes);
-  const afterBedtime = nowMinutes >= settings.bedtimeThreshold;
-  const isEndOfDay = !next && afterBedtime;
-
-  if (isEndOfDay) {
-    return (
-      <div className={styles.page}>
-        <EndOfDayCard
-          afterMidnight={false}
-          hasTomorrowPlan={false}
-          onStart={async () => {
-            // Won't fire pre-midnight, but kept for type safety
-          }}
-        />
-      </div>
-    );
-  }
+  const next = nextDashboardEvent(projected, nowMinutes);
 
   const nb = nextBottle(projected, nowMinutes);
   const nn = nextNap(projected, nowMinutes);
@@ -258,7 +244,9 @@ export default function DashboardPage() {
             onStartBedtime={handleStartBedtime}
             onEndBedtime={handleEndSleep}
           />
-          <StartDayButton hasTomorrowPlan={false} onStart={handleStartDay} />
+          {process.env.NODE_ENV === "development" && (
+            <StartDayButton hasTomorrowPlan={false} onStart={handleStartDay} />
+          )}
         </div>
       </div>
 
