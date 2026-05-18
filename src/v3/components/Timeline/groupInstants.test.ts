@@ -5,6 +5,7 @@
 
 import { describe, expect, it } from "vitest";
 import type { Event } from "../../schemas";
+import { NO_OWNER } from "../../schemas";
 import { groupInstants } from "./groupInstants";
 
 const ev = (overrides: Partial<Event>): Event => ({
@@ -16,6 +17,7 @@ const ev = (overrides: Partial<Event>): Event => ({
   startTime: 0,
   label: "x",
   hasPutdown: false,
+  owner: NO_OWNER,
   lifecycle: { state: "projected" },
   ...overrides,
 });

@@ -6,6 +6,7 @@
 import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
 import type { Day, OwnersConfig, OwnershipTemplate } from "../../schemas";
+import { NO_OWNER } from "../../schemas";
 import { aSettings } from "../../__tests__/factories";
 import { TomorrowPreview } from "./TomorrowPreview";
 
@@ -68,6 +69,7 @@ describe("TomorrowPreview (V3)", () => {
         startTime: 11 * 60,
         label: "Pediatrician",
         hasPutdown: false,
+        owner: NO_OWNER,
         lifecycle: { state: "completed" as const, committedAt: 11 * 60 },
       },
     ];

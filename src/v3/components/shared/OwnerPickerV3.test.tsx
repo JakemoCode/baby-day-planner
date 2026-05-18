@@ -11,7 +11,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { OwnersConfig } from "../../schemas";
+import { NO_OWNER, type OwnersConfig } from "../../schemas";
 import { OwnerPickerV3 } from "./OwnerPickerV3";
 
 const owners: OwnersConfig = {
@@ -25,7 +25,7 @@ const owners: OwnersConfig = {
 
 describe("OwnerPickerV3", () => {
   it("renders one option per parent + each other owner + None", () => {
-    render(<OwnerPickerV3 owners={owners} value={undefined} onChange={() => {}} />);
+    render(<OwnerPickerV3 owners={owners} value={NO_OWNER} onChange={() => {}} />);
     expect(screen.getByRole("button", { name: "None" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Jake" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Sam" })).toBeInTheDocument();
@@ -56,27 +56,27 @@ describe("OwnerPickerV3", () => {
 
   it("clicking a parent emits the parent OwnerRef", async () => {
     const onChange = vi.fn();
-    render(<OwnerPickerV3 owners={owners} value={undefined} onChange={onChange} />);
+    render(<OwnerPickerV3 owners={owners} value={NO_OWNER} onChange={onChange} />);
     await userEvent.click(screen.getByRole("button", { name: "Sam" }));
     expect(onChange).toHaveBeenCalledWith({ slot: "parent2" });
   });
 
   it("clicking an other-owner emits the other OwnerRef with otherId", async () => {
     const onChange = vi.fn();
-    render(<OwnerPickerV3 owners={owners} value={undefined} onChange={onChange} />);
+    render(<OwnerPickerV3 owners={owners} value={NO_OWNER} onChange={onChange} />);
     await userEvent.click(screen.getByRole("button", { name: "Daycare" }));
     expect(onChange).toHaveBeenCalledWith({ slot: "other", otherId: "daycare" });
   });
 
-  it("clicking None emits undefined to clear the ref", async () => {
+  it("clicking None emits NO_OWNER to clear the ref (§F37)", async () => {
     const onChange = vi.fn();
     render(<OwnerPickerV3 owners={owners} value={{ slot: "parent1" }} onChange={onChange} />);
     await userEvent.click(screen.getByRole("button", { name: "None" }));
-    expect(onChange).toHaveBeenCalledWith(undefined);
+    expect(onChange).toHaveBeenCalledWith(NO_OWNER);
   });
 
   it("encodes slot key on data-owner so existing CSS selectors keep working", () => {
-    render(<OwnerPickerV3 owners={owners} value={undefined} onChange={() => {}} />);
+    render(<OwnerPickerV3 owners={owners} value={NO_OWNER} onChange={() => {}} />);
     expect(screen.getByRole("button", { name: "Jake" })).toHaveAttribute("data-owner", "parent1");
     expect(screen.getByRole("button", { name: "Daycare" })).toHaveAttribute(
       "data-owner",
@@ -85,7 +85,7 @@ describe("OwnerPickerV3", () => {
   });
 
   it("sets --owner-color inline on each option from the configured palette", () => {
-    render(<OwnerPickerV3 owners={owners} value={undefined} onChange={() => {}} />);
+    render(<OwnerPickerV3 owners={owners} value={NO_OWNER} onChange={() => {}} />);
     expect(screen.getByRole("button", { name: "Jake" }).getAttribute("style")).toContain(
       "--owner-color: #0af",
     );

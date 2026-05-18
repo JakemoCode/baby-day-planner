@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Event } from "../schemas";
+import { NO_OWNER } from "../schemas";
 import { effectiveEndOf, isInProgress } from "./effectiveEnd";
 
 const napLen = 60; // minutes
@@ -15,6 +16,7 @@ function recordedNap(startTime: number, endTime: number): Event {
     startTime,
     endTime,
     hasPutdown: false,
+    owner: NO_OWNER,
     lifecycle: { state: "recorded", annotatedAt: startTime },
   };
 }
@@ -54,6 +56,7 @@ describe("effectiveEndOf", () => {
       startTime: 9 * 60,
       endTime: 10 * 60,
       hasPutdown: false,
+      owner: NO_OWNER,
       lifecycle: { state: "projected" },
     };
     // projected — no extension regardless of now
@@ -71,6 +74,7 @@ describe("effectiveEndOf", () => {
       startTime: 9 * 60,
       endTime: 9 * 60 + 30,
       hasPutdown: false,
+      owner: NO_OWNER,
       lifecycle: { state: "completed", committedAt: 9 * 60 },
     };
     expect(effectiveEndOf(nap, napLen, 11 * 60)).toBe(9 * 60 + 30);
@@ -93,6 +97,7 @@ describe("effectiveEndOf", () => {
       label: "Nap 1",
       startTime: 9 * 60,
       hasPutdown: false,
+      owner: NO_OWNER,
       lifecycle: { state: "recorded", annotatedAt: 9 * 60 },
     };
     expect(effectiveEndOf(nap, napLen, 9 * 60 + 30)).toBe(10 * 60);
@@ -124,6 +129,7 @@ describe("effectiveEndOf", () => {
       label: "Nap 1",
       startTime: 9 * 60,
       hasPutdown: false,
+      owner: NO_OWNER,
       lifecycle: { state: "recorded", annotatedAt: 9 * 60 },
     };
     expect(effectiveEndOf(nap, napLen, 18 * 60)).toBe(13 * 60);
@@ -152,6 +158,7 @@ describe("isInProgress", () => {
       startTime: 9 * 60,
       endTime: 10 * 60,
       hasPutdown: false,
+      owner: NO_OWNER,
       lifecycle: { state: "projected" },
     };
     expect(isInProgress(projected, napLen, 9 * 60 + 30)).toBe(false);

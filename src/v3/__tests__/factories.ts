@@ -5,17 +5,18 @@
  * before reaching for the full Event literal.
  */
 
-import type {
-  Context,
-  Day,
-  Event,
-  EventKind,
-  EventType,
-  Lifecycle,
-  OwnerRef,
-  OwnershipTemplate,
-  Settings,
-  TimeMin,
+import {
+  NO_OWNER,
+  type Context,
+  type Day,
+  type Event,
+  type EventKind,
+  type EventType,
+  type Lifecycle,
+  type OwnerRef,
+  type OwnershipTemplate,
+  type Settings,
+  type TimeMin,
 } from "../schemas";
 
 let idCounter = 0;
@@ -51,10 +52,10 @@ function eventBase(
     startTime: start,
     label: overrides.label ?? eventKey,
     hasPutdown: overrides.hasPutdown ?? false,
+    owner: overrides.owner ?? NO_OWNER, // §F37: owner is required; default to unassigned
     lifecycle,
   };
   if (end !== undefined) event.endTime = end;
-  if (overrides.owner !== undefined) event.owner = overrides.owner;
   if (overrides.amountOz !== undefined) event.amountOz = overrides.amountOz;
   return event;
 }

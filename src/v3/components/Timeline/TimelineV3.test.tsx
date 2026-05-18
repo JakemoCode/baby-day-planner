@@ -12,6 +12,7 @@ import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { Event, OwnersConfig } from "../../schemas";
+import { NO_OWNER } from "../../schemas";
 import { TimelineV3 } from "./TimelineV3";
 import { expandPutdownBlocks } from "./expandPutdown";
 
@@ -31,6 +32,7 @@ const ev = (overrides: Partial<Event>): Event => ({
   endTime: 10 * 60,
   label: "Nap 1",
   hasPutdown: false,
+  owner: NO_OWNER,
   lifecycle: { state: "projected" },
   ...overrides,
 });

@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import type { Event } from "../schemas";
+import { NO_OWNER } from "../schemas";
 import { useV3Events } from "./useV3Events";
 
 const watchEventsMock = vi.fn();
@@ -26,6 +27,7 @@ const baseEvent = (overrides: Partial<Event>): Event => ({
   label: "Bottle 1",
   amountOz: 5,
   hasPutdown: false,
+  owner: NO_OWNER,
   lifecycle: { state: "completed", committedAt: 7 * 60 + 5 },
   ...overrides,
 });

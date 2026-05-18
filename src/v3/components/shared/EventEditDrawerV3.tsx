@@ -4,7 +4,7 @@ import { useEffect, useId, useState } from "react";
 import styles from "./EventEditDrawer.module.css";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import type { Event, EventType, OwnerRef, OwnersConfig, TimeMin } from "../../schemas";
-import { isRecorded } from "../../schemas";
+import { isRecorded, NO_OWNER } from "../../schemas";
 import { formatHM24, formatTimeForDisplay, nextDayAt, parseHM24 } from "../../ui/time";
 import { OwnerPickerV3 } from "./OwnerPickerV3";
 import { formToEvent, type FormState } from "./formToEvent";
@@ -105,7 +105,7 @@ type InternalForm = {
   startTime: TimeMin | undefined;
   endTime: TimeMin | undefined;
   amountOz: number | undefined;
-  owner: OwnerRef | undefined;
+  owner: OwnerRef; // §F37: always defined; NO_OWNER for unassigned
   label: string;
 };
 
@@ -114,7 +114,7 @@ function eventToForm(event: Event | null): InternalForm {
     startTime: event?.startTime,
     endTime: event?.endTime,
     amountOz: event?.amountOz,
-    owner: event?.owner,
+    owner: event?.owner ?? NO_OWNER,
     label: event?.label ?? "",
   };
 }
@@ -252,8 +252,8 @@ export function EventEditDrawerV3({
       // `recorded`: putdown.ts derives hasPutdown from {projected, recorded}.
       // Cascade's manualBedtime check is `!isProjected`, so `recorded`
       // remains authoritative and matches the drawer-edit shape.
+      owner: napCandidate.owner, // §F37: owner is required (NO_OWNER if unassigned)
       lifecycle: { state: "recorded", annotatedAt: nowMinutes },
-      ...(napCandidate.owner ? { owner: napCandidate.owner } : {}),
     };
     // Sequence: delete original FIRST so the dual-doc state can never
     // surface (the user sees one chip turn into the other, not two).

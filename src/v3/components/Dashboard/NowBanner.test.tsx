@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
 import type { Event, OwnersConfig, TimeMin } from "@/v3/schemas";
+import { NO_OWNER } from "@/v3/schemas";
 import { NowBanner } from "./NowBanner";
 
 const owners: OwnersConfig = {
@@ -19,6 +20,7 @@ const ww = (overrides: Partial<Event> = {}): Event => ({
   startTime: (7 * 60) as TimeMin,
   endTime: (9 * 60) as TimeMin,
   hasPutdown: false,
+  owner: NO_OWNER,
   lifecycle: { state: "projected" },
   ...overrides,
 });
@@ -33,6 +35,7 @@ const napEvent = (start: TimeMin): Event => ({
   startTime: start,
   endTime: (start + 60) as TimeMin,
   hasPutdown: false,
+  owner: NO_OWNER,
   lifecycle: { state: "recorded", annotatedAt: start },
 });
 
@@ -46,6 +49,7 @@ const bedtimeEvent = (start: TimeMin): Event => ({
   startTime: start,
   endTime: (start + 600) as TimeMin,
   hasPutdown: false,
+  owner: NO_OWNER,
   lifecycle: { state: "recorded", annotatedAt: start },
 });
 

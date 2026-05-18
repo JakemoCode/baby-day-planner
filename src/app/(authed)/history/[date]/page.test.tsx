@@ -2,6 +2,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { renderWithAuth, screen } from "@/test-utils";
 import type { Day, Event, OwnersConfig, Settings } from "@/v3/schemas";
+import { NO_OWNER } from "@/v3/schemas";
 
 const getDayByDateMock = vi.fn();
 const useV3SettingsMock = vi.fn();
@@ -60,6 +61,7 @@ const bottle: Event = {
   label: "Bottle 1",
   amountOz: 5,
   hasPutdown: false,
+  owner: NO_OWNER,
   lifecycle: { state: "completed", committedAt: 7 * 60 + 5 },
 };
 

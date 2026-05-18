@@ -1,6 +1,7 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { renderWithAuth, screen, userEvent } from "@/test-utils";
 import type { Day, Event, OwnersConfig, Settings } from "@/v3/schemas";
+import { NO_OWNER } from "@/v3/schemas";
 import { aSettings } from "@/v3/__tests__/factories";
 import DashboardPage from "./page";
 
@@ -249,6 +250,7 @@ describe("DashboardPage (V3)", () => {
       label: "Dream Feed",
       startTime: 22 * 60,
       hasPutdown: false,
+      owner: NO_OWNER,
       lifecycle: { state: "projected" },
     };
     setupHooks({ nowMinutes: 20 * 60, projected: [upcoming] });
@@ -269,6 +271,7 @@ describe("DashboardPage (V3)", () => {
       startTime: 9 * 60,
       endTime: 10 * 60, // placeholder endTime set by NapActionButton
       hasPutdown: false,
+      owner: NO_OWNER,
       lifecycle: { state: "recorded", annotatedAt: 9 * 60 },
     };
     const { saveEvent } = setupHooks({
@@ -314,6 +317,7 @@ describe("DashboardPage (V3)", () => {
       label: "Bottle 1",
       startTime: 8 * 60,
       hasPutdown: false,
+      owner: NO_OWNER,
       lifecycle: { state: "completed", committedAt: 8 * 60 },
     };
     const recordedBottleDup: Event = {
@@ -330,6 +334,7 @@ describe("DashboardPage (V3)", () => {
       label: "Bottle 2",
       startTime: 11 * 60,
       hasPutdown: false,
+      owner: NO_OWNER,
       lifecycle: { state: "projected" },
     };
 

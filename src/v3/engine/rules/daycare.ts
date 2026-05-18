@@ -9,7 +9,7 @@
  *           weekday + Day.suppressedDaycareDay !== true
  *   R21.3 — projected naps/bottles inside the [dropoff, pickup) window
  *           auto-assign the daycare owner UNLESS template/recorded already
- *           supplied one (gate on `e.owner === undefined`)
+ *           supplied one (gate on `isNoOwner(e.owner)` per §F37)
  *   R21.5 — Day.suppressedDaycareDay short-circuits projection (handled
  *           by R21.1's match condition)
  *   R21.7 — recorded daycare events drive the window (dedup by eventKey
@@ -21,7 +21,14 @@
  *   R21.6 — settings validation (UI / Phase 3)
  */
 
-import type { Context, Event, OwnerRef, TimeMin, Weekday } from "../../schemas";
+import {
+  isNoOwner,
+  type Context,
+  type Event,
+  type OwnerRef,
+  type TimeMin,
+  type Weekday,
+} from "../../schemas";
 import type { Rule } from "../evaluator";
 import { hasType, isProjected, projectedEvent } from "../helpers";
 
@@ -145,7 +152,7 @@ function activeDaycareWindow(events: Event[], ctx: Context): Window | null {
 function isWindowCandidate(e: Event, window: Window): boolean {
   if (!isNap(e) && !isBottle(e)) return false;
   if (!isProjected(e)) return false;
-  if (e.owner !== undefined) return false;
+  if (!isNoOwner(e.owner)) return false; // §F37: unassigned is { slot: "none" }
   return e.startTime >= window.start && e.startTime < window.end;
 }
 

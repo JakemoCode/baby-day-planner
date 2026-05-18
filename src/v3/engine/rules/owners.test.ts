@@ -32,7 +32,7 @@ import {
   aTemplate,
   otherOwner,
 } from "../../__tests__/factories";
-import type { Context, Event } from "../../schemas";
+import { NO_OWNER, type Context, type Event } from "../../schemas";
 import type { Rule } from "../evaluator";
 import { projectDay } from "../projectDay";
 import { ALL_RULES } from "./index";
@@ -100,8 +100,8 @@ describe("R12.2 — projected naps inherit template.napOwners[N-1]", () => {
     const naps = out.filter((e) => e.type === "nap").sort((a, b) => a.startTime - b.startTime);
     expect(naps[0]!.owner).toEqual(PARENT1);
     expect(naps[1]!.owner).toEqual(PARENT2);
-    expect(naps[2]!.owner).toBeUndefined();
-    expect(naps[3]!.owner).toBeUndefined();
+    expect(naps[2]!.owner).toEqual({ slot: "none" });
+    expect(naps[3]!.owner).toEqual({ slot: "none" });
   });
 
   it("sparse napOwners (undefined slot in middle) → that nap has no owner; neighbors do", () => {
@@ -125,7 +125,7 @@ describe("R12.2 — projected naps inherit template.napOwners[N-1]", () => {
 
     const naps = out.filter((e) => e.type === "nap").sort((a, b) => a.startTime - b.startTime);
     expect(naps[0]!.owner).toEqual(PARENT1);
-    expect(naps[1]!.owner).toBeUndefined();
+    expect(naps[1]!.owner).toEqual({ slot: "none" });
     expect(naps[2]!.owner).toEqual(PARENT2);
     expect(naps[3]!.owner).toEqual(PARENT1);
   });
@@ -144,7 +144,7 @@ describe("R12.2 — projected naps inherit template.napOwners[N-1]", () => {
     const out = run(ctx);
 
     const naps = out.filter((e) => e.type === "nap");
-    expect(naps.every((n) => n.owner === undefined)).toBe(true);
+    expect(naps.every((n) => n.owner.slot === "none")).toBe(true);
   });
 });
 
@@ -176,7 +176,7 @@ describe("R12.1 — clearing is deliberate: cleared owner is not re-stamped", ()
 
     const out = run(ctx);
     const napTwo = out.find((e) => e.id === recordedClearedOwner.id);
-    expect(napTwo?.owner).toBeUndefined(); // template did NOT re-stamp
+    expect(napTwo?.owner).toEqual({ slot: "none" }); // template did NOT re-stamp
   });
 
   it("overridden projection is NOT re-stamped (deliberate user-edit choice persists)", () => {
@@ -194,7 +194,7 @@ describe("R12.1 — clearing is deliberate: cleared owner is not re-stamped", ()
       label: "Nap 2",
       hasPutdown: false,
       lifecycle: { state: "recorded", annotatedAt: 11 * 60 },
-      // owner omitted — user explicitly cleared via drawer
+      owner: NO_OWNER, // §F37: user explicitly cleared via drawer
     };
 
     const ctx = aContext({
@@ -212,7 +212,7 @@ describe("R12.1 — clearing is deliberate: cleared owner is not re-stamped", ()
 
     const out = run(ctx);
     const napTwo = out.find((e) => e.id === overriddenNap2.id);
-    expect(napTwo?.owner).toBeUndefined();
+    expect(napTwo?.owner).toEqual({ slot: "none" });
     expect(napTwo?.lifecycle.state).toBe("recorded");
   });
 });
@@ -231,6 +231,7 @@ describe("R12.x — eventKey index parsing rejects malformed keys", () => {
       endTime: 10 * 60,
       label: "Nap",
       hasPutdown: false,
+      owner: NO_OWNER,
       lifecycle: { state: "projected" },
     };
 
@@ -245,7 +246,7 @@ describe("R12.x — eventKey index parsing rejects malformed keys", () => {
 
     const out = run(ctx);
     const found = out.find((e) => e.id === malformedNap.id);
-    expect(found?.owner).toBeUndefined();
+    expect(found?.owner).toEqual({ slot: "none" });
   });
 });
 
@@ -279,7 +280,7 @@ describe("R12.1 — recorded events keep their owner; template doesn't override"
     expect(napTwo!.owner).toEqual(PARENT1); // recorded owner preserved
     // The other naps (1, 3, 4) all inherit PARENT2 from the template.
     const others = out.filter((e) => e.type === "nap" && e.id !== recorded.id);
-    expect(others.every((n) => n.owner !== undefined && n.owner.slot === "parent2")).toBe(true);
+    expect(others.every((n) => n.owner.slot === "parent2")).toBe(true);
   });
 });
 
@@ -312,11 +313,11 @@ describe("R12.3 — projected wake_windows inherit template.wakeWindowOwners[N-1
       .sort((a, b) => a.startTime - b.startTime)
       .slice(0, 4);
     expect(wws).toHaveLength(4);
-    expect(wws.every((w) => w.owner !== undefined && w.owner.slot === "parent2")).toBe(true);
+    expect(wws.every((w) => w.owner.slot === "parent2")).toBe(true);
     // Sanity: naps in the template-covered slots did NOT bleed into
     // the WW owner choice.
     const naps = out.filter((e) => e.type === "nap").slice(0, 4);
-    expect(naps.every((n) => n.owner !== undefined && n.owner.slot === "parent1")).toBe(true);
+    expect(naps.every((n) => n.owner.slot === "parent1")).toBe(true);
   });
 
   it("template wakeWindowOwners absent → wake windows have no owner (no fallback to nap owner)", () => {
@@ -337,7 +338,7 @@ describe("R12.3 — projected wake_windows inherit template.wakeWindowOwners[N-1
     const out = run(ctx);
 
     const wws = out.filter((e) => e.type === "wake_window");
-    expect(wws.every((w) => w.owner === undefined)).toBe(true);
+    expect(wws.every((w) => w.owner.slot === "none")).toBe(true);
   });
 });
 
@@ -378,7 +379,7 @@ describe("R12.5 — projected bedtime inherits template.bedtimeOwner if set", ()
     const out = run(ctx);
 
     const bedtime = out.find((e) => e.type === "bedtime");
-    expect(bedtime?.owner).toBeUndefined();
+    expect(bedtime?.owner).toEqual({ slot: "none" });
   });
 });
 
@@ -424,6 +425,6 @@ describe("R12.6 — projected bottles inherit template.bottleOwners[N-1] (chrono
     const out = run(ctx);
 
     const bottles = out.filter((e) => e.type === "bottle");
-    expect(bottles.every((b) => b.owner === undefined)).toBe(true);
+    expect(bottles.every((b) => b.owner.slot === "none")).toBe(true);
   });
 });

@@ -61,8 +61,9 @@ const RuleApplyWakeWindowOverrides: Rule = {
       if (!isWakeWindow(e) || !isProjected(e)) return [e];
       const override = overridesByKey.get(e.eventKey);
       if (!override) return [e];
-      const next: Event = { ...e };
-      if (override.owner !== undefined) next.owner = override.owner;
+      // §F37: owner on the override is required. Pass through directly;
+      // unassigned is represented by { slot: "none" }, not by omission.
+      const next: Event = { ...e, owner: override.owner };
       if (override.label) next.label = override.label;
       return [next];
     });

@@ -163,10 +163,16 @@ function recordedFieldsMatch(a: Event, b: Event): boolean {
 }
 
 function sameOwner(a: Event["owner"], b: Event["owner"]): boolean {
-  if (a === undefined && b === undefined) return true;
-  if (a === undefined || b === undefined) return false;
-  if (a.slot !== b.slot) return false;
-  if (a.slot === "other" && b.slot === "other") return a.otherId === b.otherId;
+  // §F37: owner is required and uses { slot: "none" } for unassigned.
+  // Belt-and-suspenders: also treat `undefined` (legacy data, untyped
+  // fixtures) as equivalent to NO_OWNER so a pre-F37 in-memory event
+  // doesn't crash the evaluator before the read-seam defaulter runs.
+  const aSlot = a?.slot ?? "none";
+  const bSlot = b?.slot ?? "none";
+  if (aSlot !== bSlot) return false;
+  if (aSlot === "other" && bSlot === "other") {
+    return (a as { otherId: string }).otherId === (b as { otherId: string }).otherId;
+  }
   return true;
 }
 

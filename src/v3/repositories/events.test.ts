@@ -13,6 +13,7 @@ import type { RulesTestEnvironment } from "@firebase/rules-unit-testing";
 import type { Firestore } from "firebase/firestore";
 import { ALLOWED_USER, startTestEnv } from "../../../tests/integration/firestore-test-utils";
 import type { Event } from "../schemas";
+import { NO_OWNER } from "../schemas";
 import { createEvent, deleteEvent, listEvents, updateEvent, watchEvents } from "./events";
 
 const ev = (overrides: Partial<Event>): Event => ({
@@ -25,6 +26,7 @@ const ev = (overrides: Partial<Event>): Event => ({
   label: "Bottle 1",
   amountOz: 5,
   hasPutdown: false,
+  owner: NO_OWNER,
   lifecycle: { state: "completed", committedAt: 7 * 60 + 5 },
   ...overrides,
 });
@@ -92,6 +94,31 @@ describe("v3 events repository", () => {
     const listed = await listEvents(database, "child-1", "day-1");
     const got = listed.find((e) => e.id === "e-recorded");
     expect(got?.lifecycle).toEqual({ state: "recorded", annotatedAt: 9 * 60 + 2 });
+  });
+
+  it("§F37 round-trip: assigning then unassigning owner persists NO_OWNER (no stale value)", async () => {
+    // Seam test for the §F37 fix. Pre-F37, "unassign owner" tried to delete the
+    // owner field via updateDoc with a patch missing `owner` — but Firestore
+    // updateDoc is field-merge: omitted fields are LEFT UNTOUCHED, so the prior
+    // owner survived. Post-F37, "unassigned" is the explicit { slot: "none" }
+    // value, so updateDoc always overwrites the field. This test fails if
+    // anyone reverts the schema change AND lets the owner-clear path go back
+    // to merging a field-less patch.
+    const database = db();
+    await createEvent(database, "child-1", ev({ id: "e-owner-flip", owner: { slot: "parent1" } }));
+    await updateEvent(database, "child-1", "day-1", "e-owner-flip", {
+      owner: NO_OWNER,
+    });
+    const listed = await listEvents(database, "child-1", "day-1");
+    const got = listed.find((e) => e.id === "e-owner-flip");
+    expect(got?.owner).toEqual(NO_OWNER);
+    // And the symmetric: assigning AFTER a NO_OWNER state works too.
+    await updateEvent(database, "child-1", "day-1", "e-owner-flip", {
+      owner: { slot: "parent2" },
+    });
+    const listed2 = await listEvents(database, "child-1", "day-1");
+    const got2 = listed2.find((e) => e.id === "e-owner-flip");
+    expect(got2?.owner).toEqual({ slot: "parent2" });
   });
 
   it("watches events ordered by startTime", async () => {

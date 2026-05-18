@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { currentWakeWindow, nextBottle, nextEvent, nextNap, projectedBedtime } from "./selectors";
 import type { Event, EventKind, EventType, Lifecycle, TimeMin } from "./schemas";
+import { NO_OWNER } from "./schemas";
 import { PUTDOWN_KIND_TAG } from "./components/Timeline/expandPutdown";
 
 const projected: Lifecycle = { state: "projected" };
@@ -18,6 +19,7 @@ function makeEvent(
     startTime: partial.startTime,
     label: partial.label ?? partial.type,
     hasPutdown: partial.hasPutdown ?? false,
+    owner: NO_OWNER,
     lifecycle: partial.lifecycle ?? projected,
   };
   if (partial.endTime !== undefined) e.endTime = partial.endTime;

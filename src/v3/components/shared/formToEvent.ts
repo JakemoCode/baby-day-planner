@@ -9,7 +9,7 @@
  * pull a clock dependency into this pure transform.
  */
 
-import type { Event, OwnerRef, TimeMin } from "../../schemas";
+import { NO_OWNER, type Event, type OwnerRef, type TimeMin } from "../../schemas";
 import { reduceLifecycle } from "../../lifecycle";
 
 export type FormState = {
@@ -59,11 +59,9 @@ export function formToEvent(form: FormState, source: Event, nowMinutes: TimeMin)
     delete (next as { amountOz?: number }).amountOz;
   }
 
-  if (form.owner !== undefined) {
-    next.owner = form.owner;
-  } else {
-    delete (next as { owner?: OwnerRef }).owner;
-  }
+  // §F37: owner is required; "no owner" is the explicit NO_OWNER value
+  // (not a deleted/missing field). The picker always provides one.
+  next.owner = form.owner ?? NO_OWNER;
 
   return next;
 }

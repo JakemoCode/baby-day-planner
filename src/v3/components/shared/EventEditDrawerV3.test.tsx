@@ -10,6 +10,7 @@ import { describe, expect, it, vi } from "vitest";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { Event, OwnersConfig, TimeMin } from "../../schemas";
+import { NO_OWNER } from "../../schemas";
 import { EventEditDrawerV3 } from "./EventEditDrawerV3";
 
 const owners: OwnersConfig = {
@@ -32,6 +33,7 @@ const projectedNap = (overrides: Partial<Event> = {}): Event => ({
   endTime: 10 * 60,
   label: "Nap 1",
   hasPutdown: false,
+  owner: NO_OWNER,
   lifecycle: { state: "projected" },
   ...overrides,
 });
@@ -45,6 +47,7 @@ const projectedBottle = (overrides: Partial<Event> = {}): Event => ({
   startTime: 7 * 60 + 30,
   label: "Bottle 1",
   hasPutdown: false,
+  owner: NO_OWNER,
   lifecycle: { state: "projected" },
   ...overrides,
 });
@@ -184,6 +187,7 @@ describe("EventEditDrawerV3", () => {
       endTime: 11 * 60,
       label: "Nap 2",
       hasPutdown: false,
+      owner: NO_OWNER,
       lifecycle: { state: "completed", committedAt: 11 * 60 },
     };
     // Source nap at 11:30–12:00 — clear of recordedNap (9:30–11:00).
@@ -284,6 +288,7 @@ describe("EventEditDrawerV3", () => {
       endTime: 12 * 60,
       label: "Nap 2",
       hasPutdown: false,
+      owner: NO_OWNER,
       lifecycle: { state: "recorded", annotatedAt: 10 * 60 },
     };
     const actuals: Event[] = [overriddenNap];
@@ -357,6 +362,7 @@ describe("EventEditDrawerV3", () => {
       endTime: 9 * 60,
       label: "Wake window 1",
       hasPutdown: false,
+      owner: NO_OWNER,
       lifecycle: { state: "projected" },
     };
     render(
@@ -394,6 +400,7 @@ describe("EventEditDrawerV3", () => {
       endTime: 15 * 60,
       label: "Pediatrician",
       hasPutdown: false,
+      owner: NO_OWNER,
       lifecycle: { state: "projected" },
     };
     render(
@@ -433,6 +440,7 @@ describe("Past-threshold prompt when editing a nap (physiology cascade)", () => 
     endTime: end,
     label: "Nap 2",
     hasPutdown: false,
+    owner: NO_OWNER,
     lifecycle: { state: "completed", committedAt: start },
   });
 

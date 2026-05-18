@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { Event, TimeMin } from "@/v3/schemas";
+import { NO_OWNER } from "@/v3/schemas";
 import { NapActionButton, type NapActionButtonProps } from "./NapActionButton";
 
 const DEFAULT_NAP_MINUTES = 90;
@@ -17,6 +18,7 @@ const napInProgress = (): Event => ({
   startTime: 9 * 60,
   endTime: 9 * 60 + DEFAULT_NAP_MINUTES,
   hasPutdown: false,
+  owner: NO_OWNER,
   lifecycle: { state: "recorded", annotatedAt: 9 * 60 },
 });
 
@@ -30,6 +32,7 @@ const bedtimeInProgress = (): Event => ({
   startTime: 19 * 60 + 30,
   endTime: DEFAULT_WAKE_TIME + 24 * 60,
   hasPutdown: false,
+  owner: NO_OWNER,
   lifecycle: { state: "recorded", annotatedAt: 19 * 60 + 30 },
 });
 
@@ -42,6 +45,7 @@ const projectedNap = (n: number): Event => ({
   label: `Nap ${n}`,
   startTime: 9 * 60,
   hasPutdown: false,
+  owner: NO_OWNER,
   lifecycle: { state: "projected" },
 });
 
@@ -97,6 +101,7 @@ describe("NapActionButton", () => {
       label: "Nap 2",
       dayId: "d1",
       hasPutdown: false,
+      owner: NO_OWNER,
     });
     // endTime must be set (not undefined) — this was the image bug
     expect(arg.endTime).toBeDefined();

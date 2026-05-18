@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
 import type { Event, OwnersConfig, TimeMin } from "@/v3/schemas";
+import { NO_OWNER } from "@/v3/schemas";
 import { NextBottlePanel } from "./NextBottlePanel";
 
 const owners: OwnersConfig = {
@@ -19,6 +20,7 @@ const bottle = (overrides: Partial<Event> = {}): Event => ({
   startTime: (overrides.startTime ?? 7 * 60) as TimeMin,
   amountOz: 4,
   hasPutdown: false,
+  owner: NO_OWNER,
   lifecycle: { state: "recorded", annotatedAt: (overrides.startTime ?? 7 * 60) as TimeMin },
   ...overrides,
 });
@@ -33,6 +35,7 @@ const nextProjected = (startTime: TimeMin): Event => ({
   startTime,
   amountOz: 5,
   hasPutdown: false,
+  owner: NO_OWNER,
   lifecycle: { state: "projected" },
 });
 

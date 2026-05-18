@@ -15,7 +15,7 @@
  * Used by `v3EventConverter.fromFirestore` — the single canonical seam.
  */
 
-import type { Event, EventKind, EventType } from "../schemas";
+import { NO_OWNER, type Event, type EventKind, type EventType } from "../schemas";
 import { migrateLegacyLifecycle } from "../lifecycle";
 
 function deriveKind(input: Partial<Event>): EventKind {
@@ -38,12 +38,13 @@ export function withV3EventDefaults(input: Partial<Event>): Event {
     startTime: input.startTime ?? 0,
     label: input.label ?? "",
     hasPutdown: input.hasPutdown ?? false,
+    // §F37: owner is required; pre-F37 docs missing the field migrate to NO_OWNER on read.
+    owner: input.owner ?? NO_OWNER,
     lifecycle: migratedLifecycle ?? input.lifecycle ?? { state: "projected" },
   };
 
   if (input.endTime !== undefined) out.endTime = input.endTime;
   if (input.amountOz !== undefined) out.amountOz = input.amountOz;
-  if (input.owner !== undefined) out.owner = input.owner;
 
   return out;
 }

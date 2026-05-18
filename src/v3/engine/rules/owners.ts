@@ -23,7 +23,7 @@
  *   R12.9 — extras / dailyRecurring carry their own defaults; not template-driven.
  */
 
-import type { Event, OwnerSlotEntry, OwnershipTemplate } from "../../schemas";
+import { isNoOwner, type Event, type OwnerSlotEntry, type OwnershipTemplate } from "../../schemas";
 import type { Rule } from "../evaluator";
 import { hasType, isProjected } from "../helpers";
 
@@ -50,7 +50,7 @@ function templateOwnerByIndexRule(spec: {
   }
 
   function isStampable(event: Event): boolean {
-    return isType(event) && isProjected(event) && event.owner === undefined;
+    return isType(event) && isProjected(event) && isNoOwner(event.owner);
   }
 
   return {
@@ -125,13 +125,13 @@ const RuleApplyTemplateBedtimeOwner: Rule = {
   dependsOn: ["R3.1"],
   matches: (events, ctx) => {
     if (!ctx.template?.bedtimeOwner) return false;
-    return events.some((e) => isBedtime(e) && isProjected(e) && e.owner === undefined);
+    return events.some((e) => isBedtime(e) && isProjected(e) && isNoOwner(e.owner));
   },
   produces: (events, ctx) => {
     const owner = ctx.template?.bedtimeOwner;
     if (!owner) return events;
     return events.map((e) =>
-      isBedtime(e) && isProjected(e) && e.owner === undefined ? { ...e, owner } : e,
+      isBedtime(e) && isProjected(e) && isNoOwner(e.owner) ? { ...e, owner } : e,
     );
   },
 };

@@ -17,6 +17,7 @@
 
 import { describe, expect, it } from "vitest";
 import type { Event, OwnerRef, OwnershipTemplate } from "../../schemas";
+import { NO_OWNER } from "../../schemas";
 import { setOwnerInTemplate } from "./setOwnerInTemplate";
 
 const P1: OwnerRef = { slot: "parent1" };
@@ -42,6 +43,7 @@ const event = (eventKey: string): Event => ({
   endTime: 10 * 60,
   label: eventKey,
   hasPutdown: false,
+  owner: NO_OWNER,
   lifecycle: { state: "projected" },
 });
 

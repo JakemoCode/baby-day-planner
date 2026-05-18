@@ -7,7 +7,7 @@
 import { describe, expect, it } from "vitest";
 import { aContext, aDay, aSettings } from "../../__tests__/factories";
 import { projectDay } from "../../engine/projectDay";
-import type { Event } from "../../schemas";
+import { NO_OWNER, type Event } from "../../schemas";
 import { formToEvent, type FormState } from "./formToEvent";
 
 const NOW = 8 * 60 + 30;
@@ -22,6 +22,7 @@ const projectedNap = (overrides: Partial<Event> = {}): Event => ({
   endTime: 10 * 60,
   label: "Nap 1",
   hasPutdown: false,
+  owner: NO_OWNER,
   lifecycle: { state: "projected" },
   ...overrides,
 });
@@ -35,6 +36,7 @@ const projectedBottle = (overrides: Partial<Event> = {}): Event => ({
   startTime: 7 * 60 + 30,
   label: "Bottle 1",
   hasPutdown: false,
+  owner: NO_OWNER,
   lifecycle: { state: "projected" },
   ...overrides,
 });
@@ -104,6 +106,7 @@ describe("formToEvent — lifecycle dispatch from projected", () => {
       label: "Walk",
       startTime: 9 * 60,
       hasPutdown: false,
+      owner: NO_OWNER,
       lifecycle: { state: "projected" },
     };
     const form: FormState = {
@@ -129,6 +132,7 @@ describe("formToEvent — lifecycle dispatch from projected", () => {
       label: "Snack",
       startTime: 10 * 60,
       hasPutdown: false,
+      owner: NO_OWNER,
       lifecycle: { state: "projected" },
     };
     const form: FormState = {
@@ -306,10 +310,10 @@ describe("formToEvent — exactOptionalPropertyTypes safety", () => {
     expect("endTime" in next).toBe(false);
   });
 
-  it("clears owner when the form unsets it", () => {
+  it("clears owner to NO_OWNER when the form unsets it (§F37)", () => {
     const source = projectedNap({ owner: { slot: "parent1" } });
     const form: FormState = { ...formFromEvent(source), owner: undefined };
     const next = formToEvent(form, source, NOW);
-    expect("owner" in next).toBe(false);
+    expect(next.owner).toEqual({ slot: "none" });
   });
 });

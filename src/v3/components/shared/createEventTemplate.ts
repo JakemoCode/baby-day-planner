@@ -12,7 +12,7 @@
  */
 
 import { newEventId } from "../../lib/newEventId";
-import { isRecorded } from "../../schemas";
+import { isRecorded, NO_OWNER } from "../../schemas";
 import type { Event, EventType, Settings, TimeMin } from "../../schemas";
 
 export type CreatableType = "bottle" | "pump" | "extra";
@@ -58,6 +58,7 @@ export function buildCreateTemplate({
       startTime: nowMinutes,
       amountOz: settings.defaultBottleAmountOz,
       hasPutdown: false,
+      owner: NO_OWNER, // §F37: owner required; new events start unassigned
       lifecycle: { state: "projected" },
     };
   }
@@ -74,6 +75,7 @@ export function buildCreateTemplate({
       startTime: nowMinutes,
       endTime: nowMinutes + settings.defaultPumpDurationMinutes,
       hasPutdown: false,
+      owner: NO_OWNER, // §F37: owner required; new events start unassigned
       lifecycle: { state: "projected" },
     };
   }
@@ -91,6 +93,7 @@ export function buildCreateTemplate({
       label: "",
       startTime: nowMinutes,
       hasPutdown: false,
+      owner: NO_OWNER, // §F37: owner required; new events start unassigned
       lifecycle: { state: "projected" },
     };
   }

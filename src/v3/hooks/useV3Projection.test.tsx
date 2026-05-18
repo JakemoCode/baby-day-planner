@@ -114,7 +114,7 @@ describe("useV3Projection — engine wiring (real projectDay)", () => {
   it("omitting template means no template-driven owner stamps on naps", () => {
     const { result } = renderHook(() => useV3Projection({ day, settings, actuals: [] }));
     const naps = result.current.filter((e) => e.type === "nap");
-    expect(naps.every((n) => n.owner === undefined)).toBe(true);
+    expect(naps.every((n) => n.owner.slot === "none")).toBe(true);
   });
 
   it("recompute on actuals change actually re-anchors the cascade (not just reference inequality)", () => {

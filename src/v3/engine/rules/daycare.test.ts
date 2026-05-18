@@ -26,7 +26,7 @@ import {
   aTemplate,
   otherOwner,
 } from "../../__tests__/factories";
-import type { Context, Event, WeekdayFlags } from "../../schemas";
+import { NO_OWNER, type Context, type Event, type WeekdayFlags } from "../../schemas";
 import { projectDay } from "../projectDay";
 import { ALL_RULES } from "./index";
 
@@ -188,7 +188,7 @@ describe("R21.3 — projected naps/bottles inside the window auto-assign daycare
     expect(naps[1]!.owner).toEqual(DAYCARE);
     expect(naps[2]!.owner).toEqual(DAYCARE);
     if (naps[3]) {
-      expect(naps[3]!.owner).toBeUndefined();
+      expect(naps[3]!.owner).toEqual({ slot: "none" });
     }
   });
 
@@ -216,7 +216,7 @@ describe("R21.3 — projected naps/bottles inside the window auto-assign daycare
     const out = run(ctx);
     const naps = out.filter((e) => e.type === "nap");
     // Template wins — every nap is PARENT1, even those inside the window.
-    expect(naps.every((n) => n.owner !== undefined && n.owner.slot === "parent1")).toBe(true);
+    expect(naps.every((n) => n.owner.slot === "parent1")).toBe(true);
   });
 
   it("recorded nap with explicit owner stays unchanged (reality wins)", () => {
@@ -279,7 +279,7 @@ describe("R21.3 — projected naps/bottles inside the window auto-assign daycare
     const out = run(ctx);
     const napOne = out.find((e) => e.eventKey === "nap_1");
     expect(napOne?.startTime).toBe(9 * 60);
-    expect(napOne?.owner).toBeUndefined(); // nap_1 (9:00) is before 10:00 dropoff
+    expect(napOne?.owner).toEqual({ slot: "none" }); // nap_1 (9:00) is before 10:00 dropoff
   });
 });
 
@@ -303,7 +303,7 @@ describe("R21 — defensive edge cases", () => {
     });
     const out = run(ctx);
     const naps = out.filter((e) => e.type === "nap");
-    expect(naps.every((n) => n.owner === undefined)).toBe(true);
+    expect(naps.every((n) => n.owner.slot === "none")).toBe(true);
   });
 
   it("inverted window (dropoff > pickup) auto-assigns nothing (data-integrity safety)", () => {
@@ -328,7 +328,7 @@ describe("R21 — defensive edge cases", () => {
     });
     const out = run(ctx);
     const naps = out.filter((e) => e.type === "nap");
-    expect(naps.every((n) => n.owner === undefined)).toBe(true);
+    expect(naps.every((n) => n.owner.slot === "none")).toBe(true);
   });
 
   it("malformed Day.date does NOT throw and silently skips daycare projection", () => {
@@ -364,7 +364,7 @@ describe("R21 — defensive edge cases", () => {
       label: "Nap 2",
       hasPutdown: false,
       lifecycle: { state: "recorded", annotatedAt: 11 * 60 },
-      // owner omitted — user explicitly cleared
+      owner: NO_OWNER, // §F37: user explicitly cleared owner
     };
     const ctx = aContext({
       day: aDay({ wakeTime: 7 * 60, date: "2026-05-08" }),
@@ -385,7 +385,7 @@ describe("R21 — defensive edge cases", () => {
     });
     const out = run(ctx);
     const napTwo = out.find((e) => e.id === overriddenNap.id);
-    expect(napTwo?.owner).toBeUndefined();
+    expect(napTwo?.owner).toEqual({ slot: "none" });
     expect(napTwo?.lifecycle.state).toBe("recorded");
   });
 });
@@ -403,6 +403,7 @@ describe("R21.7 — recorded daycare events shift the auto-assign window", () =>
       startTime: 14 * 60,
       label: "Daycare Pickup",
       hasPutdown: false,
+      owner: NO_OWNER,
       lifecycle: { state: "completed", committedAt: 14 * 60 },
     };
 
@@ -428,7 +429,7 @@ describe("R21.7 — recorded daycare events shift the auto-assign window", () =>
     // nap_2 at ~12:15 is BEFORE 14:00 → daycare owner.
     expect(out.find((e) => e.eventKey === "nap_2")?.owner).toEqual(DAYCARE);
     // nap_3 at ~15:30 is AFTER recorded pickup → no daycare owner.
-    expect(out.find((e) => e.eventKey === "nap_3")?.owner).toBeUndefined();
+    expect(out.find((e) => e.eventKey === "nap_3")?.owner).toEqual({ slot: "none" });
   });
 
   it("if user records a daycare_dropoff at 9:30, naps before 9:30 are NOT auto-assigned", () => {
@@ -441,6 +442,7 @@ describe("R21.7 — recorded daycare events shift the auto-assign window", () =>
       startTime: 9 * 60 + 30, // recorded later than projected 8:30
       label: "Daycare Dropoff",
       hasPutdown: false,
+      owner: NO_OWNER,
       lifecycle: { state: "completed", committedAt: 9 * 60 + 30 },
     };
 
@@ -464,7 +466,7 @@ describe("R21.7 — recorded daycare events shift the auto-assign window", () =>
 
     const out = run(ctx);
     const napOne = out.find((e) => e.eventKey === "nap_1"); // 9:00, before 9:30 recorded dropoff
-    expect(napOne?.owner).toBeUndefined();
+    expect(napOne?.owner).toEqual({ slot: "none" });
 
     const napTwo = out.find((e) => e.eventKey === "nap_2"); // ~12:15, inside window
     expect(napTwo?.owner).toEqual(DAYCARE);

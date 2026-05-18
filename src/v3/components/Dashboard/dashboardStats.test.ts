@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import type { Event, TimeMin } from "@/v3/schemas";
+import { NO_OWNER } from "@/v3/schemas";
 import {
   bottleTotals,
   napTotals,
@@ -18,6 +19,7 @@ const bottle = (overrides: Partial<Event> = {}): Event => ({
   startTime: (overrides.startTime ?? 7 * 60) as TimeMin,
   amountOz: 4,
   hasPutdown: false,
+  owner: NO_OWNER,
   lifecycle: { state: "recorded", annotatedAt: (overrides.startTime ?? 7 * 60) as TimeMin },
   ...overrides,
 });
@@ -32,6 +34,7 @@ const nap = (overrides: Partial<Event> = {}): Event => ({
   startTime: (overrides.startTime ?? 9 * 60) as TimeMin,
   endTime: ((overrides.startTime ?? 9 * 60) + 60) as TimeMin,
   hasPutdown: false,
+  owner: NO_OWNER,
   lifecycle: { state: "recorded", annotatedAt: (overrides.startTime ?? 9 * 60) as TimeMin },
   ...overrides,
 });
@@ -113,6 +116,7 @@ describe("nextDashboardEvent", () => {
         startTime: (8 * 60) as TimeMin,
         endTime: (9 * 60) as TimeMin,
         hasPutdown: false,
+        owner: NO_OWNER,
         lifecycle: { state: "projected" },
       },
       bottle({ startTime: (9 * 60) as TimeMin }),
@@ -138,6 +142,7 @@ describe("nextDashboardEvent", () => {
       startTime: (10 * 60 + 45) as TimeMin,
       endTime: (11 * 60) as TimeMin,
       hasPutdown: false,
+      owner: NO_OWNER,
       lifecycle: { state: "projected" },
     };
     const next = nextDashboardEvent([syntheticPutdown, realNap], (10 * 60 + 30) as TimeMin);

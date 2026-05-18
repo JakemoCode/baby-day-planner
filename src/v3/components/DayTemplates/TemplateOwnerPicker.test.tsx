@@ -8,7 +8,7 @@
 
 import { describe, expect, it, vi } from "vitest";
 import { render, screen, userEvent } from "@/test-utils";
-import type { Event, OwnersConfig, OwnershipTemplate } from "../../schemas";
+import { NO_OWNER, type Event, type OwnersConfig, type OwnershipTemplate } from "../../schemas";
 import { TemplateOwnerPicker } from "./TemplateOwnerPicker";
 
 const owners: OwnersConfig = {
@@ -27,6 +27,7 @@ const napEvent: Event = {
   endTime: 10 * 60,
   label: "Nap 1",
   hasPutdown: false,
+  owner: NO_OWNER,
   lifecycle: { state: "projected" },
 };
 
@@ -40,6 +41,7 @@ const wakeWindowEvent: Event = {
   endTime: 9 * 60,
   label: "Wake window 1",
   hasPutdown: false,
+  owner: NO_OWNER,
   lifecycle: { state: "projected" },
 };
 
@@ -52,6 +54,7 @@ const bottleEvent: Event = {
   startTime: 11 * 60,
   label: "Bottle 2",
   hasPutdown: false,
+  owner: NO_OWNER,
   lifecycle: { state: "projected" },
 };
 
@@ -65,6 +68,7 @@ const bedtimeEvent: Event = {
   endTime: 19 * 60 + 30,
   label: "Bedtime",
   hasPutdown: false,
+  owner: NO_OWNER,
   lifecycle: { state: "projected" },
 };
 
@@ -133,7 +137,7 @@ describe("TemplateOwnerPicker (V3)", () => {
       />,
     );
     await userEvent.click(screen.getByRole("button", { name: "None" }));
-    expect(onSelect).toHaveBeenCalledWith(undefined);
+    expect(onSelect).toHaveBeenCalledWith(NO_OWNER);
   });
 
   it("reads wake_window owner from template.wakeWindowOwners by index", () => {

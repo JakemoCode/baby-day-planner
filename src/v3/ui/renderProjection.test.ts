@@ -7,6 +7,7 @@
 
 import { describe, expect, it } from "vitest";
 import type { Event, Settings } from "../schemas";
+import { NO_OWNER } from "../schemas";
 import { aSettings } from "../__tests__/factories";
 import { renderProjection } from "./renderProjection";
 import { PUTDOWN_KIND_TAG } from "../components/Timeline/expandPutdown";
@@ -29,6 +30,7 @@ const projectedBottle = (overrides: Partial<Event>): Event => ({
   label: "Bottle 1",
   amountOz: 5,
   hasPutdown: false,
+  owner: NO_OWNER,
   lifecycle: { state: "projected" },
   ...overrides,
 });
@@ -43,6 +45,7 @@ const projectedNap = (overrides: Partial<Event>): Event => ({
   endTime: 11 * 60,
   label: "Nap 1",
   hasPutdown: true,
+  owner: NO_OWNER,
   lifecycle: { state: "projected" },
   ...overrides,
 });
@@ -57,6 +60,7 @@ const projectedBedtime = (overrides: Partial<Event>): Event => ({
   endTime: 7 * 60 + 24 * 60,
   label: "Bedtime",
   hasPutdown: true,
+  owner: NO_OWNER,
   lifecycle: { state: "projected" },
   ...overrides,
 });
