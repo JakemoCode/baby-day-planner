@@ -10,6 +10,7 @@
 
 import { describe, expect, it } from "vitest";
 import type { Event } from "../../schemas";
+import { NO_OWNER } from "../../schemas";
 import { PUTDOWN_KIND_TAG, expandPutdownBlocks } from "./expandPutdown";
 
 const ev = (overrides: Partial<Event>): Event => ({
@@ -22,6 +23,7 @@ const ev = (overrides: Partial<Event>): Event => ({
   endTime: 10 * 60,
   label: "Nap 1",
   hasPutdown: false,
+  owner: NO_OWNER,
   lifecycle: { state: "projected" },
   ...overrides,
 });
@@ -62,6 +64,7 @@ describe("expandPutdownBlocks", () => {
     const recorded = ev({
       id: "nap-1",
       hasPutdown: true,
+      owner: NO_OWNER,
       lifecycle: { state: "completed", committedAt: 10 * 60 },
     });
     const out = expandPutdownBlocks([recorded], {
@@ -81,6 +84,7 @@ describe("expandPutdownBlocks", () => {
       endTime: 31 * 60,
       label: "Bedtime",
       hasPutdown: true,
+      owner: NO_OWNER,
     });
     const out = expandPutdownBlocks([bedtime], {
       putdownLeadMinutes: 20,
@@ -119,6 +123,7 @@ describe("expandPutdownBlocks", () => {
       const recorded = ev({
         id: "nap-rec",
         hasPutdown: true,
+        owner: NO_OWNER,
         startTime: 9 * 60,
         lifecycle: { state: "completed", committedAt: 9 * 60 },
       });
@@ -136,6 +141,7 @@ describe("expandPutdownBlocks", () => {
       const overridden = ev({
         id: "nap-ov",
         hasPutdown: true,
+        owner: NO_OWNER,
         startTime: 14 * 60,
         lifecycle: { state: "recorded", annotatedAt: 10 * 60 },
       });
@@ -161,6 +167,7 @@ describe("expandPutdownBlocks", () => {
         eventKey: "nap_2",
         startTime: 13 * 60,
         hasPutdown: true,
+        owner: NO_OWNER,
         lifecycle: { state: "projected" },
       });
       const out = expandPutdownBlocks([nap2], {
@@ -185,6 +192,7 @@ describe("expandPutdownBlocks", () => {
         startTime: 9 * 60,
         label: "Nap 1",
         hasPutdown: false,
+        owner: NO_OWNER,
         lifecycle: { state: "recorded", annotatedAt: 9 * 60 },
       };
       const projNap2 = ev({
@@ -193,6 +201,7 @@ describe("expandPutdownBlocks", () => {
         startTime: 9 * 60 + 45,
         endTime: 10 * 60 + 45,
         hasPutdown: true,
+        owner: NO_OWNER,
         lifecycle: { state: "projected" },
       });
       const out = expandPutdownBlocks([startedNap1, projNap2], {
@@ -214,6 +223,7 @@ describe("expandPutdownBlocks", () => {
         startTime: 9 * 60,
         endTime: 9 * 60 + 20,
         hasPutdown: false,
+        owner: NO_OWNER,
         lifecycle: { state: "recorded", annotatedAt: 9 * 60 },
       });
       const projNap2 = ev({
@@ -222,6 +232,7 @@ describe("expandPutdownBlocks", () => {
         startTime: 13 * 60,
         endTime: 14 * 60,
         hasPutdown: true,
+        owner: NO_OWNER,
         lifecycle: { state: "projected" },
       });
       const out = expandPutdownBlocks([startedNap1, projNap2], {

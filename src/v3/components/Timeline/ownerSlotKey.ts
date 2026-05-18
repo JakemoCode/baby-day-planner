@@ -13,6 +13,8 @@ import type { OwnerRef } from "../../schemas";
 export function ownerSlotKey(ref: OwnerRef | undefined): string | null {
   if (!ref) return null;
   switch (ref.slot) {
+    case "none":
+      return null; // §F37: no data-owner attr for unassigned events
     case "parent1":
       return "parent1";
     case "parent2":

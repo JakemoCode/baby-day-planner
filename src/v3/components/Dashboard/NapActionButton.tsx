@@ -1,6 +1,6 @@
 "use client";
 
-import type { Event, TimeMin } from "@/v3/schemas";
+import { NO_OWNER, type Event, type TimeMin } from "@/v3/schemas";
 import { currentLocalMinutes, nextDayAt } from "@/v3/ui/time";
 import { ActionButton } from "./ActionButton";
 
@@ -109,6 +109,7 @@ export function NapActionButton({
         startTime: nowMin,
         endTime: nextDayAt(defaultWakeTime),
         hasPutdown: false,
+        owner: NO_OWNER, // §F37: owner is required
         lifecycle: { state: "recorded", annotatedAt: nowMin },
       };
       void onStartBedtime(bedtime);
@@ -131,6 +132,7 @@ export function NapActionButton({
         startTime: nowMin,
         endTime: nowMin + defaultNapLengthMinutes,
         hasPutdown: false,
+        owner: mode.projected.owner, // §F37: pass through (NO_OWNER if unassigned)
         lifecycle: { state: "recorded", annotatedAt: nowMin },
       };
       void onStart(nap);

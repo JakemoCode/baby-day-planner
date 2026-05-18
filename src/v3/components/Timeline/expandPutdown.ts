@@ -93,6 +93,7 @@ function syntheticPutdown(parent: Event, lead: TimeMin): Event {
   // PUTDOWN_KIND_TAG eventKey is what the timeline branches on for
   // putdown-specific rendering.
   const type: EventType = parent.type;
+  // §F37: owner is required; pass parent's owner through directly.
   const synthetic: Event = {
     id: `putdown:${parent.id}`,
     dayId: parent.dayId,
@@ -104,7 +105,7 @@ function syntheticPutdown(parent: Event, lead: TimeMin): Event {
     label: "Putdown",
     hasPutdown: false,
     lifecycle: parent.lifecycle,
-    ...(parent.owner !== undefined ? { owner: parent.owner } : {}),
+    owner: parent.owner,
   };
   return synthetic;
 }

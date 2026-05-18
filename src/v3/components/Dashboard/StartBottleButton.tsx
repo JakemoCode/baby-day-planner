@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { Event, TimeMin } from "@/v3/schemas";
+import { NO_OWNER, type Event, type TimeMin } from "@/v3/schemas";
 import { newEventId } from "@/v3/lib/newEventId";
 import { currentLocalMinutes } from "@/v3/ui/time";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
@@ -50,6 +50,7 @@ export function StartBottleButton({
       startTime,
       amountOz: defaultAmountOz,
       hasPutdown: false,
+      owner: NO_OWNER, // §F37: owner required
       lifecycle: { state: "completed", committedAt: startTime },
     };
   };

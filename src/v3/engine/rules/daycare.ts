@@ -9,7 +9,7 @@
  *           weekday + Day.suppressedDaycareDay !== true
  *   R21.3 — projected naps/bottles inside the [dropoff, pickup) window
  *           auto-assign the daycare owner UNLESS template/recorded already
- *           supplied one (gate on `e.owner === undefined`)
+ *           supplied one (gate on `isNoOwner(e.owner)` per §F37)
  *   R21.5 — Day.suppressedDaycareDay short-circuits projection (handled
  *           by R21.1's match condition)
  *   R21.7 — recorded daycare events drive the window (dedup by eventKey
@@ -21,7 +21,14 @@
  *   R21.6 — settings validation (UI / Phase 3)
  */
 
-import type { Context, Event, OwnerRef, TimeMin, Weekday } from "../../schemas";
+import {
+  isNoOwner,
+  type Context,
+  type Event,
+  type OwnerRef,
+  type TimeMin,
+  type Weekday,
+} from "../../schemas";
 import type { Rule } from "../evaluator";
 import { hasType, isProjected, projectedEvent } from "../helpers";
 
@@ -82,9 +89,9 @@ const RuleAssignDaycareWindowOwner: Rule = {
   // Run after R3.1 so nap times are settled, after R5.4 so bottle order
   // is chronological, after R21.1 so the daycare events are present, and
   // after the template-owner rules so template precedence works via
-  // `owner === undefined` gating. R5.4 is reachable transitively through
-  // R12.6 and R3.1 through R12.2, but listing them explicitly makes the
-  // intent visible to a future reader.
+  // `isNoOwner(owner)` gating (§F37). R5.4 is reachable transitively
+  // through R12.6 and R3.1 through R12.2, but listing them explicitly
+  // makes the intent visible to a future reader.
   dependsOn: ["R3.1", "R5.4", "R21.1", "R12.2", "R12.6"],
   matches: (events, ctx) => {
     const window = activeDaycareWindow(events, ctx);
@@ -145,7 +152,7 @@ function activeDaycareWindow(events: Event[], ctx: Context): Window | null {
 function isWindowCandidate(e: Event, window: Window): boolean {
   if (!isNap(e) && !isBottle(e)) return false;
   if (!isProjected(e)) return false;
-  if (e.owner !== undefined) return false;
+  if (!isNoOwner(e.owner)) return false; // §F37: unassigned is { slot: "none" }
   return e.startTime >= window.start && e.startTime < window.end;
 }
 

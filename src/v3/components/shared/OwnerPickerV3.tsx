@@ -2,22 +2,23 @@
 
 import styles from "./OwnerPicker.module.css";
 import type { OwnerRef, OwnersConfig } from "../../schemas";
-import { ownerRefEquals } from "../../schemas";
+import { NO_OWNER, ownerRefEquals } from "../../schemas";
 import { ownerColor } from "../../ui/owners";
 import { ownerStyleVar } from "../../ui/ownerStyle";
 
 export type OwnerPickerV3Props = {
   owners: OwnersConfig;
-  value: OwnerRef | undefined;
-  onChange: (next: OwnerRef | undefined) => void;
+  /** §F37: now always defined; pass NO_OWNER for the unassigned case. */
+  value: OwnerRef;
+  onChange: (next: OwnerRef) => void;
   label?: string;
 };
 
-type Option = { displayName: string; ref: OwnerRef | undefined; slotKey: string };
+type Option = { displayName: string; ref: OwnerRef; slotKey: string };
 
 function buildOptions(owners: OwnersConfig): Option[] {
   return [
-    { displayName: "None", ref: undefined, slotKey: "none" },
+    { displayName: "None", ref: NO_OWNER, slotKey: "none" },
     { displayName: owners.parent1.displayName, ref: { slot: "parent1" }, slotKey: "parent1" },
     { displayName: owners.parent2.displayName, ref: { slot: "parent2" }, slotKey: "parent2" },
     ...owners.other.map<Option>((o) => ({
@@ -28,9 +29,7 @@ function buildOptions(owners: OwnersConfig): Option[] {
   ];
 }
 
-function isSelected(value: OwnerRef | undefined, ref: OwnerRef | undefined): boolean {
-  if (value === undefined && ref === undefined) return true;
-  if (value === undefined || ref === undefined) return false;
+function isSelected(value: OwnerRef, ref: OwnerRef): boolean {
   return ownerRefEquals(value, ref);
 }
 

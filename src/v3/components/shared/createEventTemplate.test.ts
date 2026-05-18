@@ -10,6 +10,7 @@
 
 import { describe, expect, it } from "vitest";
 import type { Event, Settings } from "../../schemas";
+import { NO_OWNER } from "../../schemas";
 import { aSettings } from "../../__tests__/factories";
 import { buildCreateTemplate } from "./createEventTemplate";
 
@@ -28,6 +29,7 @@ const recordedBottle = (n: number, startTime: number): Event => ({
   label: `Bottle ${n}`,
   amountOz: 5,
   hasPutdown: false,
+  owner: NO_OWNER,
   lifecycle: { state: "completed", committedAt: startTime },
 });
 
@@ -74,6 +76,7 @@ describe("buildCreateTemplate (V3)", () => {
       label: "Bottle 2",
       amountOz: 5,
       hasPutdown: false,
+      owner: NO_OWNER,
       lifecycle: { state: "projected" },
     };
     const tpl = buildCreateTemplate({
@@ -146,7 +149,7 @@ describe("buildCreateTemplate (V3)", () => {
         settings: settings(),
         nowMinutes: NOW,
       });
-      expect(tpl.owner).toBeUndefined();
+      expect(tpl.owner).toEqual({ slot: "none" });
     }
   });
 });

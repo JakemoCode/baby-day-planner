@@ -8,7 +8,7 @@
  */
 
 import type { Context, Event, EventKind, EventType, OwnerRef } from "../schemas";
-import { isRecorded } from "../schemas";
+import { isRecorded, NO_OWNER } from "../schemas";
 
 // ---------------------------------------------------------------------------
 // Predicates
@@ -61,10 +61,10 @@ export function projectedEvent(input: ProjectedEventInput): Event {
     startTime: input.startTime,
     label: input.label,
     hasPutdown: input.hasPutdown ?? false,
+    owner: input.owner ?? NO_OWNER, // §F37: owner is required; default to unassigned
     lifecycle: { state: "projected" },
   };
   if (input.endTime !== undefined) event.endTime = input.endTime;
   if (input.amountOz !== undefined) event.amountOz = input.amountOz;
-  if (input.owner !== undefined) event.owner = input.owner;
   return event;
 }

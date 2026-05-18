@@ -18,6 +18,7 @@
 import { describe, expect, it } from "vitest";
 import { PARENT1, PARENT2, aContext, aDay, aSettings, aTemplate } from "../../__tests__/factories";
 import type { Context, Event, OwnerRef } from "../../schemas";
+import { NO_OWNER } from "../../schemas";
 import { projectDay } from "../projectDay";
 import { ALL_RULES } from "./index";
 import { RULES as R4_2_RULES } from "./wakeWindowOverrides";
@@ -151,6 +152,7 @@ describe("R4.2 — wake_window owner overrides survive recompute", () => {
       endTime: 9 * 60,
       label: "Wake window 1",
       hasPutdown: false,
+      owner: NO_OWNER,
       lifecycle: { state: "recorded", annotatedAt: 7 * 60 },
     };
     const rule = R4_2_RULES[0];
@@ -172,6 +174,7 @@ describe("R4.2 — wake_window owner overrides survive recompute", () => {
       endTime: 9 * 60,
       label: "Wake window 1",
       hasPutdown: false,
+      owner: NO_OWNER,
       lifecycle: { state: "projected" },
     };
     const rule = R4_2_RULES[0];
@@ -195,6 +198,6 @@ describe("R4.2 — wake_window owner overrides survive recompute", () => {
     // were passed.
     const wakeWindows = out.filter((e) => e.type === "wake_window");
     expect(wakeWindows.length).toBeGreaterThanOrEqual(2);
-    expect(wakeWindows.every((e) => e.owner === undefined)).toBe(true);
+    expect(wakeWindows.every((e) => e.owner.slot === "none")).toBe(true);
   });
 });

@@ -24,7 +24,31 @@ export type TimeMin = number;
 
 export type OwnerSlot = "parent1" | "parent2";
 
-export type OwnerRef = { slot: OwnerSlot } | { slot: "other"; otherId: string };
+/**
+ * Owner assignment on an event. Includes an explicit `{ slot: "none" }`
+ * sentinel for "unassigned" — §F37 (2026-05-18) — so we never represent
+ * the absence-of-owner as `undefined`. Two reasons:
+ *
+ * 1. **Firestore `updateDoc` is field-merge.** A patch that omits the
+ *    `owner` field does not clear it on the server; the stale value
+ *    survives. Writing `{ slot: "none" }` as a real value sidesteps the
+ *    entire merge dance.
+ * 2. **Discrete state > implicit absence.** "User explicitly said no
+ *    owner" is semantically different from "field was never set"; the
+ *    "none" slot makes the distinction explicit at the schema layer.
+ *
+ * `OwnerSlot` (parent1/parent2) is unchanged — it's the narrower type
+ * used by `defaultOwnerSlot` / `pumpOwnerSlot` in Settings, which MUST
+ * resolve to a real parent.
+ */
+export type OwnerRef = { slot: OwnerSlot } | { slot: "other"; otherId: string } | { slot: "none" };
+
+export const NO_OWNER: OwnerRef = { slot: "none" };
+
+/** True iff this OwnerRef means "no owner assigned." */
+export function isNoOwner(ref: OwnerRef): boolean {
+  return ref.slot === "none";
+}
 
 /**
  * Two OwnerRefs match if they refer to the same slot identity.
@@ -111,7 +135,13 @@ export type Event = {
   endTime?: TimeMin;
 
   label: string;
-  owner?: OwnerRef;
+  /**
+   * Owner is always present (§F37 2026-05-18). Use `{ slot: "none" }`
+   * (or the `NO_OWNER` constant) for unassigned. Old documents missing
+   * the field are auto-promoted to `NO_OWNER` by `withV3EventDefaults`
+   * at the read seam.
+   */
+  owner: OwnerRef;
   /** bottle only. */
   amountOz?: number;
 

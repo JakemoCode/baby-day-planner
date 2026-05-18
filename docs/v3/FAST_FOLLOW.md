@@ -580,28 +580,61 @@ need to ship before F2b — could be folded into the same PR.
 
 ## §F36 — Owner cannot be unassigned from blocks or instant chips
 
+> Note: commit messages and in-code comments call this `§F37` — the
+> number we wrote the fix under, before docs/PR #183 renumbered it to
+> §F36 during the docs-hygiene sweep. Same item, same fix.
+
 **Source**: Jake, 2026-05-18 (click-test of §F2b timeline).
 
-**Status**: `pending`
+**Status**: `in-progress` (this PR).
 
-**What**: the owner picker / event drawer has no "None" or "Unassign"
-affordance, so once an event has an owner assigned there's no way to
-revert it to unowned through the UI. Confirmed for blocks (naps,
-bedtime, pump, duration extras) and instant chips (bottles, instant
-extras, daycare).
+**Root cause** turned out to be deeper than "missing None button": the
+picker already had a None option that called `onChange(undefined)`. The
+bug was in the write path — `useV3Events.saveEvent` calls Firestore's
+`updateDoc`, which is field-merge: a patch that omits `owner` does NOT
+clear the field on the server (the stale owner survives).
 
-Likely fix is in the owner-picker shared component used by the edit
-drawer — add an explicit "None" option that writes `owner: undefined`
-(or whatever the schema's "no owner" representation is) when picked.
-Repo-write path also needs to handle clearing the field cleanly
-(Firestore needs `deleteField()` or equivalent, not `undefined`).
+**Fix** (this PR) per Jake's "discrete value" direction: stop using
+`undefined` as the absence-of-owner representation. Schema change:
+- Add `{ slot: "none" }` to the `OwnerRef` union (exposed as `NO_OWNER`).
+- Make `Event.owner` REQUIRED (was optional). Read-seam defaulter
+  migrates pre-F37 docs missing the field to `NO_OWNER` on load.
+- Picker emits `NO_OWNER` when None is selected (was `undefined`).
+- `formToEvent` writes `owner: NO_OWNER` (no more `delete` of the field).
+- Engine rules (`R12.x`, `R21.x`) updated to check `isNoOwner(owner)`
+  instead of `owner === undefined`.
 
-**Why fast-follow**: small UI surface, but writes through the same
-event update path as everything else, so worth its own PR with a
-seam test (per `feedback_seam_coverage_required.md` memory) that
-walks tap-None → save → re-read → owner gone from projected event.
+Net effect: every write now includes an explicit `owner` field, so
+Firestore `updateDoc`'s merge semantics can't strand a stale value.
 
-**Estimated effort**: 1 day (component + write-path + seam test).
+**Seam test** added to `src/v3/repositories/events.test.ts` covering
+the full PARENT1 → NO_OWNER → PARENT2 round-trip via the real emulator.
+
+---
+
+## §F2c — §F2b chip phase-switch + BottomTab regressions
+
+**Source**: Jake, 2026-05-18 (click-test after §F2b PR #178 merged).
+
+**Status**: `pending` — needs verification (click-test on F37 dev
+server did NOT show these regressions; may have been a stale-server
+artifact from a parallel worktree).
+
+**What**:
+1. The chip's wrap-aware phase switching (label/time inline → label
+   on top, time+owner below) regressed somewhere between the
+   `ChipContent` extraction (commit `c8ecc73`) and the lint refactor
+   (commit `fc81519`). Long chip labels truncate-with-ellipsis on row 1
+   even though there is room on row 2 — and per Jake's correction:
+   sometimes they don't truncate at all, just overflow.
+2. The BottomTab nav bar scrolls off the page instead of staying
+   pinned. Likely fallout from §F2b's
+   `body { overflow-x: hidden; max-width: 100vw }` interacting with
+   the BottomTab's `position: fixed` (or sticky) layer.
+
+**Verification step before fixing**: open `main` on a clean dev server
+(kill all other Next servers first) and reproduce both symptoms. If
+they don't repro, close this entry as "stale-server artifact."
 
 ---
 

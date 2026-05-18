@@ -13,6 +13,7 @@
 
 import { describe, expect, it } from "vitest";
 import type { Event } from "../schemas";
+import { NO_OWNER } from "../schemas";
 import { projectDay } from "../engine/projectDay";
 import { renderProjection } from "../ui/renderProjection";
 import { aContext, aDay, aSettings } from "./factories";
@@ -32,6 +33,7 @@ function recordedNapSlot(n: number, startTime: number, napLen: number): Event {
     startTime,
     endTime: startTime + napLen,
     hasPutdown: false,
+    owner: NO_OWNER,
     lifecycle: { state: "recorded", annotatedAt: startTime },
   };
 }
@@ -217,6 +219,7 @@ describe("seam: Start Nap Now → renderProjection", () => {
       startTime: 9 * 60,
       endTime: 9 * 60 + 30, // user explicitly ended early
       hasPutdown: false,
+      owner: NO_OWNER,
       lifecycle: { state: "completed", committedAt: 9 * 60 },
     };
     const ctx = aContext({

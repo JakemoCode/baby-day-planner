@@ -19,6 +19,7 @@
 import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
 import type { Event, OwnersConfig, TimeMin } from "@/v3/schemas";
+import { NO_OWNER } from "@/v3/schemas";
 import { aDay, aSettings } from "@/v3/__tests__/factories";
 import { projectDay } from "@/v3/engine/projectDay";
 import { isInProgress } from "@/v3/lib/effectiveEnd";
@@ -68,6 +69,7 @@ function bottleActual(start: TimeMin, oz: number): Event {
     startTime: start,
     amountOz: oz,
     hasPutdown: false,
+    owner: NO_OWNER,
     lifecycle: { state: "completed", committedAt: start },
   };
 }
@@ -83,6 +85,7 @@ function completedNapActual(start: TimeMin, end: TimeMin): Event {
     startTime: start,
     endTime: end,
     hasPutdown: false,
+    owner: NO_OWNER,
     lifecycle: { state: "completed", committedAt: end },
   };
 }
@@ -101,6 +104,7 @@ function inProgressNapActual(start: TimeMin, endPlaceholder: TimeMin): Event {
     startTime: start,
     endTime: endPlaceholder,
     hasPutdown: false,
+    owner: NO_OWNER,
     lifecycle: { state: "recorded", annotatedAt: start },
   };
 }
@@ -205,6 +209,7 @@ describe("Dashboard seam — real projectDay + new panels", () => {
         startTime: (19 * 60 + 30) as TimeMin,
         endTime: (20 * 60 + 30) as TimeMin,
         hasPutdown: false,
+        owner: NO_OWNER,
         lifecycle: { state: "completed", committedAt: (20 * 60 + 30) as TimeMin },
       },
     ];

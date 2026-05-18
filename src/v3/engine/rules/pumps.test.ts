@@ -7,6 +7,7 @@
 import { describe, expect, it } from "vitest";
 import { aContext, aDay, aSettings } from "../../__tests__/factories";
 import type { Event } from "../../schemas";
+import { NO_OWNER } from "../../schemas";
 import type { Rule } from "../evaluator";
 import { projectDay } from "../projectDay";
 import { RULES as PUMP_RULES } from "./pumps";
@@ -24,6 +25,7 @@ function aRecordedPump(start: number, eventKey: string, durationMin = 25): Event
     endTime: start + durationMin,
     label: "Pump",
     hasPutdown: false,
+    owner: NO_OWNER,
     lifecycle: { state: "completed", committedAt: start },
   };
 }

@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { renderWithAuth, screen, userEvent } from "@/test-utils";
 import type { Day, Event, OwnersConfig } from "@/v3/schemas";
+import { NO_OWNER } from "@/v3/schemas";
 import { ArchivedDayView } from "./ArchivedDayView";
 
 const owners: OwnersConfig = {
@@ -29,6 +30,7 @@ const bottle: Event = {
   label: "Bottle 1",
   amountOz: 5,
   hasPutdown: false,
+  owner: NO_OWNER,
   lifecycle: { state: "completed", committedAt: 7 * 60 + 5 },
 };
 
@@ -42,6 +44,7 @@ const nap: Event = {
   endTime: 10 * 60,
   label: "Nap 1",
   hasPutdown: false,
+  owner: NO_OWNER,
   lifecycle: { state: "completed", committedAt: 10 * 60 },
 };
 

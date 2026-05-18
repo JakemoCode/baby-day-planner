@@ -28,6 +28,7 @@ import { describe, expect, it } from "vitest";
 import { aContext, aDay, aSettings } from "./factories";
 import { projectDay } from "../engine/projectDay";
 import type { Event, EventType, Lifecycle } from "../schemas";
+import { NO_OWNER } from "../schemas";
 
 type Cell = {
   type: EventType;
@@ -84,6 +85,7 @@ function buildEvent(type: EventType, state: Lifecycle["state"], when: number): E
     // actually fires (would fail if the engine just passed the input
     // through with a defaulted value).
     hasPutdown: false,
+    owner: NO_OWNER,
     lifecycle: lifecycleOf(state, when),
   };
   if (isBlock) event.endTime = when + 60;

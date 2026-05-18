@@ -8,7 +8,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import type { Event } from "../schemas";
+import { NO_OWNER, type Event } from "../schemas";
 import { withV3EventDefaults } from "./eventDefaults";
 
 describe("withV3EventDefaults", () => {
@@ -22,6 +22,7 @@ describe("withV3EventDefaults", () => {
       startTime: 7 * 60 + 30,
       label: "Bottle 1",
       hasPutdown: false,
+      owner: NO_OWNER,
       lifecycle: { state: "completed", committedAt: 7 * 60 + 30 },
     };
     expect(withV3EventDefaults(v3)).toEqual(v3);

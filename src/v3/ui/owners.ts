@@ -13,6 +13,8 @@ import type { OwnerRef, OwnersConfig } from "../schemas";
 export function ownerDisplayName(ref: OwnerRef | undefined, owners: OwnersConfig): string {
   if (!ref) return "";
   switch (ref.slot) {
+    case "none":
+      return "";
     case "parent1":
       return owners.parent1.displayName;
     case "parent2":
@@ -25,6 +27,8 @@ export function ownerDisplayName(ref: OwnerRef | undefined, owners: OwnersConfig
 export function ownerColor(ref: OwnerRef | undefined, owners: OwnersConfig): string | null {
   if (!ref) return null;
   switch (ref.slot) {
+    case "none":
+      return null;
     case "parent1":
       return owners.parent1.color;
     case "parent2":

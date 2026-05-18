@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
 import type { Event, OwnersConfig, TimeMin } from "@/v3/schemas";
+import { NO_OWNER } from "@/v3/schemas";
 import { NextEventCard } from "./NextEventCard";
 
 const owners: OwnersConfig = {
@@ -19,6 +20,7 @@ const ev = (overrides: Partial<Event> = {}): Event => ({
   startTime: 9 * 60 + 30,
   endTime: 10 * 60 + 15,
   hasPutdown: false,
+  owner: NO_OWNER,
   lifecycle: { state: "projected" },
   ...overrides,
 });
@@ -105,6 +107,7 @@ describe("NextEventCard — putdown sub-line", () => {
     startTime: (14 * 60 + 10) as TimeMin,
     endTime: (15 * 60 + 25) as TimeMin,
     hasPutdown: true,
+    owner: NO_OWNER,
     lifecycle: { state: "projected" as const },
   };
 

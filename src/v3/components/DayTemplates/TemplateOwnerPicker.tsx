@@ -17,7 +17,13 @@
  */
 
 import { BottomSheet } from "@/components/shared/BottomSheet";
-import type { Event, OwnerRef, OwnershipTemplate, OwnersConfig } from "../../schemas";
+import {
+  NO_OWNER,
+  type Event,
+  type OwnerRef,
+  type OwnershipTemplate,
+  type OwnersConfig,
+} from "../../schemas";
 import { OwnerPickerV3 } from "../shared/OwnerPickerV3";
 import { getOwnerAt, templateSlotForEvent } from "./templateSlot";
 
@@ -42,8 +48,15 @@ export function TemplateOwnerPicker({
 }: TemplateOwnerPickerProps) {
   const slot = templateSlotForEvent(event);
   const current = slot === undefined ? undefined : getOwnerAt(template, slot);
+  // §F37: OwnerPickerV3 now requires a defined value (NO_OWNER for unassigned).
+  // A missing template entry is rendered the same as an explicit NO_OWNER.
   const picker = (
-    <OwnerPickerV3 owners={owners} value={current} onChange={onSelect} label={event.label} />
+    <OwnerPickerV3
+      owners={owners}
+      value={current ?? NO_OWNER}
+      onChange={onSelect}
+      label={event.label}
+    />
   );
 
   // No chrome requested → bare picker (preserves the original API).

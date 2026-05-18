@@ -7,6 +7,7 @@
 import { describe, expect, it } from "vitest";
 import { aContext, aDay, aSettings } from "../../__tests__/factories";
 import type { Day, Event } from "../../schemas";
+import { NO_OWNER } from "../../schemas";
 import type { Rule } from "../evaluator";
 import { projectDay } from "../projectDay";
 import { RULES as DR_RULES } from "./dailyRecurring";
@@ -142,6 +143,7 @@ describe("R11.5 — existing event at same eventKey suppresses projection", () =
       startTime: 17 * 60 + 12, // user logged at 17:12, slightly off the 17:00 setting
       label: "Cook Dinner",
       hasPutdown: false,
+      owner: NO_OWNER,
       lifecycle: { state: "completed", committedAt: 17 * 60 + 12 },
     };
 

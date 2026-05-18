@@ -8,6 +8,7 @@
 
 import fc from "fast-check";
 import type { Day, Event, Lifecycle, OwnerRef, ProjectInput, Settings, TimeMin } from "../schemas";
+import { NO_OWNER } from "../schemas";
 import { aDay, aSettings } from "./factories";
 
 // ---------------------------------------------------------------------------
@@ -91,6 +92,7 @@ export const arbRecordedNap: fc.Arbitrary<Event> = fc
       endTime: start + durationMinutes,
       label: `Nap ${slot}`,
       hasPutdown: false,
+      owner: NO_OWNER,
       lifecycle: { state: "completed", committedAt: start },
     };
     return event;
@@ -105,6 +107,7 @@ export const arbRecordedBottle: fc.Arbitrary<Event> = arbDayTime.map((start) => 
   startTime: start,
   label: "Bottle",
   hasPutdown: false,
+  owner: NO_OWNER,
   lifecycle: { state: "completed", committedAt: start },
   amountOz: 5,
 }));
