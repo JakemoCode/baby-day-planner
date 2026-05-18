@@ -41,8 +41,8 @@
 
   /* Event-type accent hues (§F2b — named per §F34 spirit) */
   --color-rust: #bc5b2e; /* bottle dot */
-  --color-honey: #d4a04a; /* extra (other) edge + dot */
-  --color-honey-soft: #f0d9a6; /* extra (other) block fill */
+  --color-honey: #d9b347; /* extra (other) edge + dot — goldenrod, distinct from rust */
+  --color-honey-soft: #f5e2a5; /* extra (other) block fill */
 
   /* ─────── Owner colors ─────── */
   --color-owner-jake: #7a8fa8; /* dusty blue */

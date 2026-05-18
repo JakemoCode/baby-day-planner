@@ -20,7 +20,7 @@
 .hourTick {
   position: absolute;
   height: 0;
-  border-top: 3px dashed var(--color-border);
+  border-top: 3px dashed var(--color-border-strong); /* §F2b: --color-border read too faint */
   pointer-events: none;
 }
 
