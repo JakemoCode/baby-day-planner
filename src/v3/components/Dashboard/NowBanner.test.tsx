@@ -33,7 +33,7 @@ const napEvent = (start: TimeMin): Event => ({
   startTime: start,
   endTime: (start + 60) as TimeMin,
   hasPutdown: false,
-  lifecycle: { state: "recorded", at: start },
+  lifecycle: { state: "recorded", annotatedAt: start },
 });
 
 const bedtimeEvent = (start: TimeMin): Event => ({
@@ -46,7 +46,7 @@ const bedtimeEvent = (start: TimeMin): Event => ({
   startTime: start,
   endTime: (start + 600) as TimeMin,
   hasPutdown: false,
-  lifecycle: { state: "recorded", at: start },
+  lifecycle: { state: "recorded", annotatedAt: start },
 });
 
 describe("NowBanner", () => {

@@ -121,7 +121,7 @@ describe("NextEventCard — putdown sub-line", () => {
     const bottleEvent = {
       ...napEvent,
       type: "bottle" as const,
-      kind: "point" as const,
+      kind: "instant" as const,
       label: "Bottle",
       eventKey: "bottle_1",
     };

@@ -13,11 +13,12 @@ const bottle = (overrides: Partial<Event> = {}): Event => ({
   dayId: "d1",
   eventKey: `bottle_${overrides.startTime ?? 0}`,
   type: "bottle",
-  kind: "point",
+  kind: "instant",
   label: "Bottle",
   startTime: (overrides.startTime ?? 7 * 60) as TimeMin,
   amountOz: 4,
-  lifecycle: { state: "recorded", at: (overrides.startTime ?? 7 * 60) as TimeMin },
+  hasPutdown: false,
+  lifecycle: { state: "recorded", annotatedAt: (overrides.startTime ?? 7 * 60) as TimeMin },
   ...overrides,
 });
 
@@ -31,7 +32,7 @@ const nap = (overrides: Partial<Event> = {}): Event => ({
   startTime: (overrides.startTime ?? 9 * 60) as TimeMin,
   endTime: ((overrides.startTime ?? 9 * 60) + 60) as TimeMin,
   hasPutdown: false,
-  lifecycle: { state: "recorded", at: (overrides.startTime ?? 9 * 60) as TimeMin },
+  lifecycle: { state: "recorded", annotatedAt: (overrides.startTime ?? 9 * 60) as TimeMin },
   ...overrides,
 });
 

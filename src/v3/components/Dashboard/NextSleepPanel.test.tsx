@@ -19,7 +19,7 @@ const nap = (overrides: Partial<Event> = {}): Event => ({
   startTime: (overrides.startTime ?? 9 * 60) as TimeMin,
   endTime: ((overrides.startTime ?? 9 * 60) + 60) as TimeMin,
   hasPutdown: false,
-  lifecycle: { state: "recorded", at: (overrides.startTime ?? 9 * 60) as TimeMin },
+  lifecycle: { state: "recorded", annotatedAt: (overrides.startTime ?? 9 * 60) as TimeMin },
   ...overrides,
 });
 

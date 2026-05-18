@@ -213,7 +213,7 @@ export default function DashboardPage() {
       />
       <NextSleepPanel
         nextNap={nn}
-        {...(bedtime ? { bedtime } : {})}
+        bedtime={bedtime}
         actuals={actuals}
         nowMinutes={nowMinutes}
         putdownLeadMinutes={settings.putdownLeadMinutes}
