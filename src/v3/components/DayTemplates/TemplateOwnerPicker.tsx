@@ -10,24 +10,25 @@
  * re-resolve.
  *
  * Chrome is opt-in. When `title` or `onCancel` is passed, the picker
- * wraps itself in a sticky-bottom card with a header (label + Cancel).
- * When neither is passed, the picker renders bare — preserving the
- * original headless behavior for callers that supply their own chrome.
+ * wraps itself in a `BottomSheet` (the same drawer chrome the FAB type
+ * picker uses). When neither is passed, the picker renders bare —
+ * preserving the original headless behavior for callers that supply
+ * their own wrapper.
  */
 
+import { BottomSheet } from "@/components/shared/BottomSheet";
 import type { Event, OwnerRef, OwnershipTemplate, OwnersConfig } from "../../schemas";
 import { OwnerPickerV3 } from "../shared/OwnerPickerV3";
 import { getOwnerAt, templateSlotForEvent } from "./templateSlot";
-import styles from "./TemplateOwnerPicker.module.css";
 
 export type TemplateOwnerPickerProps = {
   event: Event;
   template: OwnershipTemplate;
   owners: OwnersConfig;
   onSelect: (owner: OwnerRef | undefined) => void;
-  /** Header label rendered inside the picker's card chrome. */
+  /** Title shown in the BottomSheet chrome. */
   title?: string;
-  /** Dismiss handler. When set, renders a Cancel button alongside the title. */
+  /** Dismiss handler. When set, the picker renders inside a BottomSheet. */
   onCancel?: () => void;
 };
 
@@ -45,21 +46,12 @@ export function TemplateOwnerPicker({
     <OwnerPickerV3 owners={owners} value={current} onChange={onSelect} label={event.label} />
   );
 
-  // No chrome requested → behave like a bare picker (preserves existing
-  // tests and callers that supply their own wrapper).
+  // No chrome requested → bare picker (preserves the original API).
   if (title === undefined && onCancel === undefined) return picker;
 
   return (
-    <div className={styles.card}>
-      <div className={styles.header}>
-        {title !== undefined && <span className={styles.title}>{title}</span>}
-        {onCancel !== undefined && (
-          <button type="button" className={styles.cancel} onClick={onCancel}>
-            Cancel
-          </button>
-        )}
-      </div>
+    <BottomSheet open={true} title={title ?? "Owner"} onCancel={onCancel ?? (() => undefined)}>
       {picker}
-    </div>
+    </BottomSheet>
   );
 }
