@@ -219,9 +219,13 @@ export function TimelineV3({
           <InstantCluster
             key={g.key}
             items={g.items}
-            topPx={yOf(g.startMinutes) - 12}
-            rightPx={BLOCK_RIGHT_INSET - GUTTER_W}
-            widthPx={GUTTER_W - 8}
+            topPx={yOf(
+              g.startMinutes,
+            )} /* §F2b: was -12 magic offset; cluster self-centers via translateY(-50%) so vertical alignment stays correct as chip grows in height */
+            rightPx={4} /* §F2b: was BLOCK_RIGHT_INSET - GUTTER_W (24) — chips hug viewport edge */
+            widthPx={
+              140
+            } /* §F2b: was GUTTER_W - 8 (116) — give labels room; max-safe vs BLOCK_RIGHT_INSET 148 */
             leaderWidthPx={LEADER_LINE_W}
             owners={owners}
             colorMode={colorMode}

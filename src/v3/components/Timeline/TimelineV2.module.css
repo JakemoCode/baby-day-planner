@@ -20,7 +20,7 @@
 .hourTick {
   position: absolute;
   height: 0;
-  border-top: 3px dashed var(--color-border);
+  border-top: 3px dashed var(--color-border-strong); /* §F2b: --color-border read too faint */
   pointer-events: none;
 }
 
@@ -28,6 +28,7 @@
   position: absolute;
   left: 0;
   font-size: var(--text-xs);
+  font-weight: var(--weight-semibold); /* §F2b: bumped per Jake — keep muted color */
   color: var(--color-muted);
   text-align: right;
   padding-right: var(--space-2);
