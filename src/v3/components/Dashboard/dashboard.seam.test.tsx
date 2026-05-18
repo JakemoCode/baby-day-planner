@@ -92,6 +92,9 @@ function completedNapActual(start: TimeMin, end: TimeMin): Event {
 }
 
 function inProgressNapActual(start: TimeMin, endPlaceholder: TimeMin): Event {
+  // In-progress nap: lifecycle "recorded" with placeholder endTime
+  // (start + defaultNapLengthMinutes). isInProgress() detects this
+  // via the time window, not the lifecycle state.
   return {
     id: `n-${start}-ip`,
     dayId: day.id,
@@ -170,12 +173,15 @@ describe("Dashboard seam — real projectDay + new panels", () => {
     // NowBanner: in-progress nap wins over wake window.
     expect(screen.getByText(/nap in progress/i)).toBeVisible();
 
-    // NextEventCard: next must NOT be the in-progress nap itself.
-    // If next is a nap, it must start at or after the in-progress nap's end (11:45).
+    // NextEventCard: next must NOT be the in-progress nap itself — unconditionally,
+    // regardless of whether next turns out to be a nap, bottle, or bedtime.
+    // A regression where nextDashboardEvent returned the in-progress nap would slip
+    // past a conditional type-guard check.
     expect(next).toBeDefined();
-    if (next?.type === "nap") {
-      expect(next.startTime).toBeGreaterThanOrEqual(11 * 60 + 45);
-    }
+    expect(next?.id).not.toBe(inProgressNap?.id);
+    // next is the projected second nap (starts ~12:30 after the in-progress nap ends at 11:45).
+    expect(next?.type === "bottle" || next?.type === "nap").toBe(true);
+    expect(next?.startTime).toBeGreaterThan(11 * 60 + 45);
 
     // Panel totals via helpers (independent confirmation of the join).
     // The in-progress nap has an endTime so napTotals counts it.
