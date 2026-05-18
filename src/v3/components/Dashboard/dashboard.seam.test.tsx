@@ -184,8 +184,8 @@ describe("Dashboard seam — real projectDay + new panels", () => {
     expect(nTotals).toEqual({ count: 2, totalMinutes: 120 });
 
     // Rendered text matches.
-    expect(screen.getByText(/today: 2 bottles, 9oz/i)).toBeVisible();
-    expect(screen.getByText(/today: 2 naps, 2h/i)).toBeVisible();
+    expect(screen.getByText(/today: 2 bottles · 9oz/i)).toBeVisible();
+    expect(screen.getByText(/today: 2 naps · 2h/i)).toBeVisible();
   });
 
   it("past bedtime threshold with bedtime completed: NextEventCard shows the end-of-day empty copy", () => {

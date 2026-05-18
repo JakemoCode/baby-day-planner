@@ -1,5 +1,5 @@
 import type { Event, OwnersConfig, TimeMin } from "@/v3/schemas";
-import { formatTimeForDisplay, formatTimeShort } from "@/v3/ui/time";
+import { formatHoursMinutes, formatTimeForDisplay, formatTimeShort } from "@/v3/ui/time";
 import { OwnerPill } from "./OwnerPill";
 import { bottleTotals, lastBottle } from "./dashboardStats";
 import styles from "./NextBottlePanel.module.css";
@@ -15,6 +15,11 @@ function pluralBottles(n: number): string {
   return n === 1 ? "bottle" : "bottles";
 }
 
+function formatDelta(deltaMinutes: number): string {
+  if (deltaMinutes <= 0) return "now";
+  return `in ${formatHoursMinutes(deltaMinutes)}`;
+}
+
 export function NextBottlePanel({ nextBottle, actuals, nowMinutes, owners }: NextBottlePanelProps) {
   const last = lastBottle(actuals);
   const totals = bottleTotals(actuals);
@@ -23,19 +28,20 @@ export function NextBottlePanel({ nextBottle, actuals, nowMinutes, owners }: Nex
     <section className={styles.card} aria-label="Bottle stats">
       <p className={styles.heading}>Next bottle</p>
       {nextBottle && (
-        <p className={styles.line}>
-          Next bottle: {formatTimeForDisplay(nextBottle.startTime)}{" "}
+        <div className={styles.timeRow}>
+          <span className={styles.time}>{formatTimeForDisplay(nextBottle.startTime)}</span>
+          <span className={styles.delta}>{formatDelta(nextBottle.startTime - nowMinutes)}</span>
           {nextBottle.owner && <OwnerPill owner={nextBottle.owner} owners={owners} />}
-        </p>
+        </div>
       )}
       {last && (
-        <p className={`${styles.line} ${styles.muted}`}>
-          Based on last bottle: {last.amountOz ?? 0}oz, {Math.max(0, nowMinutes - last.startTime)}{" "}
-          min ago ({formatTimeShort(last.startTime)})
+        <p className={styles.line}>
+          Last: {last.amountOz ?? 0}oz, {Math.max(0, nowMinutes - last.startTime)} min ago (
+          {formatTimeShort(last.startTime)})
         </p>
       )}
-      <p className={`${styles.line} ${styles.muted}`}>
-        Today: {totals.count} {pluralBottles(totals.count)}, {totals.oz}oz
+      <p className={styles.footer}>
+        Today: {totals.count} {pluralBottles(totals.count)} · {totals.oz}oz
       </p>
     </section>
   );

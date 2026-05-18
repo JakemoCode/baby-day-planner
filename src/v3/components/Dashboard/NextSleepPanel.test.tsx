@@ -61,11 +61,12 @@ describe("NextSleepPanel", () => {
         owners={owners}
       />,
     );
-    expect(screen.getByText(/putdown 1:50 PM → nap 2:10 PM/i)).toBeVisible();
-    expect(screen.getByText(/projected bedtime: 7:30 PM/i)).toBeVisible();
+    expect(screen.getByText("2:10 PM")).toBeVisible();
+    expect(screen.getByText(/putdown 1:50 PM/i)).toBeVisible();
+    expect(screen.getByText(/bedtime 7:30 PM/i)).toBeVisible();
   });
 
-  it("renders 'based on last nap' line and today totals when prior naps exist", () => {
+  it("renders 'Last nap' line and today totals when prior naps exist", () => {
     const actuals: Event[] = [
       nap({ startTime: (9 * 60) as TimeMin, endTime: (10 * 60) as TimeMin }),
       nap({ startTime: (13 * 60) as TimeMin, endTime: (14 * 60 + 18) as TimeMin }),
@@ -81,12 +82,12 @@ describe("NextSleepPanel", () => {
       />,
     );
     expect(screen.queryByText(/putdown/i)).toBeNull();
-    expect(screen.getByText(/based on last nap: 1h 18m, 47 min ago \(2:18p\)/i)).toBeVisible();
-    expect(screen.getByText(/today: 2 naps, 2h 18m/i)).toBeVisible();
-    expect(screen.getByText(/projected bedtime: 7:30 PM/i)).toBeVisible();
+    expect(screen.getByText(/last nap: 1h 18m, 47 min ago \(2:18p\)/i)).toBeVisible();
+    expect(screen.getByText(/today: 2 naps · 2h 18m/i)).toBeVisible();
+    expect(screen.getByText(/bedtime 7:30 PM/i)).toBeVisible();
   });
 
-  it("hides 'based on last nap' when no completed nap yet today", () => {
+  it("hides 'Last nap' when no completed nap yet today", () => {
     render(
       <NextSleepPanel
         nextNap={projectedNap((9 * 60 + 30) as TimeMin)}
@@ -97,11 +98,11 @@ describe("NextSleepPanel", () => {
         owners={owners}
       />,
     );
-    expect(screen.queryByText(/based on last/i)).toBeNull();
-    expect(screen.getByText(/today: 0 naps, 0m/i)).toBeVisible();
+    expect(screen.queryByText(/last nap:/i)).toBeNull();
+    expect(screen.getByText(/today: 0 naps · 0m/i)).toBeVisible();
   });
 
-  it("hides projected-bedtime line when bedtime prop is undefined", () => {
+  it("hides bedtime footer line when bedtime prop is undefined", () => {
     render(
       <NextSleepPanel
         nextNap={projectedNap((9 * 60 + 30) as TimeMin)}
@@ -112,6 +113,6 @@ describe("NextSleepPanel", () => {
         owners={owners}
       />,
     );
-    expect(screen.queryByText(/projected bedtime/i)).toBeNull();
+    expect(screen.queryByText(/bedtime \d/i)).toBeNull();
   });
 });

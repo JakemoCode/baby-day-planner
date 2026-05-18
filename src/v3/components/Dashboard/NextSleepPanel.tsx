@@ -17,6 +17,11 @@ function pluralNaps(n: number): string {
   return n === 1 ? "nap" : "naps";
 }
 
+function formatDelta(deltaMinutes: number): string {
+  if (deltaMinutes <= 0) return "now";
+  return `in ${formatHoursMinutes(deltaMinutes)}`;
+}
+
 export function NextSleepPanel({
   nextNap,
   bedtime,
@@ -27,32 +32,36 @@ export function NextSleepPanel({
 }: NextSleepPanelProps) {
   const last = lastCompletedNap(actuals);
   const totals = napTotals(actuals);
+  const putdownTime = nextNap && (Math.max(0, nextNap.startTime - putdownLeadMinutes) as TimeMin);
 
   return (
     <section className={styles.card} aria-label="Sleep stats">
       <p className={styles.heading}>Next sleep</p>
       {nextNap && (
-        <p className={styles.line}>
-          Putdown{" "}
-          {formatTimeForDisplay(Math.max(0, nextNap.startTime - putdownLeadMinutes) as TimeMin)} →
-          Nap {formatTimeForDisplay(nextNap.startTime)}{" "}
-          {nextNap.owner && <OwnerPill owner={nextNap.owner} owners={owners} />}
-        </p>
+        <>
+          <div className={styles.timeRow}>
+            <span className={styles.time}>{formatTimeForDisplay(nextNap.startTime)}</span>
+            <span className={styles.delta}>{formatDelta(nextNap.startTime - nowMinutes)}</span>
+            {nextNap.owner && <OwnerPill owner={nextNap.owner} owners={owners} />}
+          </div>
+          {putdownTime !== undefined && (
+            <p className={styles.putdown}>Putdown {formatTimeForDisplay(putdownTime)}</p>
+          )}
+        </>
       )}
       {last && last.endTime !== undefined && (
-        <p className={`${styles.line} ${styles.muted}`}>
-          Based on last nap: {formatHoursMinutes(last.endTime - last.startTime)},{" "}
+        <p className={styles.line}>
+          Last nap: {formatHoursMinutes(last.endTime - last.startTime)},{" "}
           {Math.max(0, nowMinutes - last.endTime)} min ago ({formatTimeShort(last.endTime)})
         </p>
       )}
-      <p className={`${styles.line} ${styles.muted}`}>
-        Today: {totals.count} {pluralNaps(totals.count)}, {formatHoursMinutes(totals.totalMinutes)}
+      <p className={styles.footer}>
+        <span>
+          Today: {totals.count} {pluralNaps(totals.count)} ·{" "}
+          {formatHoursMinutes(totals.totalMinutes)}
+        </span>
+        {bedtime && <span>Bedtime {formatTimeForDisplay(bedtime.startTime)}</span>}
       </p>
-      {bedtime && (
-        <p className={`${styles.line} ${styles.muted}`}>
-          Projected bedtime: {formatTimeForDisplay(bedtime.startTime)}
-        </p>
-      )}
     </section>
   );
 }

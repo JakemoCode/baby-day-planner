@@ -51,12 +51,13 @@ describe("NextBottlePanel", () => {
       />,
     );
     expect(screen.getByLabelText("Bottle stats")).toBeVisible();
-    expect(screen.getByText(/1:00 PM/)).toBeVisible();
-    expect(screen.getByText(/based on last bottle: 5oz, 60 min ago \(10a\)/i)).toBeVisible();
-    expect(screen.getByText(/today: 2 bottles, 9oz/i)).toBeVisible();
+    expect(screen.getByText("1:00 PM")).toBeVisible();
+    expect(screen.getByText(/in 2h/i)).toBeVisible();
+    expect(screen.getByText(/last: 5oz, 60 min ago \(10a\)/i)).toBeVisible();
+    expect(screen.getByText(/today: 2 bottles · 9oz/i)).toBeVisible();
   });
 
-  it("hides next-bottle line when no next is available", () => {
+  it("hides hero time row when no next bottle is available", () => {
     render(
       <NextBottlePanel
         nextBottle={undefined}
@@ -65,12 +66,12 @@ describe("NextBottlePanel", () => {
         owners={owners}
       />,
     );
-    expect(screen.queryByText(/next bottle: \d/i)).toBeNull();
-    expect(screen.getByText(/based on last bottle: 4oz/i)).toBeVisible();
-    expect(screen.getByText(/today: 1 bottle, 4oz/i)).toBeVisible();
+    expect(screen.queryByText(/in \d/i)).toBeNull();
+    expect(screen.getByText(/last: 4oz/i)).toBeVisible();
+    expect(screen.getByText(/today: 1 bottle · 4oz/i)).toBeVisible();
   });
 
-  it("hides 'based on last' line when no recorded bottle yet today", () => {
+  it("hides 'Last' line when no recorded bottle yet today", () => {
     render(
       <NextBottlePanel
         nextBottle={nextProjected((7 * 60) as TimeMin)}
@@ -79,7 +80,7 @@ describe("NextBottlePanel", () => {
         owners={owners}
       />,
     );
-    expect(screen.queryByText(/based on last/i)).toBeNull();
-    expect(screen.getByText(/today: 0 bottles, 0oz/i)).toBeVisible();
+    expect(screen.queryByText(/^last:/i)).toBeNull();
+    expect(screen.getByText(/today: 0 bottles · 0oz/i)).toBeVisible();
   });
 });
