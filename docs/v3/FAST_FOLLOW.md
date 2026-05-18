@@ -49,14 +49,18 @@ need any V3 plumbing.
 **Status**: split into F2a + F2b (2026-05-18 after Variant A pick
 in palette-explore mockup).
 
-**§F2a — Dashboard surface contrast lift**: `in-progress` (this PR).
-Two-token change: `--color-bg` from `#fbf8f3` to deeper cream `#f2ebde`,
-`--color-surface` from `#ffffff` to soft ivory `#fcf8ee` (raised stays
-white). Bg→surface contrast goes from 1.06 → 1.12. Spec asked for ≥1.4
-but matching that requires a noticeably darker oat bg (`#e3d7be`) which
-Jake vetoed in the palette-explore mockup as too sandy — the wedding
-palette is intentionally close-tone. Cards now visibly lift off the bg
-without losing the warm-cream feel.
+**§F2a — Dashboard surface contrast lift + sage side-band**: `in-progress`
+(this PR). One token + two component changes:
+- `--color-bg` from `#fbf8f3` to deeper cream `#f2ebde` (cards stay
+  pure white; raised stays `#fefcf7` for timeline-block warmth)
+- `NextBottlePanel` + `NextSleepPanel` get a 4px sage side-band on
+  the left (`border-left: 4px solid var(--color-accent-soft)`) per
+  Variant A of the palette-explore mockup
+
+Bg→surface contrast goes from 1.06 → 1.19. Spec asked for ≥1.4 but
+matching that requires a noticeably darker oat bg (`#e3d7be`) which
+Jake vetoed as too sandy — the wedding palette is intentionally
+close-tone.
 
 **§F2b — Timeline palette pass**: `pending`. After F2a ships, build
 a timeline-focused HTML mockup (3 chip-treatment variants exploring
@@ -68,7 +72,7 @@ testing checks engine *output* (event arrays), not rendered pixels.
 Palette can shift independently.
 
 **Acceptance**:
-- ✅ Surface visibly lifts off bg (1.06 → 1.12 in F2a; original ≥1.4
+- ✅ Surface visibly lifts off bg (1.06 → 1.19 in F2a; original ≥1.4
   target relaxed — see F2a entry for the wedding-palette reason).
 - Owner stripes readable as colored bands at chip-thumbnail size (F2b).
 - Existing tokens stay token-named (no inline colors anywhere).
