@@ -206,7 +206,12 @@ export default function DashboardPage() {
 
   return (
     <div className={styles.page}>
-      <NextEventCard event={next} nowMinutes={nowMinutes} owners={settings.owners} />
+      <NextEventCard
+        event={next}
+        nowMinutes={nowMinutes}
+        owners={settings.owners}
+        putdownLeadMinutes={settings.putdownLeadMinutes}
+      />
       <NextBottlePanel
         nextBottle={nb}
         actuals={actuals}

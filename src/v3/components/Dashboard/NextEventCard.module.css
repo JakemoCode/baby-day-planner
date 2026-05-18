@@ -72,3 +72,9 @@
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-card);
 }
+
+.putdown {
+  margin: 4px 0 0;
+  font-size: 0.875rem;
+  color: var(--color-text-muted);
+}

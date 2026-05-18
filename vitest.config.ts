@@ -8,7 +8,12 @@ export default defineConfig({
     environment: "jsdom",
     setupFiles: ["./vitest.setup.ts"],
     globals: true,
-    include: ["src/**/*.test.{ts,tsx}", "tests/**/*.test.{ts,tsx}"],
+    include: [
+      "src/**/*.test.{ts,tsx}",
+      "tests/**/*.test.{ts,tsx}",
+      ".claude/worktrees/f32-retire-eod/src/**/*.test.{ts,tsx}",
+      ".claude/worktrees/f32-retire-eod/tests/**/*.test.{ts,tsx}",
+    ],
     fileParallelism: false,
     coverage: {
       provider: "v8",

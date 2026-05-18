@@ -7,6 +7,7 @@ export type NextEventCardProps = {
   event: Event | undefined;
   nowMinutes: TimeMin;
   owners: OwnersConfig;
+  putdownLeadMinutes: number;
 };
 
 function formatDelta(deltaMinutes: number): { text: string; isNow: boolean } {
@@ -14,16 +15,23 @@ function formatDelta(deltaMinutes: number): { text: string; isNow: boolean } {
   return { text: `in ${formatHoursMinutes(deltaMinutes)}`, isNow: false };
 }
 
-export function NextEventCard({ event, nowMinutes, owners }: NextEventCardProps) {
+export function NextEventCard({
+  event,
+  nowMinutes,
+  owners,
+  putdownLeadMinutes,
+}: NextEventCardProps) {
   if (!event) {
     return (
       <div className={styles.empty} role="status">
-        <p>Nothing scheduled — enjoy the quiet.</p>
+        <p>No more events — have a good night.</p>
       </div>
     );
   }
 
   const delta = formatDelta(event.startTime - nowMinutes);
+  const showPutdown = event.type === "nap" || event.type === "bedtime";
+  const putdownTime = Math.max(0, event.startTime - putdownLeadMinutes) as TimeMin;
 
   return (
     <article className={styles.card} aria-label="Next event">
@@ -36,6 +44,9 @@ export function NextEventCard({ event, nowMinutes, owners }: NextEventCardProps)
         </span>
         <OwnerPill owner={event.owner} owners={owners} className={styles.owner} />
       </div>
+      {showPutdown && (
+        <p className={styles.putdown}>Putdown {formatTimeForDisplay(putdownTime)}</p>
+      )}
     </article>
   );
 }
