@@ -74,7 +74,7 @@
 }
 
 .putdown {
-  margin: 4px 0 0;
-  font-size: 0.875rem;
-  color: var(--color-text-muted);
+  margin: var(--space-1) 0 0;
+  font-size: var(--text-sm);
+  color: var(--color-muted);
 }
