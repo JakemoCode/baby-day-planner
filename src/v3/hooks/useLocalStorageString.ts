@@ -17,7 +17,10 @@ function subscribe(key: string, callback: () => void): () => void {
  * `storage` event) and within the same tab (via a per-key custom event that
  * the setter dispatches, since storage events don't fire in the originating tab).
  */
-export function useLocalStorageString(key: string, defaultValue: string): [string, (next: string) => void] {
+export function useLocalStorageString(
+  key: string,
+  defaultValue: string,
+): [string, (next: string) => void] {
   const value = useSyncExternalStore(
     (cb) => subscribe(key, cb),
     () => {
