@@ -179,6 +179,7 @@ export default function SettingsPage() {
           id="pumpOwnerSlot"
           label="Pump owner"
           value={value.pumpOwnerSlot}
+          owners={value.owners}
           onChange={(v) => set("pumpOwnerSlot", v)}
         />
         <NumberRow
@@ -612,13 +613,19 @@ function OwnerSlotRow({
   id,
   label,
   value,
+  owners,
   onChange,
 }: {
   id: string;
   label: string;
   value: OwnerSlot;
+  owners: Settings["owners"];
   onChange: (next: OwnerSlot) => void;
 }) {
+  const labelFor = (slot: "parent1" | "parent2", fallback: string): string => {
+    const name = owners[slot].displayName.trim();
+    return name.length > 0 ? name : fallback;
+  };
   return (
     <div className={styles.field}>
       <label htmlFor={id} className={styles.fieldLabel}>
@@ -630,8 +637,8 @@ function OwnerSlotRow({
         onChange={(e) => onChange(e.target.value as OwnerSlot)}
         className={styles.input}
       >
-        <option value="parent1">Parent 1</option>
-        <option value="parent2">Parent 2</option>
+        <option value="parent1">{labelFor("parent1", "Parent 1")}</option>
+        <option value="parent2">{labelFor("parent2", "Parent 2")}</option>
       </select>
     </div>
   );
