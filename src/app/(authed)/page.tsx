@@ -30,7 +30,7 @@ import { FABTypePicker } from "@/components/shared/FABTypePicker";
 import type { CreatableType } from "@/v3/components/shared/createEventTemplate";
 import { buildCreateTemplate } from "@/v3/components/shared/createEventTemplate";
 import { EventEditDrawerV3 } from "@/v3/components/shared/EventEditDrawerV3";
-import { CurrentWakeWindowStatus } from "@/v3/components/Dashboard/CurrentWakeWindowStatus";
+import { NowBanner } from "@/v3/components/Dashboard/NowBanner";
 import { EndOfDayCard } from "@/v3/components/Dashboard/EndOfDayCard";
 import { NapActionButton } from "@/v3/components/Dashboard/NapActionButton";
 import { NextBottlePreview } from "@/v3/components/Dashboard/NextBottlePreview";
@@ -235,7 +235,13 @@ export default function DashboardPage() {
           {...(bedtime ? { bedtime } : {})}
         />
       )}
-      <CurrentWakeWindowStatus wakeWindow={cww} owners={settings.owners} />
+      <NowBanner
+        {...(cww ? { wakeWindow: cww } : {})}
+        {...(inProgressNap ? { inProgressNap } : {})}
+        {...(inProgressBedtime ? { inProgressBedtime } : {})}
+        owners={settings.owners}
+        nowMinutes={nowMinutes}
+      />
 
       <div className={styles.actions}>
         <StartBottleButton
