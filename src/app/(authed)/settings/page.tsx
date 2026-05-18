@@ -59,7 +59,9 @@ export default function SettingsPage() {
     <main className={styles.page}>
       <h1 className={styles.heading}>Settings</h1>
 
-      <OwnersConfigEditor value={value.owners} onChange={(owners) => set("owners", owners)} />
+      <Section title="Owners" isOpen={openSlug === "owners"} onToggle={handleToggle}>
+        <OwnersConfigEditor value={value.owners} onChange={(owners) => set("owners", owners)} />
+      </Section>
 
       <Section title="Default times" isOpen={openSlug === "default-times"} onToggle={handleToggle}>
         <TimeRow

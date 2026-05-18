@@ -34,9 +34,7 @@ export function OwnersConfigEditor({ value, onChange }: OwnersConfigEditorProps)
   };
 
   return (
-    <section className={styles.section}>
-      <h2 className={styles.heading}>Owners</h2>
-
+    <div className={styles.section}>
       <div className={styles.row}>
         <div className={styles.field}>
           <label className={styles.label} htmlFor="parent1-name">
@@ -138,6 +136,6 @@ export function OwnersConfigEditor({ value, onChange }: OwnersConfigEditorProps)
       <button type="button" className={styles.addButton} onClick={addOther}>
         + Add other owner
       </button>
-    </section>
+    </div>
   );
 }
