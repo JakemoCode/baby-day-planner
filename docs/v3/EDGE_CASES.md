@@ -892,12 +892,12 @@
 - **Rule(s)**: R18.1
 - **Source**: fbb1687 (2026-05-07)
 
-### EC-DA4: NextEventCard suppresses overlapping previews
+### EC-DA4: NextBottlePanel always renders
 - **Given**: nextEvent.type === "bottle"
 - **When**: dashboard renders
-- **Then**: NextBottlePanel is hidden (smart suppression) _(component renamed from `NextBottlePreview` in §F32 2026-05-17)_
-- **Rule(s)**: R18.5
-- **Source**: rule-derived
+- **Then**: NextBottlePanel still renders (§F32 retired the R18.5 smart-suppression rule; stat panels are unconditional).
+- **Rule(s)**: (R18.5 retired in §F32 2026-05-17)
+- **Source**: §F32 acceptance — "All panels render even when their event type is 'next' (no suppression)"
 
 ### EC-DA5: End-of-day view after bedtime threshold
 - **Given**: nowMinutes >= bedtimeThreshold; no upcoming events
@@ -906,12 +906,12 @@
 - **Rule(s)**: R18.6
 - **Source**: rule-derived
 
-### EC-DA6: Day without wakeTime shows start prompt
-- **Given**: day.wakeTime is undefined
+### EC-DA6: Day without wakeTime shows wake gate
+- **Given**: day.wakeTime is undefined (or no day yet)
 - **When**: dashboard mounts
-- **Then**: shows "Start New Day" prompt; tapping creates day with wakeTime=now
+- **Then**: shows a slim "Wake up" CTA (§F32, 2026-05-18); tapping seeds default settings if absent then calls `startNewDay` anchored at `settings.defaultWakeTime` (not wall-clock).
 - **Rule(s)**: R14.3, R14.4
-- **Source**: rule-derived
+- **Source**: §F32 spec §E + page.tsx wake-gate
 
 ### EC-DA7: useEvents skips subscription when no dayId
 - **Given**: dashboard before "Start New Day" tapped (dayId="")
