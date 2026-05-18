@@ -1,7 +1,7 @@
 # Baby Day Planner — UI Requirements
 
 > Source: PRD at `/Users/jakemosher/Workspace/docs/private_baby_day_planner_v1_prd.md` + interview decisions captured 2026-05-05.
-> Engine: `src/domain/` (merged). Data layer: `src/repositories/` + `src/hooks/` (merged).
+> Engine: `src/v3/engine/`. Data layer: `src/v3/repositories/` + `src/v3/hooks/`. Schema: `src/v3/schemas.ts`.
 
 ## Pages and routes
 
@@ -132,7 +132,7 @@ Sign-in flow + `(authed)` layout already shipped in Plan B.
 - **WakeWindowsEditor** — array of minutes (one per nap)
 - **NapDefaultsEditor** — `defaultNapLengthMinutes`, `shortNapThresholdMinutes`, `shortNapAdjustmentMinutes`, `bedtimeThreshold`, `putdownLeadMinutes`
 - **BottleRulesEditor** — `defaultBottleAmountOz`, `defaultBottleIntervalMinutes`, list of `BottleRule[]` (add/edit/delete, no reorder)
-- **DreamFeedEditor** — enabled toggle, earliestTime, latestTime, minMinutesAfterBedtime
+- **DreamFeedEditor** — `enabled` toggle + optional `time` hint. Time math removed post-simplification; dream feed is render-only (see `../_archive/v3/SIMPLIFICATION_SCOPE.md §3`).
 - **PumpTimesEditor** — list of `"HH:MM"` strings
 - **WeekendTemplateEditor** — Saturday + Sunday templates (nap owners[], wake-window owners[]). Flip Jake↔Kelly button. "Copy Sat → Sun flipped" button.
 - **AlwaysPromotePlanToggle** — settings toggle for Tomorrow Plan auto-promotion behavior
@@ -189,7 +189,7 @@ Sign-in flow + `(authed)` layout already shipped in Plan B.
 ### Data Layer
 - Type: Firestore via repository hooks (`useSettings`, `useDay`, `useEvents`, `useTemplates`, `useSyncStatus`)
 - Mock strategy: mock the hook in component tests; integration tests use Firebase emulator (already wired)
-- Schema location: `src/domain/types.ts`
+- Schema location: `src/v3/schemas.ts`
 
 ### Per-flow error scenarios
 - **Start Bottle Now**: optimistic create succeeds locally; if Firestore write fails, optimistic state reverts on next watcher snapshot. UI shows red toast on error.
@@ -205,11 +205,11 @@ Sign-in flow + `(authed)` layout already shipped in Plan B.
 - Desktop-only features: none (v1)
 - Touch-specific interactions: none beyond tap
 
-## Open questions / future considerations
+## Locked decisions / deferred work
 
-- **Dark mode** — light default, dark optional. Implementation deferred until base UI is built. Build with CSS-variable-friendly tokens so theme switch is one stylesheet swap.
-- **Multi-child** — single hardcoded `NEXT_PUBLIC_DEFAULT_CHILD_ID=aden`. Data layer already supports `children/{childId}/...`. Future: child picker.
-- **Staging environment** — separate Firebase project, deployed at distinct URL. Address in deployment plan, not this build.
+- **Dark mode** — light only is the locked decision (see project memory). Tokens are CSS-variable-friendly via `tokens.css`; user-selectable themes are tracked in FAST_FOLLOW §F33.
+- **Multi-child** — single hardcoded `NEXT_PUBLIC_DEFAULT_CHILD_ID=aden`. Data layer already supports `children/{childId}/...`. Onboarding + child picker tracked in FAST_FOLLOW §F10.
+- **Staging environment** — separate Firebase project, deployed at distinct URL. Belongs in a deployment plan, not this doc.
 
 ## Decisions log
 
