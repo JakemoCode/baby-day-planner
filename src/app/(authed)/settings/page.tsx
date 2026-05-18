@@ -19,7 +19,10 @@ const ACCORDION_LOCAL_EVENT = "bdp:accordion-change";
 const DEFAULT_OPEN_SLUG = "default-times";
 
 function slugify(title: string): string {
-  return title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+  return title
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "");
 }
 
 function subscribeToAccordion(callback: () => void): () => void {
@@ -148,7 +151,11 @@ export default function SettingsPage() {
         />
       </Section>
 
-      <Section title="Wake windows (per nap N)" isOpen={openSlug === "wake-windows-per-nap-n"} onToggle={handleToggle}>
+      <Section
+        title="Wake windows (per nap N)"
+        isOpen={openSlug === "wake-windows-per-nap-n"}
+        onToggle={handleToggle}
+      >
         <WakeWindowsRow
           value={value.wakeWindowsMinutes}
           onChange={(v) => set("wakeWindowsMinutes", v)}
@@ -222,7 +229,11 @@ export default function SettingsPage() {
         />
       </Section>
 
-      <Section title="Timeline display" isOpen={openSlug === "timeline-display"} onToggle={handleToggle}>
+      <Section
+        title="Timeline display"
+        isOpen={openSlug === "timeline-display"}
+        onToggle={handleToggle}
+      >
         <ColorModeRow
           id="timelineColorMode"
           label="Color encodes"
