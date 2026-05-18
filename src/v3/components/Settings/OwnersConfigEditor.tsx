@@ -76,7 +76,7 @@ export function OwnersConfigEditor({ value, onChange }: OwnersConfigEditorProps)
             type="text"
             value={value.parent2.displayName}
             onChange={(e) => updateParent("parent2", { displayName: e.target.value })}
-            placeholder="e.g. Sam"
+            placeholder="e.g. Kelly"
           />
         </div>
         <div className={styles.field}>
