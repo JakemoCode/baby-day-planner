@@ -252,7 +252,7 @@ function Section({
         }}
       >
         <span className={styles.sectionChevron} aria-hidden="true">
-          ▸
+          ▶
         </span>
         <h2 className={styles.sectionTitle}>{title}</h2>
       </summary>
