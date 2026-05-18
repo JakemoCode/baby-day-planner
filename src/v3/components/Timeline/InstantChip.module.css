@@ -87,41 +87,44 @@
   min-width: 0;
 }
 
-.topRow {
-  display: inline-flex;
-  /* Center-align (was baseline) so the label + time share their optical
-   * mid-line rather than sitting on the same text baseline — at the
-   * differing font-sizes (12 / 11) baseline alignment made the time
-   * sit visually lower than the label. */
-  align-items: center;
-  gap: 6px;
-  min-width: 0; /* §F2b: let the label shrink under text-overflow */
-}
+/* §F2b: chip body now uses the same two-row pattern as duration blocks —
+ * label on row 1, owner + time on row 2. Removes the row-1 competition
+ * for horizontal space that forced premature label truncation. */
 
 .label {
   font-size: 12px;
   font-weight: var(--weight-semibold);
   white-space: nowrap;
-  line-height: 1;
-  overflow: hidden; /* §F2b: truncate long labels (e.g. "Pick up from daycare") */
+  line-height: 1.1;
+  overflow: hidden; /* truncate ONLY as last resort */
   text-overflow: ellipsis;
   min-width: 0;
+  max-width: 100%;
+}
+
+.secondRow {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  line-height: 1.1;
+  color: var(--color-muted);
+  min-width: 0;
+  white-space: nowrap;
+}
+
+/* When both owner and time appear, separate them with a middot. */
+.secondRow .ownerName + .time::before {
+  content: "·";
+  margin: 0 4px 0 2px;
+  color: var(--color-muted);
 }
 
 .time {
-  font-size: 11px;
   color: var(--color-muted);
-  white-space: nowrap;
-  line-height: 1;
 }
 
 .ownerName {
-  font-size: 12px;
   font-weight: var(--weight-medium);
-  line-height: 1;
-  /* Owner name should hug the left edge of the chip body, not center
-   * itself by stretching to the chip's flex cross-axis width. */
-  align-self: flex-start;
-  text-align: left;
   color: var(--owner-color, inherit);
 }

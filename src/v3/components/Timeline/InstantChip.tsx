@@ -55,15 +55,15 @@ export function InstantChip({ event, owners, colorMode, onClick }: InstantChipPr
     >
       <span className={styles.dot} aria-hidden="true" />
       <span className={styles.body}>
-        <span className={styles.topRow}>
-          <span className={styles.label}>{label}</span>
+        <span className={styles.label}>{label}</span>
+        <span className={styles.secondRow}>
+          {ownerName && (
+            <span className={styles.ownerName} {...(slotKey ? { "data-owner": slotKey } : {})}>
+              {ownerName}
+            </span>
+          )}
           <span className={styles.time}>{time}</span>
         </span>
-        {ownerName && (
-          <span className={styles.ownerName} {...(slotKey ? { "data-owner": slotKey } : {})}>
-            {ownerName}
-          </span>
-        )}
       </span>
     </Tag>
   );

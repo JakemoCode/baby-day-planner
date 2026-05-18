@@ -13,7 +13,10 @@
   display: flex;
   flex-direction: row;
   flex-wrap: wrap;
-  justify-content: flex-start;
+  /* §F2b: was flex-start — left-anchoring chips inside a fixed-width
+   * cluster left a visible empty gap on the right of single chips.
+   * Right-end keeps chips hugged to the timeline's right edge. */
+  justify-content: flex-end;
   align-items: center;
   gap: 4px;
   transition: opacity var(--motion-fast) var(--easing-out);
