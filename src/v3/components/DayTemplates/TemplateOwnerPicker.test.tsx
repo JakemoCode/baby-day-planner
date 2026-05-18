@@ -192,4 +192,22 @@ describe("TemplateOwnerPicker (V3)", () => {
     );
     expect(screen.getByRole("button", { name: "None" })).toHaveAttribute("aria-pressed", "true");
   });
+
+  it("renders title + Cancel chrome when both props passed, and Cancel invokes the handler", async () => {
+    const onCancel = vi.fn();
+    const template = makeTemplate({ napOwners: [{ slot: "parent2" }] });
+    render(
+      <TemplateOwnerPicker
+        event={napEvent}
+        template={template}
+        owners={owners}
+        title="Owner for Nap 1"
+        onCancel={onCancel}
+        onSelect={() => {}}
+      />,
+    );
+    expect(screen.getByText("Owner for Nap 1")).toBeVisible();
+    await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(onCancel).toHaveBeenCalledTimes(1);
+  });
 });
