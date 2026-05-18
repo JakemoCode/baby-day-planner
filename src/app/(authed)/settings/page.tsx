@@ -175,6 +175,12 @@ export default function SettingsPage() {
       </Section>
 
       <Section title="Pumps" isOpen={openSlug === "pumps"} onToggle={handleToggle}>
+        <OwnerSlotRow
+          id="pumpOwnerSlot"
+          label="Pump owner"
+          value={value.pumpOwnerSlot}
+          onChange={(v) => set("pumpOwnerSlot", v)}
+        />
         <NumberRow
           id="defaultPumpDurationMinutes"
           label="Default pump duration (min)"
@@ -182,12 +188,7 @@ export default function SettingsPage() {
           onChange={(v) => set("defaultPumpDurationMinutes", v)}
           help="How long a pump session typically takes; pumps render as duration blocks of this length."
         />
-        <OwnerSlotRow
-          id="pumpOwnerSlot"
-          label="Pump owner"
-          value={value.pumpOwnerSlot}
-          onChange={(v) => set("pumpOwnerSlot", v)}
-        />
+        <div className={styles.subSectionHeading}>Pump times</div>
         <PumpTimesRow
           value={value.pumpTimes}
           defaultDuration={value.defaultPumpDurationMinutes}
