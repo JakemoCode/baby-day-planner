@@ -629,6 +629,48 @@ slightly smaller font to fit.
 InstantChip for the wrap detection — extend the same effect to also
 measure and toggle a `data-near-fit` attribute).
 
+## §F39 — Tomorrow as a fully-editable plan with auto-promote at wake
+
+**Source**: Jake, 2026-05-18 (after F13 click-test exposed the silent template-gate on /tomorrow).
+
+**Status**: `pending`. **Absorbs §F12** (its "confirm + auto-promote on Start Day" intent is a strict subset).
+
+**Required behaviors on `/tomorrow`**:
+- Assign or unassign event owners on any projected event (no template-gate).
+- Add or remove custom events (FAB shipped via PR #179; delete already works via drawer).
+- Edits auto-promote in the morning when tomorrow becomes today.
+
+**Shape**:
+
+| Block | What | Lift |
+|---|---|---|
+| Schema | New `TomorrowPlan` doc: `{ childId, date, ownerOverrides, extras, startTemplateId? }` | ½d |
+| Persistence | Tomorrow page reads/writes to this doc instead of in-memory state | ½d |
+| Auto-promote | On first wake event recorded for date `D`, look up `TomorrowPlan[D]`; fold `ownerOverrides` onto the day's projected events and create `extras` as recorded events on the day | 1d |
+| Tests | Round-trip persistence; auto-promote-on-wake; override-then-promote integration; no-plan-no-op | bundled |
+
+Templates' role: pure prefill. "Start from template" copies its owners into `ownerOverrides`; further edits don't touch the template.
+
+**Design questions to settle before any code**:
+
+| Question | Options |
+|---|---|
+| Auto-promote trigger | (a) first wake event recorded for the plan's date (**lean**) — piggy-backs on existing lifecycle, robust to late wakes (b) clock-time threshold (e.g. 4 AM rollover) — fires even if user forgets to record wake |
+| When does the plan doc materialize? | (a) on first edit — page idle = no doc (**lean**) (b) on page open — always one doc per visited tomorrow |
+| Template-link semantics after prefill | (a) one-shot snapshot — template changes don't propagate (**lean**) (b) loose link — template changes propagate until first override |
+
+**Out of scope**:
+- Multi-day forward planning (use §F35).
+- Per-event time edits on tomorrow's projected events (own follow-up; tomorrow's wake-time anchor stays the only time control).
+- Undoing auto-promote (no rollback button; user-recorded actuals on the day win as normal).
+
+**Estimated effort**: 2–3 days. Three PRs:
+1. Schema + repository for `TomorrowPlan` (no UI changes).
+2. Engine: materialize-on-wake rule + tests.
+3. UI: drop the template gate; rewire owner picker to write overrides; "Start from template" prefill button.
+
+---
+
 ---
 
 ## §F38 — Template extras (FAB on `/day-templates`)
