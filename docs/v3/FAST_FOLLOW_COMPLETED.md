@@ -65,3 +65,14 @@ Structurally closed by current `putdown.ts` lifecycle gate. The rule
 only sets `hasPutdown=true` for `{projected, overridden}` lifecycles
 — a manually-recorded nap is `started` or `completed`, so the
 synthetic chip can no longer be emitted. No standalone fix needed.
+
+## §F32 — Retire `EndOfDayCard`; dashboard always shows stats
+
+Shipped 2026-05-17 — branch `worktree-f32-retire-eod`. Retired
+EndOfDayCard's two early-return branches; reshaped dashboard around
+always-visible NextBottlePanel + NextSleepPanel + unified NowBanner
+(wake-window doubles as in-progress sleep banner). Wake gate replaced
+with a slim "Wake up" CTA. `StartDayButton` is dev-only.
+
+Spec: `docs/superpowers/specs/2026-05-17-f32-retire-eod-design.md`.
+Plan: `docs/superpowers/plans/2026-05-17-f32-retire-eod.md`.

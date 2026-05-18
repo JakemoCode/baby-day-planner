@@ -224,53 +224,50 @@
   - Token file: src/styles/tokens.css
 - Build status: [ ] not started
 
-## NextBottlePreview
+## NextBottlePanel
+> Renamed from `NextBottlePreview` in §F32 (2026-05-17). Adds per-day bottle totals (recorded events only).
 - Page: Dashboard
 - Dependencies: EmptyState
 - Hook: useEvents (engine selector `nextBottle`)
 - Complexity: low
 - Build config:
-  - File: src/components/Dashboard/NextBottlePreview.tsx
-  - Test: src/components/Dashboard/NextBottlePreview.test.tsx
-  - Styles: src/components/Dashboard/NextBottlePreview.module.css
-  - Test utilities: src/test-utils.ts
-  - Hook imports: @/hooks/useEvents, @/domain
+  - File: src/v3/components/Dashboard/NextBottlePanel.tsx
+  - Test: src/v3/components/Dashboard/NextBottlePanel.test.tsx
+  - Styles: src/v3/components/Dashboard/NextBottlePanel.module.css
   - Test runner: vitest
   - CSS approach: CSS Modules
   - Token file: src/styles/tokens.css
-- Build status: [ ] not started
+- Build status: [x] shipped §F32
 
-## NextNapPreview
+## NextSleepPanel
+> Renamed from `NextNapPreview` in §F32 (2026-05-17). Adds per-day nap totals (recorded events only).
 - Page: Dashboard
 - Dependencies: none
 - Hook: useEvents (engine selector `nextNap`)
 - Complexity: low
 - Build config:
-  - File: src/components/Dashboard/NextNapPreview.tsx
-  - Test: src/components/Dashboard/NextNapPreview.test.tsx
-  - Styles: src/components/Dashboard/NextNapPreview.module.css
-  - Test utilities: src/test-utils.ts
-  - Hook imports: @/hooks/useEvents, @/domain
+  - File: src/v3/components/Dashboard/NextSleepPanel.tsx
+  - Test: src/v3/components/Dashboard/NextSleepPanel.test.tsx
+  - Styles: src/v3/components/Dashboard/NextSleepPanel.module.css
   - Test runner: vitest
   - CSS approach: CSS Modules
   - Token file: src/styles/tokens.css
-- Build status: [ ] not started
+- Build status: [x] shipped §F32
 
-## CurrentWakeWindowStatus
+## NowBanner
+> Renamed from `CurrentWakeWindowStatus` in §F32 (2026-05-17). Unifies wake-window indicator + in-progress sleep banner (priority: bedtime > nap > wake-window).
 - Page: Dashboard
 - Dependencies: none
-- Hook: useEvents (engine selector `currentWakeWindow`)
+- Hook: useEvents (engine selectors `currentWakeWindow`, in-progress sleep)
 - Complexity: low
 - Build config:
-  - File: src/components/Dashboard/CurrentWakeWindowStatus.tsx
-  - Test: src/components/Dashboard/CurrentWakeWindowStatus.test.tsx
-  - Styles: src/components/Dashboard/CurrentWakeWindowStatus.module.css
-  - Test utilities: src/test-utils.ts
-  - Hook imports: @/hooks/useEvents, @/domain
+  - File: src/v3/components/Dashboard/NowBanner.tsx
+  - Test: src/v3/components/Dashboard/NowBanner.test.tsx
+  - Styles: src/v3/components/Dashboard/NowBanner.module.css
   - Test runner: vitest
   - CSS approach: CSS Modules
   - Token file: src/styles/tokens.css
-- Build status: [ ] not started
+- Build status: [x] shipped §F32
 
 ## StartBottleButton
 - Page: Dashboard
@@ -321,20 +318,9 @@
 - Build status: [ ] not started
 
 ## EndOfDayCard
-- Page: Dashboard
-- Dependencies: StartDayButton
-- Hook: useEvents
-- Complexity: low
-- Build config:
-  - File: src/components/Dashboard/EndOfDayCard.tsx
-  - Test: src/components/Dashboard/EndOfDayCard.test.tsx
-  - Styles: src/components/Dashboard/EndOfDayCard.module.css
-  - Test utilities: src/test-utils.ts
-  - Hook imports: @/hooks/useEvents
-  - Test runner: vitest
-  - CSS approach: CSS Modules
-  - Token file: src/styles/tokens.css
-- Build status: [ ] not started
+> **Retired in §F32 (2026-05-17).** Both early-return branches removed from
+> `src/app/(authed)/page.tsx`; all `EndOfDayCard.*` files deleted. Dashboard
+> now always shows stats. See `docs/v3/FAST_FOLLOW_COMPLETED.md` §F32.
 
 ---
 
@@ -616,7 +602,7 @@ Build pages last after all their components ship.
 
 ## DashboardPage
 - Page: Dashboard
-- Dependencies: AppShell, NextEventCard, NextBottlePreview, NextNapPreview, CurrentWakeWindowStatus, StartBottleButton, NapActionButton, StartDayButton, EndOfDayCard, FAB, EventEditDrawer
+- Dependencies: AppShell, NextEventCard, NextBottlePanel, NextSleepPanel, NowBanner, StartBottleButton, NapActionButton, StartDayButton, FAB, EventEditDrawer
 - Hook: useDay, useEvents, useSettings, useTemplates
 - Complexity: medium
 - Build config:
@@ -725,7 +711,7 @@ SyncStatusIcon, OwnerPicker, ConfirmDialog, EmptyState, LoadingState, FAB, Botto
 Header (uses SyncStatusIcon), AppShell (uses Header + BottomTabs + KebabMenu), EventEditDrawer (uses OwnerPicker + ConfirmDialog)
 
 **Wave 3 — Dashboard leaves**
-NextEventCard, NextBottlePreview, NextNapPreview, CurrentWakeWindowStatus, StartBottleButton, NapActionButton, StartDayButton, EndOfDayCard
+NextEventCard, NextBottlePanel, NextSleepPanel, NowBanner, StartBottleButton, NapActionButton, StartDayButton
 
 **Wave 4 — Timeline**
 DurationBlock, PointMarker, TimelineList (uses DurationBlock + PointMarker + CurrentTimeIndicator)
