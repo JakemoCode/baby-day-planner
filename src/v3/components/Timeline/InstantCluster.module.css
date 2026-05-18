@@ -16,6 +16,11 @@
   justify-content: flex-start;
   align-items: center;
   gap: 4px;
+  /* §F2b: cluster centers vertically on its time position. Replaces the
+   * previous -12 px magic offset in TimelineV3.tsx that assumed a 24 px
+   * single-row chip. Wrapped chips are ~40 px tall; this rule keeps the
+   * vertical midline locked to startMinutes regardless of chip height. */
+  transform: translateY(-50%);
   transition: opacity var(--motion-fast) var(--easing-out);
 }
 
