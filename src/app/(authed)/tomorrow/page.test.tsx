@@ -126,9 +126,11 @@ describe("TomorrowPage (V3)", () => {
   it("persists buffered extras to the new day on promote", async () => {
     render(<TomorrowPage />);
     // Add two extras through the drawer.
-    await userEvent.click(screen.getByRole("button", { name: /add extra event/i }));
+    await userEvent.click(screen.getByRole("button", { name: /add an event/i }));
+    await userEvent.click(screen.getByRole("button", { name: /custom/i }));
     await userEvent.click(screen.getByRole("button", { name: /^save$/i }));
-    await userEvent.click(screen.getByRole("button", { name: /add extra event/i }));
+    await userEvent.click(screen.getByRole("button", { name: /add an event/i }));
+    await userEvent.click(screen.getByRole("button", { name: /custom/i }));
     await userEvent.click(screen.getByRole("button", { name: /^save$/i }));
 
     await userEvent.click(screen.getByRole("button", { name: /promote to today/i }));
@@ -168,7 +170,8 @@ describe("TomorrowPage (V3)", () => {
     // Extras now default to instant (kind upgraded to "block" only if
     // the user enters an endTime), so the saved extra renders as an
     // instant-chip, not a timeline-block.
-    await userEvent.click(screen.getByRole("button", { name: /add extra event/i }));
+    await userEvent.click(screen.getByRole("button", { name: /add an event/i }));
+    await userEvent.click(screen.getByRole("button", { name: /custom/i }));
     await userEvent.click(screen.getByRole("button", { name: /^save$/i }));
 
     const extraChip = screen
