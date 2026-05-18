@@ -11,8 +11,13 @@ import { saveTemplate } from "@/v3/repositories/templates";
 import { newDayId } from "@/v3/lib/newEventId";
 import { db } from "@/lib/firebase/client";
 import { LoadingState } from "@/components/shared/LoadingState";
+import { FAB } from "@/components/shared/FAB";
+import { FABTypePicker } from "@/components/shared/FABTypePicker";
 import { EventEditDrawerV3 } from "@/v3/components/shared/EventEditDrawerV3";
-import { buildCreateTemplate } from "@/v3/components/shared/createEventTemplate";
+import {
+  buildCreateTemplate,
+  type CreatableType,
+} from "@/v3/components/shared/createEventTemplate";
 import { TomorrowForm, type TomorrowFormValue } from "@/v3/components/Tomorrow/TomorrowForm";
 import { TomorrowPreview } from "@/v3/components/Tomorrow/TomorrowPreview";
 import { PromoteTomorrowButton } from "@/v3/components/Tomorrow/PromoteTomorrowButton";
@@ -46,6 +51,7 @@ export default function TomorrowPage() {
   const [form, setForm] = useState<TomorrowFormValue>({ wakeTime: 7 * 60 });
   const [extras, setExtras] = useState<Event[]>([]);
   const [drawer, setDrawer] = useState<DrawerState>({ open: false });
+  const [pickerOpen, setPickerOpen] = useState(false);
   const [pickedEvent, setPickedEvent] = useState<Event | null>(null);
   // Local override of the selected template so owner edits in the
   // preview reflect immediately without waiting for the listener
@@ -109,9 +115,9 @@ export default function TomorrowPage() {
     router.replace("/");
   };
 
-  const handleAddExtra = () => {
+  const handleAddEvent = (type: CreatableType) => {
     const tpl = buildCreateTemplate({
-      type: "extra",
+      type,
       dayId: tomorrowDay.id,
       actuals: extras,
       settings,
@@ -125,9 +131,6 @@ export default function TomorrowPage() {
       <section className={styles.section}>
         <h2 className={styles.sectionTitle}>Plan</h2>
         <TomorrowForm value={form} templates={templates} onChange={setForm} />
-        <button type="button" onClick={handleAddExtra}>
-          Add extra event
-        </button>
       </section>
 
       <section className={styles.section}>
@@ -168,6 +171,17 @@ export default function TomorrowPage() {
           }}
         />
       )}
+
+      <FAB label="Add an event" onClick={() => setPickerOpen(true)} />
+
+      <FABTypePicker
+        open={pickerOpen}
+        onSelect={(type: CreatableType) => {
+          setPickerOpen(false);
+          handleAddEvent(type);
+        }}
+        onCancel={() => setPickerOpen(false)}
+      />
 
       <EventEditDrawerV3
         key={
