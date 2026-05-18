@@ -651,13 +651,13 @@ measure and toggle a `data-near-fit` attribute).
 
 Templates' role: pure prefill. "Start from template" copies its owners into `ownerOverrides`; further edits don't touch the template.
 
-**Design questions to settle before any code**:
+**Design decisions** (locked 2026-05-18):
 
-| Question | Options |
+| Decision | Locked |
 |---|---|
-| Auto-promote trigger | (a) first wake event recorded for the plan's date (**lean**) — piggy-backs on existing lifecycle, robust to late wakes (b) clock-time threshold (e.g. 4 AM rollover) — fires even if user forgets to record wake |
-| When does the plan doc materialize? | (a) on first edit — page idle = no doc (**lean**) (b) on page open — always one doc per visited tomorrow |
-| Template-link semantics after prefill | (a) one-shot snapshot — template changes don't propagate (**lean**) (b) loose link — template changes propagate until first override |
+| Auto-promote trigger | **First wake event recorded for the plan's date.** Piggy-backs on existing lifecycle; robust to late wakes. |
+| Plan doc materialization | **On first edit.** Opening `/tomorrow` and leaving it idle creates no doc. The first owner-pick / extra / template-prefill action is what writes the `TomorrowPlan` to Firestore. |
+| Template-link semantics | **One-shot snapshot.** "Start from template" copies its owners into `ownerOverrides` once; subsequent template edits do not propagate. |
 
 **Out of scope**:
 - Multi-day forward planning (use §F35).
