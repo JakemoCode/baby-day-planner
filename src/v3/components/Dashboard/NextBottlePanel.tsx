@@ -1,56 +1,46 @@
-import type { Event, OwnersConfig } from "@/v3/schemas";
-import { isRecorded } from "@/v3/schemas";
-import { formatTimeForDisplay } from "@/v3/ui/time";
-import { PreviewCard } from "./PreviewCard";
+import type { Event, OwnersConfig, TimeMin } from "@/v3/schemas";
+import { formatTimeForDisplay, formatTimeShort } from "@/v3/ui/time";
+import { OwnerPill } from "./OwnerPill";
+import { bottleTotals, lastBottle } from "./dashboardStats";
 
-export type NextBottlePreviewProps = {
-  bottle: Event | undefined;
-  /** True when no Bottle 1 has been logged yet — show the start-of-day prompt. */
-  bottle1Pending: boolean;
+export type NextBottlePanelProps = {
+  nextBottle: Event | undefined;
+  actuals: Event[];
+  nowMinutes: TimeMin;
   owners: OwnersConfig;
-  /** Most recent recorded bottle, shown as subtext when present. */
-  lastBottle?: Event;
 };
 
-function formatOz(oz: number): string {
-  return `${oz} oz`;
+function pluralBottles(n: number): string {
+  return n === 1 ? "bottle" : "bottles";
 }
 
-function formatLast(b: Event): string {
-  const time = formatTimeForDisplay(b.startTime);
-  return b.amountOz != null ? `Last: ${time} · ${formatOz(b.amountOz)}` : `Last: ${time}`;
-}
-
-export function NextBottlePreview({ bottle, bottle1Pending, lastBottle }: NextBottlePreviewProps) {
-  const meta = lastBottle ? formatLast(lastBottle) : undefined;
-  const metaProp = meta !== undefined ? { meta } : {};
-
-  if (!bottle) {
-    const message = bottle1Pending ? "Start first bottle for schedule" : "No more bottles today";
-    return (
-      <PreviewCard
-        heading="Next bottle"
-        ariaLabel="Next bottle"
-        primary={null}
-        emptyMessage={message}
-        {...metaProp}
-      />
-    );
-  }
-
-  const recorded = isRecorded(bottle.lifecycle);
-  const ozPart = bottle.amountOz != null ? formatOz(bottle.amountOz) : "";
-  const subtitle = recorded
-    ? `logged · ${ozPart} ${bottle.label}`.trim()
-    : `projected · based on ${ozPart} ${bottle.label}`.trim();
+export function NextBottlePanel({
+  nextBottle,
+  actuals,
+  nowMinutes,
+  owners,
+}: NextBottlePanelProps) {
+  const last = lastBottle(actuals);
+  const totals = bottleTotals(actuals);
 
   return (
-    <PreviewCard
-      heading="Next bottle"
-      ariaLabel="Next bottle"
-      primary={formatTimeForDisplay(bottle.startTime)}
-      subtitle={subtitle}
-      {...metaProp}
-    />
+    <section aria-label="Bottle stats">
+      <h3>Next bottle</h3>
+      {nextBottle && (
+        <p>
+          Next bottle: {formatTimeForDisplay(nextBottle.startTime)}{" "}
+          {nextBottle.owner && <OwnerPill owner={nextBottle.owner} owners={owners} />}
+        </p>
+      )}
+      {last && (
+        <p>
+          Based on last bottle: {last.amountOz ?? 0}oz, {nowMinutes - last.startTime} min ago (
+          {formatTimeShort(last.startTime)})
+        </p>
+      )}
+      <p>
+        Today: {totals.count} {pluralBottles(totals.count)}, {totals.oz}oz
+      </p>
+    </section>
   );
 }

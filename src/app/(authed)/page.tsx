@@ -33,7 +33,7 @@ import { EventEditDrawerV3 } from "@/v3/components/shared/EventEditDrawerV3";
 import { NowBanner } from "@/v3/components/Dashboard/NowBanner";
 import { EndOfDayCard } from "@/v3/components/Dashboard/EndOfDayCard";
 import { NapActionButton } from "@/v3/components/Dashboard/NapActionButton";
-import { NextBottlePreview } from "@/v3/components/Dashboard/NextBottlePreview";
+import { NextBottlePanel } from "@/v3/components/Dashboard/NextBottlePanel";
 import { NextEventCard } from "@/v3/components/Dashboard/NextEventCard";
 import { NextNapPreview } from "@/v3/components/Dashboard/NextNapPreview";
 import { StartBottleButton } from "@/v3/components/Dashboard/StartBottleButton";
@@ -140,8 +140,6 @@ export default function DashboardPage() {
   const inProgressBedtime = actuals.find(
     (e) => e.type === "bedtime" && isInProgress(e, settings.defaultNapLengthMinutes, nowMinutes),
   );
-  const bottle1Pending = !actuals.some((e) => e.type === "bottle" && isRecorded(e.lifecycle));
-
   // "Next" ordinals = unique nap/bottle slots that are RECORDED (the
   // user committed a specific time). Owner-only annotations have a
   // non-recorded lifecycle and don't bump the ordinal. Dedupe by
@@ -164,7 +162,6 @@ export default function DashboardPage() {
   // Smart suppression: when NextEventCard already announces the same fact a
   // preview card would, hide the preview to avoid redundancy.
   const nextType = next?.type;
-  const hideBottlePreview = nextType === "bottle";
   // V3 has no top-level "putdown" EventType; putdowns are render-only,
   // injected by `expandPutdown` in TimelineV3 and never surface through
   // `nextEvent(projected, ...)`. So nap + bedtime cover the suppression.
@@ -219,14 +216,12 @@ export default function DashboardPage() {
   return (
     <div className={styles.page}>
       <NextEventCard event={next} nowMinutes={nowMinutes} owners={settings.owners} />
-      {!hideBottlePreview && (
-        <NextBottlePreview
-          bottle={nb}
-          bottle1Pending={bottle1Pending}
-          owners={settings.owners}
-          {...(lastBottle ? { lastBottle } : {})}
-        />
-      )}
+      <NextBottlePanel
+        nextBottle={nb}
+        actuals={actuals}
+        nowMinutes={nowMinutes}
+        owners={settings.owners}
+      />
       {!hideNapPreview && (
         <NextNapPreview
           nap={nn}
