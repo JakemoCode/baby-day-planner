@@ -1,34 +1,27 @@
 /*
- * V3 Pill chip with two-row layout when owner is set:
- *   [dot] [ Bottle 1   7:00a ]
- *         [ Jake             ]
- *
- * V3 difference from V2: dot color, border color, and owner-name text
- * color are driven by the `--owner-color` CSS custom property set
- * inline by the V3 component (from `ownerColor(event.owner, owners)`).
- * If no owner is set, the property falls back to default tokens.
+ * V3 Pill chip. §F2b updates:
+ *  - dot color = event type (rules below); owner-mode preserves owner-color
+ *  - chip border = 2px owner color when [data-owner] is set
+ *  - text-align: left so the <button> default doesn't center contents
+ *  - phased layout: short chips use [label time] / [owner]; long chips
+ *    flip to [label] / [time · owner] (see InstantChip.tsx for the
+ *    measurement that drives `data-wrapped`)
  */
 
 .chip {
   display: inline-flex;
-  /* Center-align so dot + label + time sit on the same optical baseline.
-   * Previously was flex-start with a magic-number margin-top on .dot —
-   * which fought vertical centering once the chip's padding grew. */
   align-items: center;
   gap: 6px;
   padding: 6px 10px;
   border-radius: 12px;
   background: var(--color-surface-raised);
-  /* §F2b: default border is the stronger neutral; chips with an owner get
-   * a thicker (2px) owner-color band so the owner tint reads at a glance. */
   border: 1px solid var(--color-border-strong);
   font: inherit;
   color: var(--color-fg);
   cursor: pointer;
-  white-space: nowrap;
   line-height: 1;
-  max-width: 100%; /* §F2b: never exceed parent — combined with label ellipsis below */
-  text-align: left; /* §F2b: button default is center; force left so label/secondRow start at left */
+  max-width: 100%;
+  text-align: left;
   transition:
     background var(--motion-fast) var(--easing-out),
     border-color var(--motion-fast) var(--easing-out);
@@ -56,9 +49,6 @@
   height: 8px;
   border-radius: 50%;
   flex-shrink: 0;
-  /* §F2b: in type-mode the dot indicates event type (rules below); in
-   * owner-mode it keeps the existing owner-color behavior. Fallback is
-   * muted neutral for any type without an explicit assignment. */
   background: var(--color-muted);
 }
 
@@ -79,50 +69,59 @@
   background: var(--color-success);
 }
 
-/* === Content layout ================================================ */
+/* === Body & rows ============================================ */
 
 .body {
   display: inline-flex;
   flex-direction: column;
   gap: 2px;
   min-width: 0;
+  flex: 1 1 auto;
 }
 
-/* §F2b: chip body now uses the same two-row pattern as duration blocks —
- * label on row 1, owner + time on row 2. Removes the row-1 competition
- * for horizontal space that forced premature label truncation. */
+.topRow {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+  max-width: 100%;
+}
 
 .label {
   font-size: 12px;
   font-weight: var(--weight-semibold);
   white-space: nowrap;
   line-height: 1.1;
-  overflow: hidden; /* truncate ONLY as last resort */
+  overflow: hidden;
   text-overflow: ellipsis;
   min-width: 0;
-  max-width: 100%;
+  flex: 1 1 auto;
+}
+
+.time {
+  font-size: 11px;
+  color: var(--color-muted);
+  line-height: 1.1;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .secondRow {
   display: inline-flex;
-  align-items: center;
+  align-items: baseline;
   gap: 4px;
+  min-width: 0;
+  white-space: nowrap;
   font-size: 11px;
   line-height: 1.1;
   color: var(--color-muted);
-  min-width: 0;
-  white-space: nowrap;
 }
 
-/* When both time and owner appear, separate them with a middot.
- * Order is time → owner (matches "4:20 - 5:05p · Jake" duration pattern). */
+/* When the chip is wrapped, time precedes owner: render the middot via
+ * ::before so we don't need a separator span in the JSX. */
 .secondRow .time + .ownerName::before {
   content: "·";
   margin: 0 4px 0 2px;
-  color: var(--color-muted);
-}
-
-.time {
   color: var(--color-muted);
 }
 

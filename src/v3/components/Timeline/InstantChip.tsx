@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import styles from "./InstantChip.module.css";
 import type { Event, OwnersConfig } from "../../schemas";
 import { formatTimeShort } from "../../ui/time";
@@ -40,12 +41,51 @@ export function InstantChip({ event, owners, colorMode, onClick }: InstantChipPr
   const slotKey = ownerSlotKey(event.owner);
   const a11y = `${event.label} at ${time}${ownerName ? ` ${ownerName}` : ""}`;
 
+  /**
+   * §F2b layout phases (driven by overflow detection on the label):
+   *   wrapped=false → row 1: [label time], row 2: [owner] (Jake's phase 0/1)
+   *   wrapped=true  → row 1: [label],      row 2: [time · owner] (phase 2/3)
+   * When the chip resizes (or label/time change), we reset to the unwrapped
+   * state and re-measure; if the label's content width still exceeds its
+   * client width even after time vacates row 1, the label ellipses (phase 4).
+   *
+   * Stability note: we only flip to wrapped once per (label, chip-width)
+   * cycle — otherwise time vacating would restore label headroom and
+   * oscillate the layout.
+   */
+  const chipRef = useRef<HTMLElement | null>(null);
+  const labelRef = useRef<HTMLSpanElement | null>(null);
+  const [wrapped, setWrapped] = useState(false);
+
+  useLayoutEffect(() => {
+    setWrapped(false);
+  }, [label, time]);
+
+  useLayoutEffect(() => {
+    if (wrapped) return;
+    const el = labelRef.current;
+    if (!el) return;
+    if (el.scrollWidth > el.clientWidth + 0.5) {
+      setWrapped(true);
+    }
+  });
+
+  useEffect(() => {
+    const el = chipRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(() => setWrapped(false));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
   return (
     <Tag
+      ref={chipRef as never}
       data-testid="instant-chip"
       data-type={event.type}
       data-color-mode={colorMode}
       data-static={!interactive}
+      data-wrapped={wrapped}
       className={styles.chip}
       style={ownerStyleVar(ownerColor(event.owner, owners))}
       {...(slotKey ? { "data-owner": slotKey } : {})}
@@ -55,15 +95,22 @@ export function InstantChip({ event, owners, colorMode, onClick }: InstantChipPr
     >
       <span className={styles.dot} aria-hidden="true" />
       <span className={styles.body}>
-        <span className={styles.label}>{label}</span>
-        <span className={styles.secondRow}>
-          <span className={styles.time}>{time}</span>
-          {ownerName && (
-            <span className={styles.ownerName} {...(slotKey ? { "data-owner": slotKey } : {})}>
-              {ownerName}
-            </span>
-          )}
+        <span className={styles.topRow}>
+          <span ref={labelRef} className={styles.label}>
+            {label}
+          </span>
+          {!wrapped && <span className={styles.time}>{time}</span>}
         </span>
+        {(wrapped || ownerName) && (
+          <span className={styles.secondRow}>
+            {wrapped && <span className={styles.time}>{time}</span>}
+            {ownerName && (
+              <span className={styles.ownerName} {...(slotKey ? { "data-owner": slotKey } : {})}>
+                {ownerName}
+              </span>
+            )}
+          </span>
+        )}
       </span>
     </Tag>
   );
