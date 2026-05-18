@@ -106,5 +106,5 @@ post-PR-open: synth-putdown leak into `NextEventCard`, missing card
 chrome on stat panels, and a typography pass aligning panel hierarchy
 with `NextEventCard` (hero accent time + delta + footer with totals).
 
-Spec: `docs/superpowers/specs/2026-05-17-f32-retire-eod-design.md`.
-Plan: `docs/superpowers/plans/2026-05-17-f32-retire-eod.md`.
+Spec: `docs/_archive/superpowers/specs/2026-05-17-f32-retire-eod-design.md`.
+Plan: `docs/_archive/superpowers/plans/2026-05-17-f32-retire-eod.md`.

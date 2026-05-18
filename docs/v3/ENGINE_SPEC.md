@@ -82,7 +82,7 @@ and `src/v3/ui/dreamFeedLabel.ts` for the label application behavior.
 Historical engine rules R8.0–R8.9 are archived in
 [REQUIREMENTS_v3_legacy.md](../_archive/v3/REQUIREMENTS_v3_legacy.md).
 They were removed because dream feed is not a scheduling concern — it
-is purely a display concern. See `docs/v3/SIMPLIFICATION_SCOPE.md §3`
+is purely a display concern. See `docs/_archive/v3/SIMPLIFICATION_SCOPE.md §3`
 for the decision rationale.
 
 ---
@@ -323,7 +323,7 @@ their original eventKey. Lookups by `id` stay intact.
 The no-feed region for each nap is `[nap.startTime, nap.endTime]` — the
 nap itself. (Note: the putdown wind-down is NOT part of the no-feed
 region; wind-down is render-only and a bottle can legitimately be the
-entirety of wind-down. See `docs/v3/SIMPLIFICATION_SCOPE.md §7 Q2`.)
+entirety of wind-down. See `docs/_archive/v3/SIMPLIFICATION_SCOPE.md §7 Q2`.)
 
 If a **projected** bottle's startTime falls strictly inside the
 no-feed region, the engine moves it to whichever region edge —
@@ -436,7 +436,7 @@ cascade once recordings start.
 > accidental-duplicate guard (UX layer) is the only protection needed
 > at record-time. Smaller bottles legitimately produce shorter intervals
 > (DOMAIN.md §2); the engine has no business calling that anomalous.
-> See `SIMPLIFICATION_SCOPE.md §7 Q4` for the decision rationale.
+> See `../_archive/v3/SIMPLIFICATION_SCOPE.md §7 Q4` for the decision rationale.
 
 ---
 
@@ -849,7 +849,7 @@ setup; configurable for other families).
 This is the ONLY event with a rule-derived (vs. template-derived)
 default owner. Dream-feed engine-side owner inheritance has been
 removed; see [Removed Concepts](#removed-concepts) and
-`SIMPLIFICATION_SCOPE.md §3.3`.
+`../_archive/v3/SIMPLIFICATION_SCOPE.md §3.3`.
 
 ### R12.9 No template inheritance for: wake events, extras (manual), dailyRecurring (uses its own default)
 
