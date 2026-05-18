@@ -14,9 +14,14 @@
   color-scheme: light;
 
   /* ─────── Surfaces ─────── */
-  --color-bg: #fbf8f3; /* warm cream */
-  --color-surface: #ffffff; /* card surface */
-  --color-surface-raised: #fefcf7; /* slight warm tint for elevation */
+  /* §F2a (2026-05-18): bg darkened to deepen cream so the existing
+     white cards visibly lift off the page (1.06 → 1.19). Cards stay
+     pure white; raised stays the original off-white for timeline
+     block warmth. Spec asked for ≥1.4 but the wedding palette doesn't
+     tolerate that delta without going sandy. */
+  --color-bg: #f2ebde; /* deeper warm cream */
+  --color-surface: #ffffff; /* white cards */
+  --color-surface-raised: #fefcf7; /* slight warm tint — timeline blocks */
 
   /* ─────── Foreground ─────── */
   --color-fg: #2a2520; /* warm near-black */
