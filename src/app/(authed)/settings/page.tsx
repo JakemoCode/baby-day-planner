@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { db } from "@/lib/firebase/client";
 import { LoadingState } from "@/components/shared/LoadingState";
 import { SettingsAccount } from "@/v3/components/shared/SettingsAccount";
@@ -13,6 +14,13 @@ import styles from "./page.module.css";
 
 const CHILD_ID = process.env.NEXT_PUBLIC_DEFAULT_CHILD_ID ?? "aden";
 
+const ACCORDION_STORAGE_KEY = "bdp.settings.accordion.openSlug";
+const DEFAULT_OPEN_SLUG = "default-times";
+
+function slugify(title: string): string {
+  return title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+}
+
 function parseTime(s: string): TimeMin {
   const m = /^(\d{1,2}):(\d{2})$/.exec(s);
   if (!m) return 0;
@@ -21,6 +29,26 @@ function parseTime(s: string): TimeMin {
 
 export default function SettingsPage() {
   const { settings, loading } = useV3Settings(CHILD_ID);
+  const [openSlug, setOpenSlug] = useState<string>(DEFAULT_OPEN_SLUG);
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(ACCORDION_STORAGE_KEY);
+      if (stored) setOpenSlug(stored);
+    } catch {
+      // localStorage unavailable (private mode) — fall through to default.
+    }
+  }, []);
+
+  const handleToggle = (slug: string) => {
+    const next = openSlug === slug ? "" : slug;
+    setOpenSlug(next);
+    try {
+      localStorage.setItem(ACCORDION_STORAGE_KEY, next);
+    } catch {
+      // localStorage unavailable — state still updates in-memory.
+    }
+  };
 
   if (loading) {
     return (
@@ -45,7 +73,7 @@ export default function SettingsPage() {
 
       <OwnersConfigEditor value={value.owners} onChange={(owners) => set("owners", owners)} />
 
-      <Section title="Default times">
+      <Section title="Default times" isOpen={openSlug === "default-times"} onToggle={handleToggle}>
         <TimeRow
           id="defaultWakeTime"
           label="Default wake time"
@@ -61,7 +89,7 @@ export default function SettingsPage() {
         />
       </Section>
 
-      <Section title="Naps">
+      <Section title="Naps" isOpen={openSlug === "naps"} onToggle={handleToggle}>
         <NumberRow
           id="defaultNapLengthMinutes"
           label="Default nap length (min)"
@@ -101,14 +129,14 @@ export default function SettingsPage() {
         />
       </Section>
 
-      <Section title="Wake windows (per nap N)">
+      <Section title="Wake windows (per nap N)" isOpen={openSlug === "wake-windows-per-nap-n"} onToggle={handleToggle}>
         <WakeWindowsRow
           value={value.wakeWindowsMinutes}
           onChange={(v) => set("wakeWindowsMinutes", v)}
         />
       </Section>
 
-      <Section title="Bottles">
+      <Section title="Bottles" isOpen={openSlug === "bottles"} onToggle={handleToggle}>
         <NumberRow
           id="defaultBottleAmountOz"
           label="Default amount (oz)"
@@ -148,7 +176,7 @@ export default function SettingsPage() {
         />
       </Section>
 
-      <Section title="Pumps">
+      <Section title="Pumps" isOpen={openSlug === "pumps"} onToggle={handleToggle}>
         <PumpTimesRow value={value.pumpTimes} onChange={(v) => set("pumpTimes", v)} />
         <NumberRow
           id="defaultPumpDurationMinutes"
@@ -165,7 +193,7 @@ export default function SettingsPage() {
         />
       </Section>
 
-      <Section title="Dream feed">
+      <Section title="Dream feed" isOpen={openSlug === "dream-feed"} onToggle={handleToggle}>
         <CheckboxRow
           id="dreamFeedEnabled"
           label="Label first post-bedtime bottle as Dream Feed"
@@ -175,7 +203,7 @@ export default function SettingsPage() {
         />
       </Section>
 
-      <Section title="Timeline display">
+      <Section title="Timeline display" isOpen={openSlug === "timeline-display"} onToggle={handleToggle}>
         <ColorModeRow
           id="timelineColorMode"
           label="Color encodes"
@@ -204,12 +232,34 @@ export default function SettingsPage() {
   );
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({
+  title,
+  isOpen,
+  onToggle,
+  children,
+}: {
+  title: string;
+  isOpen: boolean;
+  onToggle: (slug: string) => void;
+  children: React.ReactNode;
+}) {
+  const slug = slugify(title);
   return (
-    <section className={styles.section}>
-      <h2 className={styles.sectionTitle}>{title}</h2>
+    <details className={styles.section} open={isOpen}>
+      <summary
+        className={styles.sectionSummary}
+        onClick={(e) => {
+          e.preventDefault();
+          onToggle(slug);
+        }}
+      >
+        <span className={styles.sectionChevron} aria-hidden="true">
+          ▸
+        </span>
+        <h2 className={styles.sectionTitle}>{title}</h2>
+      </summary>
       <div className={styles.sectionBody}>{children}</div>
-    </section>
+    </details>
   );
 }
 
