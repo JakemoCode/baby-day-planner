@@ -11,17 +11,21 @@ import styles from "./AppShell.module.css";
 export type AppShellProps = {
   childId: string;
   childName: string;
+  /** Optional ISO "YYYY-MM-DD" — when present, Header renders age beside name. */
+  dateOfBirth?: string;
   children: ReactNode;
 };
 
-export function AppShell({ childId, childName, children }: AppShellProps) {
+export function AppShell({ childId, childName, dateOfBirth, children }: AppShellProps) {
   const { day } = useV3Day(childId);
   const dateProp = day?.date ? { date: day.date } : {};
+  const dobProp = dateOfBirth ? { dateOfBirth } : {};
 
   return (
     <div className={styles.shell}>
       <Header
         childName={childName}
+        {...dobProp}
         {...dateProp}
         actions={
           <>

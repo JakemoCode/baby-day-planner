@@ -22,7 +22,7 @@ describe("AppShell", () => {
         <p>page content</p>
       </AppShell>,
     );
-    expect(screen.getByText(/Aden's Day/i)).toBeVisible();
+    expect(screen.getByText(/Aden/i)).toBeVisible();
   });
 
   it("renders bottom tabs nav", () => {

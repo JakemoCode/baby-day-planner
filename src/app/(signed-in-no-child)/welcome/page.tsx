@@ -105,9 +105,7 @@ export default function WelcomePage() {
       {step === 1 && (
         <form className={styles.form} onSubmit={nextStep}>
           <p className={styles.eyebrow}>First time setup · Step 1 of 2</p>
-          <p className={styles.intro}>
-            Let&apos;s get you set up — a couple of details so the app can start helping right away.
-          </p>
+          <p className={styles.intro}>Enter a couple details so we can get you set up</p>
           <label className={styles.field}>
             <span>Child&apos;s name</span>
             <input

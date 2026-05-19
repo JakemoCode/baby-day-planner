@@ -43,7 +43,11 @@ export default function SignedInWithChildLayout({ children }: { children: ReactN
 
   return (
     <ChildProvider child={resolution.child}>
-      <AppShell childId={resolution.child.id} childName={resolution.child.displayName}>
+      <AppShell
+        childId={resolution.child.id}
+        childName={resolution.child.displayName}
+        dateOfBirth={resolution.child.dateOfBirth}
+      >
         {children}
       </AppShell>
     </ChildProvider>
