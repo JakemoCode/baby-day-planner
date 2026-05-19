@@ -7,12 +7,18 @@
   gap: var(--space-5);
 }
 
-.heading {
-  font-size: var(--font-size-2xl);
+.cardHeading {
+  font-size: var(--font-size-xl);
   font-weight: 700;
   color: var(--color-fg);
   margin: 0;
-  text-align: center;
+  line-height: 1.2;
+}
+
+.divider {
+  border: 0;
+  border-top: 1px solid var(--color-border);
+  margin: 0;
 }
 
 .eyebrow {

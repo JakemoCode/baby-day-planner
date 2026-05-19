@@ -101,10 +101,11 @@ export default function WelcomePage() {
 
   return (
     <div className={styles.page}>
-      <h1 className={styles.heading}>Welcome to Baby Day Planner</h1>
       {step === 1 && (
         <form className={styles.form} onSubmit={nextStep}>
+          <h1 className={styles.cardHeading}>Welcome to Baby Day Planner</h1>
           <p className={styles.eyebrow}>First time setup · Step 1 of 2</p>
+          <hr className={styles.divider} />
           <label className={styles.field}>
             <span>Child&apos;s name</span>
             <input
@@ -134,7 +135,9 @@ export default function WelcomePage() {
       )}
       {step === 2 && (
         <form className={styles.form} onSubmit={submit}>
+          <h1 className={styles.cardHeading}>Almost there</h1>
           <p className={styles.eyebrow}>First time setup · Step 2 of 2</p>
+          <hr className={styles.divider} />
           <label className={styles.field}>
             <span>Parent 1 name</span>
             <input
