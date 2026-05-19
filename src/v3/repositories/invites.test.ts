@@ -7,7 +7,11 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import type { RulesTestEnvironment } from "@firebase/rules-unit-testing";
 import type { Firestore } from "firebase/firestore";
-import { ALLOWED_USER, startTestEnv } from "../../../tests/integration/firestore-test-utils";
+import {
+  ALLOWED_USER,
+  seedAllowedUser,
+  startTestEnv,
+} from "../../../tests/integration/firestore-test-utils";
 import type { Invite } from "../schemas";
 import { consumeInvite, createInvite, loadInvite } from "./invites";
 import { createUser, loadUser } from "./users";
@@ -34,6 +38,9 @@ describe("v3 invites repository", () => {
   });
   beforeEach(async () => {
     await env.clearFirestore();
+    // Jake (inviter) must have "child-xyz" in his user doc — the tightened
+    // /invites create rule requires childId in inviter's users.childIds.
+    await seedAllowedUser(env, ALLOWED_USER.uid, ["child-xyz"]);
   });
 
   function dbAs(user: { uid: string; email: string }): Firestore {

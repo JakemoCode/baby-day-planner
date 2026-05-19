@@ -28,9 +28,10 @@ export default function InvitePage() {
   const { user, status } = useAuth();
   const router = useRouter();
   const [claim, setClaim] = useState<ClaimState>({ status: "idle" });
-  // Ref-based gate (not state) so we can kick off the async claim WITHOUT
-  // calling setState synchronously in the effect body — React 19's
-  // `react-hooks/set-state-in-effect` rule forbids that path.
+  // Once-guard against React Strict Mode's double effect-fire in dev:
+  // without it, two concurrent consumeInvite transactions would race and
+  // the second would throw "already consumed". Ref (not state) avoids
+  // re-renders.
   const startedRef = useRef(false);
 
   useEffect(() => {

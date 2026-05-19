@@ -33,5 +33,4 @@ export async function sendInviteEmail(_input: SendInviteEmailInput): Promise<voi
   // TODO(post-PR #2): wire the actual provider here. Until then, even when
   // the flag flips on, sending is a no-op — the recipient still needs the
   // copy-link UX. Provider choice + integration land in a separate PR.
-  return;
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth/useAuth";
 import { AppShell } from "@/components/shared/AppShell";
@@ -27,17 +27,25 @@ export default function SignedInWithChildLayout({ children }: { children: ReactN
     }
   }, [status, router]);
 
+  // Once we've ever resolved to "ready" this session, never redirect to
+  // /welcome again. This catches the post-onboarding-writeBatch race where
+  // the fresh useV3User subscription briefly fires with the pre-write
+  // cached snapshot (user=null) before the server snapshot arrives —
+  // bouncing back to /welcome would remount WelcomePage at step 1 (bug
+  // Jake hit on 2026-05-19). Latched in an effect so the ref update
+  // doesn't fire during render; the redirect effect below reads it.
+  const everReadyRef = useRef(false);
+
   useEffect(() => {
-    // Grace period before redirecting to /welcome: after the welcome submit's
-    // writeBatch, this layout mounts and its fresh useV3User subscription
-    // can briefly fire with the pre-write cached snapshot (user=null) before
-    // the server snapshot arrives. Without this delay, the brief "no-user-doc"
-    // bounces back to /welcome and remounts WelcomePage at step 1 (bug Jake
-    // hit on 2026-05-19). 200ms is longer than the snapshot lag but short
-    // enough to feel instant for the genuine "you haven't onboarded yet" case.
+    if (resolution.status === "ready") {
+      everReadyRef.current = true;
+    }
+  }, [resolution.status]);
+
+  useEffect(() => {
     if (resolution.status !== "no-user-doc" && resolution.status !== "no-child") return;
-    const timer = setTimeout(() => router.replace("/welcome"), 200);
-    return () => clearTimeout(timer);
+    if (everReadyRef.current) return;
+    router.replace("/welcome");
   }, [resolution.status, router]);
 
   if (resolution.status !== "ready") {

@@ -125,6 +125,7 @@ export function InviteCoParentSection() {
         onClick={() => {
           setToken(null);
           setCopied(false);
+          setError(null);
         }}
       >
         Generate a different link
