@@ -13,7 +13,6 @@ import { formatHM24 } from "@/v3/ui/time";
 import styles from "./page.module.css";
 import { useCurrentChild } from "@/v3/context/ChildProvider";
 
-
 const ACCORDION_STORAGE_KEY = "bdp.settings.accordion.openSlug";
 const DEFAULT_OPEN_SLUG = "default-times";
 

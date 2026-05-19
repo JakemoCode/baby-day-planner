@@ -164,7 +164,9 @@ export default function WelcomePage() {
               required
               aria-label="Default wake time"
             />
-            <small>You can tune nap length, bedtime threshold, and wake windows later in Settings.</small>
+            <small>
+              You can tune nap length, bedtime threshold, and wake windows later in Settings.
+            </small>
           </label>
           {error && (
             <p role="alert" className={styles.error}>

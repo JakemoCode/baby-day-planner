@@ -34,7 +34,6 @@ import { StartDayButton } from "@/v3/components/Dashboard/StartDayButton";
 import styles from "./page.module.css";
 import { useCurrentChild } from "@/v3/context/ChildProvider";
 
-
 type DrawerState =
   | { open: false }
   | { open: true; mode: "create"; template: Event }

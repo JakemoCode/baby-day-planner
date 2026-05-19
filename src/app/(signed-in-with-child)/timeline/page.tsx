@@ -20,7 +20,6 @@ import { TimelineV3 } from "@/v3/components/Timeline/TimelineV3";
 import styles from "./page.module.css";
 import { useCurrentChild } from "@/v3/context/ChildProvider";
 
-
 type DrawerState =
   | { open: false }
   | { open: true; mode: "create"; template: Event }

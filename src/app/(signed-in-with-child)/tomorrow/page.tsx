@@ -26,7 +26,6 @@ import { setOwnerInTemplate } from "@/v3/components/DayTemplates/setOwnerInTempl
 import styles from "./page.module.css";
 import { useCurrentChild } from "@/v3/context/ChildProvider";
 
-
 // Anchor the Tomorrow page's "now" to noon so create-templates and
 // drawer constraints land in the middle of the planned day rather
 // than wherever the user happens to be browsing from.

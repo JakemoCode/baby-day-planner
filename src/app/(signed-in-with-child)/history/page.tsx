@@ -11,7 +11,6 @@ import { HistoryList } from "@/v3/components/History/HistoryList";
 import styles from "./page.module.css";
 import { useCurrentChild } from "@/v3/context/ChildProvider";
 
-
 export default function HistoryPage() {
   const CHILD_ID = useCurrentChild().id;
   const router = useRouter();
