@@ -38,13 +38,7 @@ export function useChildResolution(): ChildProviderResolution {
   return { status: "ready", child };
 }
 
-export function ChildProvider({
-  child,
-  children,
-}: {
-  child: Child;
-  children: ReactNode;
-}) {
+export function ChildProvider({ child, children }: { child: Child; children: ReactNode }) {
   return <ChildContext.Provider value={{ child }}>{children}</ChildContext.Provider>;
 }
 

@@ -35,19 +35,11 @@ export async function createUser(db: Firestore, user: User): Promise<void> {
   await setDoc(userRef(db, user.uid), user);
 }
 
-export async function addChildToUser(
-  db: Firestore,
-  uid: string,
-  childId: string,
-): Promise<void> {
+export async function addChildToUser(db: Firestore, uid: string, childId: string): Promise<void> {
   await updateDoc(doc(db, userPath(uid)), { childIds: arrayUnion(childId) });
 }
 
-export function watchUser(
-  db: Firestore,
-  uid: string,
-  cb: (user: User | null) => void,
-): () => void {
+export function watchUser(db: Firestore, uid: string, cb: (user: User | null) => void): () => void {
   return onSnapshot(userRef(db, uid), (snap) => {
     cb(snap.exists() ? snap.data() : null);
   });

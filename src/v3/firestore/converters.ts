@@ -12,7 +12,15 @@ import type {
   QueryDocumentSnapshot,
   SnapshotOptions,
 } from "firebase/firestore";
-import type { Child, Day, Event, OwnershipTemplate, Settings, TomorrowPlan, User } from "../schemas";
+import type {
+  Child,
+  Day,
+  Event,
+  OwnershipTemplate,
+  Settings,
+  TomorrowPlan,
+  User,
+} from "../schemas";
 import { withV3DayDefaults } from "./dayDefaults";
 import { withV3EventDefaults } from "./eventDefaults";
 import { withV3SettingsDefaults } from "./settingsDefaults";
