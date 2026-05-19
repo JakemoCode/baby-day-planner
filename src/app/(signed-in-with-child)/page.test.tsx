@@ -141,13 +141,13 @@ describe("DashboardPage (V3)", () => {
   it("shows Wake up button when there is no active day (settings present)", () => {
     setupHooks({ day: null, settings: makeSettings() });
     renderWithAuth(<DashboardPage />);
-    expect(screen.getByRole("button", { name: /Wake up/i })).toBeVisible();
+    expect(screen.getByRole("button", { name: /Start first day/i })).toBeVisible();
   });
 
   it("wake-gate: Day with wakeTime undefined is treated as no active day", () => {
     setupHooks({ day: makeDay({ wakeTime: undefined as unknown as number }) });
     renderWithAuth(<DashboardPage />);
-    expect(screen.getByRole("button", { name: /Wake up/i })).toBeVisible();
+    expect(screen.getByRole("button", { name: /Start first day/i })).toBeVisible();
   });
 
   it("settings missing post-§F3: dashboard renders loading, not the Wake up gate", () => {
@@ -157,7 +157,7 @@ describe("DashboardPage (V3)", () => {
     // never re-spawn the bootstrap-seed flow that PR #1 removed.
     setupHooks({ day: null, settings: null });
     renderWithAuth(<DashboardPage />);
-    expect(screen.queryByRole("button", { name: /Wake up/i })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Start first day/i })).toBeNull();
     expect(screen.getByText(/Loading today/i)).toBeVisible();
   });
 
@@ -165,7 +165,7 @@ describe("DashboardPage (V3)", () => {
     it("clicks Wake up → creates day at settings.defaultWakeTime (no settings seed)", async () => {
       setupHooks({ day: null, settings: makeSettings({ defaultWakeTime: 8 * 60 + 15 }) });
       renderWithAuth(<DashboardPage />);
-      await userEvent.click(screen.getByRole("button", { name: /Wake up/i }));
+      await userEvent.click(screen.getByRole("button", { name: /Start first day/i }));
 
       // §F3 PR #1: settings is guaranteed present by the layout gate —
       // dashboard never seeds defaults.
@@ -185,7 +185,7 @@ describe("DashboardPage (V3)", () => {
         settings: makeSettings({ defaultWakeTime: 7 * 60 }),
       });
       renderWithAuth(<DashboardPage />);
-      await userEvent.click(screen.getByRole("button", { name: /Wake up/i }));
+      await userEvent.click(screen.getByRole("button", { name: /Start first day/i }));
 
       expect(saveSettingsMock).not.toHaveBeenCalled();
       expect(startNewDayMock).toHaveBeenCalledTimes(1);
@@ -202,7 +202,7 @@ describe("DashboardPage (V3)", () => {
     renderWithAuth(<DashboardPage />);
     // Must NOT show the Wake up button; should show the dashboard surface
     // with at least the "add an event" FAB.
-    expect(screen.queryByRole("button", { name: /Wake up/i })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Start first day/i })).toBeNull();
     expect(screen.getByRole("button", { name: /Add an event/i })).toBeVisible();
   });
 
@@ -212,7 +212,7 @@ describe("DashboardPage (V3)", () => {
       projected: [], // no upcoming event
     });
     renderWithAuth(<DashboardPage />);
-    expect(screen.queryByRole("button", { name: /Wake up/i })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Start first day/i })).toBeNull();
     expect(screen.getByRole("button", { name: /Add an event/i })).toBeVisible();
   });
 
@@ -234,7 +234,7 @@ describe("DashboardPage (V3)", () => {
     };
     setupHooks({ nowMinutes: 20 * 60, projected: [upcoming] });
     renderWithAuth(<DashboardPage />);
-    expect(screen.queryByRole("button", { name: /Wake up/i })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Start first day/i })).toBeNull();
     expect(screen.getByRole("button", { name: /Add an event/i })).toBeVisible();
   });
 

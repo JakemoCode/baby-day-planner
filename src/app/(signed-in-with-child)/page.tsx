@@ -98,9 +98,9 @@ export default function DashboardPage() {
       });
     };
     return (
-      <div className={styles.page}>
+      <div className={styles.firstDayGate}>
         <ActionButton variant="primary" onClick={() => void handleStart()}>
-          Wake up
+          Start first day
         </ActionButton>
       </div>
     );

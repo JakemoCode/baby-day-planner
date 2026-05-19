@@ -5,6 +5,19 @@
   padding: var(--space-4);
 }
 
+/* First-day gate — vertically/horizontally centered single CTA. Used when
+   the day doc hasn't been anchored yet (just-onboarded user, or first
+   load of a new calendar date until §F17 ships auto-anchor). */
+.firstDayGate {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  min-height: 70vh;
+}
+
 .actions {
   display: flex;
   flex-direction: column;
