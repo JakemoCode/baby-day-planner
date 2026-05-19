@@ -687,106 +687,52 @@ function DaycareEditor({
   owners: Settings["owners"];
   onChange: (next: DaycareConfig) => void;
 }) {
-  function isOwnerValid(c: DaycareConfig): boolean {
-    return c.ownerId !== "" && owners.other.some((o) => o.id === c.ownerId);
-  }
-  function isTimeRangeValid(c: DaycareConfig): boolean {
-    return c.dropoffTime < c.pickupTime;
-  }
-  const ownerOK = isOwnerValid(value);
-  const timesOK = isTimeRangeValid(value);
-  const canEnable = ownerOK && timesOK;
-
-  // R21.6 (UI validation gate). Auto-disable daycare when the config
-  // becomes invalid so the engine never stamps a bogus owner onto window
-  // events. The user re-enables once owner + times are valid again.
-  const commit = (next: DaycareConfig) => {
-    const stillValid = isOwnerValid(next) && isTimeRangeValid(next);
-    onChange(next.enabled && !stillValid ? { ...next, enabled: false } : next);
-  };
-
+  const timesOK = value.dropoffTime < value.pickupTime;
   return (
     <>
       <CheckboxRow
         id="daycare-enabled"
         label="Enable daycare"
         value={value.enabled}
-        disabled={!canEnable}
-        onChange={(enabled) => commit({ ...value, enabled })}
-        help={
-          canEnable
-            ? "When enabled, events between dropoff and pickup on the chosen weekdays auto-assign the daycare owner."
-            : "Pick a daycare owner and make sure dropoff is before pickup to enable."
-        }
+        onChange={(enabled) => onChange({ ...value, enabled })}
+        help="On enabled weekdays the day starts with a daycare dropoff and pickup. Events between are understood to happen at daycare."
       />
-      <DaycareOwnerRow
-        id="daycare-owner"
-        label="Daycare owner"
-        value={value.ownerId}
+      <OwnerSlotRow
+        id="daycare-dropoff-owner"
+        label="Dropoff owner"
+        value={value.dropoffOwnerSlot}
         owners={owners}
-        onChange={(ownerId) => commit({ ...value, ownerId })}
+        onChange={(dropoffOwnerSlot) => onChange({ ...value, dropoffOwnerSlot })}
+      />
+      <OwnerSlotRow
+        id="daycare-pickup-owner"
+        label="Pickup owner"
+        value={value.pickupOwnerSlot}
+        owners={owners}
+        onChange={(pickupOwnerSlot) => onChange({ ...value, pickupOwnerSlot })}
       />
       <TimeRow
         id="daycare-dropoff"
         label="Dropoff time"
         value={value.dropoffTime}
-        onChange={(dropoffTime) => commit({ ...value, dropoffTime })}
+        onChange={(dropoffTime) => onChange({ ...value, dropoffTime })}
       />
       <TimeRow
         id="daycare-pickup"
         label="Pickup time"
         value={value.pickupTime}
-        onChange={(pickupTime) => commit({ ...value, pickupTime })}
+        onChange={(pickupTime) => onChange({ ...value, pickupTime })}
       />
       {!timesOK && (
         <small className={styles.fieldHelp} role="alert">
           Dropoff must be before pickup.
         </small>
       )}
-      <WeekdaysRow value={value.weekdays} onChange={(weekdays) => commit({ ...value, weekdays })} />
+      <WeekdaysRow
+        value={value.weekdays}
+        onChange={(weekdays) => onChange({ ...value, weekdays })}
+      />
     </>
-  );
-}
-
-function DaycareOwnerRow({
-  id,
-  label,
-  value,
-  owners,
-  onChange,
-}: {
-  id: string;
-  label: string;
-  value: string;
-  owners: Settings["owners"];
-  onChange: (next: string) => void;
-}) {
-  const others = owners.other;
-  return (
-    <div className={styles.field}>
-      <label htmlFor={id} className={styles.fieldLabel}>
-        {label}
-      </label>
-      {others.length === 0 ? (
-        <small className={styles.fieldHelp}>
-          Add a daycare entry under <strong>Owners</strong> first, then select it here.
-        </small>
-      ) : (
-        <select
-          id={id}
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          className={styles.input}
-        >
-          <option value="">— pick an owner —</option>
-          {others.map((o) => (
-            <option key={o.id} value={o.id}>
-              {o.displayName.trim() || `Other (${o.id.slice(0, 6)})`}
-            </option>
-          ))}
-        </select>
-      )}
-    </div>
   );
 }
 

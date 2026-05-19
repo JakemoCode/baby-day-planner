@@ -51,7 +51,8 @@ const DEFAULTS: Omit<Settings, "childId"> = {
     enabled: false,
     dropoffTime: 8 * 60,
     pickupTime: 17 * 60,
-    ownerId: "",
+    dropoffOwnerSlot: "parent1",
+    pickupOwnerSlot: "parent2",
     weekdays: {
       mon: false,
       tue: false,

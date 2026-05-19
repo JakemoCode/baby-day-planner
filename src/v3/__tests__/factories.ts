@@ -165,7 +165,8 @@ export function aSettings(overrides: Partial<Settings> = {}): Settings {
       enabled: false,
       dropoffTime: 8 * 60 + 30,
       pickupTime: 17 * 60 + 30,
-      ownerId: "daycare",
+    dropoffOwnerSlot: "parent1",
+    pickupOwnerSlot: "parent2",
       weekdays: { mon: true, tue: true, wed: true, thu: true, fri: true, sat: false, sun: false },
     },
     owners: {
