@@ -160,6 +160,8 @@ describe("WelcomePage", () => {
     await userEvent.type(screen.getByLabelText(/Child's name/i), "Aden");
     await userEvent.type(screen.getByLabelText(/Date of birth/i), "2025-04-10");
     await userEvent.click(screen.getByRole("button", { name: /Next/i }));
+    // Parent 1 is required — fill it so browser form-validation doesn't block submit.
+    await userEvent.type(screen.getByLabelText(/Parent 1 name/i), "Jake");
     await userEvent.click(screen.getByRole("button", { name: /Get started/i }));
 
     const alert = await screen.findByRole("alert");

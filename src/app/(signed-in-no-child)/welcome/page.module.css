@@ -46,6 +46,11 @@
   color: var(--color-fg);
 }
 
+.optional {
+  font-weight: 400;
+  color: var(--color-muted);
+}
+
 .field input {
   padding: var(--space-3);
   font-size: var(--font-size-md);

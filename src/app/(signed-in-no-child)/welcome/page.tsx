@@ -43,8 +43,8 @@ export default function WelcomePage() {
   const [step, setStep] = useState<Step>(1);
   const [displayName, setDisplayName] = useState("");
   const [dateOfBirth, setDateOfBirth] = useState("");
-  const [parent1Name, setParent1Name] = useState("Parent 1");
-  const [parent2Name, setParent2Name] = useState("Parent 2");
+  const [parent1Name, setParent1Name] = useState("");
+  const [parent2Name, setParent2Name] = useState("");
   const [wakeTimeStr, setWakeTimeStr] = useState("07:00");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -141,16 +141,20 @@ export default function WelcomePage() {
               type="text"
               value={parent1Name}
               onChange={(e) => setParent1Name(e.target.value)}
+              placeholder="e.g. Jake"
               required
               aria-label="Parent 1 name"
             />
           </label>
           <label className={styles.field}>
-            <span>Parent 2 name (optional)</span>
+            <span>
+              Parent 2 name <span className={styles.optional}>(optional)</span>
+            </span>
             <input
               type="text"
               value={parent2Name}
               onChange={(e) => setParent2Name(e.target.value)}
+              placeholder="e.g. Kelly"
               aria-label="Parent 2 name"
             />
           </label>
