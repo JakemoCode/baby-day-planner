@@ -1,5 +1,6 @@
 export const CHILDREN = "children";
 export const USERS = "users";
+export const INVITES = "invites";
 
 export function childPath(childId: string): string {
   return `${CHILDREN}/${childId}`;
@@ -7,6 +8,10 @@ export function childPath(childId: string): string {
 
 export function userPath(uid: string): string {
   return `${USERS}/${uid}`;
+}
+
+export function invitePath(token: string): string {
+  return `${INVITES}/${token}`;
 }
 
 export function settingsPath(childId: string): string {

@@ -8,7 +8,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import type { RulesTestEnvironment } from "@firebase/rules-unit-testing";
 import type { Firestore } from "firebase/firestore";
-import { ALLOWED_USER, startTestEnv } from "../../../tests/integration/firestore-test-utils";
+import { ALLOWED_USER, seedAllowedUser, startTestEnv } from "../../../tests/integration/firestore-test-utils";
 import type { Settings } from "../schemas";
 import { aSettings } from "../__tests__/factories";
 import { getSettings, saveSettings, watchSettings } from "./settings";
@@ -38,6 +38,7 @@ describe("v3 settings repository", () => {
   });
   beforeEach(async () => {
     await env.clearFirestore();
+    await seedAllowedUser(env, ALLOWED_USER.uid, ["child-1"]);
   });
 
   function db(): Firestore {

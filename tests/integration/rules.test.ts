@@ -6,7 +6,12 @@ import {
   type RulesTestEnvironment,
 } from "@firebase/rules-unit-testing";
 import { doc, getDoc, setDoc } from "firebase/firestore";
-import { startTestEnv, ALLOWED_USER, FORBIDDEN_USER } from "./firestore-test-utils";
+import {
+  startTestEnv,
+  seedAllowedUser,
+  ALLOWED_USER,
+  FORBIDDEN_USER,
+} from "./firestore-test-utils";
 
 describe("Firestore security rules", () => {
   let env: RulesTestEnvironment;
@@ -18,6 +23,10 @@ describe("Firestore security rules", () => {
   });
   beforeEach(async () => {
     await env.clearFirestore();
+    // PR #2: /children/{id} is now childIds-scoped; seed jake → ["c1"] so
+    // the read+day-create tests still pass. The "denies non-allowlisted"
+    // case is independent of this seed.
+    await seedAllowedUser(env, ALLOWED_USER.uid, ["c1"]);
   });
 
   it("denies reads to unauthenticated users", async () => {

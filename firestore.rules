@@ -12,50 +12,83 @@ service cloud.firestore {
       return value is string && value.size() > 0;
     }
 
+    // §F3 PR #2: child access gated on the user→child mapping.
+    // The user doc lookup is one extra read per request; acceptable for the
+    // dogfood / single-family scale and is the data-isolation primitive that
+    // makes invite-based co-parent sharing safe.
+    function canAccessChild(childId) {
+      return isAllowlisted()
+        && childId in get(/databases/$(database)/documents/users/$(request.auth.uid)).data.childIds;
+    }
+
     match /users/{uid} {
       allow read, write: if isAllowlisted() && request.auth.uid == uid;
     }
 
-    // TODO(PR #2 — §F3 invites): tighten to
-    //   allow read, write: if isAllowlisted()
-    //     && request.auth.uid in get(/databases/$(database)/documents/users/$(request.auth.uid)).data.childIds;
-    // Today the allowlist (jake136 + kellyrbarber) is the data-isolation gate.
-    // Acceptable while the user set is single-family; MUST land before any
-    // third party / dogfood expansion.
+    // §F3 PR #2 — co-parent invite tokens.
+    // Create: allowlisted user mints an invite they own (createdBy == uid).
+    // Read:   any allowlisted user (consumers must load to validate before
+    //         claiming; the token itself is the secret).
+    // Update: any allowlisted user *other than the creator* marking it
+    //         consumed under their own uid. The transaction in
+    //         `consumeInvite` writes `consumedBy` + `consumedAt`; the rule
+    //         enforces the consumer identity.
+    // Delete: never (audit trail).
+    match /invites/{token} {
+      allow create: if isAllowlisted()
+        && request.resource.data.createdBy == request.auth.uid;
+      allow read: if isAllowlisted();
+      allow update: if isAllowlisted()
+        && request.resource.data.consumedBy == request.auth.uid
+        && resource.data.createdBy != request.auth.uid;
+      allow delete: if false;
+    }
+
     match /children/{childId} {
-      allow read, write: if isAllowlisted();
+      // Create: any allowlisted user can mint a new child for themselves;
+      // the onboarding writeBatch creates Child + Settings + User atomically.
+      // After create, access is gated by user→child mapping.
+      allow create: if isAllowlisted()
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.id == childId;
+      allow read, update, delete: if canAccessChild(childId);
 
       match /settings/current {
-        allow read: if isAllowlisted();
-        allow write: if isAllowlisted()
+        allow read: if canAccessChild(childId);
+        // Allow setting up settings during onboarding (parent doc may not
+        // yet be readable via canAccessChild because the user doc is being
+        // written in the same batch). Mirror the create exception above.
+        allow create: if isAllowlisted()
+          && request.resource.data.childId == childId;
+        allow update: if canAccessChild(childId)
           && request.resource.data.childId == childId;
       }
 
       match /days/{dayId} {
-        allow read: if isAllowlisted();
-        allow create: if isAllowlisted()
+        allow read: if canAccessChild(childId);
+        allow create: if canAccessChild(childId)
           && request.resource.data.childId == childId
           && request.resource.data.id == dayId
           && isString(request.resource.data.date)
           && request.resource.data.status in ["planned", "active", "archived"];
-        allow update, delete: if isAllowlisted();
+        allow update, delete: if canAccessChild(childId);
 
         match /events/{eventId} {
-          allow read: if isAllowlisted();
-          allow create: if isAllowlisted()
+          allow read: if canAccessChild(childId);
+          allow create: if canAccessChild(childId)
             && request.resource.data.dayId == dayId
             && request.resource.data.id == eventId
             && request.resource.data.startTime is int;
-          allow update, delete: if isAllowlisted();
+          allow update, delete: if canAccessChild(childId);
         }
       }
 
       match /templates/{templateId} {
-        allow read, write: if isAllowlisted();
+        allow read, write: if canAccessChild(childId);
       }
 
       match /tomorrowPlans/{date} {
-        allow read, write: if isAllowlisted();
+        allow read, write: if canAccessChild(childId);
       }
     }
   }

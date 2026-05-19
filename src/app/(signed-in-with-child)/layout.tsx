@@ -28,9 +28,16 @@ export default function SignedInWithChildLayout({ children }: { children: ReactN
   }, [status, router]);
 
   useEffect(() => {
-    if (resolution.status === "no-user-doc" || resolution.status === "no-child") {
-      router.replace("/welcome");
-    }
+    // Grace period before redirecting to /welcome: after the welcome submit's
+    // writeBatch, this layout mounts and its fresh useV3User subscription
+    // can briefly fire with the pre-write cached snapshot (user=null) before
+    // the server snapshot arrives. Without this delay, the brief "no-user-doc"
+    // bounces back to /welcome and remounts WelcomePage at step 1 (bug Jake
+    // hit on 2026-05-19). 200ms is longer than the snapshot lag but short
+    // enough to feel instant for the genuine "you haven't onboarded yet" case.
+    if (resolution.status !== "no-user-doc" && resolution.status !== "no-child") return;
+    const timer = setTimeout(() => router.replace("/welcome"), 200);
+    return () => clearTimeout(timer);
   }, [resolution.status, router]);
 
   if (resolution.status !== "ready") {

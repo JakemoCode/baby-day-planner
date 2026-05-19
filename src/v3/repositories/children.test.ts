@@ -7,7 +7,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import type { RulesTestEnvironment } from "@firebase/rules-unit-testing";
 import type { Firestore } from "firebase/firestore";
-import { ALLOWED_USER, startTestEnv } from "../../../tests/integration/firestore-test-utils";
+import { ALLOWED_USER, seedAllowedUser, startTestEnv } from "../../../tests/integration/firestore-test-utils";
 import type { Child } from "../schemas";
 import { createChild, loadChild } from "./children";
 
@@ -30,6 +30,7 @@ describe("v3 children repository", () => {
   });
   beforeEach(async () => {
     await env.clearFirestore();
+    await seedAllowedUser(env, ALLOWED_USER.uid, ["child-abc", "kid-1", "kid-2", "missing-id"]);
   });
 
   function db(): Firestore {
