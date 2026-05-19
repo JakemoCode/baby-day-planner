@@ -104,7 +104,10 @@ export default function WelcomePage() {
       <h1 className={styles.heading}>Welcome to Baby Day Planner</h1>
       {step === 1 && (
         <form className={styles.form} onSubmit={nextStep}>
-          <p className={styles.eyebrow}>Step 1 of 2 — Your child</p>
+          <p className={styles.eyebrow}>First time setup · Step 1 of 2</p>
+          <p className={styles.intro}>
+            Let&apos;s get you set up — a couple of details so the app can start helping right away.
+          </p>
           <label className={styles.field}>
             <span>Child&apos;s name</span>
             <input
@@ -134,7 +137,7 @@ export default function WelcomePage() {
       )}
       {step === 2 && (
         <form className={styles.form} onSubmit={submit}>
-          <p className={styles.eyebrow}>Step 2 of 2 — Co-parents &amp; routine</p>
+          <p className={styles.eyebrow}>First time setup · Step 2 of 2</p>
           <label className={styles.field}>
             <span>Parent 1 name</span>
             <input
