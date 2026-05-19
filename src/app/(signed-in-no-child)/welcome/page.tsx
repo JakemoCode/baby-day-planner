@@ -2,28 +2,24 @@
 
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { collection, doc } from "firebase/firestore";
+import { collection, doc, writeBatch } from "firebase/firestore";
 import { useAuth } from "@/lib/auth/useAuth";
 import { db } from "@/lib/firebase/client";
-import { CHILDREN } from "@/lib/firestore/paths";
-import { createChild } from "@/v3/repositories/children";
-import { createUser } from "@/v3/repositories/users";
-import { saveSettings } from "@/v3/repositories/settings";
+import { CHILDREN, childPath, settingsPath, userPath } from "@/lib/firestore/paths";
+import { v3ChildConverter, v3SettingsConverter, v3UserConverter } from "@/v3/firestore/converters";
 import { withV3SettingsDefaults } from "@/v3/firestore/settingsDefaults";
 import styles from "./page.module.css";
 
 type Step = 1 | 2;
 
 function minutesFromTimeInput(value: string): number {
-  // "07:00" → 420
-  const [h, m] = value.split(":").map((s) => parseInt(s, 10));
-  return (h ?? 0) * 60 + (m ?? 0);
-}
-
-function timeInputFromMinutes(min: number): string {
-  const h = Math.floor(min / 60);
-  const m = min % 60;
-  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+  // "07:00" → 420. `<input type="time" required>` enforces HH:MM, but parseInt
+  // can still yield NaN on Safari edge cases — guard with isFinite so we never
+  // persist `defaultWakeTime: NaN` and corrupt every downstream projection.
+  const [hRaw, mRaw] = value.split(":");
+  const h = Number.parseInt(hRaw ?? "", 10);
+  const m = Number.parseInt(mRaw ?? "", 10);
+  return (Number.isFinite(h) ? h : 0) * 60 + (Number.isFinite(m) ? m : 0);
 }
 
 /**
@@ -68,14 +64,6 @@ export default function WelcomePage() {
       const newId = doc(collection(db, CHILDREN)).id;
       const now = Date.now();
 
-      await createChild(db, {
-        id: newId,
-        displayName: displayName.trim(),
-        dateOfBirth,
-        createdAt: now,
-        createdBy: user.uid,
-      });
-
       const settings = withV3SettingsDefaults({
         childId: newId,
         defaultWakeTime: minutesFromTimeInput(wakeTimeStr),
@@ -85,13 +73,24 @@ export default function WelcomePage() {
           other: [],
         },
       })!;
-      await saveSettings(db, newId, settings);
 
-      await createUser(db, {
+      // Atomic 3-doc write so a partial failure can never leave orphaned
+      // Child/Settings docs unreachable from any /users/{uid}.
+      const batch = writeBatch(db);
+      batch.set(doc(db, childPath(newId)).withConverter(v3ChildConverter), {
+        id: newId,
+        displayName: displayName.trim(),
+        dateOfBirth,
+        createdAt: now,
+        createdBy: user.uid,
+      });
+      batch.set(doc(db, settingsPath(newId)).withConverter(v3SettingsConverter), settings);
+      batch.set(doc(db, userPath(user.uid)).withConverter(v3UserConverter), {
         uid: user.uid,
         childIds: [newId],
         createdAt: now,
       });
+      await batch.commit();
 
       router.replace("/");
     } catch (err) {
@@ -194,6 +193,3 @@ export default function WelcomePage() {
     </div>
   );
 }
-
-// Re-export for testability (lets RTL stable-import via @/-aliases).
-export { timeInputFromMinutes };

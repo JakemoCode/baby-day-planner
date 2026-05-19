@@ -33,8 +33,7 @@ export function useChildResolution(): ChildProviderResolution {
   if (userLoading) return { status: "loading" };
   if (!userDoc) return { status: "no-user-doc" };
   if (userDoc.childIds.length === 0) return { status: "no-child" };
-  if (childLoading) return { status: "loading" };
-  if (!child) return { status: "loading" };
+  if (childLoading || !child) return { status: "loading" };
   return { status: "ready", child };
 }
 

@@ -16,6 +16,12 @@ service cloud.firestore {
       allow read, write: if isAllowlisted() && request.auth.uid == uid;
     }
 
+    // TODO(PR #2 — §F3 invites): tighten to
+    //   allow read, write: if isAllowlisted()
+    //     && request.auth.uid in get(/databases/$(database)/documents/users/$(request.auth.uid)).data.childIds;
+    // Today the allowlist (jake136 + kellyrbarber) is the data-isolation gate.
+    // Acceptable while the user set is single-family; MUST land before any
+    // third party / dogfood expansion.
     match /children/{childId} {
       allow read, write: if isAllowlisted();
 

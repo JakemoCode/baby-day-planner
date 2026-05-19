@@ -36,7 +36,7 @@ export async function createUser(db: Firestore, user: User): Promise<void> {
 }
 
 export async function addChildToUser(db: Firestore, uid: string, childId: string): Promise<void> {
-  await updateDoc(doc(db, userPath(uid)), { childIds: arrayUnion(childId) });
+  await updateDoc(userRef(db, uid), { childIds: arrayUnion(childId) });
 }
 
 export function watchUser(db: Firestore, uid: string, cb: (user: User | null) => void): () => void {

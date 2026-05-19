@@ -21,10 +21,20 @@ export function useV3Child(childId: string): UseV3ChildResult {
 
   useEffect(() => {
     if (!childId) return;
-    return watchChild(db, childId, (c) => {
+    // Stale-callback guard — see useV3User for the full reasoning. React 19's
+    // set-state-in-effect rule blocks the obvious "reset to null on input
+    // change" path; this prevents the in-flight write from the previous
+    // subscription. Residual stale-flash window is bounded by Firestore latency.
+    let active = true;
+    const unsub = watchChild(db, childId, (c) => {
+      if (!active) return;
       setChild(c);
       setLoading(false);
     });
+    return () => {
+      active = false;
+      unsub();
+    };
   }, [childId]);
 
   return { child, loading };
