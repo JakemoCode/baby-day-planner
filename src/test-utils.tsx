@@ -20,6 +20,20 @@ import { render, type RenderOptions, type RenderResult } from "@testing-library/
 import { vi } from "vitest";
 import type { User } from "firebase/auth";
 import { AuthContext, type AuthContextValue } from "@/lib/auth/AuthProvider";
+import { ChildProvider } from "@/v3/context/ChildProvider";
+import type { Child } from "@/v3/schemas";
+
+export const TEST_CHILD: Child = {
+  id: "test-child-id",
+  displayName: "Aden",
+  dateOfBirth: "2025-04-10",
+  createdAt: 1_700_000_000_000,
+  createdBy: "test-uid-jake",
+};
+
+export function aChild(overrides: Partial<Child> = {}): Child {
+  return { ...TEST_CHILD, ...overrides };
+}
 
 const DEFAULT_USER = {
   uid: "test-uid-jake",
@@ -43,15 +57,25 @@ function MockAuthProvider({ value, children }: { value: AuthContextValue; childr
 
 export type RenderWithAuthOptions = Omit<RenderOptions, "wrapper"> & {
   auth?: Partial<AuthContextValue>;
+  /**
+   * Child to expose via ChildProvider. Defaults to `TEST_CHILD`. Pass `null`
+   * to omit the provider entirely (for components that don't need it, or
+   * tests of the not-yet-onboarded path).
+   */
+  child?: Child | null;
 };
 
 export function renderWithAuth(
   ui: ReactElement,
-  { auth, ...renderOptions }: RenderWithAuthOptions = {},
+  { auth, child = TEST_CHILD, ...renderOptions }: RenderWithAuthOptions = {},
 ): RenderResult & { authValue: AuthContextValue } {
   const authValue = makeAuthContext(auth);
   const result = render(ui, {
-    wrapper: ({ children }) => <MockAuthProvider value={authValue}>{children}</MockAuthProvider>,
+    wrapper: ({ children }) => (
+      <MockAuthProvider value={authValue}>
+        {child ? <ChildProvider child={child}>{children}</ChildProvider> : children}
+      </MockAuthProvider>
+    ),
     ...renderOptions,
   });
   return { ...result, authValue };

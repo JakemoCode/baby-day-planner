@@ -12,7 +12,15 @@ import type {
   QueryDocumentSnapshot,
   SnapshotOptions,
 } from "firebase/firestore";
-import type { Day, Event, OwnershipTemplate, Settings, TomorrowPlan } from "../schemas";
+import type {
+  Child,
+  Day,
+  Event,
+  OwnershipTemplate,
+  Settings,
+  TomorrowPlan,
+  User,
+} from "../schemas";
 import { withV3DayDefaults } from "./dayDefaults";
 import { withV3EventDefaults } from "./eventDefaults";
 import { withV3SettingsDefaults } from "./settingsDefaults";
@@ -27,6 +35,10 @@ function passthrough<T extends object>(): FirestoreDataConverter<T> {
 export const v3TemplateConverter = passthrough<OwnershipTemplate>();
 
 export const v3TomorrowPlanConverter = passthrough<TomorrowPlan>();
+
+export const v3ChildConverter = passthrough<Child>();
+
+export const v3UserConverter = passthrough<User>();
 
 /**
  * Settings converter applies `withV3SettingsDefaults` on read so partial

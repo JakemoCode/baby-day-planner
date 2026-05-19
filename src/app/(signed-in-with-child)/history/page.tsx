@@ -9,10 +9,10 @@ import { LoadingState } from "@/components/shared/LoadingState";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { HistoryList } from "@/v3/components/History/HistoryList";
 import styles from "./page.module.css";
-
-const CHILD_ID = process.env.NEXT_PUBLIC_DEFAULT_CHILD_ID ?? "aden";
+import { useCurrentChild } from "@/v3/context/ChildProvider";
 
 export default function HistoryPage() {
+  const CHILD_ID = useCurrentChild().id;
   const router = useRouter();
   const [days, setDays] = useState<Day[]>([]);
   const [loading, setLoading] = useState(true);

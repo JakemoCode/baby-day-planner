@@ -16,8 +16,6 @@ import { useV3Templates } from "@/v3/hooks/useV3Templates";
 import { useV3Projection } from "@/v3/hooks/useV3Projection";
 import { getOrCreatePlannedDay, startNewDay } from "@/v3/repositories/days";
 import { createEvent } from "@/v3/repositories/events";
-import { saveSettings } from "@/v3/repositories/settings";
-import { DEFAULT_WAKE_TIME, withV3SettingsDefaults } from "@/v3/firestore/settingsDefaults";
 import { db } from "@/lib/firebase/client";
 import { LoadingState } from "@/components/shared/LoadingState";
 import { FAB } from "@/components/shared/FAB";
@@ -34,8 +32,7 @@ import { NextSleepPanel } from "@/v3/components/Dashboard/NextSleepPanel";
 import { StartBottleButton } from "@/v3/components/Dashboard/StartBottleButton";
 import { StartDayButton } from "@/v3/components/Dashboard/StartDayButton";
 import styles from "./page.module.css";
-
-const CHILD_ID = process.env.NEXT_PUBLIC_DEFAULT_CHILD_ID ?? "aden";
+import { useCurrentChild } from "@/v3/context/ChildProvider";
 
 type DrawerState =
   | { open: false }
@@ -51,6 +48,7 @@ function todayDate(): string {
 }
 
 export default function DashboardPage() {
+  const CHILD_ID = useCurrentChild().id;
   const nowMinutes = useNowMinutes();
   const { day, loading: dayLoading } = useV3Day(CHILD_ID);
   const { settings, loading: settingsLoading } = useV3Settings(CHILD_ID);
@@ -80,31 +78,29 @@ export default function DashboardPage() {
   }
 
   // Wake gate: explicit undefined check — `wakeTime: 0` is technically
-  // valid (midnight) and must NOT be treated as "no day yet".
-  if (!day || !settings || day.wakeTime === undefined) {
+  // valid (midnight) and must NOT be treated as "no day yet". Settings
+  // is guaranteed present post-§F3 onboarding (layout redirects to
+  // /welcome otherwise), so `!settings` collapses to a defensive load
+  // state rather than a first-time-bootstrap branch.
+  if (!settings) {
+    return (
+      <div className={styles.page}>
+        <LoadingState label="Loading today" />
+      </div>
+    );
+  }
+  if (!day || day.wakeTime === undefined) {
     const handleStart = async () => {
-      // First-time bootstrap: if the user has no Settings doc yet (fresh
-      // install, wiped emulator, etc.), seed defaults BEFORE creating
-      // the day. Without this, the dashboard renders past the day-write
-      // but the wake-gate fires again on `!settings`, indistinguishable
-      // from "nothing happened." Idempotent: when settings exist we skip.
-      if (!settings) {
-        const defaults = withV3SettingsDefaults({ childId: CHILD_ID })!;
-        await saveSettings(db, CHILD_ID, defaults);
-      }
-      // Anchor the new day at `settings.defaultWakeTime` (or the just-
-      // seeded default), not wall-clock. Tapping Start at 2:30 PM
-      // should NOT rotate the projected day to start at 2:30 PM.
       await startNewDay(db, CHILD_ID, {
         newDayId: `day-${Date.now()}`,
         newDate: todayDate(),
-        newWakeTime: settings?.defaultWakeTime ?? DEFAULT_WAKE_TIME,
+        newWakeTime: settings.defaultWakeTime,
       });
     };
     return (
-      <div className={styles.page}>
+      <div className={styles.firstDayGate}>
         <ActionButton variant="primary" onClick={() => void handleStart()}>
-          Wake up
+          Start first day
         </ActionButton>
       </div>
     );

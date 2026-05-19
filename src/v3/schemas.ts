@@ -392,3 +392,36 @@ export type TomorrowPlan = {
   extras: Event[];
   startTemplateId?: string;
 };
+
+/**
+ * §F10 Child — identity record for a tracked child. One doc per child
+ * at `/children/{id}/`. All child-scoped subcollections (settings, days,
+ * events, templates, tomorrowPlans) live underneath.
+ *
+ * `id` matches the Firestore doc id. `createdBy` is the uid of the user
+ * who ran onboarding; future co-parents are linked via `/users/{uid}.childIds`.
+ */
+export type Child = {
+  id: string;
+  displayName: string;
+  /** ISO "YYYY-MM-DD". */
+  dateOfBirth: string;
+  /** ms epoch. */
+  createdAt: number;
+  /** Auth uid of the onboarding user. */
+  createdBy: string;
+};
+
+/**
+ * §F3 User — per-auth-user record mapping a Firebase uid to the children
+ * they can access. One doc per uid at `/users/{uid}/`. Existence of this
+ * doc is the signal "auth user has been introduced to the app"; an empty
+ * `childIds` array means "signed in but hasn't onboarded yet" and gates
+ * the welcome flow.
+ */
+export type User = {
+  uid: string;
+  childIds: string[];
+  /** ms epoch. */
+  createdAt: number;
+};

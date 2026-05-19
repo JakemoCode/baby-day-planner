@@ -5,7 +5,7 @@ import { Header } from "./Header";
 describe("Header", () => {
   it("renders the child's name and the date", () => {
     renderWithAuth(<Header childName="Aden" date="2026-05-05" />);
-    expect(screen.getByText(/Aden's Day/i)).toBeVisible();
+    expect(screen.getByText(/Aden/i)).toBeVisible();
     // "May 5" or similar localized form
     expect(screen.getByText(/May 5|May 05/i)).toBeVisible();
   });

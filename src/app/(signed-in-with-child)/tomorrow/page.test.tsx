@@ -12,7 +12,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { renderWithAuth, screen } from "@/test-utils";
 import userEvent from "@testing-library/user-event";
 import type { OwnersConfig, OwnershipTemplate } from "@/v3/schemas";
 import { aSettings } from "@/v3/__tests__/factories";
@@ -57,7 +57,7 @@ const owners: OwnersConfig = {
   other: [],
 };
 
-const settings = aSettings({ childId: "child-1", owners });
+const settings = aSettings({ childId: "test-child-id", owners });
 
 const templates: OwnershipTemplate[] = [
   {
@@ -77,7 +77,7 @@ describe("TomorrowPage (V3)", () => {
 
   it("shows loading until settings resolve", () => {
     vi.mocked(useV3Settings).mockReturnValueOnce({ settings: null, loading: true });
-    render(<TomorrowPage />);
+    renderWithAuth(<TomorrowPage />);
     expect(screen.getByText(/loading tomorrow/i)).toBeVisible();
   });
 
@@ -86,19 +86,19 @@ describe("TomorrowPage (V3)", () => {
   // the template <select> can render its options.
   it("shows loading until templates resolve", () => {
     vi.mocked(useV3Templates).mockReturnValueOnce({ templates: [], loading: true });
-    render(<TomorrowPage />);
+    renderWithAuth(<TomorrowPage />);
     expect(screen.getByText(/loading tomorrow/i)).toBeVisible();
   });
 
   it("renders form, preview, and promote button when loaded", () => {
-    render(<TomorrowPage />);
+    renderWithAuth(<TomorrowPage />);
     expect(screen.getByLabelText(/wake time/i)).toBeVisible();
     expect(screen.getByLabelText(/ownership template/i)).toBeVisible();
     expect(screen.getByRole("button", { name: /promote to today/i })).toBeVisible();
   });
 
   it("selecting a template updates the preview with template-derived owners", async () => {
-    render(<TomorrowPage />);
+    renderWithAuth(<TomorrowPage />);
     // Before selection: nap blocks have no owner attribute.
     const initialNaps = screen
       .getAllByTestId("timeline-block")
@@ -113,7 +113,7 @@ describe("TomorrowPage (V3)", () => {
   });
 
   it("promote button calls V3 startNewDay with the form values", async () => {
-    render(<TomorrowPage />);
+    renderWithAuth(<TomorrowPage />);
     await userEvent.click(screen.getByRole("button", { name: /promote to today/i }));
     expect(startNewDay).toHaveBeenCalledTimes(1);
     const args = vi.mocked(startNewDay).mock.calls[0]?.[2];
@@ -124,7 +124,7 @@ describe("TomorrowPage (V3)", () => {
   });
 
   it("persists buffered extras to the new day on promote", async () => {
-    render(<TomorrowPage />);
+    renderWithAuth(<TomorrowPage />);
     // Add two extras through the drawer.
     await userEvent.click(screen.getByRole("button", { name: /add an event/i }));
     await userEvent.click(screen.getByRole("button", { name: /custom/i }));
@@ -151,7 +151,7 @@ describe("TomorrowPage (V3)", () => {
   });
 
   it("uses a UUID-based newDayId (no Date.now()-style ids)", async () => {
-    render(<TomorrowPage />);
+    renderWithAuth(<TomorrowPage />);
     await userEvent.click(screen.getByRole("button", { name: /promote to today/i }));
     const args = vi.mocked(startNewDay).mock.calls[0]?.[2];
     // V3 ids must come from crypto.randomUUID() (PR-C1 audit). The
@@ -161,7 +161,7 @@ describe("TomorrowPage (V3)", () => {
   });
 
   it("editing the same projected event twice does not duplicate the extra", async () => {
-    render(<TomorrowPage />);
+    renderWithAuth(<TomorrowPage />);
     // First "add extra" creates a projected template event and saves
     // it into extras. Re-opening that same event via the timeline tap
     // routes through the edit-of-projected branch; the bug being
@@ -196,7 +196,7 @@ describe("TomorrowPage (V3)", () => {
   });
 
   it("promote forwards the selected templateId", async () => {
-    render(<TomorrowPage />);
+    renderWithAuth(<TomorrowPage />);
     await userEvent.selectOptions(screen.getByLabelText(/ownership template/i), "tmpl-saturday");
     await userEvent.click(screen.getByRole("button", { name: /promote to today/i }));
     const args = vi.mocked(startNewDay).mock.calls[0]?.[2];

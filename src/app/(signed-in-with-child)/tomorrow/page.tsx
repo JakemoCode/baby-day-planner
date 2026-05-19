@@ -24,8 +24,7 @@ import { PromoteTomorrowButton } from "@/v3/components/Tomorrow/PromoteTomorrowB
 import { TemplateOwnerPicker } from "@/v3/components/DayTemplates/TemplateOwnerPicker";
 import { setOwnerInTemplate } from "@/v3/components/DayTemplates/setOwnerInTemplate";
 import styles from "./page.module.css";
-
-const CHILD_ID = process.env.NEXT_PUBLIC_DEFAULT_CHILD_ID ?? "aden";
+import { useCurrentChild } from "@/v3/context/ChildProvider";
 
 // Anchor the Tomorrow page's "now" to noon so create-templates and
 // drawer constraints land in the middle of the planned day rather
@@ -44,6 +43,7 @@ function tomorrowDateString(): string {
 }
 
 export default function TomorrowPage() {
+  const CHILD_ID = useCurrentChild().id;
   const router = useRouter();
   const { settings, loading: settingsLoading } = useV3Settings(CHILD_ID);
   const { templates, loading: templatesLoading } = useV3Templates(CHILD_ID);

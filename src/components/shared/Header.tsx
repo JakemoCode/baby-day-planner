@@ -3,6 +3,8 @@ import styles from "./Header.module.css";
 
 export type HeaderProps = {
   childName: string;
+  /** ISO date string "YYYY-MM-DD" — child's date of birth. Renders age beside name. */
+  dateOfBirth?: string;
   /** ISO date string "YYYY-MM-DD". Defaults to today. */
   date?: string;
   /** Right-side actions (e.g. SyncStatusIcon + KebabMenu). */
@@ -26,11 +28,36 @@ function parseLocalDate(yyyymmdd: string): Date {
   return new Date(y ?? 1970, (m ?? 1) - 1, day ?? 1);
 }
 
-export function Header({ childName, date, actions }: HeaderProps) {
+/**
+ * Parent-talk age formatting:
+ *   < 14 days  → "N day(s)"
+ *   < 12 weeks → "N weeks"
+ *   < 24 months → "N months"   (using calendar-month math, not /30.4)
+ *   else       → "N years"
+ */
+export function formatAge(dob: string, now: Date = new Date()): string {
+  const birth = parseLocalDate(dob);
+  const ms = now.getTime() - birth.getTime();
+  const days = Math.floor(ms / 86_400_000);
+  if (days < 0) return "";
+  if (days < 14) return `${days} day${days === 1 ? "" : "s"}`;
+  const weeks = Math.floor(days / 7);
+  if (weeks < 12) return `${weeks} weeks`;
+  let months = (now.getFullYear() - birth.getFullYear()) * 12 + (now.getMonth() - birth.getMonth());
+  if (now.getDate() < birth.getDate()) months -= 1;
+  if (months < 24) return `${months} months`;
+  return `${Math.floor(months / 12)} years`;
+}
+
+export function Header({ childName, dateOfBirth, date, actions }: HeaderProps) {
+  const age = dateOfBirth ? formatAge(dateOfBirth) : "";
   return (
     <header className={styles.header}>
       <div className={styles.title}>
-        <span className={styles.name}>{childName}&apos;s Day</span>
+        <span className={styles.name}>
+          {childName}
+          {age && <span className={styles.age}>, {age}</span>}
+        </span>
         <span className={styles.date}>{formatDate(date)}</span>
       </div>
       {actions && <div className={styles.actions}>{actions}</div>}
