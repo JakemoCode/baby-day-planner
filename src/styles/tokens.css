@@ -51,7 +51,7 @@
   --color-honey-soft: #f5e2a5; /* extra (other) block fill */
 
   /* ─────── Owner colors ─────── */
-/* Earth-tone owner palette. The current hex pair is calibrated for the
+  /* Earth-tone owner palette. The current hex pair is calibrated for the
    * warm-cream/sage palette. When we expose theme presets, the
    * historical saturated variant lives here too as the 'loud' variant. */
   --color-owner-jake: #7a8fa8; /* dusty blue */
