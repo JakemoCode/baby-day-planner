@@ -910,12 +910,8 @@ function DailyRecurringEditor({
                 className={styles.input}
               >
                 <option value="">— none —</option>
-                <option value="parent1">
-                  {owners.parent1.displayName.trim() || "Parent 1"}
-                </option>
-                <option value="parent2">
-                  {owners.parent2.displayName.trim() || "Parent 2"}
-                </option>
+                <option value="parent1">{owners.parent1.displayName.trim() || "Parent 1"}</option>
+                <option value="parent2">{owners.parent2.displayName.trim() || "Parent 2"}</option>
               </select>
             </div>
           </div>
