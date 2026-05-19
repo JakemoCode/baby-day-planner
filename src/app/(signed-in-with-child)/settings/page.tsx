@@ -616,12 +616,14 @@ function CheckboxRow({
   value,
   onChange,
   help,
+  disabled,
 }: {
   id: string;
   label: string;
   value: boolean;
   onChange: (next: boolean) => void;
   help?: string;
+  disabled?: boolean;
 }) {
   return (
     <div className={styles.field}>
@@ -630,6 +632,7 @@ function CheckboxRow({
           id={id}
           type="checkbox"
           checked={value}
+          disabled={disabled === true}
           onChange={(e) => onChange(e.target.checked)}
           className={styles.checkboxInput}
         />
@@ -684,38 +687,63 @@ function DaycareEditor({
   owners: Settings["owners"];
   onChange: (next: DaycareConfig) => void;
 }) {
+  function isOwnerValid(c: DaycareConfig): boolean {
+    return c.ownerId !== "" && owners.other.some((o) => o.id === c.ownerId);
+  }
+  function isTimeRangeValid(c: DaycareConfig): boolean {
+    return c.dropoffTime < c.pickupTime;
+  }
+  const ownerOK = isOwnerValid(value);
+  const timesOK = isTimeRangeValid(value);
+  const canEnable = ownerOK && timesOK;
+
+  // R21.6 (UI validation gate). Auto-disable daycare when the config
+  // becomes invalid so the engine never stamps a bogus owner onto window
+  // events. The user re-enables once owner + times are valid again.
+  const commit = (next: DaycareConfig) => {
+    const stillValid = isOwnerValid(next) && isTimeRangeValid(next);
+    onChange(next.enabled && !stillValid ? { ...next, enabled: false } : next);
+  };
+
   return (
     <>
       <CheckboxRow
         id="daycare-enabled"
         label="Enable daycare"
         value={value.enabled}
-        onChange={(enabled) => onChange({ ...value, enabled })}
-        help="When enabled, events between dropoff and pickup on the chosen weekdays auto-assign the daycare owner."
+        disabled={!canEnable}
+        onChange={(enabled) => commit({ ...value, enabled })}
+        help={
+          canEnable
+            ? "When enabled, events between dropoff and pickup on the chosen weekdays auto-assign the daycare owner."
+            : "Pick a daycare owner and make sure dropoff is before pickup to enable."
+        }
       />
       <DaycareOwnerRow
         id="daycare-owner"
         label="Daycare owner"
         value={value.ownerId}
         owners={owners}
-        onChange={(ownerId) => onChange({ ...value, ownerId })}
+        onChange={(ownerId) => commit({ ...value, ownerId })}
       />
       <TimeRow
         id="daycare-dropoff"
         label="Dropoff time"
         value={value.dropoffTime}
-        onChange={(dropoffTime) => onChange({ ...value, dropoffTime })}
+        onChange={(dropoffTime) => commit({ ...value, dropoffTime })}
       />
       <TimeRow
         id="daycare-pickup"
         label="Pickup time"
         value={value.pickupTime}
-        onChange={(pickupTime) => onChange({ ...value, pickupTime })}
+        onChange={(pickupTime) => commit({ ...value, pickupTime })}
       />
-      <WeekdaysRow
-        value={value.weekdays}
-        onChange={(weekdays) => onChange({ ...value, weekdays })}
-      />
+      {!timesOK && (
+        <small className={styles.fieldHelp} role="alert">
+          Dropoff must be before pickup.
+        </small>
+      )}
+      <WeekdaysRow value={value.weekdays} onChange={(weekdays) => commit({ ...value, weekdays })} />
     </>
   );
 }
@@ -810,12 +838,16 @@ function DailyRecurringEditor({
   const update = (i: number, patch: Partial<DailyRecurring>) => {
     onChange(value.map((r, j) => (j === i ? { ...r, ...patch } : r)));
   };
+  const removeField = <K extends keyof DailyRecurring>(i: number, key: K) => {
+    const { [key]: _omit, ...rest } = value[i];
+    onChange(value.map((r, j) => (j === i ? (rest as DailyRecurring) : r)));
+  };
   const remove = (i: number) => onChange(value.filter((_, j) => j !== i));
   const add = () =>
     onChange([
       ...value,
       {
-        id: newEventId("recur"),
+        id: newEventId("daily-recurring"),
         label: "",
         time: 12 * 60,
         enabled: true,
@@ -881,8 +913,7 @@ function DailyRecurringEditor({
                 onChange={(e) => {
                   const raw = e.target.value;
                   if (raw === "") {
-                    const { durationMinutes: _omit, ...rest } = item;
-                    onChange(value.map((r, j) => (j === i ? rest : r)));
+                    removeField(i, "durationMinutes");
                     return;
                   }
                   const n = Number(raw);
@@ -901,8 +932,7 @@ function DailyRecurringEditor({
                 onChange={(e) => {
                   const v = e.target.value;
                   if (v === "") {
-                    const { defaultOwnerSlot: _omit, ...rest } = item;
-                    onChange(value.map((r, j) => (j === i ? rest : r)));
+                    removeField(i, "defaultOwnerSlot");
                     return;
                   }
                   update(i, { defaultOwnerSlot: v as OwnerSlot });
