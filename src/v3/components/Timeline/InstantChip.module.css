@@ -28,7 +28,10 @@
 }
 
 .chip[data-owner] {
-  border: 2px solid var(--owner-color);
+  /* Blend the owner color with the page bg so the chip identity
+   * shows through without the saturated edge effect a 2px solid
+   * earth-tone produces against the warm cream surface. */
+  border: 2px solid color-mix(in srgb, var(--owner-color) 55%, var(--color-bg));
 }
 
 .chip[data-static="true"] {
@@ -127,5 +130,7 @@
 
 .ownerName {
   font-weight: var(--weight-medium);
-  color: var(--owner-color, inherit);
+  /* Same color-mix treatment as the chip border; keeps the owner
+   * association readable but tones the saturation down. */
+  color: color-mix(in srgb, var(--owner-color, currentColor) 70%, var(--color-fg));
 }
