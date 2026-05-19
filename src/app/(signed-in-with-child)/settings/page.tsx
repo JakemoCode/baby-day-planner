@@ -8,7 +8,18 @@ import { withV3SettingsDefaults } from "@/v3/firestore/settingsDefaults";
 import { useLocalStorageString } from "@/v3/hooks/useLocalStorageString";
 import { useV3Settings } from "@/v3/hooks/useV3Settings";
 import { saveSettings } from "@/v3/repositories/settings";
-import type { BottleIntervalRule, OwnerSlot, PumpSession, Settings, TimeMin } from "@/v3/schemas";
+import type {
+  BottleIntervalRule,
+  DailyRecurring,
+  DaycareConfig,
+  OwnerSlot,
+  PumpSession,
+  Settings,
+  TimeMin,
+  Weekday,
+  WeekdayFlags,
+} from "@/v3/schemas";
+import { newEventId } from "@/v3/lib/newEventId";
 import { formatHM24 } from "@/v3/ui/time";
 import styles from "./page.module.css";
 import { useCurrentChild } from "@/v3/context/ChildProvider";
@@ -204,6 +215,26 @@ export default function SettingsPage() {
           value={value.dreamFeedEnabled}
           onChange={(v) => set("dreamFeedEnabled", v)}
           help="Render-only label. The bottle cascade is unchanged; the first projected bottle past bedtime is just renamed."
+        />
+      </Section>
+
+      <Section title="Daycare" isOpen={openSlug === "daycare"} onToggle={handleToggle}>
+        <DaycareEditor
+          value={value.daycare}
+          owners={value.owners}
+          onChange={(v) => set("daycare", v)}
+        />
+      </Section>
+
+      <Section
+        title="Daily recurring"
+        isOpen={openSlug === "daily-recurring"}
+        onToggle={handleToggle}
+      >
+        <DailyRecurringEditor
+          value={value.dailyRecurring}
+          owners={value.owners}
+          onChange={(v) => set("dailyRecurring", v)}
         />
       </Section>
 
@@ -640,6 +671,267 @@ function OwnerSlotRow({
         <option value="parent1">{labelFor("parent1", "Parent 1")}</option>
         <option value="parent2">{labelFor("parent2", "Parent 2")}</option>
       </select>
+    </div>
+  );
+}
+
+function DaycareEditor({
+  value,
+  owners,
+  onChange,
+}: {
+  value: DaycareConfig;
+  owners: Settings["owners"];
+  onChange: (next: DaycareConfig) => void;
+}) {
+  return (
+    <>
+      <CheckboxRow
+        id="daycare-enabled"
+        label="Enable daycare"
+        value={value.enabled}
+        onChange={(enabled) => onChange({ ...value, enabled })}
+        help="When enabled, events between dropoff and pickup on the chosen weekdays auto-assign the daycare owner."
+      />
+      <DaycareOwnerRow
+        id="daycare-owner"
+        label="Daycare owner"
+        value={value.ownerId}
+        owners={owners}
+        onChange={(ownerId) => onChange({ ...value, ownerId })}
+      />
+      <TimeRow
+        id="daycare-dropoff"
+        label="Dropoff time"
+        value={value.dropoffTime}
+        onChange={(dropoffTime) => onChange({ ...value, dropoffTime })}
+      />
+      <TimeRow
+        id="daycare-pickup"
+        label="Pickup time"
+        value={value.pickupTime}
+        onChange={(pickupTime) => onChange({ ...value, pickupTime })}
+      />
+      <WeekdaysRow
+        value={value.weekdays}
+        onChange={(weekdays) => onChange({ ...value, weekdays })}
+      />
+    </>
+  );
+}
+
+function DaycareOwnerRow({
+  id,
+  label,
+  value,
+  owners,
+  onChange,
+}: {
+  id: string;
+  label: string;
+  value: string;
+  owners: Settings["owners"];
+  onChange: (next: string) => void;
+}) {
+  const others = owners.other;
+  return (
+    <div className={styles.field}>
+      <label htmlFor={id} className={styles.fieldLabel}>
+        {label}
+      </label>
+      {others.length === 0 ? (
+        <small className={styles.fieldHelp}>
+          Add a daycare entry under <strong>Owners</strong> first, then select it here.
+        </small>
+      ) : (
+        <select
+          id={id}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          className={styles.input}
+        >
+          <option value="">— pick an owner —</option>
+          {others.map((o) => (
+            <option key={o.id} value={o.id}>
+              {o.displayName.trim() || `Other (${o.id.slice(0, 6)})`}
+            </option>
+          ))}
+        </select>
+      )}
+    </div>
+  );
+}
+
+const WEEKDAY_LABELS: ReadonlyArray<{ key: Weekday; label: string }> = [
+  { key: "mon", label: "Mon" },
+  { key: "tue", label: "Tue" },
+  { key: "wed", label: "Wed" },
+  { key: "thu", label: "Thu" },
+  { key: "fri", label: "Fri" },
+  { key: "sat", label: "Sat" },
+  { key: "sun", label: "Sun" },
+];
+
+function WeekdaysRow({
+  value,
+  onChange,
+}: {
+  value: WeekdayFlags;
+  onChange: (next: WeekdayFlags) => void;
+}) {
+  return (
+    <div className={styles.field}>
+      <label className={styles.fieldLabel}>Active weekdays</label>
+      <div className={styles.weekdays}>
+        {WEEKDAY_LABELS.map(({ key, label }) => (
+          <label key={key} className={styles.weekdayPill}>
+            <input
+              type="checkbox"
+              checked={value[key]}
+              onChange={(e) => onChange({ ...value, [key]: e.target.checked })}
+            />
+            {label}
+          </label>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function DailyRecurringEditor({
+  value,
+  owners,
+  onChange,
+}: {
+  value: DailyRecurring[];
+  owners: Settings["owners"];
+  onChange: (next: DailyRecurring[]) => void;
+}) {
+  const update = (i: number, patch: Partial<DailyRecurring>) => {
+    onChange(value.map((r, j) => (j === i ? { ...r, ...patch } : r)));
+  };
+  const remove = (i: number) => onChange(value.filter((_, j) => j !== i));
+  const add = () =>
+    onChange([
+      ...value,
+      {
+        id: newEventId("recur"),
+        label: "",
+        time: 12 * 60,
+        enabled: true,
+      },
+    ]);
+
+  return (
+    <div className={styles.repeater}>
+      {value.length === 0 && (
+        <small className={styles.fieldHelp}>
+          No recurring events yet. Add things like &quot;Walk&quot;, &quot;Cook dinner&quot;, or any
+          fixed-time event that happens every day.
+        </small>
+      )}
+      {value.map((item, i) => (
+        <div key={item.id} className={styles.recurringCard}>
+          <div className={styles.recurringRow}>
+            <CheckboxRow
+              id={`recur-${item.id}-enabled`}
+              label="Enabled"
+              value={item.enabled}
+              onChange={(enabled) => update(i, { enabled })}
+            />
+          </div>
+          <div className={styles.recurringRow}>
+            <div className={styles.field}>
+              <label htmlFor={`recur-${item.id}-label`} className={styles.fieldLabel}>
+                Label
+              </label>
+              <input
+                id={`recur-${item.id}-label`}
+                type="text"
+                value={item.label}
+                onChange={(e) => update(i, { label: e.target.value })}
+                className={styles.input}
+                placeholder="e.g. Walk"
+              />
+            </div>
+            <div className={styles.field}>
+              <label htmlFor={`recur-${item.id}-time`} className={styles.fieldLabel}>
+                Time
+              </label>
+              <input
+                id={`recur-${item.id}-time`}
+                type="time"
+                value={formatHM24(item.time)}
+                onChange={(e) => update(i, { time: parseTime(e.target.value) })}
+                className={styles.input}
+              />
+            </div>
+          </div>
+          <div className={styles.recurringRow}>
+            <div className={styles.field}>
+              <label htmlFor={`recur-${item.id}-duration`} className={styles.fieldLabel}>
+                Duration (min)
+              </label>
+              <input
+                id={`recur-${item.id}-duration`}
+                type="number"
+                min={1}
+                placeholder="instant"
+                value={item.durationMinutes ?? ""}
+                onChange={(e) => {
+                  const raw = e.target.value;
+                  if (raw === "") {
+                    const { durationMinutes: _omit, ...rest } = item;
+                    onChange(value.map((r, j) => (j === i ? rest : r)));
+                    return;
+                  }
+                  const n = Number(raw);
+                  if (Number.isFinite(n) && n > 0) update(i, { durationMinutes: n });
+                }}
+                className={styles.input}
+              />
+            </div>
+            <div className={styles.field}>
+              <label htmlFor={`recur-${item.id}-owner`} className={styles.fieldLabel}>
+                Default owner
+              </label>
+              <select
+                id={`recur-${item.id}-owner`}
+                value={item.defaultOwnerSlot ?? ""}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  if (v === "") {
+                    const { defaultOwnerSlot: _omit, ...rest } = item;
+                    onChange(value.map((r, j) => (j === i ? rest : r)));
+                    return;
+                  }
+                  update(i, { defaultOwnerSlot: v as OwnerSlot });
+                }}
+                className={styles.input}
+              >
+                <option value="">— none —</option>
+                <option value="parent1">
+                  {owners.parent1.displayName.trim() || "Parent 1"}
+                </option>
+                <option value="parent2">
+                  {owners.parent2.displayName.trim() || "Parent 2"}
+                </option>
+              </select>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => remove(i)}
+            aria-label={`Remove ${item.label || `recurring item ${i + 1}`}`}
+            className={styles.iconButton}
+          >
+            Remove
+          </button>
+        </div>
+      ))}
+      <button type="button" onClick={add} className={styles.addButton}>
+        + Add recurring event
+      </button>
     </div>
   );
 }
