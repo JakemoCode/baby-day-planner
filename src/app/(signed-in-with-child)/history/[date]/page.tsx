@@ -12,10 +12,11 @@ import { LoadingState } from "@/components/shared/LoadingState";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { ArchivedDayView } from "@/v3/components/History/ArchivedDayView";
 import styles from "./page.module.css";
+import { useCurrentChild } from "@/v3/context/ChildProvider";
 
-const CHILD_ID = process.env.NEXT_PUBLIC_DEFAULT_CHILD_ID ?? "aden";
 
 export default function ArchivedDayPage() {
+  const CHILD_ID = useCurrentChild().id;
   const params = useParams<{ date: string }>();
   const date = params?.date ?? "";
   const [day, setDay] = useState<Day | null>(null);

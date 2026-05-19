@@ -66,7 +66,7 @@ const OWNERS: OwnersConfig = {
 function makeDay(overrides: Partial<Day> = {}): Day {
   return {
     id: "day-1",
-    childId: "aden",
+    childId: "test-child-id",
     date: "2026-05-10",
     status: "active",
     wakeTime: 7 * 60,
@@ -80,7 +80,7 @@ function makeSettings(overrides: Partial<Settings> = {}): Settings {
   // wakeWindowsMinutes empty so the engine doesn't project naps in
   // tests that only care about the day/event wiring.
   return aSettings({
-    childId: "aden",
+    childId: "test-child-id",
     wakeWindowsMinutes: [],
     owners: OWNERS,
     ...overrides,
@@ -138,8 +138,8 @@ describe("DashboardPage (V3)", () => {
     expect(screen.getByText(/Loading today/i)).toBeVisible();
   });
 
-  it("shows Wake up button when there is no active day", () => {
-    setupHooks({ day: null, settings: null });
+  it("shows Wake up button when there is no active day (settings present)", () => {
+    setupHooks({ day: null, settings: makeSettings() });
     renderWithAuth(<DashboardPage />);
     expect(screen.getByRole("button", { name: /Wake up/i })).toBeVisible();
   });
@@ -150,51 +150,25 @@ describe("DashboardPage (V3)", () => {
     expect(screen.getByRole("button", { name: /Wake up/i })).toBeVisible();
   });
 
+  it("settings missing post-§F3: dashboard renders loading, not the Wake up gate", () => {
+    // After §F3 onboarding, the layout guarantees /users/{uid}.childIds[0]
+    // → /children/{id} resolved AND its /settings/current doc exists. If
+    // settings turns up null in the dashboard, treat as a transient load —
+    // never re-spawn the bootstrap-seed flow that PR #1 removed.
+    setupHooks({ day: null, settings: null });
+    renderWithAuth(<DashboardPage />);
+    expect(screen.queryByRole("button", { name: /Wake up/i })).toBeNull();
+    expect(screen.getByText(/Loading today/i)).toBeVisible();
+  });
+
   describe("Start New Day flow from the wake-gate", () => {
-    // These tests close the audit-flagged P0 gap: page.test.tsx had a
-    // startNewDayMock declared but never triggered. The wake-gate
-    // handler was completely uncovered. The "Start New Day → no
-    // settings doc → silent failure" bug that shipped during
-    // click-test would have been caught here.
-    //
-    // F32: The "Wake up" button fires handleStart directly (no confirm
-    // dialog). One click → settings seed + day creation.
-    it("clicks Wake up → seeds default settings AND creates day when no settings exist", async () => {
-      setupHooks({ day: null, settings: null });
-      renderWithAuth(<DashboardPage />);
-      await userEvent.click(screen.getByRole("button", { name: /Wake up/i }));
-
-      // Settings doc must be seeded BEFORE the day, otherwise the wake-
-      // gate re-fires on `!settings` after the day write and the user
-      // sees no state change.
-      expect(saveSettingsMock).toHaveBeenCalledTimes(1);
-      // Seeded settings come from `withV3SettingsDefaults({childId})`, which
-      // produces the canonical defaults. defaultWakeTime is 7am.
-      expect(saveSettingsMock).toHaveBeenCalledWith(
-        expect.anything(),
-        "aden",
-        expect.objectContaining({ defaultWakeTime: 7 * 60, childId: "aden" }),
-      );
-
-      expect(startNewDayMock).toHaveBeenCalledTimes(1);
-      // No settings → falls back to DEFAULT_WAKE_TIME (7am).
-      expect(startNewDayMock).toHaveBeenCalledWith(
-        expect.anything(),
-        "aden",
-        expect.objectContaining({
-          newDayId: expect.stringMatching(/^day-\d+$/),
-          newDate: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
-          newWakeTime: 7 * 60,
-        }),
-      );
-    });
-
-    it("when settings already exist: skips the saveSettings call; just creates day", async () => {
+    it("clicks Wake up → creates day at settings.defaultWakeTime (no settings seed)", async () => {
       setupHooks({ day: null, settings: makeSettings({ defaultWakeTime: 8 * 60 + 15 }) });
       renderWithAuth(<DashboardPage />);
       await userEvent.click(screen.getByRole("button", { name: /Wake up/i }));
 
-      // Settings already present → no bootstrap write.
+      // §F3 PR #1: settings is guaranteed present by the layout gate —
+      // dashboard never seeds defaults.
       expect(saveSettingsMock).not.toHaveBeenCalled();
       // Day created with the actual configured wake time, not the default.
       expect(startNewDayMock).toHaveBeenCalledTimes(1);
@@ -205,16 +179,21 @@ describe("DashboardPage (V3)", () => {
       );
     });
 
-    it("when day exists but wakeTime is undefined: same flow (seeds settings if missing, then creates)", async () => {
+    it("when day exists but wakeTime is undefined: same flow (creates day at settings wakeTime)", async () => {
       setupHooks({
         day: makeDay({ wakeTime: undefined as unknown as number }),
-        settings: null,
+        settings: makeSettings({ defaultWakeTime: 7 * 60 }),
       });
       renderWithAuth(<DashboardPage />);
       await userEvent.click(screen.getByRole("button", { name: /Wake up/i }));
 
-      expect(saveSettingsMock).toHaveBeenCalledTimes(1);
+      expect(saveSettingsMock).not.toHaveBeenCalled();
       expect(startNewDayMock).toHaveBeenCalledTimes(1);
+      expect(startNewDayMock).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.anything(),
+        expect.objectContaining({ newWakeTime: 7 * 60 }),
+      );
     });
   });
 

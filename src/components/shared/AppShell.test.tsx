@@ -18,7 +18,7 @@ vi.mock("@/hooks/useSyncStatus", () => ({
 describe("AppShell", () => {
   it("renders header with child name and date", () => {
     renderWithAuth(
-      <AppShell childName="Aden">
+      <AppShell childId="kid-test" childName="Aden">
         <p>page content</p>
       </AppShell>,
     );
@@ -27,7 +27,7 @@ describe("AppShell", () => {
 
   it("renders bottom tabs nav", () => {
     renderWithAuth(
-      <AppShell childName="Aden">
+      <AppShell childId="kid-test" childName="Aden">
         <p>x</p>
       </AppShell>,
     );
@@ -36,7 +36,7 @@ describe("AppShell", () => {
 
   it("renders the children inside main", () => {
     renderWithAuth(
-      <AppShell childName="Aden">
+      <AppShell childId="kid-test" childName="Aden">
         <p>page content</p>
       </AppShell>,
     );
@@ -46,7 +46,7 @@ describe("AppShell", () => {
 
   it("renders SyncStatusIcon and KebabMenu in header actions", () => {
     renderWithAuth(
-      <AppShell childName="Aden">
+      <AppShell childId="kid-test" childName="Aden">
         <p>x</p>
       </AppShell>,
     );
@@ -57,7 +57,7 @@ describe("AppShell", () => {
   it("renders without throwing when there's no active day (Header omits date)", () => {
     vi.mocked(useV3Day).mockReturnValueOnce({ day: null, loading: false });
     renderWithAuth(
-      <AppShell childName="Aden">
+      <AppShell childId="kid-test" childName="Aden">
         <p>page content</p>
       </AppShell>,
     );

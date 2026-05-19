@@ -13,6 +13,7 @@ import {
   arrayUnion,
   doc,
   getDoc,
+  onSnapshot,
   setDoc,
   updateDoc,
   type Firestore,
@@ -40,4 +41,14 @@ export async function addChildToUser(
   childId: string,
 ): Promise<void> {
   await updateDoc(doc(db, userPath(uid)), { childIds: arrayUnion(childId) });
+}
+
+export function watchUser(
+  db: Firestore,
+  uid: string,
+  cb: (user: User | null) => void,
+): () => void {
+  return onSnapshot(userRef(db, uid), (snap) => {
+    cb(snap.exists() ? snap.data() : null);
+  });
 }

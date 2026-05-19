@@ -11,8 +11,8 @@ import { saveSettings } from "@/v3/repositories/settings";
 import type { BottleIntervalRule, OwnerSlot, PumpSession, Settings, TimeMin } from "@/v3/schemas";
 import { formatHM24 } from "@/v3/ui/time";
 import styles from "./page.module.css";
+import { useCurrentChild } from "@/v3/context/ChildProvider";
 
-const CHILD_ID = process.env.NEXT_PUBLIC_DEFAULT_CHILD_ID ?? "aden";
 
 const ACCORDION_STORAGE_KEY = "bdp.settings.accordion.openSlug";
 const DEFAULT_OPEN_SLUG = "default-times";
@@ -31,6 +31,7 @@ function parseTime(s: string): TimeMin {
 }
 
 export default function SettingsPage() {
+  const CHILD_ID = useCurrentChild().id;
   const { settings, loading } = useV3Settings(CHILD_ID);
   const [openSlug, setOpenSlug] = useLocalStorageString(ACCORDION_STORAGE_KEY, DEFAULT_OPEN_SLUG);
 

@@ -13,8 +13,8 @@ import { TimelineV3 } from "@/v3/components/Timeline/TimelineV3";
 import { db } from "@/lib/firebase/client";
 import { LoadingState } from "@/components/shared/LoadingState";
 import styles from "./page.module.css";
+import { useCurrentChild } from "@/v3/context/ChildProvider";
 
-const CHILD_ID = process.env.NEXT_PUBLIC_DEFAULT_CHILD_ID ?? "aden";
 const SATURDAY_ID = "tmpl-saturday";
 const SUNDAY_ID = "tmpl-sunday";
 const SYNTHETIC_DAY_ID = "tmpl-projection";
@@ -36,6 +36,7 @@ const DEFAULT_SUN: OwnershipTemplate = {
 type DayKey = "saturday" | "sunday";
 
 export default function DayTemplatesPage() {
+  const CHILD_ID = useCurrentChild().id;
   const { settings, loading: settingsLoading } = useV3Settings(CHILD_ID);
   const { templates, loading: templatesLoading } = useV3Templates(CHILD_ID);
   const [selectedDay, setSelectedDay] = useState<DayKey>("saturday");

@@ -18,8 +18,8 @@ import { buildCreateTemplate } from "@/v3/components/shared/createEventTemplate"
 import { EventEditDrawerV3 } from "@/v3/components/shared/EventEditDrawerV3";
 import { TimelineV3 } from "@/v3/components/Timeline/TimelineV3";
 import styles from "./page.module.css";
+import { useCurrentChild } from "@/v3/context/ChildProvider";
 
-const CHILD_ID = process.env.NEXT_PUBLIC_DEFAULT_CHILD_ID ?? "aden";
 
 type DrawerState =
   | { open: false }
@@ -37,6 +37,7 @@ function yesterdayDate(today: string): string {
 }
 
 export default function TimelinePage() {
+  const CHILD_ID = useCurrentChild().id;
   const nowMinutes = useNowMinutes();
   const { day, loading: dayLoading } = useV3Day(CHILD_ID);
   const { settings, loading: settingsLoading } = useV3Settings(CHILD_ID);

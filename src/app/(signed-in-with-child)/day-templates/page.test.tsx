@@ -44,7 +44,7 @@ const owners: OwnersConfig = {
   other: [{ id: "daycare", displayName: "Daycare", color: "#ccc" }],
 };
 
-const baseSettings: Settings = aSettings({ childId: "aden", owners });
+const baseSettings: Settings = aSettings({ childId: "test-child-id", owners });
 
 const saturdayTemplate: OwnershipTemplate = {
   id: "tmpl-saturday",
@@ -127,7 +127,7 @@ describe("DayTemplatesPage (V3)", () => {
     // OwnerRef (slot) — never a display string.
     expect(saveTemplateMock).toHaveBeenCalledWith(
       expect.anything(),
-      "aden",
+      "test-child-id",
       expect.objectContaining({
         id: "tmpl-saturday",
         displayName: "Saturday",

@@ -7,7 +7,7 @@
  * live underneath the same path.
  */
 
-import { doc, getDoc, setDoc, type Firestore } from "firebase/firestore";
+import { doc, getDoc, onSnapshot, setDoc, type Firestore } from "firebase/firestore";
 import { childPath } from "@/lib/firestore/paths";
 import { v3ChildConverter } from "../firestore/converters";
 import type { Child } from "../schemas";
@@ -23,4 +23,14 @@ export async function loadChild(db: Firestore, childId: string): Promise<Child |
 
 export async function createChild(db: Firestore, child: Child): Promise<void> {
   await setDoc(childRef(db, child.id), child);
+}
+
+export function watchChild(
+  db: Firestore,
+  childId: string,
+  cb: (child: Child | null) => void,
+): () => void {
+  return onSnapshot(childRef(db, childId), (snap) => {
+    cb(snap.exists() ? snap.data() : null);
+  });
 }
