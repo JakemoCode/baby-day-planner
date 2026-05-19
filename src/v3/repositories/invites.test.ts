@@ -124,9 +124,9 @@ describe("v3 invites repository", () => {
 
     it("throws when the creator tries to consume their own invite", async () => {
       await createInvite(dbAs(ALLOWED_USER), anInvite());
-      await expect(
-        consumeInvite(dbAs(ALLOWED_USER), "tok-abc", ALLOWED_USER.uid),
-      ).rejects.toThrow(/own invite/i);
+      await expect(consumeInvite(dbAs(ALLOWED_USER), "tok-abc", ALLOWED_USER.uid)).rejects.toThrow(
+        /own invite/i,
+      );
     });
   });
 });

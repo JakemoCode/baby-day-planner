@@ -1,0 +1,98 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
+import { useAuth } from "@/lib/auth/useAuth";
+import { db } from "@/lib/firebase/client";
+import { consumeInvite } from "@/v3/repositories/invites";
+import { SignIn } from "@/lib/auth/SignIn";
+import styles from "./page.module.css";
+
+type ClaimState = { status: "idle" } | { status: "error"; message: string };
+
+/**
+ * §F3 PR #2: invite consumption route.
+ *
+ * Top-level route (NOT inside (signed-in-with-child) — that group requires a
+ * resolved child, and the WHOLE point of this route is to grant access to
+ * one). Works for both signed-in and signed-out arrivals:
+ *
+ *   - Signed-out  → show SignIn; on auth success, the `useEffect` claim kicks in.
+ *   - Signed-in   → call consumeInvite immediately, redirect to / on success.
+ *   - On error    → render the error inline (token expired, already consumed, etc.)
+ *                   so the user can take action (ask the inviter for a new link).
+ */
+export default function InvitePage() {
+  const params = useParams<{ token: string }>();
+  const token = params?.token ?? "";
+  const { user, status } = useAuth();
+  const router = useRouter();
+  const [claim, setClaim] = useState<ClaimState>({ status: "idle" });
+  // Ref-based gate (not state) so we can kick off the async claim WITHOUT
+  // calling setState synchronously in the effect body — React 19's
+  // `react-hooks/set-state-in-effect` rule forbids that path.
+  const startedRef = useRef(false);
+
+  useEffect(() => {
+    if (status !== "authorized" || !user || !token) return;
+    if (startedRef.current) return;
+    startedRef.current = true;
+    (async () => {
+      try {
+        await consumeInvite(db, token, user.uid);
+        router.replace("/");
+      } catch (err) {
+        setClaim({
+          status: "error",
+          message: err instanceof Error ? err.message : "Could not claim invite.",
+        });
+      }
+    })();
+  }, [status, user, token, router]);
+
+  if (!token) {
+    return (
+      <main className={styles.page}>
+        <p className={styles.error}>Missing invite token.</p>
+      </main>
+    );
+  }
+
+  if (status === "loading") {
+    return (
+      <main className={styles.page}>
+        <p>Loading…</p>
+      </main>
+    );
+  }
+
+  if (status === "signed_out" || status === "forbidden") {
+    return (
+      <main className={styles.page}>
+        <h1 className={styles.heading}>You&apos;ve been invited</h1>
+        <p className={styles.lead}>
+          Sign in to accept the invite. We&apos;ll link your account after you authenticate.
+        </p>
+        <SignIn />
+      </main>
+    );
+  }
+
+  if (claim.status === "error") {
+    return (
+      <main className={styles.page}>
+        <h1 className={styles.heading}>Couldn&apos;t accept the invite</h1>
+        <p role="alert" className={styles.error}>
+          {claim.message}
+        </p>
+        <p className={styles.lead}>Ask the person who invited you for a fresh link.</p>
+      </main>
+    );
+  }
+
+  return (
+    <main className={styles.page}>
+      <p>Accepting invite…</p>
+    </main>
+  );
+}
