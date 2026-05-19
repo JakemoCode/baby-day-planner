@@ -1,0 +1,26 @@
+/**
+ * V3 Child repository.
+ *
+ * One doc per child at `children/{id}`. Created during §F3 onboarding;
+ * `id` is a Firebase auto-id generated client-side. All child-scoped
+ * subcollections (settings, days, events, templates, tomorrowPlans)
+ * live underneath the same path.
+ */
+
+import { doc, getDoc, setDoc, type Firestore } from "firebase/firestore";
+import { childPath } from "@/lib/firestore/paths";
+import { v3ChildConverter } from "../firestore/converters";
+import type { Child } from "../schemas";
+
+function childRef(db: Firestore, childId: string) {
+  return doc(db, childPath(childId)).withConverter(v3ChildConverter);
+}
+
+export async function loadChild(db: Firestore, childId: string): Promise<Child | null> {
+  const snap = await getDoc(childRef(db, childId));
+  return snap.exists() ? snap.data() : null;
+}
+
+export async function createChild(db: Firestore, child: Child): Promise<void> {
+  await setDoc(childRef(db, child.id), child);
+}

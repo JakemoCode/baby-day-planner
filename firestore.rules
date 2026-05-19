@@ -12,6 +12,10 @@ service cloud.firestore {
       return value is string && value.size() > 0;
     }
 
+    match /users/{uid} {
+      allow read, write: if isAllowlisted() && request.auth.uid == uid;
+    }
+
     match /children/{childId} {
       allow read, write: if isAllowlisted();
 

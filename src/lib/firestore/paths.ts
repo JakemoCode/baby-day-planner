@@ -1,7 +1,12 @@
 export const CHILDREN = "children";
+export const USERS = "users";
 
 export function childPath(childId: string): string {
   return `${CHILDREN}/${childId}`;
+}
+
+export function userPath(uid: string): string {
+  return `${USERS}/${uid}`;
 }
 
 export function settingsPath(childId: string): string {
