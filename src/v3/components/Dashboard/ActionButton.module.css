@@ -5,7 +5,9 @@
   border-radius: var(--radius-md);
   border: none;
   background: var(--color-accent);
-  color: var(--color-surface);
+  /* White-on-sage was 3.09:1 (failed AA). Dark text on sage clears 4.5:1
+   * comfortably and matches the rest of the warm-earth palette. */
+  color: var(--color-fg);
   font-size: var(--text-base);
   font-weight: var(--weight-semibold);
   cursor: pointer;
@@ -40,5 +42,7 @@
 
 .danger {
   background: var(--color-warning);
-  color: var(--color-surface);
+  /* White-on-terracotta computes to ~3.06:1, same class of bug as the
+   * primary button. Use --color-fg for ~5.4:1, matching the .button fix. */
+  color: var(--color-fg);
 }
