@@ -44,7 +44,10 @@ export function renderProjection(
       : labeled.map((e) => {
           if (e.lifecycle.state !== "recorded") return e;
           if (e.type !== "nap" && e.type !== "bedtime") return e;
-          if (e.endTime === undefined) return e;
+          // Don't early-return when endTime is undefined — that's the
+          // "Start Nap Now, in progress" shape and effectiveEndOf is
+          // exactly the function that supplies the right rendered end
+          // (placeholder + auto-extension up to the cap).
           const ext = effectiveEndOf(e, settings.defaultNapLengthMinutes, nowMinutes);
           return ext === e.endTime ? e : { ...e, endTime: ext };
         });

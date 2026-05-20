@@ -46,31 +46,30 @@ export function isInProgress(e: Event, napLen: number, now: TimeMin): boolean {
 export function effectiveEndOf(event: Event, napLen: number, now: TimeMin): TimeMin {
   const { lifecycle, startTime, endTime } = event;
 
+  // Projected / completed: render to the committed extent. Completed naps
+  // have endTime; projected naps' cascade-derived endTime is present too.
   if (lifecycle.state !== "recorded") {
     return endTime ?? startTime;
   }
 
-  // Recorded nap with no endTime: treat as startTime + napLen (same placeholder
-  // the cascade uses). This handles legacy data and the rare edge case where
-  // NapActionButton didn't set endTime.
-  const baseEnd = endTime ?? startTime + napLen;
-
-  // Auto-extend ONLY applies to "Started Nap Now, haven't ended yet" —
-  // i.e. the placeholder endTime is still in effect. Once the user
-  // commits a real duration via the drawer (handleStartTimeChange
-  // preserves duration; explicit end-time edit), endTime ≠ placeholder
-  // and the nap is treated as having a fixed extent.
+  // Recorded WITH endTime → user has committed both timestamps via the
+  // drawer (which always sets endTime). No auto-extend; render to the
+  // chosen extent.
   //
-  // Detection heuristic: endTime undefined OR exactly equal to the
-  // placeholder formula `startTime + napLen`. Edge case: a user
-  // drawer-editing duration to exactly napLen will still auto-extend.
-  // Rare; the proper fix (schema marker for "endTime user-committed")
-  // is deferred until that edge becomes a real complaint.
-  const isPlaceholderEnd = endTime === undefined || endTime === startTime + napLen;
-  if (!isPlaceholderEnd) return baseEnd;
+  // Recorded WITHOUT endTime → "Start Nap Now, waiting for End Nap." The
+  // placeholder `startTime + napLen` extends as time passes (capped at
+  // 3 extensions = 4×napLen total) so the rendered block continues to
+  // grow visually until the user taps End or edits via the drawer.
+  //
+  // The "no endTime" signal is owned by NapActionButton.Start (no endTime
+  // on creation) vs. EventEditDrawerV3.handleSave (always writes endTime
+  // because the form has start AND end fields).
+  if (endTime !== undefined) {
+    return endTime;
+  }
 
+  const baseEnd = startTime + napLen;
   if (now <= baseEnd) return baseEnd;
-
   const extensions = Math.min(3, Math.floor((now - baseEnd) / napLen) + 1);
   return baseEnd + extensions * napLen;
 }

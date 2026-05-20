@@ -5,7 +5,8 @@ import { effectiveEndOf, isInProgress } from "./effectiveEnd";
 
 const napLen = 60; // minutes
 
-function recordedNap(startTime: number, endTime: number): Event {
+/** Recorded nap in the "user committed both timestamps via drawer" shape. */
+function recordedNapWithEnd(startTime: number, endTime: number): Event {
   return {
     id: "nap_1",
     dayId: "day_test",
@@ -21,27 +22,60 @@ function recordedNap(startTime: number, endTime: number): Event {
   };
 }
 
+/** Recorded nap in the "Start Nap Now, waiting for End Nap" shape (no endTime). */
+function recordedNapInProgress(startTime: number): Event {
+  return {
+    id: "nap_1",
+    dayId: "day_test",
+    eventKey: "nap_1",
+    type: "nap",
+    kind: "block",
+    label: "Nap 1",
+    startTime,
+    hasPutdown: false,
+    owner: NO_OWNER,
+    lifecycle: { state: "recorded", annotatedAt: startTime },
+  };
+}
+
 describe("effectiveEndOf", () => {
-  it("returns endTime when now <= endTime (not yet overrun)", () => {
-    const nap = recordedNap(9 * 60, 10 * 60);
+  // ── recorded WITH endTime (user-committed extent) — NO auto-extend ────────
+
+  it("recorded WITH endTime: returns endTime regardless of now (no auto-extend)", () => {
+    // Jake's 2026-05-20 bug repro: nap committed at 9:00–10:00, now is
+    // way past at 15:00. Without the fix, this auto-extended to the cap
+    // (4×napLen = 13:00) and visually masked daycare chips R21.2 had
+    // shifted to 10:00. With the fix, returns 10:00 cleanly.
+    const nap = recordedNapWithEnd(9 * 60, 10 * 60);
+    expect(effectiveEndOf(nap, napLen, 9 * 60 + 30)).toBe(10 * 60);
+    expect(effectiveEndOf(nap, napLen, 10 * 60 + 1)).toBe(10 * 60);
+    expect(effectiveEndOf(nap, napLen, 13 * 60)).toBe(10 * 60);
+    expect(effectiveEndOf(nap, napLen, 15 * 60)).toBe(10 * 60);
+  });
+
+  // ── recorded WITHOUT endTime (Start Now, in progress) — auto-extends ──────
+
+  it("recorded WITHOUT endTime: returns startTime+napLen when not yet overrun", () => {
+    const nap = recordedNapInProgress(9 * 60);
+    // base = 9:00 + 60 = 10:00. now = 9:30 → returns 10:00.
     expect(effectiveEndOf(nap, napLen, 9 * 60 + 30)).toBe(10 * 60);
   });
 
-  it("extends by 1 napLen when now is just past endTime", () => {
-    const nap = recordedNap(9 * 60, 10 * 60);
-    // now = 10:01 → 1 extension → effectiveEnd = 11:00
+  it("recorded WITHOUT endTime: extends by 1 napLen when now is just past base", () => {
+    const nap = recordedNapInProgress(9 * 60);
+    // base = 10:00. now = 10:01 → 1 extension → 11:00.
     expect(effectiveEndOf(nap, napLen, 10 * 60 + 1)).toBe(11 * 60);
   });
 
-  it("extends by 2 napLens when now is in the second extension window", () => {
-    const nap = recordedNap(9 * 60, 10 * 60);
-    // now = 11:01 → 2 extensions → effectiveEnd = 12:00
+  it("recorded WITHOUT endTime: extends by 2 napLens when in the second extension window", () => {
+    const nap = recordedNapInProgress(9 * 60);
+    // base = 10:00. now = 11:01 → 2 extensions → 12:00.
     expect(effectiveEndOf(nap, napLen, 11 * 60 + 1)).toBe(12 * 60);
   });
 
-  it("caps at 3 extensions (startTime + 4×napLen) even when now is far beyond", () => {
-    const nap = recordedNap(9 * 60, 10 * 60);
-    // cap = 9:00 + 4*60 = 13:00. now = 15:00 >> cap
+  it("recorded WITHOUT endTime: caps at 3 extensions (startTime + 4×napLen)", () => {
+    const nap = recordedNapInProgress(9 * 60);
+    // cap = 9:00 + 4×60 = 13:00. now = 15:00 → capped at 13:00.
     expect(effectiveEndOf(nap, napLen, 15 * 60)).toBe(13 * 60);
   });
 
@@ -79,86 +113,6 @@ describe("effectiveEndOf", () => {
     };
     expect(effectiveEndOf(nap, napLen, 11 * 60)).toBe(9 * 60 + 30);
   });
-
-  it("returns endTime when now exactly equals endTime (not overrun)", () => {
-    const nap = recordedNap(9 * 60, 10 * 60);
-    expect(effectiveEndOf(nap, napLen, 10 * 60)).toBe(10 * 60);
-  });
-
-  it("recorded nap with no endTime uses startTime + napLen as base (soft-end placeholder)", () => {
-    // No endTime: base = 9:00 + 60 = 10:00.
-    // now = 9:30 → not past baseEnd → returns 10:00.
-    const nap: Event = {
-      id: "nap_1",
-      dayId: "day_test",
-      eventKey: "nap_1",
-      type: "nap",
-      kind: "block",
-      label: "Nap 1",
-      startTime: 9 * 60,
-      hasPutdown: false,
-      owner: NO_OWNER,
-      lifecycle: { state: "recorded", annotatedAt: 9 * 60 },
-    };
-    expect(effectiveEndOf(nap, napLen, 9 * 60 + 30)).toBe(10 * 60);
-  });
-
-  // Boundary tests for the cap (regression guard against off-by-one in the
-  // Math.min(3, ...) clamp).
-  it("at exactly 3 extensions away (now = baseEnd + 3*napLen): caps at 4*napLen total", () => {
-    const nap = recordedNap(9 * 60, 10 * 60);
-    // baseEnd = 10:00, +3*napLen = 13:00. now = 13:00 → cap.
-    expect(effectiveEndOf(nap, napLen, 13 * 60)).toBe(13 * 60);
-  });
-
-  it("just past the cap (now = baseEnd + 4*napLen): still capped at 4*napLen total", () => {
-    const nap = recordedNap(9 * 60, 10 * 60);
-    // baseEnd = 10:00, +4*napLen = 14:00. now = 14:00 → still capped at 13:00.
-    expect(effectiveEndOf(nap, napLen, 14 * 60)).toBe(13 * 60);
-  });
-
-  it("recorded nap with user-committed endTime (≠ placeholder) does NOT auto-extend", () => {
-    // Repro of Jake's bug 2026-05-20: drawer edit slid nap start; duration
-    // preserved, so endTime = startTime + (original duration), which is
-    // NOT the placeholder formula. The nap should render to that endTime,
-    // not auto-extend up to the 4×napLen cap.
-    //
-    // napLen = 60. User edited to start 9:30, duration 30 → endTime 10:00.
-    // 10:00 ≠ 9:30 + 60 = 10:30, so this is a user-committed end.
-    // now = 11:00 (well past). Expected: no extension, end stays at 10:00.
-    const nap: Event = {
-      id: "nap_1",
-      dayId: "day_test",
-      eventKey: "nap_1",
-      type: "nap",
-      kind: "block",
-      label: "Nap 1",
-      startTime: 9 * 60 + 30,
-      endTime: 10 * 60,
-      hasPutdown: false,
-      owner: NO_OWNER,
-      lifecycle: { state: "recorded", annotatedAt: 9 * 60 + 30 },
-    };
-    expect(effectiveEndOf(nap, napLen, 11 * 60)).toBe(10 * 60);
-  });
-
-  it("recorded nap with no endTime, overrun + cap: base = startTime+napLen, capped at startTime+4*napLen", () => {
-    // No endTime: base = 9:00 + 60 = 10:00. Cap = base + 3*napLen = 13:00.
-    // now = 18:00 (way past cap) → capped at 13:00.
-    const nap: Event = {
-      id: "nap_1",
-      dayId: "day_test",
-      eventKey: "nap_1",
-      type: "nap",
-      kind: "block",
-      label: "Nap 1",
-      startTime: 9 * 60,
-      hasPutdown: false,
-      owner: NO_OWNER,
-      lifecycle: { state: "recorded", annotatedAt: 9 * 60 },
-    };
-    expect(effectiveEndOf(nap, napLen, 18 * 60)).toBe(13 * 60);
-  });
 });
 
 // ---------------------------------------------------------------------------
@@ -167,7 +121,7 @@ describe("effectiveEndOf", () => {
 
 describe("isInProgress", () => {
   it("returns true for a recorded event with startTime <= now < effectiveEnd", () => {
-    const nap = recordedNap(9 * 60, 10 * 60);
+    const nap = recordedNapWithEnd(9 * 60, 10 * 60);
     // now = 9:30, effectiveEnd = 10:00 — in progress
     expect(isInProgress(nap, napLen, 9 * 60 + 30)).toBe(true);
   });
@@ -189,16 +143,14 @@ describe("isInProgress", () => {
     expect(isInProgress(projected, napLen, 9 * 60 + 30)).toBe(false);
   });
 
-  it("returns false when now is past the effectiveEnd (nap is over)", () => {
-    const nap = recordedNap(9 * 60, 10 * 60);
-    // now = 10:01 → effectiveEnd auto-extends to 11:00, still > now? No:
-    // now (10:01) >= effectiveEnd (11:00) is false — still in-progress.
-    // Use far-past-cap now instead:
-    expect(isInProgress(nap, napLen, 14 * 60)).toBe(false);
+  it("returns false when now is past effectiveEnd (recorded WITH endTime → no extend)", () => {
+    const nap = recordedNapWithEnd(9 * 60, 10 * 60);
+    // 2026-05-20: recorded WITH endTime no longer auto-extends. now > 10:00 → done.
+    expect(isInProgress(nap, napLen, 10 * 60 + 1)).toBe(false);
   });
 
   it("returns false when startTime > now (not started yet)", () => {
-    const nap = recordedNap(10 * 60, 11 * 60);
+    const nap = recordedNapWithEnd(10 * 60, 11 * 60);
     expect(isInProgress(nap, napLen, 9 * 60)).toBe(false);
   });
 });
