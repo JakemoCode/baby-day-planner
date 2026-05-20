@@ -1,10 +1,124 @@
 /**
- * V3 Settings defensive defaults — apply V3 defaults to a partial
- * settings doc so the engine never sees an undefined `bottleChain`, etc.
+ * V3 Settings defensive defaults — tests for makeDefaultSettings and
+ * normalizeSettingsDoc, plus backward-compat tests for withV3SettingsDefaults.
  */
 
 import { describe, expect, it } from "vitest";
-import { withV3SettingsDefaults } from "./settingsDefaults";
+import {
+  makeDefaultSettings,
+  normalizeSettingsDoc,
+  withV3SettingsDefaults,
+} from "./settingsDefaults";
+
+// ---------------------------------------------------------------------------
+// makeDefaultSettings
+// ---------------------------------------------------------------------------
+
+describe("makeDefaultSettings", () => {
+  it("returns a Settings with the given childId", () => {
+    const s = makeDefaultSettings("child-abc");
+    expect(s.childId).toBe("child-abc");
+  });
+
+  it("returns all required fields structurally valid", () => {
+    const s = makeDefaultSettings("child-1");
+    expect(s.bottleChain).toEqual({ bottlesPerDay: 5, bufferAfterWakeMinutes: 10 });
+    expect(s.owners.parent1.displayName).toBe("");
+    expect(s.daycare.weekdays.mon).toBe(false);
+    expect(s.wakeWindowsMinutes).toEqual([95, 100, 110, 120, 120, 120]);
+    expect(s.pumpTimes).toEqual([]);
+    expect(s.dailyRecurring).toEqual([]);
+    expect(s.daycare.enabled).toBe(false);
+  });
+
+  it("does not fire any legacy migration logic (no heuristic rewrite on clean input)", () => {
+    const s = makeDefaultSettings("child-1");
+    // timelinePxPerHour should be 120 (the intentional default), never 80
+    expect(s.timelinePxPerHour).toBe(120);
+    // timelineColorMode is set to a real value, not null
+    expect(s.timelineColorMode).toBe("type");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// normalizeSettingsDoc
+// ---------------------------------------------------------------------------
+
+describe("normalizeSettingsDoc", () => {
+  it("promotes pre-#155 pumpTimes: number[] to PumpSession[]", () => {
+    const raw = {
+      childId: "child-1",
+      pumpTimes: [8 * 60, 14 * 60], // legacy number[] format
+    };
+    const s = normalizeSettingsDoc(raw);
+    expect(s.pumpTimes).toEqual([{ time: 480 }, { time: 840 }]);
+  });
+
+  it("preserves pumpTimes already in PumpSession[] shape", () => {
+    const raw = {
+      childId: "child-1",
+      pumpTimes: [{ time: 8 * 60, durationMinutes: 25 }],
+    };
+    const s = normalizeSettingsDoc(raw);
+    expect(s.pumpTimes).toEqual([{ time: 480, durationMinutes: 25 }]);
+  });
+
+  it("promotes pre-#170 docs missing timelinePxPerHour (gated on timelineColorMode == null)", () => {
+    // Legacy doc: timelinePxPerHour = 80, timelineColorMode is absent (null)
+    const raw = {
+      childId: "child-1",
+      timelinePxPerHour: 80,
+      // timelineColorMode intentionally absent to simulate legacy doc
+    };
+    const s = normalizeSettingsDoc(raw);
+    // The 80 → 120 migration fires when timelineColorMode is null
+    expect(s.timelinePxPerHour).toBe(120);
+  });
+
+  it("does NOT migrate timelinePxPerHour=80 when timelineColorMode is already set (deliberate choice)", () => {
+    const raw = {
+      childId: "child-1",
+      timelinePxPerHour: 80,
+      timelineColorMode: "owner" as const,
+    };
+    const s = normalizeSettingsDoc(raw);
+    // User explicitly chose 80 with a real colorMode — preserve it
+    expect(s.timelinePxPerHour).toBe(80);
+  });
+
+  it("fills in missing required fields via DEFAULTS", () => {
+    const raw = { childId: "child-1" };
+    const s = normalizeSettingsDoc(raw);
+    expect(s.bottleChain).toEqual({ bottlesPerDay: 5, bufferAfterWakeMinutes: 10 });
+    expect(s.daycare.weekdays).toEqual({
+      mon: false,
+      tue: false,
+      wed: false,
+      thu: false,
+      fri: false,
+      sat: false,
+      sun: false,
+    });
+  });
+
+  it("returns intact a doc already in current shape (idempotent)", () => {
+    const raw = {
+      childId: "child-1",
+      timelinePxPerHour: 120,
+      timelineColorMode: "type" as const,
+      pumpTimes: [{ time: 8 * 60 }],
+      bottleChain: { bottlesPerDay: 7, bufferAfterWakeMinutes: 15 },
+    };
+    const s = normalizeSettingsDoc(raw);
+    expect(s.bottleChain.bottlesPerDay).toBe(7);
+    expect(s.timelinePxPerHour).toBe(120);
+    expect(s.pumpTimes).toEqual([{ time: 480 }]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// withV3SettingsDefaults (backward-compat re-export wrapper)
+// ---------------------------------------------------------------------------
 
 describe("withV3SettingsDefaults", () => {
   it("returns a fully-shaped Settings even from an empty input", () => {

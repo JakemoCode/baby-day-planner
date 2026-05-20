@@ -24,7 +24,7 @@ import type {
 } from "../schemas";
 import { withV3DayDefaults } from "./dayDefaults";
 import { withV3EventDefaults } from "./eventDefaults";
-import { withV3SettingsDefaults } from "./settingsDefaults";
+import { normalizeSettingsDoc } from "./settingsDefaults";
 
 function passthrough<T extends object>(): FirestoreDataConverter<T> {
   return {
@@ -44,8 +44,8 @@ export const v3UserConverter = passthrough<User>();
 export const v3InviteConverter = passthrough<Invite>();
 
 /**
- * Settings converter applies `withV3SettingsDefaults` on read so partial
- * docs become engine-safe Settings across every read path, including
+ * Settings converter applies `normalizeSettingsDoc` on read so partial /
+ * legacy docs become engine-safe Settings across every read path, including
  * consumers that bypass `useV3Settings` (e.g. one-shot `getSettings` calls).
  * Mirrors the pattern established by `v3EventConverter`.
  */
@@ -53,8 +53,8 @@ export const v3SettingsConverter: FirestoreDataConverter<Settings> = {
   toFirestore: (data) => data,
   fromFirestore: (snap: QueryDocumentSnapshot, opts?: SnapshotOptions) => {
     // Snapshot data is always present when the converter is invoked;
-    // the non-null assertion is safe here (same pattern as v3DayConverter).
-    return withV3SettingsDefaults(snap.data(opts) as Partial<Settings>)!;
+    // normalizeSettingsDoc handles missing fields and legacy migrations.
+    return normalizeSettingsDoc(snap.data(opts));
   },
 };
 
