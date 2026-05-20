@@ -92,9 +92,12 @@ const RuleProjectDaycareEvents: Rule = {
 // case of a recorded nap without endTime (legacy data only), fall back to
 // `startTime + defaultNapLengthMinutes`.
 //
-// Applies to BOTH projected and recorded daycare events — per Jake's
-// simple rule: "if a daycare chip would land inside a nap, just move it
-// to the end of the nap."
+// Applies to PROJECTED daycare events only. Recorded daycare events are
+// "reality" — the user committed a specific time, and the engine's
+// reality-wins invariant (evaluator.ts:checkRealityWins) forbids any
+// rule from mutating recorded fields. If the user records a handoff at
+// a time that conflicts with a nap, that's the user's call to live with
+// or correct.
 
 function napEnd(nap: Event, ctx: Context): TimeMin {
   return nap.endTime ?? nap.startTime + ctx.settings.defaultNapLengthMinutes;
@@ -130,6 +133,7 @@ const RuleShiftDaycareOutOfNap: Rule = {
     const naps = events.filter(isNap);
     if (naps.length === 0) return false;
     return daycareEvents.some((dc) => {
+      if (dc.lifecycle.state !== "projected") return false;
       const containing = findContainingNap(naps, dc.startTime, ctx);
       if (!containing) return false;
       // Only fire when the shift would actually change something —
@@ -142,6 +146,7 @@ const RuleShiftDaycareOutOfNap: Rule = {
     const naps = events.filter(isNap);
     return events.map((e) => {
       if (!(isDaycareDropoff(e) || isDaycarePickup(e))) return e;
+      if (e.lifecycle.state !== "projected") return e;
       const containing = findContainingNap(naps, e.startTime, ctx);
       if (!containing) return e;
       return { ...e, startTime: napEnd(containing, ctx) };

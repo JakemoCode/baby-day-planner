@@ -234,6 +234,47 @@ describe("R21.2 — nominal time shifted out of nap windows", () => {
     expect(dropoff?.startTime).toBe(7 * 60 + 55 + 45);
   });
 
+  it("recorded daycare event is NOT shifted even if it lands inside a nap (reality-wins)", () => {
+    // The engine's checkRealityWins invariant forbids any rule from
+    // mutating a recorded event's time/owner/amount. If a user explicitly
+    // records a handoff at 8:00 and a nap covers that time, R21.2 must
+    // leave the recorded event alone — the user's commitment is canonical.
+    const recordedPickup = {
+      id: "recorded_daycare_pickup",
+      dayId: "d1",
+      eventKey: "daycare_pickup",
+      type: "daycare_pickup" as const,
+      kind: "instant" as const,
+      startTime: 16 * 60 + 45, // inside the projected nap_4 window below
+      label: "Daycare Pickup",
+      owner: NO_OWNER,
+      hasPutdown: false,
+      lifecycle: { state: "recorded" as const, annotatedAt: 16 * 60 + 45 },
+    };
+    const ctx = aContext({
+      day: aDay({ wakeTime: 7 * 60, date: "2026-05-08" }),
+      actuals: [recordedPickup],
+      settings: aSettings({
+        wakeWindowsMinutes: [110, 110, 110, 110, 120, 120],
+        defaultNapLengthMinutes: 45,
+        bedtimeThreshold: 18 * 60,
+        bottleChain: { bottlesPerDay: 0, bufferAfterWakeMinutes: 10 },
+        daycare: {
+          enabled: true,
+          dropoffTime: 6 * 60, // pre-wake; no conflict
+          pickupTime: 17 * 60, // nominal pickup is also irrelevant; the recorded one is what's evaluated
+          weekdays: ALL_DAYS_TRUE,
+        },
+      }),
+    });
+    // Engine must not throw; recorded event passes through unchanged.
+    expect(() => run(ctx)).not.toThrow();
+    const out = run(ctx);
+    const pickup = out.find((e) => e.id === "recorded_daycare_pickup")!;
+    expect(pickup.startTime).toBe(16 * 60 + 45);
+    expect(pickup.lifecycle.state).toBe("recorded");
+  });
+
   it("rule is idempotent — running the engine twice produces the same shift", () => {
     const ctx = aContext({
       day: aDay({ wakeTime: 7 * 60, date: "2026-05-08" }),
