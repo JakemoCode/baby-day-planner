@@ -48,7 +48,6 @@ describe("withV3SettingsDefaults", () => {
     // Daycare defaulter populates the full nested shape: disabled, with
     // all weekday flags false and empty ownerId.
     expect(out.daycare.enabled).toBe(false);
-    expect(out.daycare.ownerId).toBe("");
     expect(out.daycare.weekdays).toEqual({
       mon: false,
       tue: false,

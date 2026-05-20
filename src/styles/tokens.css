@@ -13,6 +13,12 @@
   /* Force browser UA (scrollbars, native form controls) to light. */
   color-scheme: light;
 
+  /* Re-tint native form controls (checkboxes, radios, select-option focus
+   * highlights) so they pick up the sage accent instead of OS-default
+   * blue. Single declaration covers all native form controls in light
+   * mode; dark-mode override below mirrors via prefers-color-scheme. */
+  accent-color: var(--color-accent);
+
   /* ─────── Surfaces ─────── */
   /* §F2a (2026-05-18): bg darkened to deepen cream so the existing
      white cards visibly lift off the page (1.06 → 1.19). Cards stay
@@ -45,13 +51,16 @@
   --color-honey-soft: #f5e2a5; /* extra (other) block fill */
 
   /* ─────── Owner colors ─────── */
-  --color-owner-jake: #7a8fa8; /* dusty blue */
-  --color-owner-kelly: #ce8e7e; /* warm coral */
+  /* Earth-tone owner palette. The current hex pair is calibrated for the
+   * warm-cream/sage palette. When we expose theme presets, the
+   * historical saturated variant lives here too as the 'loud' variant. */
+  --color-owner-parent-1: #649ec3; /* dusty blue (palette refresh 2026-05-19) */
+  --color-owner-parent-2: #bc5b2e; /* terracotta (palette refresh 2026-05-19) */
   --color-owner-daycare: #9a8e82; /* warm gray */
 
   /* Owner tints (lighter shades — backgrounds for owned cards/blocks) */
-  --color-owner-jake-tint: #e1e8ef;
-  --color-owner-kelly-tint: #f3dcd2;
+  --color-owner-parent-1-tint: #d8e7f1;
+  --color-owner-parent-2-tint: #f1cbb5;
   --color-owner-daycare-tint: #ece7e1;
 
   /* ─────── Spacing (4 px base) ─────── */
@@ -132,12 +141,12 @@
     --color-danger: #c47659;
     --color-pump-tint: #3c2f44;
 
-    --color-owner-jake: #94a8c0;
-    --color-owner-kelly: #e0a695;
+    --color-owner-parent-1: #94a8c0;
+    --color-owner-parent-2: #e0a695;
     --color-owner-daycare: #aea295;
 
-    --color-owner-jake-tint: #2c333d;
-    --color-owner-kelly-tint: #3d2f29;
+    --color-owner-parent-1-tint: #2c333d;
+    --color-owner-parent-2-tint: #3d2f29;
     --color-owner-daycare-tint: #2f2c28;
 
     --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
@@ -166,11 +175,11 @@
   --color-warning: #d99878;
   --color-danger: #c47659;
 
-  --color-owner-jake: #94a8c0;
-  --color-owner-kelly: #e0a695;
+  --color-owner-parent-1: #94a8c0;
+  --color-owner-parent-2: #e0a695;
   --color-owner-daycare: #aea295;
 
-  --color-owner-jake-tint: #2c333d;
-  --color-owner-kelly-tint: #3d2f29;
+  --color-owner-parent-1-tint: #2c333d;
+  --color-owner-parent-2-tint: #3d2f29;
   --color-owner-daycare-tint: #2f2c28;
 }

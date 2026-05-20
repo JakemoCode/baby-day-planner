@@ -227,8 +227,10 @@ export type DaycareConfig = {
   enabled: boolean;
   dropoffTime: TimeMin;
   pickupTime: TimeMin;
-  /** References Settings.owners.other[].id — usually the "Daycare" entry. */
-  ownerId: string;
+  /** Parent who owns the daycare_dropoff event. */
+  dropoffOwnerSlot: OwnerSlot;
+  /** Parent who owns the daycare_pickup event. */
+  pickupOwnerSlot: OwnerSlot;
   weekdays: WeekdayFlags;
 };
 
