@@ -1,8 +1,17 @@
 /**
- * V3 Settings defensive defaults.
+ * V3 Settings construction and normalization.
  *
- * Apply V3 defaults to a partial settings doc so the engine never sees
- * an undefined `bottleChain`, `daycare.weekdays`, etc.
+ * Two seams:
+ *
+ *   makeDefaultSettings(childId)
+ *     Pure construction — builds a fully-shaped Settings from scratch with
+ *     conservative defaults. No legacy awareness. Used by the settings page
+ *     on first run (no doc exists yet) and the welcome/onboarding page.
+ *
+ *   normalizeSettingsDoc(raw)
+ *     Firestore read seam — applies migrations for legacy shapes, then fills
+ *     any missing required fields via makeDefaultSettings logic. Used by the
+ *     converter on every read.
  *
  * Defaults are deliberately conservative: numeric defaults match the
  * engine's expected ranges, daycare is disabled, owners use empty
@@ -59,8 +68,8 @@ const DEFAULTS: Omit<Settings, "childId"> = {
   },
   timelineColorMode: "type",
   // V2's default was 120 px/hour. The cutover stub set 80 by accident
-  // and a one-time migration (below) converts legacy 80 values back to
-  // 120 on read.
+  // and a one-time migration (in normalizeSettingsDoc) converts legacy
+  // 80 values back to 120 on read.
   timelinePxPerHour: 120,
   timelineDimPast: true,
 };
@@ -96,25 +105,70 @@ function normalizePumpTimes(raw: unknown): PumpSession[] {
     .filter((p): p is PumpSession => p !== null);
 }
 
-export function withV3SettingsDefaults(input: Partial<Settings> | null): Settings | null {
-  if (input === null) return null;
-  const merged: Settings = {
+/**
+ * Pure construction seam — builds a fully-shaped Settings from scratch.
+ * No legacy migration logic fires. Used by the settings page on first run
+ * when no Firestore doc exists yet, and by the welcome/onboarding page.
+ */
+export function makeDefaultSettings(childId: string): Settings {
+  return {
     ...DEFAULTS,
+    childId,
+    // Deep-clone mutable nested objects so callers can't mutate the DEFAULTS.
+    bottleChain: { ...DEFAULTS.bottleChain },
+    daycare: {
+      ...DEFAULTS.daycare,
+      weekdays: { ...DEFAULTS.daycare.weekdays },
+    },
+    owners: {
+      parent1: { ...DEFAULTS.owners.parent1 },
+      parent2: { ...DEFAULTS.owners.parent2 },
+      other: [],
+    },
+    pumpTimes: [],
+    bottleRules: [],
+    bottleIntervalRules: [],
+    dailyRecurring: [],
+    wakeWindowsMinutes: [...DEFAULTS.wakeWindowsMinutes],
+  };
+}
+
+/**
+ * Firestore read seam — applies all legacy migrations, then fills missing
+ * required fields from DEFAULTS. Called by v3SettingsConverter on every
+ * Firestore read.
+ *
+ * Migrations applied:
+ * 1. pumpTimes: number[] → PumpSession[]  (pre-#155 shape)
+ * 2. timelinePxPerHour 80 → 120 heuristic rewrite
+ *    (gated on timelineColorMode == null so deliberate 80 values are kept)
+ */
+export function normalizeSettingsDoc(raw: unknown): Settings {
+  const input = raw as Partial<Settings>;
+
+  // Start from a fully-cloned defaults baseline so any field that input
+  // doesn't override (e.g. wakeWindowsMinutes, bottleIntervalRules) is a
+  // fresh array/object — never a reference to the shared DEFAULTS.
+  // Mirrors the symmetric guarantee makeDefaultSettings already provides.
+  const baseline = makeDefaultSettings(input.childId ?? "");
+
+  const merged: Settings = {
+    ...baseline,
     ...input,
     childId: input.childId ?? "",
     pumpTimes: normalizePumpTimes(
-      (input as { pumpTimes?: unknown }).pumpTimes ?? DEFAULTS.pumpTimes,
+      (input as { pumpTimes?: unknown }).pumpTimes ?? baseline.pumpTimes,
     ),
-    bottleChain: { ...DEFAULTS.bottleChain, ...input.bottleChain },
+    bottleChain: { ...baseline.bottleChain, ...input.bottleChain },
     daycare: {
-      ...DEFAULTS.daycare,
+      ...baseline.daycare,
       ...input.daycare,
-      weekdays: { ...DEFAULTS.daycare.weekdays, ...input.daycare?.weekdays },
+      weekdays: { ...baseline.daycare.weekdays, ...input.daycare?.weekdays },
     },
     owners: {
-      parent1: { ...DEFAULTS.owners.parent1, ...input.owners?.parent1 },
-      parent2: { ...DEFAULTS.owners.parent2, ...input.owners?.parent2 },
-      other: input.owners?.other ?? DEFAULTS.owners.other,
+      parent1: { ...baseline.owners.parent1, ...input.owners?.parent1 },
+      parent2: { ...baseline.owners.parent2, ...input.owners?.parent2 },
+      other: input.owners?.other ?? baseline.owners.other,
     },
   };
 
@@ -131,4 +185,14 @@ export function withV3SettingsDefaults(input: Partial<Settings> | null): Setting
   }
 
   return merged;
+}
+
+/**
+ * @deprecated Use `normalizeSettingsDoc` from the Firestore converter seam,
+ * or `makeDefaultSettings` for first-run construction. This wrapper exists
+ * for backward-compat and will be removed once all callers are migrated.
+ */
+export function withV3SettingsDefaults(input: Partial<Settings> | null): Settings | null {
+  if (input === null) return null;
+  return normalizeSettingsDoc(input);
 }

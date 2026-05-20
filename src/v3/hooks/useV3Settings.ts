@@ -12,7 +12,7 @@ export type UseV3SettingsResult = {
 
 /**
  * Subscribes to the V3 settings doc. The `v3SettingsConverter` in
- * `converters.ts` applies `withV3SettingsDefaults` on every read, so
+ * `converters.ts` applies `normalizeSettingsDoc` on every read, so
  * the hook delivers a fully-defaulted Settings without an extra call here.
  * Mirrors the post-PR-#155 shape of `useV3Events`.
  */
