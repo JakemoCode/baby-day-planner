@@ -53,6 +53,7 @@ function run(ctx: Context): Event[] {
 describe("drawer-edit nap + daycare overlap (2026-05-20 Jake bug)", () => {
   const napLen = 45;
   const NOW = 11 * 60; // current wall-clock, well past nap end
+  const napSettings = aSettings({ defaultNapLengthMinutes: napLen });
 
   it("drawer save of a nap keeps lifecycle = recorded (scheduling intent preserves hasPutdown)", () => {
     // The lifecycle reducer keeps scheduling-type drawer saves in
@@ -96,9 +97,7 @@ describe("drawer-edit nap + daycare overlap (2026-05-20 Jake bug)", () => {
       owner: NO_OWNER,
       lifecycle: { state: "recorded", annotatedAt: NOW },
     };
-    expect(
-      resolvedEnd(editedNap, aSettings({ defaultNapLengthMinutes: napLen }), NOW),
-    ).toBe(9 * 60 + 10);
+    expect(resolvedEnd(editedNap, napSettings, NOW)).toBe(9 * 60 + 10);
   });
 
   it("end-to-end: edited nap + daycare overlap → daycare shifts to nap.endTime; nap stays 8:25–9:10", () => {
