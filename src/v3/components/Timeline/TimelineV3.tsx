@@ -48,7 +48,7 @@ const PUTDOWN_RIGHT_INSET = BLOCK_RIGHT_INSET + 26;
 const CUSTOM_LEFT_EXTRA = 110;
 const LEADER_LINE_W = 8;
 const VIEWPORT_PADDING_MIN = 30;
-const DEFAULT_VIEWPORT = { start: 7 * 60, end: 21 * 60 };
+const DEFAULT_VIEWPORT = { start: 5 * 60, end: 21 * 60 };
 const SCROLL_TOP_PADDING_PX = 80;
 const DEFAULT_PX_PER_HOUR = 120;
 
