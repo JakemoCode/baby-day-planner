@@ -130,9 +130,7 @@ describe("Dashboard seam — real projectDay + new panels", () => {
 
     // -- Selectors over projected output --
     const next = nextDashboardEvent(projected, now);
-    const inProgressNap = actuals.find(
-      (e) => e.type === "nap" && isInProgress(e, settings.defaultNapLengthMinutes, now),
-    );
+    const inProgressNap = actuals.find((e) => e.type === "nap" && isInProgress(e, settings, now));
     const cww = currentWakeWindow(projected, now);
     const bedtime = projectedBedtime(projected);
     const nb = nextBottle(projected, now);
