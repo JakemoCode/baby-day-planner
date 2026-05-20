@@ -4,17 +4,17 @@ import type { OwnersConfig } from "@/v3/schemas";
 import { OwnerPill } from "./OwnerPill";
 
 const owners: OwnersConfig = {
-  parent1: { displayName: "Jake", color: "#0af" },
-  parent2: { displayName: "Kelly", color: "#f0a" },
-  other: [{ id: "daycare", displayName: "Daycare", color: "#aa0" }],
+  parent1: { displayName: "Jake" },
+  parent2: { displayName: "Kelly" },
+  other: [{ id: "daycare", displayName: "Daycare" }],
 };
 
 describe("OwnerPill", () => {
-  it("renders the owner display name with --owner-color when set", () => {
+  it("renders the owner display name with --owner-color set to the slot token", () => {
     render(<OwnerPill owner={{ slot: "parent1" }} owners={owners} />);
     const pill = screen.getByText("Jake");
     expect(pill).toBeVisible();
-    expect(pill.style.getPropertyValue("--owner-color")).toBe("#0af");
+    expect(pill.style.getPropertyValue("--owner-color")).toBe("var(--color-owner-parent-1)");
   });
 
   it("resolves 'other' owner via owners.other[id]", () => {

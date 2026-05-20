@@ -17,9 +17,9 @@ import { TimelineV3 } from "./TimelineV3";
 import { expandPutdownBlocks } from "./expandPutdown";
 
 const owners: OwnersConfig = {
-  parent1: { displayName: "Jake", color: "#0af" },
-  parent2: { displayName: "Sam", color: "#f0a" },
-  other: [{ id: "daycare", displayName: "Daycare", color: "#ccc" }],
+  parent1: { displayName: "Jake" },
+  parent2: { displayName: "Sam" },
+  other: [{ id: "daycare", displayName: "Daycare" }],
 };
 
 const ev = (overrides: Partial<Event>): Event => ({
@@ -105,7 +105,7 @@ describe("TimelineV3", () => {
     const block = screen.getByTestId("timeline-block");
     // Read the raw style attribute — jsdom normalizes hex to rgb() when
     // accessed via .style, so assert against what the component emitted.
-    expect(block.getAttribute("style")).toContain("--owner-color: #0af");
+    expect(block.getAttribute("style")).toContain("--owner-color: var(--color-owner-parent-1)");
   });
 
   it("sets --owner-color inline on instant chips from the configured owner palette", () => {
@@ -121,7 +121,7 @@ describe("TimelineV3", () => {
     ];
     render(<TimelineV3 events={events} owners={owners} />);
     const chip = screen.getByTestId("instant-chip");
-    expect(chip.getAttribute("style")).toContain("--owner-color: #ccc");
+    expect(chip.getAttribute("style")).toContain("--owner-color: var(--color-owner-3)");
   });
 
   it("omits --owner-color when an event has no owner (CSS handles the fallback)", () => {

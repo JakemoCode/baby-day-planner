@@ -217,10 +217,16 @@ export type DailyRecurring = {
   enabled: boolean;
 };
 
+/**
+ * §F4 (2026-05-20): `color` fields were retired from the editor — owner
+ * colors are now slot-keyed via `--color-owner-*` tokens. The field
+ * stays optional on the type so persisted pre-§F4 docs continue to
+ * validate; nothing reads it anymore.
+ */
 export type OwnersConfig = {
-  parent1: { displayName: string; color: string };
-  parent2: { displayName: string; color: string };
-  other: Array<{ id: string; displayName: string; color: string }>;
+  parent1: { displayName: string; color?: string };
+  parent2: { displayName: string; color?: string };
+  other: Array<{ id: string; displayName: string; color?: string }>;
 };
 
 export type DaycareConfig = {

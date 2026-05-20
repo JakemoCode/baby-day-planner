@@ -17,15 +17,6 @@ import type { PumpSession, Settings } from "../schemas";
  * reference the same value rather than re-typing `7 * 60`. */
 export const DEFAULT_WAKE_TIME = 7 * 60;
 
-/** Pastels matching the legacy `--color-owner-parent-1` / `--color-owner-parent-2`
- * tokens. Re-exported so `projectionPlaceholders.ts` mirrors the same
- * values without drift. The §F4 fast-follow will replace this with a
- * theme picker. */
-export const DEFAULT_OWNER_COLORS = {
-  parent1: "#649ec3",
-  parent2: "#bc5b2e",
-} as const;
-
 const DEFAULTS: Omit<Settings, "childId"> = {
   defaultWakeTime: DEFAULT_WAKE_TIME,
   bedtimeThreshold: 17 * 60 + 30,
@@ -64,8 +55,8 @@ const DEFAULTS: Omit<Settings, "childId"> = {
     },
   },
   owners: {
-    parent1: { displayName: "", color: DEFAULT_OWNER_COLORS.parent1 },
-    parent2: { displayName: "", color: DEFAULT_OWNER_COLORS.parent2 },
+    parent1: { displayName: "" },
+    parent2: { displayName: "" },
     other: [],
   },
   timelineColorMode: "type",
@@ -82,32 +73,6 @@ const DEFAULTS: Omit<Settings, "childId"> = {
  * carry the 80 value.
  */
 const LEGACY_PLACEHOLDER_PX_PER_HOUR = 80;
-
-/**
- * One-time migration: rewrite the cutover-era bright placeholder colors
- * (`#0af` / `#f0a`) — which were never intended as production palette
- * values — to the legacy pastels. Applied silently on every read so
- * dev/prod docs written under the old defaults converge without a
- * separate migration script. Safe to remove once no `OwnersConfig` docs
- * carry the legacy placeholder values (§F4 theme picker supersedes).
- */
-const LEGACY_PLACEHOLDER_COLORS: Record<"parent1" | "parent2", readonly string[]> = {
-  // Pre-palette-refresh defaults (2026-05-19) included — any settings doc
-  // still holding those exact hex values gets rolled forward to the new
-  // DEFAULT_OWNER_COLORS. Explicit user picks of any other hex stay put.
-  parent1: ["#0af", "#7a8fa8"],
-  parent2: ["#f0a", "#ce8e7e"],
-};
-
-function migrateOwnerSlot(
-  slot: { displayName: string; color: string },
-  key: "parent1" | "parent2",
-): { displayName: string; color: string } {
-  if (LEGACY_PLACEHOLDER_COLORS[key].includes(slot.color)) {
-    return { ...slot, color: DEFAULT_OWNER_COLORS[key] };
-  }
-  return slot;
-}
 
 /**
  * Older settings docs persisted `pumpTimes` as `number[]` (TimeMin array).
@@ -150,14 +115,8 @@ export function withV3SettingsDefaults(input: Partial<Settings> | null): Setting
       weekdays: { ...DEFAULTS.daycare.weekdays, ...input.daycare?.weekdays },
     },
     owners: {
-      parent1: migrateOwnerSlot(
-        { ...DEFAULTS.owners.parent1, ...input.owners?.parent1 },
-        "parent1",
-      ),
-      parent2: migrateOwnerSlot(
-        { ...DEFAULTS.owners.parent2, ...input.owners?.parent2 },
-        "parent2",
-      ),
+      parent1: { ...DEFAULTS.owners.parent1, ...input.owners?.parent1 },
+      parent2: { ...DEFAULTS.owners.parent2, ...input.owners?.parent2 },
       other: input.owners?.other ?? DEFAULTS.owners.other,
     },
   };
