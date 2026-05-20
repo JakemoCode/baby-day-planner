@@ -42,5 +42,7 @@
 
 .danger {
   background: var(--color-warning);
-  color: var(--color-surface);
+  /* White-on-terracotta computes to ~3.06:1, same class of bug as the
+   * primary button. Use --color-fg for ~5.4:1, matching the .button fix. */
+  color: var(--color-fg);
 }
