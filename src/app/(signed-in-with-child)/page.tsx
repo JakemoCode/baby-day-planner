@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import type { Event, OwnershipTemplate } from "@/v3/schemas";
+import type { Event, OwnershipTemplate, TimeMin } from "@/v3/schemas";
 import { isRecorded } from "@/v3/schemas";
 import { reduceLifecycle } from "@/v3/lifecycle";
 import { isInProgress } from "@/v3/lib/effectiveEnd";
@@ -31,6 +31,7 @@ import { NextEventCard } from "@/v3/components/Dashboard/NextEventCard";
 import { NextSleepPanel } from "@/v3/components/Dashboard/NextSleepPanel";
 import { StartBottleButton } from "@/v3/components/Dashboard/StartBottleButton";
 import { StartDayButton } from "@/v3/components/Dashboard/StartDayButton";
+import { WakeConfirmSheet } from "@/v3/components/Dashboard/WakeConfirmSheet";
 import styles from "./page.module.css";
 import { useCurrentChild } from "@/v3/context/ChildProvider";
 
@@ -56,6 +57,7 @@ export default function DashboardPage() {
   const { templates } = useV3Templates(CHILD_ID);
   const [drawer, setDrawer] = useState<DrawerState>({ open: false });
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [wakeSheetOpen, setWakeSheetOpen] = useState(false);
 
   const template = useMemo<OwnershipTemplate | undefined>(() => {
     if (!day?.templateId) return undefined;
@@ -114,8 +116,16 @@ export default function DashboardPage() {
   const inProgressNap = actuals.find(
     (e) => e.type === "nap" && isInProgress(e, settings.defaultNapLengthMinutes, nowMinutes),
   );
+  // Bedtime in-progress detection is intentionally NOT time-windowed.
+  // `isInProgress` requires `startTime <= now`, but a bedtime that began
+  // at 8 PM yesterday-frame (startTime=1200) and is being checked at
+  // 6:42 AM next morning (nowMinutes=402) would fail that check even
+  // though it's the exact state where the user needs "End overnight
+  // sleep" / wake-up. A recorded bedtime stays in-progress until the
+  // user explicitly ends it (TIME_EDIT → completed) or wakes the new
+  // day via the wake CTA.
   const inProgressBedtime = actuals.find(
-    (e) => e.type === "bedtime" && isInProgress(e, settings.defaultNapLengthMinutes, nowMinutes),
+    (e) => e.type === "bedtime" && e.lifecycle.state === "recorded",
   );
   // "Next" ordinals = unique nap/bottle slots that are RECORDED (the
   // user committed a specific time). Owner-only annotations have a
@@ -160,14 +170,27 @@ export default function DashboardPage() {
   const handleStartBedtime = async (bedtime: Event) => {
     await saveEvent(bedtime);
   };
-  // TIME_EDIT on a recorded nap or bedtime → completed. Handles both —
-  // they're structurally identical (spread, replace endTime, reduce).
-  const handleEndSleep = async (event: Event, endTime: number) => {
+  // TIME_EDIT on a recorded nap → completed.
+  const handleEndNap = async (event: Event, endTime: number) => {
     if (!day || day.id === "") return;
     await saveEvent({
       ...event,
       endTime,
       lifecycle: reduceLifecycle(event.lifecycle, { type: "TIME_EDIT", at: endTime }),
+    });
+  };
+  // "End overnight sleep" = morning wake-up. Opens the confirm sheet
+  // (handler on the JSX), Confirm fires startNewDay — which atomically
+  // archives the active day, trims yesterday's bedtime endTime, and
+  // creates the new day. The bedtime trim is startNewDay's job; this
+  // handler doesn't TIME_EDIT the bedtime directly.
+  const handleConfirmWake = async (wakeTime: TimeMin) => {
+    setWakeSheetOpen(false);
+    await startNewDay(db, CHILD_ID, {
+      newDayId: `day-${Date.now()}`,
+      newDate: todayDate(),
+      newWakeTime: wakeTime,
+      ...(day.templateId ? { templateId: day.templateId } : {}),
     });
   };
   const handleStartDay = async ({ useTomorrowPlan: _ }: { useTomorrowPlan: boolean }) => {
@@ -231,9 +254,9 @@ export default function DashboardPage() {
             defaultWakeTime={settings.defaultWakeTime}
             {...(nn ? { nextProjectedNap: nn } : {})}
             onStart={handleStartNap}
-            onEnd={handleEndSleep}
+            onEnd={handleEndNap}
             onStartBedtime={handleStartBedtime}
-            onEndBedtime={handleEndSleep}
+            onEndBedtime={async () => setWakeSheetOpen(true)}
           />
           {process.env.NODE_ENV === "development" && (
             <StartDayButton hasTomorrowPlan={false} onStart={handleStartDay} />
@@ -292,6 +315,18 @@ export default function DashboardPage() {
         }}
         onCancel={() => setDrawer({ open: false })}
       />
+
+      {/* Conditionally mount so each open creates a fresh component
+          with a fresh `useState(formatHM24(nowMinutes))` initial value.
+          Unconditional mount would snapshot `nowMinutes` at dashboard
+          mount; by morning the prefill would be stale. */}
+      {wakeSheetOpen && (
+        <WakeConfirmSheet
+          nowMinutes={nowMinutes}
+          onConfirm={handleConfirmWake}
+          onCancel={() => setWakeSheetOpen(false)}
+        />
+      )}
     </div>
   );
 }
