@@ -167,37 +167,29 @@ describe("R21.2 — nominal time shifted out of nap windows", () => {
   });
 
   it("pickup falling inside a projected nap shifts to nap end", () => {
-    // Force a late nap that contains 17:00. WW=180min each, napLen=45.
-    // Wake 7:00 → nap1 10:00–10:45 → nap2 13:45–14:30 → nap3 17:30+.
-    // Hmm — need nap to actually cover 17:00. Construct with shorter WWs.
+    // Deterministic cascade: WW=110min, napLen=45, wake 7:00 →
+    //   nap_1 8:50–9:35, nap_2 11:25–12:10, nap_3 14:00–14:45,
+    //   nap_4 16:35–17:20.
+    // Pickup nominal 17:00 falls inside nap_4 → expect shift to 17:20.
     const ctx = aContext({
       day: aDay({ wakeTime: 7 * 60, date: "2026-05-08" }),
       settings: aSettings({
-        // 4 nap-windows; cascade lands nap4 at 16:30 ish.
-        wakeWindowsMinutes: [120, 150, 150, 165, 150, 150],
+        wakeWindowsMinutes: [110, 110, 110, 110, 120, 120],
         defaultNapLengthMinutes: 45,
+        // bedtimeThreshold > nap_4 start so the 4th sleep stays a nap, not bedtime.
+        bedtimeThreshold: 18 * 60,
         bottleChain: { bottlesPerDay: 0, bufferAfterWakeMinutes: 10 },
         daycare: {
           enabled: true,
           dropoffTime: 6 * 60, // pre-wake; no nap conflict
-          pickupTime: 17 * 60, // intended to land inside the late nap
+          pickupTime: 17 * 60,
           weekdays: ALL_DAYS_TRUE,
         },
       }),
     });
     const out = run(ctx);
-    const naps = out.filter((e) => e.type === "nap").sort((a, b) => a.startTime - b.startTime);
-    const pickup = out.find((e) => e.type === "daycare_pickup")!;
-    // Find a nap containing the nominal pickup (17:00).
-    const containing = naps.find(
-      (n) => n.startTime <= 17 * 60 && 17 * 60 < (n.endTime ?? n.startTime),
-    );
-    if (containing) {
-      expect(pickup.startTime).toBe(containing.endTime!);
-    } else {
-      // No conflict landed → nominal time preserved.
-      expect(pickup.startTime).toBe(17 * 60);
-    }
+    const pickup = out.find((e) => e.type === "daycare_pickup");
+    expect(pickup?.startTime).toBe(17 * 60 + 20);
   });
 
   it("dropoff with no nap conflict keeps its nominal time", () => {
