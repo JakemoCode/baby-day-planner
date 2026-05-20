@@ -179,15 +179,11 @@ export default function DashboardPage() {
       lifecycle: reduceLifecycle(event.lifecycle, { type: "TIME_EDIT", at: endTime }),
     });
   };
-  // "End overnight sleep" = morning wake-up. Opens the confirm sheet so
-  // the parent can pick the actual wake time (default = now). Confirm
-  // fires startNewDay, which atomically:
-  //   - archives the current active day,
-  //   - trims yesterday's recorded bedtime endTime to `newWakeTime + 24h`,
-  //   - creates the new active day with `wakeTime = newWakeTime`.
-  // The Wake handler doesn't TIME_EDIT the bedtime itself — startNewDay's
-  // trim does that as part of the same transaction.
-  const handleOpenWakeSheet = () => setWakeSheetOpen(true);
+  // "End overnight sleep" = morning wake-up. Opens the confirm sheet
+  // (handler on the JSX), Confirm fires startNewDay — which atomically
+  // archives the active day, trims yesterday's bedtime endTime, and
+  // creates the new day. The bedtime trim is startNewDay's job; this
+  // handler doesn't TIME_EDIT the bedtime directly.
   const handleConfirmWake = async (wakeTime: TimeMin) => {
     setWakeSheetOpen(false);
     await startNewDay(db, CHILD_ID, {
@@ -260,7 +256,7 @@ export default function DashboardPage() {
             onStart={handleStartNap}
             onEnd={handleEndNap}
             onStartBedtime={handleStartBedtime}
-            onEndBedtime={async () => handleOpenWakeSheet()}
+            onEndBedtime={async () => setWakeSheetOpen(true)}
           />
           {process.env.NODE_ENV === "development" && (
             <StartDayButton hasTomorrowPlan={false} onStart={handleStartDay} />
@@ -320,12 +316,17 @@ export default function DashboardPage() {
         onCancel={() => setDrawer({ open: false })}
       />
 
-      <WakeConfirmSheet
-        open={wakeSheetOpen}
-        nowMinutes={nowMinutes}
-        onConfirm={handleConfirmWake}
-        onCancel={() => setWakeSheetOpen(false)}
-      />
+      {/* Conditionally mount so each open creates a fresh component
+          with a fresh `useState(formatHM24(nowMinutes))` initial value.
+          Unconditional mount would snapshot `nowMinutes` at dashboard
+          mount; by morning the prefill would be stale. */}
+      {wakeSheetOpen && (
+        <WakeConfirmSheet
+          nowMinutes={nowMinutes}
+          onConfirm={handleConfirmWake}
+          onCancel={() => setWakeSheetOpen(false)}
+        />
+      )}
     </div>
   );
 }

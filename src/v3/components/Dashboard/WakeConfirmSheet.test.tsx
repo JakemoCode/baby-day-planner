@@ -7,22 +7,15 @@ import { WakeConfirmSheet } from "./WakeConfirmSheet";
 const NOW = (6 * 60 + 42) as TimeMin; // 6:42 AM
 
 describe("WakeConfirmSheet", () => {
-  it("does not render when closed", () => {
-    render(
-      <WakeConfirmSheet open={false} nowMinutes={NOW} onConfirm={vi.fn()} onCancel={vi.fn()} />,
-    );
-    expect(screen.queryByRole("dialog")).toBeNull();
-  });
-
   it("opens with the time input pre-filled to nowMinutes", () => {
-    render(<WakeConfirmSheet open nowMinutes={NOW} onConfirm={vi.fn()} onCancel={vi.fn()} />);
+    render(<WakeConfirmSheet nowMinutes={NOW} onConfirm={vi.fn()} onCancel={vi.fn()} />);
     const input = screen.getByLabelText(/wake time/i) as HTMLInputElement;
     expect(input.value).toBe("06:42");
   });
 
   it("emits onConfirm with the parsed time when 'Start day' is clicked", async () => {
     const onConfirm = vi.fn();
-    render(<WakeConfirmSheet open nowMinutes={NOW} onConfirm={onConfirm} onCancel={vi.fn()} />);
+    render(<WakeConfirmSheet nowMinutes={NOW} onConfirm={onConfirm} onCancel={vi.fn()} />);
     // User edits the time to 6:30 AM (they were checking phone late).
     const input = screen.getByLabelText(/wake time/i) as HTMLInputElement;
     await userEvent.clear(input);
@@ -33,8 +26,29 @@ describe("WakeConfirmSheet", () => {
 
   it("calls onCancel when Cancel is clicked", async () => {
     const onCancel = vi.fn();
-    render(<WakeConfirmSheet open nowMinutes={NOW} onConfirm={vi.fn()} onCancel={onCancel} />);
+    render(<WakeConfirmSheet nowMinutes={NOW} onConfirm={vi.fn()} onCancel={onCancel} />);
     await userEvent.click(screen.getByRole("button", { name: /cancel/i }));
     expect(onCancel).toHaveBeenCalled();
+  });
+
+  it("captures nowMinutes fresh on each mount (parent must conditionally mount)", () => {
+    // Caller contract: parent renders `{open && <WakeConfirmSheet ... />}`
+    // so each open creates a new instance with the current `nowMinutes`.
+    // Verify by unmounting + remounting with a different value — the
+    // input must reflect the LATEST mount's value, not the first.
+    const { unmount } = render(
+      <WakeConfirmSheet nowMinutes={(8 * 60) as TimeMin} onConfirm={vi.fn()} onCancel={vi.fn()} />,
+    );
+    expect((screen.getByLabelText(/wake time/i) as HTMLInputElement).value).toBe("08:00");
+    unmount();
+
+    render(
+      <WakeConfirmSheet
+        nowMinutes={(6 * 60 + 30) as TimeMin}
+        onConfirm={vi.fn()}
+        onCancel={vi.fn()}
+      />,
+    );
+    expect((screen.getByLabelText(/wake time/i) as HTMLInputElement).value).toBe("06:30");
   });
 });
