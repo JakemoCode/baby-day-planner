@@ -10,10 +10,13 @@ body {
   margin: 0;
   padding: 0;
   /* §F2b: hard backstop so any too-wide child (long event labels, etc.)
-   * cannot expand the viewport sideways. Routes should still respect
-   * their own width caps; this is belt-and-suspenders. */
+   * cannot expand the viewport sideways. Use `clip` not `hidden` —
+   * `overflow-x: hidden` implicitly promotes overflow-y to `auto`, making
+   * the element a scroll container and breaking `position: sticky` on
+   * descendants (the AppShell Header). `clip` paints-clips without
+   * establishing a scroll container, so sticky keeps working. */
   max-width: 100vw;
-  overflow-x: hidden;
+  overflow-x: clip;
 }
 body {
   background: var(--color-bg);

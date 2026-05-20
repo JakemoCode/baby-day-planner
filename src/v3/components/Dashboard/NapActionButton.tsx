@@ -60,7 +60,7 @@ function decideMode(
 
 const MODE_LABEL: Record<ButtonMode["kind"], string> = {
   "end-nap": "End Nap",
-  "end-bedtime": "End Bedtime",
+  "end-bedtime": "End overnight sleep",
   "start-bedtime": "Start Bedtime Now",
   "start-nap": "Start Nap Now",
 };

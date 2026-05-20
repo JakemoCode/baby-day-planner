@@ -182,9 +182,9 @@ describe("NapActionButton — CTA swap past bedtime threshold (§F8)", () => {
 });
 
 describe("NapActionButton — in-progress bedtime detection (Bug A from PR #166 dogfooding)", () => {
-  it("renders 'End Bedtime' when a bedtime is in progress", () => {
+  it("renders 'End overnight sleep' when a bedtime is in progress", () => {
     // After Start Bedtime Now creates a recorded bedtime, the CTA must
-    // switch to 'End Bedtime' — not stay on 'Start Bedtime Now'.
+    // switch to 'End overnight sleep' — not stay on 'Start Bedtime Now'.
     render(
       <NapActionButton
         {...makeProps({
@@ -193,7 +193,7 @@ describe("NapActionButton — in-progress bedtime detection (Bug A from PR #166 
         })}
       />,
     );
-    expect(screen.getByRole("button", { name: /end bedtime/i })).toBeVisible();
+    expect(screen.getByRole("button", { name: /end overnight sleep/i })).toBeVisible();
   });
 
   it("calls onEndBedtime with the in-progress bedtime and current TimeMin on click", async () => {

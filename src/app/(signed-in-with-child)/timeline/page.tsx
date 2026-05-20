@@ -89,6 +89,7 @@ export default function TimelinePage() {
         scrollToNowOnMount
         pxPerHour={settings.timelinePxPerHour}
         dimPast={settings.timelineDimPast}
+        viewportPaddingMin={12}
         onEventTap={(event) => setDrawer({ open: true, mode: "edit", event })}
       />
 

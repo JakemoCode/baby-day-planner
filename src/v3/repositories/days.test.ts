@@ -15,7 +15,9 @@ import {
   seedAllowedUser,
   startTestEnv,
 } from "../../../tests/integration/firestore-test-utils";
-import type { Day } from "../schemas";
+import type { Day, Event } from "../schemas";
+import { NO_OWNER } from "../schemas";
+import { createEvent, listEvents } from "./events";
 import {
   archiveDay,
   createDay,
@@ -181,6 +183,85 @@ describe("v3 days repository", () => {
     const got = await getDay(database, "child-1", "day-no-tpl");
     expect(got).not.toBeNull();
     expect("templateId" in (got as object)).toBe(false);
+  });
+
+  // -------------------------------------------------------------------------
+  // startNewDay trims the previous day's in-progress bedtime so the
+  // overnight sleep block visually meets the wake event instead of
+  // overshooting to R7.1's defaultWakeTime placeholder.
+  // -------------------------------------------------------------------------
+
+  const recordedBedtime = (overrides: Partial<Event> = {}): Event => ({
+    id: "bedtime",
+    dayId: "day-yesterday",
+    eventKey: "bedtime",
+    type: "bedtime",
+    kind: "block",
+    label: "Bedtime",
+    startTime: 20 * 60, // 8 PM
+    endTime: 7 * 60 + 24 * 60, // next-morning 7 AM placeholder
+    hasPutdown: false,
+    owner: NO_OWNER,
+    lifecycle: { state: "recorded", annotatedAt: 20 * 60 },
+    ...overrides,
+  });
+
+  it("startNewDay trims a recorded bedtime in the archived day to newWakeTime (+24h frame)", async () => {
+    const database = db();
+    await createDay(database, day({ id: "day-yesterday", date: "2026-05-08" }));
+    await createEvent(database, "child-1", recordedBedtime());
+
+    await startNewDay(database, "child-1", {
+      newDayId: "day-today",
+      newDate: "2026-05-09",
+      newWakeTime: 6 * 60 + 15, // 6:15 AM
+    });
+
+    const events = await listEvents(database, "child-1", "day-yesterday");
+    const bedtime = events.find((e) => e.type === "bedtime");
+    expect(bedtime).toBeDefined();
+    // Trimmed to newWakeTime in the OLD day's frame (+24h).
+    expect(bedtime!.endTime).toBe(6 * 60 + 15 + 24 * 60);
+    expect(bedtime!.lifecycle.state).toBe("completed");
+  });
+
+  it("startNewDay leaves an already-completed bedtime alone (user-set endTime is authoritative)", async () => {
+    const database = db();
+    await createDay(database, day({ id: "day-yesterday", date: "2026-05-08" }));
+    const userEnd = 5 * 60 + 30 + 24 * 60; // user explicitly ended bedtime at 5:30a
+    await createEvent(
+      database,
+      "child-1",
+      recordedBedtime({
+        endTime: userEnd,
+        lifecycle: { state: "completed", committedAt: userEnd },
+      }),
+    );
+
+    await startNewDay(database, "child-1", {
+      newDayId: "day-today",
+      newDate: "2026-05-09",
+      newWakeTime: 7 * 60, // 7:00 — would clobber the 5:30 if we touched it
+    });
+
+    const events = await listEvents(database, "child-1", "day-yesterday");
+    const bedtime = events.find((e) => e.type === "bedtime");
+    expect(bedtime!.endTime).toBe(userEnd);
+    expect(bedtime!.lifecycle.state).toBe("completed");
+  });
+
+  it("startNewDay is a no-op for bedtime trim when the archived day has no bedtime", async () => {
+    const database = db();
+    await createDay(database, day({ id: "day-yesterday", date: "2026-05-08" }));
+    // No bedtime event seeded.
+    await startNewDay(database, "child-1", {
+      newDayId: "day-today",
+      newDate: "2026-05-09",
+      newWakeTime: 7 * 60,
+    });
+    // Archive completed; new day created. Just confirm the call didn't throw.
+    const yesterday = await getDay(database, "child-1", "day-yesterday");
+    expect(yesterday?.status).toBe("archived");
   });
 
   // -------------------------------------------------------------------------
