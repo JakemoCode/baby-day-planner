@@ -114,7 +114,7 @@ export default function DashboardPage() {
   const nn = nextNap(projected, nowMinutes);
   const cww = currentWakeWindow(projected, nowMinutes);
   const inProgressNap = actuals.find(
-    (e) => e.type === "nap" && isInProgress(e, settings.defaultNapLengthMinutes, nowMinutes),
+    (e) => e.type === "nap" && isInProgress(e, settings, nowMinutes),
   );
   // Bedtime in-progress detection is intentionally NOT time-windowed.
   // `isInProgress` requires `startTime <= now`, but a bedtime that began
