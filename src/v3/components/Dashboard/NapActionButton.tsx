@@ -72,7 +72,7 @@ export function NapActionButton({
   nextProjectedNap,
   nowMinutes,
   bedtimeThreshold,
-  defaultNapLengthMinutes,
+  defaultNapLengthMinutes: _defaultNapLengthMinutes,
   defaultWakeTime,
   onStart,
   onEnd,
@@ -122,6 +122,12 @@ export function NapActionButton({
     // decideMode would have returned "start-bedtime" instead, so this
     // branch is reachable only when nextProjectedNap exists.
     if (mode.kind === "start-nap") {
+      // Omit endTime: "Start Nap Now, waiting for End Nap" — effectiveEndOf
+      // auto-extends the placeholder as time passes until the user taps
+      // End Nap (which sets endTime + flips to completed) or opens the
+      // drawer (which always writes endTime). The undefined endTime is
+      // the marker that distinguishes "in progress" from "user-committed
+      // extent" (Jake's 2026-05-20 bug fix).
       const nap: Event = {
         id: mode.projected.eventKey,
         dayId,
@@ -130,7 +136,6 @@ export function NapActionButton({
         kind: "block",
         label: mode.projected.label,
         startTime: nowMin,
-        endTime: nowMin + defaultNapLengthMinutes,
         hasPutdown: false,
         owner: mode.projected.owner, // §F37: pass through (NO_OWNER if unassigned)
         lifecycle: { state: "recorded", annotatedAt: nowMin },

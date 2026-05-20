@@ -228,11 +228,7 @@ export default function SettingsPage() {
       </Section>
 
       <Section title="Daycare" isOpen={openSlug === "daycare"} onToggle={handleToggle}>
-        <DaycareEditor
-          value={value.daycare}
-          owners={value.owners}
-          onChange={(v) => set("daycare", v)}
-        />
+        <DaycareEditor value={value.daycare} onChange={(v) => set("daycare", v)} />
       </Section>
 
       <Section
@@ -689,11 +685,9 @@ function OwnerSlotRow({
 
 function DaycareEditor({
   value,
-  owners,
   onChange,
 }: {
   value: DaycareConfig;
-  owners: Settings["owners"];
   onChange: (next: DaycareConfig) => void;
 }) {
   const timesOK = value.dropoffTime < value.pickupTime;
@@ -704,21 +698,7 @@ function DaycareEditor({
         label="Enable daycare"
         value={value.enabled}
         onChange={(enabled) => onChange({ ...value, enabled })}
-        help="On enabled weekdays the day starts with a daycare dropoff and pickup. Events between are understood to happen at daycare."
-      />
-      <OwnerSlotRow
-        id="daycare-dropoff-owner"
-        label="Dropoff owner"
-        value={value.dropoffOwnerSlot}
-        owners={owners}
-        onChange={(dropoffOwnerSlot) => onChange({ ...value, dropoffOwnerSlot })}
-      />
-      <OwnerSlotRow
-        id="daycare-pickup-owner"
-        label="Pickup owner"
-        value={value.pickupOwnerSlot}
-        owners={owners}
-        onChange={(pickupOwnerSlot) => onChange({ ...value, pickupOwnerSlot })}
+        help="On enabled days, daycare dropoff and pickup times will automatically be displayed."
       />
       <TimeRow
         id="daycare-dropoff"

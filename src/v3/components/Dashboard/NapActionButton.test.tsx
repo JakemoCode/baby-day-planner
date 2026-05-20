@@ -103,13 +103,13 @@ describe("NapActionButton", () => {
       hasPutdown: false,
       owner: NO_OWNER,
     });
-    // endTime must be set (not undefined) — this was the image bug
-    expect(arg.endTime).toBeDefined();
-    expect(typeof arg.endTime).toBe("number");
+    // 2026-05-20: Start Nap Now OMITS endTime (so effectiveEndOf
+    // recognizes "in progress, auto-extend") — distinguishes from a
+    // drawer-saved nap which always has endTime and renders to that
+    // committed extent. See effectiveEndOf header + drawerEditNapPlusDaycare.test.
+    expect(arg.endTime).toBeUndefined();
     // lifecycle must be recorded (not started)
     expect(arg.lifecycle.state).toBe("recorded");
-    // endTime should be startTime + defaultNapLengthMinutes
-    expect(arg.endTime).toBe(arg.startTime + DEFAULT_NAP_MINUTES);
   });
 
   it("calls onEnd with the in-progress nap and current TimeMin endTime", async () => {

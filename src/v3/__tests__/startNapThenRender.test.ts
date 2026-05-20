@@ -21,7 +21,12 @@ import { PUTDOWN_KIND_TAG } from "../components/Timeline/expandPutdown";
 
 // Mirrors the exact shape NapActionButton now mints: id === eventKey === "nap_N",
 // endTime set to startTime + napLen (placeholder).
-function recordedNapSlot(n: number, startTime: number, napLen: number): Event {
+// "Start Nap Now"-shaped fixture: recorded + NO endTime. effectiveEndOf
+// auto-extends from the placeholder `startTime + napLen` until the user
+// taps End Nap (which writes endTime + flips to completed). The napLen
+// parameter is unused now (kept for call-site stability) — the placeholder
+// derives at read time from `ctx.settings.defaultNapLengthMinutes`.
+function recordedNapSlot(n: number, startTime: number, _napLen: number): Event {
   const key = `nap_${n}`;
   return {
     id: key,
@@ -31,7 +36,24 @@ function recordedNapSlot(n: number, startTime: number, napLen: number): Event {
     kind: "block",
     label: `Nap ${n}`,
     startTime,
-    endTime: startTime + napLen,
+    hasPutdown: false,
+    owner: NO_OWNER,
+    lifecycle: { state: "recorded", annotatedAt: startTime },
+  };
+}
+
+/** Drawer-saved fixture: recorded + committed endTime (no auto-extend). */
+function drawerSavedNapSlot(n: number, startTime: number, endTime: number): Event {
+  const key = `nap_${n}`;
+  return {
+    id: key,
+    dayId: "day_test",
+    eventKey: key,
+    type: "nap",
+    kind: "block",
+    label: `Nap ${n}`,
+    startTime,
+    endTime,
     hasPutdown: false,
     owner: NO_OWNER,
     lifecycle: { state: "recorded", annotatedAt: startTime },
@@ -244,13 +266,12 @@ describe("seam: Start Nap Now → renderProjection", () => {
   it("effectiveEnd caps at startTime + 4×napLen — applies at render time (expandPutdown), not cascade", () => {
     const wakeTime = 7 * 60;
     const napLen = 60;
-    // nap_1: recorded at 9:00, endTime = 10:00 (placeholder).
-    // now = 14:00 (5 hours later, well past 3 extensions).
-    // cap = 9:00 + 4*60 = 13:00.
-    // The CASCADE uses endTime (10:00) as cursor — so ww_2 starts at 10:00.
-    // effectiveEndOf (used by putdown render) caps the IN-PROGRESS window at 13:00,
-    // so no putdown chips for future naps render inside [9:00, 13:00].
-    const nap1 = recordedNapSlot(1, 9 * 60, napLen);
+    // nap_1: recorded with COMMITTED endTime 10:00 (drawer-saved shape).
+    // now = 14:00 (4 hours later). The cascade uses the committed endTime
+    // (10:00) as cursor — so ww_2 starts at 10:00, regardless of how
+    // effectiveEndOf would handle in-progress extension on a different
+    // shape. (The point of this test: cascade ≠ render-time effectiveEnd.)
+    const nap1 = drawerSavedNapSlot(1, 9 * 60, 10 * 60);
 
     const settings = aSettings({
       defaultNapLengthMinutes: napLen,

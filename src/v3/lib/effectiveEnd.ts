@@ -46,17 +46,30 @@ export function isInProgress(e: Event, napLen: number, now: TimeMin): boolean {
 export function effectiveEndOf(event: Event, napLen: number, now: TimeMin): TimeMin {
   const { lifecycle, startTime, endTime } = event;
 
+  // Projected / completed: render to the committed extent. Completed naps
+  // have endTime; projected naps' cascade-derived endTime is present too.
   if (lifecycle.state !== "recorded") {
     return endTime ?? startTime;
   }
 
-  // Recorded nap with no endTime: treat as startTime + napLen (same placeholder
-  // the cascade uses). This handles legacy data and the rare edge case where
-  // NapActionButton didn't set endTime.
-  const baseEnd = endTime ?? startTime + napLen;
+  // Recorded WITH endTime → user has committed both timestamps via the
+  // drawer (which always sets endTime). No auto-extend; render to the
+  // chosen extent.
+  //
+  // Recorded WITHOUT endTime → "Start Nap Now, waiting for End Nap." The
+  // placeholder `startTime + napLen` extends as time passes (capped at
+  // 3 extensions = 4×napLen total) so the rendered block continues to
+  // grow visually until the user taps End or edits via the drawer.
+  //
+  // The "no endTime" signal is owned by NapActionButton.Start (no endTime
+  // on creation) vs. EventEditDrawerV3.handleSave (always writes endTime
+  // because the form has start AND end fields).
+  if (endTime !== undefined) {
+    return endTime;
+  }
 
+  const baseEnd = startTime + napLen;
   if (now <= baseEnd) return baseEnd;
-
   const extensions = Math.min(3, Math.floor((now - baseEnd) / napLen) + 1);
   return baseEnd + extensions * napLen;
 }
