@@ -20,7 +20,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { effectiveEndOf } from "../lib/effectiveEnd";
+import { resolvedEnd } from "../lib/effectiveEnd";
 import { reduceLifecycle } from "../lifecycle";
 import { ALL_RULES } from "../engine/rules";
 import { projectDay } from "../engine/projectDay";
@@ -74,7 +74,7 @@ describe("drawer-edit nap + daycare overlap (2026-05-20 Jake bug)", () => {
   });
 
   it("a RECORDED nap WITH endTime does NOT auto-extend past it (the actual fix)", () => {
-    // Pre-fix: effectiveEndOf auto-extended any recorded nap whose endTime
+    // Pre-fix: resolvedEnd auto-extended any recorded nap whose endTime
     // was past `now`, capping at startTime+4×napLen. For Jake's nap edit
     // (8:25 start, 9:10 endTime, now 11:00), this returned 11:25 (cap),
     // visually swallowing the daycare chip R21.2 had shifted to 9:10.
@@ -96,7 +96,7 @@ describe("drawer-edit nap + daycare overlap (2026-05-20 Jake bug)", () => {
       owner: NO_OWNER,
       lifecycle: { state: "recorded", annotatedAt: NOW },
     };
-    expect(effectiveEndOf(editedNap, napLen, NOW)).toBe(9 * 60 + 10);
+    expect(resolvedEnd(editedNap, aSettings({ defaultNapLengthMinutes: napLen }), NOW)).toBe(9 * 60 + 10);
   });
 
   it("end-to-end: edited nap + daycare overlap → daycare shifts to nap.endTime; nap stays 8:25–9:10", () => {
@@ -111,7 +111,7 @@ describe("drawer-edit nap + daycare overlap (2026-05-20 Jake bug)", () => {
       endTime: 9 * 60 + 10,
       hasPutdown: false,
       owner: NO_OWNER,
-      // Drawer-saved nap: recorded + endTime set. effectiveEndOf
+      // Drawer-saved nap: recorded + endTime set. resolvedEnd
       // returns endTime (no auto-extend) because endTime is present.
       lifecycle: { state: "recorded", annotatedAt: NOW },
     };
@@ -137,6 +137,6 @@ describe("drawer-edit nap + daycare overlap (2026-05-20 Jake bug)", () => {
 
     // And the rendered visual extent of the nap is its raw endTime —
     // the renderer should match what the engine used to shift daycare.
-    expect(effectiveEndOf(editedNap, napLen, NOW)).toBe(9 * 60 + 10);
+    expect(resolvedEnd(editedNap, ctx.settings, NOW)).toBe(9 * 60 + 10);
   });
 });
