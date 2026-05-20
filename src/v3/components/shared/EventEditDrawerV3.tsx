@@ -101,6 +101,16 @@ const CREATE_TITLE_BY_TYPE: Partial<Record<EventType, string>> = {
 
 const NAP_DEFAULT_MINUTES = 60;
 
+const OWNER_TYPES: ReadonlySet<EventType> = new Set([
+  "nap",
+  "wake_window",
+  "bottle",
+  "extra",
+  "bedtime",
+  "daycare_dropoff",
+  "daycare_pickup",
+]);
+
 type InternalForm = {
   startTime: TimeMin | undefined;
   endTime: TimeMin | undefined;
@@ -169,12 +179,7 @@ export function EventEditDrawerV3({
   const showStartTime = type !== "wake_window";
   const showEndTime = type === "nap" || type === "extra" || type === "pump";
   const showAmount = type === "bottle";
-  const showOwner =
-    type === "nap" ||
-    type === "wake_window" ||
-    type === "bottle" ||
-    type === "extra" ||
-    type === "bedtime";
+  const showOwner = OWNER_TYPES.has(type);
   const showLabel = type === "extra";
 
   const errors = validateForm(type, form.startTime, form.endTime, sourceEvent.id, existingEvents);
