@@ -87,7 +87,7 @@ Independent. Land any time.
 
 ## §B — `effectiveEnd` Module accepts `Settings`, not `napLen`
 
-**Status:** `pending`
+**Status:** `done` — PR #201. Fixup narrowed the Interface further to `EffectiveEndConfig = Pick<Settings, "defaultNapLengthMinutes">` so `expandPutdown.ts` doesn't need an `as unknown as Settings` cast.
 
 **Files involved**
 - `src/v3/lib/effectiveEnd.ts` (the Module)
@@ -154,7 +154,7 @@ Independent. Light enough for a Saturday morning.
 
 ## §C — Split `withV3SettingsDefaults` into defaults vs migrations
 
-**Status:** `pending`
+**Status:** `done` — PR #203. Fixup made `normalizeSettingsDoc` use `makeDefaultSettings` as its baseline so nested arrays (`wakeWindowsMinutes`, `bottleIntervalRules`, etc.) are fresh per-call — symmetric with the construction seam.
 
 **Files involved**
 - `src/v3/firestore/settingsDefaults.ts` (the Module)
@@ -222,7 +222,7 @@ parallel session adding a Settings field needs to update both Modules.
 
 ## §D — Fix render-synthetic filter coupling direction
 
-**Status:** `pending`
+**Status:** `done` — PR #200
 
 **Files involved**
 - `src/v3/selectors.ts` (engine layer)
