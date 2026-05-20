@@ -278,6 +278,74 @@ describe("DashboardPage (V3)", () => {
     );
   });
 
+  describe("Wake-up flow: 'End overnight sleep' opens WakeConfirmSheet", () => {
+    const inProgressBedtime: Event = {
+      id: "bedtime",
+      dayId: "day-1",
+      eventKey: "bedtime",
+      type: "bedtime",
+      kind: "block",
+      label: "Bedtime",
+      startTime: 20 * 60, // 8 PM yesterday-frame
+      endTime: 7 * 60 + 24 * 60, // R7.1 placeholder = next-morning 7 AM
+      hasPutdown: false,
+      owner: NO_OWNER,
+      lifecycle: { state: "recorded", annotatedAt: 20 * 60 },
+    };
+
+    it("Confirm fires startNewDay with the picked wakeTime (NOT TIME_EDIT on the bedtime directly)", async () => {
+      // 6:42 AM "now"; bedtime is in-progress because effectiveEnd extends
+      // it past its placeholder endTime overnight.
+      const { saveEvent } = setupHooks({
+        actuals: [inProgressBedtime],
+        nowMinutes: 6 * 60 + 42,
+      });
+      startNewDayMock.mockResolvedValue({
+        archivedDayId: "day-1",
+        newDayId: "day-new",
+      });
+      renderWithAuth(<DashboardPage />);
+
+      // CTA reads "End overnight sleep" when a bedtime is in progress.
+      await userEvent.click(screen.getByRole("button", { name: /end overnight sleep/i }));
+
+      // Sheet opens with the time pre-filled to nowMinutes.
+      const input = screen.getByLabelText(/wake time/i) as HTMLInputElement;
+      expect(input.value).toBe("06:42");
+
+      // User edits to 6:30 (they were checking phone late) and confirms.
+      await userEvent.clear(input);
+      await userEvent.type(input, "06:30");
+      await userEvent.click(screen.getByRole("button", { name: /^start day$/i }));
+
+      // startNewDay is called with newWakeTime = 6:30 in the new day's frame.
+      // The bedtime trim is startNewDay's responsibility (covered by
+      // days.test.ts) — saveEvent must NOT be called directly here.
+      expect(startNewDayMock).toHaveBeenCalledTimes(1);
+      expect(startNewDayMock).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.any(String),
+        expect.objectContaining({ newWakeTime: 6 * 60 + 30 }),
+      );
+      expect(saveEvent).not.toHaveBeenCalled();
+    });
+
+    it("Cancel closes the sheet without firing startNewDay", async () => {
+      setupHooks({
+        actuals: [inProgressBedtime],
+        nowMinutes: 6 * 60 + 42,
+      });
+      renderWithAuth(<DashboardPage />);
+
+      await userEvent.click(screen.getByRole("button", { name: /end overnight sleep/i }));
+      await userEvent.click(screen.getByRole("button", { name: /cancel/i }));
+
+      expect(startNewDayMock).not.toHaveBeenCalled();
+      // Sheet is gone from the DOM.
+      expect(screen.queryByLabelText(/wake time/i)).toBeNull();
+    });
+  });
+
   it("uniqueRecordedKeys counts distinct eventKey across recorded actuals only", () => {
     // Pin the wall clock to the test day's date so the §F22 calendar-day
     // routing in handleLogBottle takes the same-day branch (i.e. uses
