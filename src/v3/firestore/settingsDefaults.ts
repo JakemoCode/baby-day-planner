@@ -69,8 +69,7 @@ const DEFAULTS: Omit<Settings, "childId"> = {
 
 /**
  * Cutover-era stub default that was never an intentional product choice.
- * Mirrors the `migrateOwnerSlot` pattern below. Removable once no docs
- * carry the 80 value.
+ * Removable once no docs carry the 80 value.
  */
 const LEGACY_PLACEHOLDER_PX_PER_HOUR = 80;
 
