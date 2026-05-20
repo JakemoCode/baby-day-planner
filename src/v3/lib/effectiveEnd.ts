@@ -25,6 +25,14 @@
 import type { Event, Settings, TimeMin } from "../schemas";
 
 /**
+ * The minimal slice of Settings this Module reads. Accepts a full Settings
+ * (structurally a superset) OR a small object literal — no `as unknown as
+ * Settings` casts needed at call sites that don't have a real Settings on
+ * hand (e.g. `expandPutdown.ts` which gets a scalar from its caller).
+ */
+export type EffectiveEndConfig = Pick<Settings, "defaultNapLengthMinutes">;
+
+/**
  * True when an event is currently in its in-progress window:
  * - lifecycle.state === "recorded" (user-anchored but not yet done)
  * - startTime <= now (it has started)
@@ -37,14 +45,14 @@ import type { Event, Settings, TimeMin } from "../schemas";
  *   - inProgressNap selector (page.tsx) — End Nap button visibility
  *   - expandPutdown.ts — R6.8 in-progress overlap gate
  */
-export function isInProgress(e: Event, settings: Settings, now: TimeMin): boolean {
+export function isInProgress(e: Event, config: EffectiveEndConfig, now: TimeMin): boolean {
   if (e.lifecycle.state !== "recorded") return false;
   if (e.startTime > now) return false;
-  return now < resolvedEnd(e, settings, now);
+  return now < resolvedEnd(e, config, now);
 }
 
-export function resolvedEnd(event: Event, settings: Settings, now: TimeMin): TimeMin {
-  const napLen = settings.defaultNapLengthMinutes;
+export function resolvedEnd(event: Event, config: EffectiveEndConfig, now: TimeMin): TimeMin {
+  const napLen = config.defaultNapLengthMinutes;
   const { lifecycle, startTime, endTime } = event;
 
   // Projected / completed: render to the committed extent. Completed naps
