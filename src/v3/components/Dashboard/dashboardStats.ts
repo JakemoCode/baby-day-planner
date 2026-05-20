@@ -8,7 +8,7 @@
 
 import type { Event, TimeMin } from "@/v3/schemas";
 import { isRecorded } from "@/v3/schemas";
-import { PUTDOWN_KIND_TAG } from "@/v3/components/Timeline/expandPutdown";
+import { isRenderSynthetic } from "@/v3/lib/syntheticEvents";
 
 const DASHBOARD_NEXT_TYPES = new Set<Event["type"]>(["bottle", "nap", "bedtime"]);
 
@@ -69,7 +69,7 @@ export function lastCompletedNap(events: Event[]): Event | undefined {
 export function nextDashboardEvent(events: Event[], now: TimeMin): Event | undefined {
   const sorted = [...events].sort((a, b) => a.startTime - b.startTime);
   for (const e of sorted) {
-    if (e.eventKey === PUTDOWN_KIND_TAG) continue;
+    if (isRenderSynthetic(e)) continue;
     if (!DASHBOARD_NEXT_TYPES.has(e.type)) continue;
     if (
       (e.type === "nap" || e.type === "bedtime") &&

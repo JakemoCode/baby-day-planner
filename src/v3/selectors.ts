@@ -8,7 +8,7 @@
  */
 
 import type { Event, TimeMin } from "./schemas";
-import { PUTDOWN_KIND_TAG } from "./components/Timeline/expandPutdown";
+import { isRenderSynthetic } from "./lib/syntheticEvents";
 
 /** Stable ascending sort by startTime. Returns a new array. */
 function sortByStart(events: Event[]): Event[] {
@@ -25,7 +25,7 @@ function sortByStart(events: Event[]): Event[] {
  * the putdown's PUTDOWN_KIND_TAG eventKey.)
  */
 function isEngineEvent(e: Event): boolean {
-  return e.eventKey !== PUTDOWN_KIND_TAG;
+  return !isRenderSynthetic(e);
 }
 
 /**

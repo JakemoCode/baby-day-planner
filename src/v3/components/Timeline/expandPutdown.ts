@@ -10,8 +10,9 @@
 
 import type { Event, EventType, TimeMin } from "../../schemas";
 import { effectiveEndOf, isInProgress } from "../../lib/effectiveEnd";
+import { PUTDOWN_KIND_TAG } from "../../lib/syntheticEvents";
 
-export const PUTDOWN_KIND_TAG = "__putdown__";
+export { PUTDOWN_KIND_TAG };
 
 export type ExpandPutdownOptions = {
   putdownLeadMinutes: TimeMin;
