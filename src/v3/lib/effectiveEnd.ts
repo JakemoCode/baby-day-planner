@@ -55,6 +55,20 @@ export function effectiveEndOf(event: Event, napLen: number, now: TimeMin): Time
   // NapActionButton didn't set endTime.
   const baseEnd = endTime ?? startTime + napLen;
 
+  // Auto-extend ONLY applies to "Started Nap Now, haven't ended yet" —
+  // i.e. the placeholder endTime is still in effect. Once the user
+  // commits a real duration via the drawer (handleStartTimeChange
+  // preserves duration; explicit end-time edit), endTime ≠ placeholder
+  // and the nap is treated as having a fixed extent.
+  //
+  // Detection heuristic: endTime undefined OR exactly equal to the
+  // placeholder formula `startTime + napLen`. Edge case: a user
+  // drawer-editing duration to exactly napLen will still auto-extend.
+  // Rare; the proper fix (schema marker for "endTime user-committed")
+  // is deferred until that edge becomes a real complaint.
+  const isPlaceholderEnd = endTime === undefined || endTime === startTime + napLen;
+  if (!isPlaceholderEnd) return baseEnd;
+
   if (now <= baseEnd) return baseEnd;
 
   const extensions = Math.min(3, Math.floor((now - baseEnd) / napLen) + 1);

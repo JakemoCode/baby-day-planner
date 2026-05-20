@@ -117,6 +117,31 @@ describe("effectiveEndOf", () => {
     expect(effectiveEndOf(nap, napLen, 14 * 60)).toBe(13 * 60);
   });
 
+  it("recorded nap with user-committed endTime (≠ placeholder) does NOT auto-extend", () => {
+    // Repro of Jake's bug 2026-05-20: drawer edit slid nap start; duration
+    // preserved, so endTime = startTime + (original duration), which is
+    // NOT the placeholder formula. The nap should render to that endTime,
+    // not auto-extend up to the 4×napLen cap.
+    //
+    // napLen = 60. User edited to start 9:30, duration 30 → endTime 10:00.
+    // 10:00 ≠ 9:30 + 60 = 10:30, so this is a user-committed end.
+    // now = 11:00 (well past). Expected: no extension, end stays at 10:00.
+    const nap: Event = {
+      id: "nap_1",
+      dayId: "day_test",
+      eventKey: "nap_1",
+      type: "nap",
+      kind: "block",
+      label: "Nap 1",
+      startTime: 9 * 60 + 30,
+      endTime: 10 * 60,
+      hasPutdown: false,
+      owner: NO_OWNER,
+      lifecycle: { state: "recorded", annotatedAt: 9 * 60 + 30 },
+    };
+    expect(effectiveEndOf(nap, napLen, 11 * 60)).toBe(10 * 60);
+  });
+
   it("recorded nap with no endTime, overrun + cap: base = startTime+napLen, capped at startTime+4*napLen", () => {
     // No endTime: base = 9:00 + 60 = 10:00. Cap = base + 3*napLen = 13:00.
     // now = 18:00 (way past cap) → capped at 13:00.
