@@ -62,14 +62,6 @@ export function KebabMenu() {
           >
             Day templates
           </Link>
-          <Link
-            href="/settings"
-            role="menuitem"
-            className={styles.item}
-            onClick={() => setOpen(false)}
-          >
-            Settings
-          </Link>
           <div className={styles.divider} role="presentation" />
           <button
             type="button"

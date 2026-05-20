@@ -15,7 +15,7 @@ Routes audited (signed-in, with active emulator session):
 | Severity | Count |
 |---|---|
 | Critical | 4 |
-| Major    | 8 |
+| Major    | 8 (2 retracted as dev-only, 1 fixed: M3, M5 retracted; M4 shipped 2026-05-20) |
 | Minor    | 7 |
 
 Routes affected: **all signed-in routes** carry the meta-viewport violation; dashboard owns the contrast + redundancy failures; `/history` carries the most visible data/render failure.
@@ -30,9 +30,9 @@ Structured violations (one per row, severity | criterion / source | route | sele
 | Critical | composition redundancy | `/` | `.NextEventPanel + .NextBottlePanel` | "NEXT EVENT" and "NEXT BOTTLE" cards stack vertically showing the **same time (4:10 PM)** with near-identical typography. Whenever the next event IS the next bottle/nap (the common case), the NEXT EVENT card is pure duplicate ink. |
 | Major | WCAG 1.4.3 | `/` | `.ActionButton-module__button` (primary `Start Bottle Now`, `Start Nap Now`, `Start New Day`) | White text `#ffffff` on sage `--color-accent #7d9a7a` → **3.09:1**. Fails AA 4.5:1 for body text; passes only large-text 3:1. Per `src/v3/components/Dashboard/ActionButton.module.css:7-8`. |
 | Major | WCAG 1.4.3 | `/` | `.NowBanner-module__muted` | "ends 4:42 PM" caption `--color-muted #7a716a` on `--color-accent-soft #c1cfbc` → **2.93:1**. `src/v3/components/Dashboard/NowBanner.module.css:24-25`. |
-| Major | composition | `/` | `.actionsRow` | CTA grid is asymmetric: `Start Bottle Now` spans full width above; `Start Nap Now` + `Start New Day` share a row below. No visible rationale for the split. |
-| Major | composition / nav | all | bottom nav `<nav>` | Bottom nav shows **only 3 items** (Dashboard / Timeline / Tomorrow). Settings, History, Day Templates, Invite live behind the kebab menu top-right — discoverability for 50% of the app is gated on a hamburger pattern users have to remember. |
-| Major | composition | all | floating `.avatar` bottom-left + FAB `+` bottom-right + bottom nav row | Three persistent foreground affordances compete in the bottom strip with no visual hierarchy. The unlabeled "N" avatar in particular has no aria-label and no obvious purpose. |
+| ~~Major~~ | ~~composition~~ | — | ~~`.actionsRow`~~ | **RETRACTED 2026-05-20** — the "Start New Day" CTA only renders in dev. Prod is symmetric (`Start Bottle Now` + `Start Nap Now`). False positive. |
+| Major | composition / nav | all | bottom nav `<nav>` | ~~Bottom nav shows only 3 items.~~ **FIXED 2026-05-20** — Settings promoted to bottom-nav as 4th tab; History + Day Templates stay in the kebab (browse + config; lower-frequency). |
+| ~~Major~~ | ~~composition~~ | — | ~~floating `.avatar`~~ | **RETRACTED 2026-05-20** — the "N" pill bottom-left is the Next.js dev-mode build indicator, not an app element. Not present in prod. False positive. |
 | Major | composition | `/tomorrow`, `/day-templates` | `.TimelineView` | Timeline preview renders **5A and 6A empty hours** above the first event (7A wake). User has to scroll past 2 hours of nothing to reach the day. Should clip to first/last event ± padding. |
 | Major | header consistency | `/settings`, `/history`, `/day-templates`, `/tomorrow` | global `<header>` | Header still shows "Wed, May 20" day-context on routes that have nothing to do with today (settings is global; tomorrow is the *next* day; history is the *past*). Misleading. |
 | Major | placeholder data | all | `<header>` "Alala, 5 years" | Dogfood data shows baby's age as "5 years" — UI built for months. Long-name + age combos at mobile risk header overflow. Cosmetic for Jake but flagged because it reveals an age-format edge case the formatter doesn't handle. |
@@ -75,14 +75,13 @@ Structured violations (one per row, severity | criterion / source | route | sele
 - `src/v3/components/Dashboard/ActionButton.module.css:7-8` — primary button white-on-`#7d9a7a` is **3.09:1**. Darken `--color-accent` (or use `--color-fg` for text on accent) to reach 4.5:1.
 - `src/v3/components/Dashboard/NowBanner.module.css:24-25` — `.muted` on accent-soft pill is **2.93:1**. Use `--color-fg-soft` (`#4a4138`) inside the pill instead of `--color-muted`.
 
-### M3 — CTA grid asymmetry (`/`)
-- `src/v3/components/Dashboard/.../actionsRow` — either render all three CTAs in a 3-up grid or commit to "primary on top, two secondary below" with clear visual differentiation (variant prop). Currently identical green + asymmetric layout reads as a layout accident.
+### ~~M3 — CTA grid asymmetry~~ (RETRACTED — dev-only "Start New Day" button. Prod renders 2 symmetric CTAs.)
 
-### M4 — Bottom nav hides half the app
-- `src/v3/components/Layout/BottomNav.tsx` (or equivalent) — promote Settings + History to bottom nav (4 or 5 items). The kebab pattern is appropriate for tertiary destinations, not primary sections.
+### M4 — Bottom nav hides half the app  ✅ FIXED 2026-05-20
+- Settings promoted to bottom-nav as 4th tab (`src/components/shared/BottomTabs.tsx`); removed from KebabMenu.
+- History + Day Templates remain in the kebab — both are lower-frequency (browse + config) and benefit from secondary placement.
 
-### M5 — Three competing bottom affordances
-- Avatar pill + FAB + bottom nav row. Pick one of: drop the avatar (it's not a navigation), move it inside the bottom nav as the rightmost item, or annotate with aria-label + visible affordance. Right now it looks like a forgotten dev artifact.
+### ~~M5 — Three competing bottom affordances~~ (RETRACTED — the "N" pill is the Next.js dev build indicator, not an app element.)
 
 ### M6 — Tomorrow + day-templates render empty 5A / 6A hours
 - `src/v3/components/Timeline/TimelineView.tsx` (or equivalent) — clip viewport to `firstEvent.startTime - 30min` and `lastEvent.endTime + 30min`. Do NOT render fixed 5A baseline if no event lives there.
