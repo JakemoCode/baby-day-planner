@@ -20,7 +20,7 @@ Sign-in flow + `(authed)` layout already shipped in Plan B.
 ## Global layout
 
 - **Persistent header**: `Aden's Day · Mon, May 5` + sync status icon (tap to refresh)
-- **Bottom navigation**: 3 tabs (Dashboard, Timeline, Tomorrow) + kebab menu (History, Settings, Sign out)
+- **Bottom navigation**: 4 tabs (Dashboard, Timeline, Tomorrow, Settings) + kebab menu (History, Day templates, Sign out)
 - **No sidebar.** Mobile-first PWA.
 
 ## Visual + UX system
