@@ -51,17 +51,19 @@
   --color-honey-soft: #f5e2a5; /* extra (other) block fill */
 
   /* ─────── Owner colors ─────── */
-  /* Earth-tone owner palette. The current hex pair is calibrated for the
-   * warm-cream/sage palette. When we expose theme presets, the
-   * historical saturated variant lives here too as the 'loud' variant. */
-  --color-owner-parent-1: #649ec3; /* dusty blue (palette refresh 2026-05-19) */
-  --color-owner-parent-2: #bc5b2e; /* terracotta (palette refresh 2026-05-19) */
-  --color-owner-daycare: #9a8e82; /* warm gray */
-
-  /* Owner tints (lighter shades — backgrounds for owned cards/blocks) */
-  --color-owner-parent-1-tint: #d8e7f1;
-  --color-owner-parent-2-tint: #f1cbb5;
-  --color-owner-daycare-tint: #ece7e1;
+  /* Slot-keyed palette. parent-1 / parent-2 are fixed by schema; -3..-6
+   * are assigned to "other" caregivers by their index in
+   * Settings.owners.other[]. Previously these were freely-edited hex
+   * fields in Settings; PR #4 (2026-05-20) replaced the per-owner color
+   * input with this fixed token set so the timeline stays palette-
+   * coherent. Tints are derived at render time via color-mix() — no
+   * `-tint` companion tokens. */
+  --color-owner-parent-1: #7a8fa9; /* dusty muted blue (pre-2026-05-19 default, restored) */
+  --color-owner-parent-2: #ce8e7e; /* soft terracotta (pre-2026-05-19 default, restored) */
+  --color-owner-3: #9a8e82; /* warm gray (was --color-owner-daycare) */
+  --color-owner-4: #7d8a5f; /* olive sage */
+  --color-owner-5: #b7869c; /* dusty mauve */
+  --color-owner-6: #b8943f; /* muted ochre */
 
   /* ─────── Spacing (4 px base) ─────── */
   --space-1: 0.25rem;
@@ -143,11 +145,10 @@
 
     --color-owner-parent-1: #94a8c0;
     --color-owner-parent-2: #e0a695;
-    --color-owner-daycare: #aea295;
-
-    --color-owner-parent-1-tint: #2c333d;
-    --color-owner-parent-2-tint: #3d2f29;
-    --color-owner-daycare-tint: #2f2c28;
+    --color-owner-3: #aea295;
+    --color-owner-4: #9da895;
+    --color-owner-5: #c8a3b3;
+    --color-owner-6: #cfb275;
 
     --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
     --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.35), 0 2px 8px rgba(0, 0, 0, 0.25);
@@ -177,9 +178,8 @@
 
   --color-owner-parent-1: #94a8c0;
   --color-owner-parent-2: #e0a695;
-  --color-owner-daycare: #aea295;
-
-  --color-owner-parent-1-tint: #2c333d;
-  --color-owner-parent-2-tint: #3d2f29;
-  --color-owner-daycare-tint: #2f2c28;
+  --color-owner-3: #aea295;
+  --color-owner-4: #9da895;
+  --color-owner-5: #c8a3b3;
+  --color-owner-6: #cfb275;
 }

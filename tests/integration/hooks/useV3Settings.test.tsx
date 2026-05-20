@@ -114,9 +114,10 @@ describe("useV3Settings (emulator-backed)", () => {
       });
 
       // Defaulter fills in the owners config with the expected shape.
+      // §F4: per-owner color was removed (slot-keyed tokens now); only
+      // displayName is asserted.
       expect(result.current.settings?.owners.parent1).toMatchObject({
         displayName: expect.any(String),
-        color: expect.any(String),
       });
       expect(result.current.settings?.owners.other).toEqual([]);
     });

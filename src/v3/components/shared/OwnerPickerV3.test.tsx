@@ -15,11 +15,11 @@ import { NO_OWNER, type OwnersConfig } from "../../schemas";
 import { OwnerPickerV3 } from "./OwnerPickerV3";
 
 const owners: OwnersConfig = {
-  parent1: { displayName: "Jake", color: "#0af" },
-  parent2: { displayName: "Sam", color: "#f0a" },
+  parent1: { displayName: "Jake" },
+  parent2: { displayName: "Sam" },
   other: [
-    { id: "daycare", displayName: "Daycare", color: "#ccc" },
-    { id: "grandma", displayName: "Grandma", color: "#fa0" },
+    { id: "daycare", displayName: "Daycare" },
+    { id: "grandma", displayName: "Grandma" },
   ],
 };
 
@@ -84,16 +84,19 @@ describe("OwnerPickerV3", () => {
     );
   });
 
-  it("sets --owner-color inline on each option from the configured palette", () => {
+  it("sets --owner-color inline on each option from the slot-keyed token", () => {
     render(<OwnerPickerV3 owners={owners} value={NO_OWNER} onChange={() => {}} />);
     expect(screen.getByRole("button", { name: "Jake" }).getAttribute("style")).toContain(
-      "--owner-color: #0af",
+      "--owner-color: var(--color-owner-parent-1)",
     );
     expect(screen.getByRole("button", { name: "Sam" }).getAttribute("style")).toContain(
-      "--owner-color: #f0a",
+      "--owner-color: var(--color-owner-parent-2)",
     );
     expect(screen.getByRole("button", { name: "Daycare" }).getAttribute("style")).toContain(
-      "--owner-color: #ccc",
+      "--owner-color: var(--color-owner-3)",
+    );
+    expect(screen.getByRole("button", { name: "Grandma" }).getAttribute("style")).toContain(
+      "--owner-color: var(--color-owner-4)",
     );
     // "None" has no owner ref → property omitted so CSS fallback (border / accent) applies.
     expect(screen.getByRole("button", { name: "None" }).getAttribute("style") ?? "").not.toContain(
