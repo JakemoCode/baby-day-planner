@@ -1007,7 +1007,7 @@
 ### EC-T12: Chip dot color = owner color (always)
 - **Given**: bottle chip with owner=Kelly
 - **When**: chip renders
-- **Then**: dot color = --color-owner-kelly
+- **Then**: dot color = --color-owner-parent-2
 - **Rule(s)**: R16.13 (V3 proposal)
 - **Source**: rule-derived
 

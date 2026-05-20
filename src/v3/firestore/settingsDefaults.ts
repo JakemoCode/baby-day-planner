@@ -17,7 +17,7 @@ import type { PumpSession, Settings } from "../schemas";
  * reference the same value rather than re-typing `7 * 60`. */
 export const DEFAULT_WAKE_TIME = 7 * 60;
 
-/** Pastels matching the legacy `--color-owner-jake` / `--color-owner-kelly`
+/** Pastels matching the legacy `--color-owner-parent-1` / `--color-owner-parent-2`
  * tokens. Re-exported so `projectionPlaceholders.ts` mirrors the same
  * values without drift. The §F4 fast-follow will replace this with a
  * theme picker. */
