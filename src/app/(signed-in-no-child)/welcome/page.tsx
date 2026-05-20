@@ -68,8 +68,8 @@ export default function WelcomePage() {
         childId: newId,
         defaultWakeTime: minutesFromTimeInput(wakeTimeStr),
         owners: {
-          parent1: { displayName: parent1Name.trim() || "Parent 1", color: "#0ab" },
-          parent2: { displayName: parent2Name.trim() || "Parent 2", color: "#f64" },
+          parent1: { displayName: parent1Name.trim() || "Parent 1" },
+          parent2: { displayName: parent2Name.trim() || "Parent 2" },
           other: [],
         },
       })!;

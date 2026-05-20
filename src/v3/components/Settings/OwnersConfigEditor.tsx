@@ -9,6 +9,12 @@ export type OwnersConfigEditorProps = {
   onChange: (next: OwnersConfig) => void;
 };
 
+/**
+ * §F4 (2026-05-20): the per-owner Color hex inputs were removed. Owner
+ * colors are now fixed by slot (parent-1, parent-2, and the four
+ * "other" positions in order) via tokens in `tokens.css`. Display
+ * name is the only user-editable identity property here.
+ */
 export function OwnersConfigEditor({ value, onChange }: OwnersConfigEditorProps) {
   const updateParent = (slot: "parent1" | "parent2", patch: Partial<OwnersConfig["parent1"]>) => {
     onChange({ ...value, [slot]: { ...value[slot], ...patch } });
@@ -25,7 +31,7 @@ export function OwnersConfigEditor({ value, onChange }: OwnersConfigEditorProps)
     const id = newEventId("other");
     onChange({
       ...value,
-      other: [...value.other, { id, displayName: "", color: "#999" }],
+      other: [...value.other, { id, displayName: "" }],
     });
   };
 
@@ -49,20 +55,6 @@ export function OwnersConfigEditor({ value, onChange }: OwnersConfigEditorProps)
             placeholder="e.g. Jake"
           />
         </div>
-        <div className={styles.field}>
-          <label className={styles.label} htmlFor="parent1-color">
-            Color
-          </label>
-          <input
-            id="parent1-color"
-            className={`${styles.input} ${styles.colorInput}`}
-            type="text"
-            value={value.parent1.color}
-            onChange={(e) => updateParent("parent1", { color: e.target.value })}
-            placeholder="#0af"
-          />
-        </div>
-        <div />
       </div>
 
       <div className={styles.row}>
@@ -79,27 +71,13 @@ export function OwnersConfigEditor({ value, onChange }: OwnersConfigEditorProps)
             placeholder="e.g. Kelly"
           />
         </div>
-        <div className={styles.field}>
-          <label className={styles.label} htmlFor="parent2-color">
-            Color
-          </label>
-          <input
-            id="parent2-color"
-            className={`${styles.input} ${styles.colorInput}`}
-            type="text"
-            value={value.parent2.color}
-            onChange={(e) => updateParent("parent2", { color: e.target.value })}
-            placeholder="#f0a"
-          />
-        </div>
-        <div />
       </div>
 
       {value.other.map((o) => (
         <div key={o.id} className={styles.row}>
           <div className={styles.field}>
             <label className={styles.label} htmlFor={`other-name-${o.id}`}>
-              Other owner name
+              Other caregiver name
             </label>
             <input
               id={`other-name-${o.id}`}
@@ -107,19 +85,7 @@ export function OwnersConfigEditor({ value, onChange }: OwnersConfigEditorProps)
               type="text"
               value={o.displayName}
               onChange={(e) => updateOther(o.id, { displayName: e.target.value })}
-              placeholder="e.g. Daycare"
-            />
-          </div>
-          <div className={styles.field}>
-            <label className={styles.label} htmlFor={`other-color-${o.id}`}>
-              Color
-            </label>
-            <input
-              id={`other-color-${o.id}`}
-              className={`${styles.input} ${styles.colorInput}`}
-              type="text"
-              value={o.color}
-              onChange={(e) => updateOther(o.id, { color: e.target.value })}
+              placeholder="e.g. Grandma"
             />
           </div>
           <button
@@ -134,7 +100,7 @@ export function OwnersConfigEditor({ value, onChange }: OwnersConfigEditorProps)
       ))}
 
       <button type="button" className={styles.addButton} onClick={addOther}>
-        + Add other owner
+        + Add other caregiver
       </button>
     </div>
   );
