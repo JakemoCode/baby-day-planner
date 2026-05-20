@@ -146,23 +146,29 @@ export function makeDefaultSettings(childId: string): Settings {
 export function normalizeSettingsDoc(raw: unknown): Settings {
   const input = raw as Partial<Settings>;
 
+  // Start from a fully-cloned defaults baseline so any field that input
+  // doesn't override (e.g. wakeWindowsMinutes, bottleIntervalRules) is a
+  // fresh array/object — never a reference to the shared DEFAULTS.
+  // Mirrors the symmetric guarantee makeDefaultSettings already provides.
+  const baseline = makeDefaultSettings(input.childId ?? "");
+
   const merged: Settings = {
-    ...DEFAULTS,
+    ...baseline,
     ...input,
     childId: input.childId ?? "",
     pumpTimes: normalizePumpTimes(
-      (input as { pumpTimes?: unknown }).pumpTimes ?? DEFAULTS.pumpTimes,
+      (input as { pumpTimes?: unknown }).pumpTimes ?? baseline.pumpTimes,
     ),
-    bottleChain: { ...DEFAULTS.bottleChain, ...input.bottleChain },
+    bottleChain: { ...baseline.bottleChain, ...input.bottleChain },
     daycare: {
-      ...DEFAULTS.daycare,
+      ...baseline.daycare,
       ...input.daycare,
-      weekdays: { ...DEFAULTS.daycare.weekdays, ...input.daycare?.weekdays },
+      weekdays: { ...baseline.daycare.weekdays, ...input.daycare?.weekdays },
     },
     owners: {
-      parent1: { ...DEFAULTS.owners.parent1, ...input.owners?.parent1 },
-      parent2: { ...DEFAULTS.owners.parent2, ...input.owners?.parent2 },
-      other: input.owners?.other ?? DEFAULTS.owners.other,
+      parent1: { ...baseline.owners.parent1, ...input.owners?.parent1 },
+      parent2: { ...baseline.owners.parent2, ...input.owners?.parent2 },
+      other: input.owners?.other ?? baseline.owners.other,
     },
   };
 

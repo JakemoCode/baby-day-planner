@@ -114,6 +114,19 @@ describe("normalizeSettingsDoc", () => {
     expect(s.timelinePxPerHour).toBe(120);
     expect(s.pumpTimes).toEqual([{ time: 480 }]);
   });
+
+  it("nested arrays not supplied by input are fresh — mutating one doc must not leak into another (symmetry with makeDefaultSettings)", () => {
+    // Two independent docs with no overrides for wakeWindowsMinutes /
+    // bottleIntervalRules. Mutating one's array must not affect the other.
+    const a = normalizeSettingsDoc({ childId: "child-A" });
+    const b = normalizeSettingsDoc({ childId: "child-B" });
+
+    a.wakeWindowsMinutes.push(999);
+    a.bottleIntervalRules.push({ minOz: 1, maxOz: 2, intervalMinutes: 30 });
+
+    expect(b.wakeWindowsMinutes).not.toContain(999);
+    expect(b.bottleIntervalRules).toHaveLength(0);
+  });
 });
 
 // ---------------------------------------------------------------------------
