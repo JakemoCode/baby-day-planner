@@ -22,5 +22,8 @@
 }
 
 .muted {
-  color: var(--color-muted);
+  /* On the tinted pill background (--color-accent-soft #c1cfbc), --color-muted
+   * #7a716a yields only 2.93:1 — below AA. Use --color-fg-soft instead which
+   * inherits the pill's text family and clears 4.5:1. */
+  color: var(--color-fg-soft);
 }
