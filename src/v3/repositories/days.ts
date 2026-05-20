@@ -26,9 +26,10 @@ import {
   where,
   type Firestore,
 } from "firebase/firestore";
-import { dayPath, daysCollectionPath } from "@/lib/firestore/paths";
-import { v3DayConverter } from "../firestore/converters";
-import type { Day, TimeMin } from "../schemas";
+import { dayPath, daysCollectionPath, eventsCollectionPath } from "@/lib/firestore/paths";
+import { v3DayConverter, v3EventConverter } from "../firestore/converters";
+import { reduceLifecycle } from "../lifecycle";
+import type { Day, Event, TimeMin } from "../schemas";
 
 function dayRef(db: Firestore, childId: string, dayId: string) {
   return doc(db, dayPath(childId, dayId)).withConverter(v3DayConverter);
@@ -162,9 +163,45 @@ export async function startNewDay(
   const activeSnap = await getDocs(activeQuery);
   const activeDoc = activeSnap.empty ? null : activeSnap.docs[0]!;
 
+  // If the day being archived has a recorded (in-progress) bedtime, trim
+  // its endTime to the new day's wakeTime so the overnight sleep block
+  // visually meets the wake event instead of overshooting to the
+  // placeholder endTime (R7.1 defaults bedtime.endTime to
+  // defaultWakeTime + 24h at start; the actual wake is the truth).
+  // Already-completed bedtimes (state="completed") have an
+  // explicit user-set endTime and are left alone.
+  let bedtimeToTrim: { ref: ReturnType<typeof doc>; current: Event } | null = null;
+  if (activeDoc) {
+    const eventsSnap = await getDocs(
+      collection(db, eventsCollectionPath(childId, activeDoc.id)).withConverter(v3EventConverter),
+    );
+    for (const d of eventsSnap.docs) {
+      const e = d.data();
+      if (e.type === "bedtime" && e.lifecycle.state === "recorded") {
+        bedtimeToTrim = { ref: d.ref, current: e };
+        break;
+      }
+    }
+  }
+
+  // Bedtime endTime lives in the OLD day's TimeMin frame (cross-day, ≥1440).
+  // newWakeTime is the NEW day's wakeTime in its own frame (e.g. 450 for 7:30a).
+  // Shift by 24h so the trim writes a value that's after the bedtime's
+  // startTime in the same frame.
+  const trimEnd = input.newWakeTime + 24 * 60;
+
   return runTransaction(db, async (tx) => {
     if (activeDoc) {
       tx.update(activeDoc.ref, { status: "archived" });
+    }
+    if (bedtimeToTrim) {
+      tx.update(bedtimeToTrim.ref, {
+        endTime: trimEnd,
+        lifecycle: reduceLifecycle(bedtimeToTrim.current.lifecycle, {
+          type: "TIME_EDIT",
+          at: trimEnd,
+        }),
+      });
     }
     const newDay: Day = {
       id: input.newDayId,
