@@ -28,7 +28,7 @@ leverage-per-effort, not by importance.
 
 ## §A — `useDrawer`: collapse the projected-event re-save protocol
 
-**Status:** `pending`
+**Status:** `done` — PR #202
 
 **Files involved**
 - `src/app/(signed-in-with-child)/page.tsx` (Dashboard)
