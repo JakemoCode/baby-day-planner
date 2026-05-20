@@ -5,7 +5,7 @@ import { LoadingState } from "@/components/shared/LoadingState";
 import { SettingsAccount } from "@/v3/components/shared/SettingsAccount";
 import { InviteCoParentSection } from "@/v3/components/Settings/InviteCoParentSection";
 import { OwnersConfigEditor } from "@/v3/components/Settings/OwnersConfigEditor";
-import { withV3SettingsDefaults } from "@/v3/firestore/settingsDefaults";
+import { makeDefaultSettings } from "@/v3/firestore/settingsDefaults";
 import { useLocalStorageString } from "@/v3/hooks/useLocalStorageString";
 import { useV3Settings } from "@/v3/hooks/useV3Settings";
 import { saveSettings } from "@/v3/repositories/settings";
@@ -61,7 +61,7 @@ export default function SettingsPage() {
   // First-run: no doc yet — start with conservative defaults so all editors
   // render. The first save creates the doc; the watcher then keeps things
   // in sync via the defaulter on read.
-  const value: Settings = settings ?? withV3SettingsDefaults({ childId: CHILD_ID })!;
+  const value: Settings = settings ?? makeDefaultSettings(CHILD_ID);
   const persist = (next: Settings) => {
     void saveSettings(db, CHILD_ID, next);
   };

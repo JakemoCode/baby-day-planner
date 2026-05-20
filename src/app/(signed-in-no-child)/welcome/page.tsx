@@ -7,7 +7,7 @@ import { useAuth } from "@/lib/auth/useAuth";
 import { db } from "@/lib/firebase/client";
 import { CHILDREN, childPath, settingsPath, userPath } from "@/lib/firestore/paths";
 import { v3ChildConverter, v3SettingsConverter, v3UserConverter } from "@/v3/firestore/converters";
-import { withV3SettingsDefaults } from "@/v3/firestore/settingsDefaults";
+import { makeDefaultSettings } from "@/v3/firestore/settingsDefaults";
 import styles from "./page.module.css";
 
 type Step = 1 | 2;
@@ -30,7 +30,7 @@ function minutesFromTimeInput(value: string): number {
  *
  * Submit writes three docs in sequence:
  *   1. /children/{newId}                    (Child doc)
- *   2. /children/{newId}/settings/current   (Settings, defaulted via withV3SettingsDefaults)
+ *   2. /children/{newId}/settings/current   (Settings, constructed via makeDefaultSettings + overrides)
  *   3. /users/{uid}                          (User with childIds: [newId])
  *
  * Then router.push("/") — the (signed-in-with-child) layout's resolution
@@ -64,15 +64,15 @@ export default function WelcomePage() {
       const newId = doc(collection(db, CHILDREN)).id;
       const now = Date.now();
 
-      const settings = withV3SettingsDefaults({
-        childId: newId,
+      const settings = {
+        ...makeDefaultSettings(newId),
         defaultWakeTime: minutesFromTimeInput(wakeTimeStr),
         owners: {
           parent1: { displayName: parent1Name.trim() || "Parent 1" },
           parent2: { displayName: parent2Name.trim() || "Parent 2" },
-          other: [],
+          other: [] as Array<{ id: string; displayName: string; color?: string }>,
         },
-      })!;
+      };
 
       // Atomic 3-doc write so a partial failure can never leave orphaned
       // Child/Settings docs unreachable from any /users/{uid}.
