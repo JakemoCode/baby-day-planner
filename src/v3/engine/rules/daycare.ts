@@ -1,12 +1,17 @@
 /**
- * R21.x — Daycare dropoff/pickup + auto-owner-assign.
+ * R21.x — Daycare dropoff/pickup projection + nap-conflict shift.
  *
  * Source: docs/v3/ENGINE_SPEC.md §21.
  *
  * Implemented here:
  *   R21.1 — daycare_dropoff and daycare_pickup as instant events
- *   R21.2 — projection gated on daycare.enabled + today is a daycare
- *           weekday + Day.suppressedDaycareDay !== true
+ *           (gated on daycare.enabled + today is a daycare weekday +
+ *           Day.suppressedDaycareDay !== true). Events project owner-less
+ *           — the per-day owner assignment lives on the timeline picker.
+ *   R21.2 — shift dropoff/pickup to nap.endTime when the nominal time
+ *           falls inside any nap [startTime, endTime). Settings times
+ *           are nominal; the engine adjusts so we never wake the baby
+ *           for daycare and never miss a nap for pickup.
  *   R21.5 — Day.suppressedDaycareDay short-circuits projection (handled
  *           by R21.1's match condition)
  *
@@ -14,23 +19,28 @@
  *   R21.3 — auto-assign daycare owner on window events.
  *   R21.7 — recorded events shifting the auto-assign window.
  *   The daycare concept is now a time-window attribute, not an owner.
- *   See §F41 for the visual indicator that will replace the deleted
- *   owner-stamping behavior.
+ *
+ * Removed (per-day owner redesign, 2026-05-20):
+ *   Settings.daycare.{dropoffOwnerSlot,pickupOwnerSlot} stamping. Daycare
+ *   events project with NO_OWNER; assignment is per-day via the drawer
+ *   like any other event.
  *
  * Out of scope here:
  *   R21.4 — dashboard CTA (UI / Phase 3)
  *   R21.6 — settings validation (UI / Phase 3)
  */
 
+import { NO_OWNER } from "../../schemas";
 import { type Context, type Event, type OwnerRef, type TimeMin, type Weekday } from "../../schemas";
 import type { Rule } from "../evaluator";
 import { hasType, projectedEvent } from "../helpers";
 
 const isDaycareDropoff = hasType("daycare_dropoff");
 const isDaycarePickup = hasType("daycare_pickup");
+const isNap = hasType("nap");
 
 // ---------------------------------------------------------------------------
-// R21.1 / R21.2 — Project daycare_dropoff and daycare_pickup
+// R21.1 — Project daycare_dropoff and daycare_pickup (owner-less)
 // ---------------------------------------------------------------------------
 
 const RuleProjectDaycareEvents: Rule = {
@@ -43,14 +53,10 @@ const RuleProjectDaycareEvents: Rule = {
   },
   produces: (events, ctx) => {
     if (!isDaycareActive(ctx)) return events;
-    // Dropoff/pickup events are owned by parent slots (the daycare owner
-    // only owns events *between* dropoff and pickup — R21.3).
-    const dropoffOwner: OwnerRef = { slot: ctx.settings.daycare.dropoffOwnerSlot };
-    const pickupOwner: OwnerRef = { slot: ctx.settings.daycare.pickupOwnerSlot };
     const dropoff = events.some(isDaycareDropoff)
       ? []
       : [
-          buildDaycareEvent(ctx, dropoffOwner, {
+          buildDaycareEvent(ctx, NO_OWNER, {
             id: "proj_daycare_dropoff",
             eventKey: "daycare_dropoff",
             type: "daycare_dropoff",
@@ -61,7 +67,7 @@ const RuleProjectDaycareEvents: Rule = {
     const pickup = events.some(isDaycarePickup)
       ? []
       : [
-          buildDaycareEvent(ctx, pickupOwner, {
+          buildDaycareEvent(ctx, NO_OWNER, {
             id: "proj_daycare_pickup",
             eventKey: "daycare_pickup",
             type: "daycare_pickup",
@@ -70,6 +76,63 @@ const RuleProjectDaycareEvents: Rule = {
           }),
         ];
     return [...events, ...dropoff, ...pickup];
+  },
+};
+
+// ---------------------------------------------------------------------------
+// R21.2 — Shift dropoff/pickup out of nap windows
+// ---------------------------------------------------------------------------
+//
+// Settings.daycare.{dropoffTime,pickupTime} are *nominal*. If the nominal
+// time falls inside a nap interval [startTime, endTime), shift the daycare
+// event to the nap's endTime — we're not waking the baby up for daycare,
+// and we're not making him miss a nap for pickup.
+//
+// Applies to PROJECTED daycare events only — once the parent records the
+// actual handoff time, that recorded value is canonical and not shifted.
+
+function findContainingNap(naps: Event[], startTime: TimeMin): Event | null {
+  // If multiple naps somehow overlap (shouldn't happen, but defensive),
+  // pick the one with the latest endTime so we shift past all of them.
+  let latest: Event | null = null;
+  for (const nap of naps) {
+    const end = nap.endTime ?? nap.startTime;
+    if (nap.startTime <= startTime && startTime < end) {
+      if (!latest || (latest.endTime ?? latest.startTime) < end) latest = nap;
+    }
+  }
+  return latest;
+}
+
+const RuleShiftDaycareOutOfNap: Rule = {
+  id: "R21.2",
+  description: "Shift daycare dropoff/pickup to end of nap if nominal time falls inside one",
+  // R3.1 = nap projection — naps must be in the event pool before we
+  // can detect overlap. R21.1 = daycare projection — daycare events must
+  // exist before we can shift them.
+  dependsOn: ["R3.1", "R21.1"],
+  matches: (events) => {
+    const daycareEvents = events.filter((e) => isDaycareDropoff(e) || isDaycarePickup(e));
+    if (daycareEvents.length === 0) return false;
+    const naps = events.filter(isNap);
+    if (naps.length === 0) return false;
+    return daycareEvents.some((dc) => {
+      // Only adjust projected daycare events — once recorded, the actual
+      // handoff time wins.
+      if (dc.lifecycle.state !== "projected") return false;
+      const containing = findContainingNap(naps, dc.startTime);
+      return containing !== null && containing.endTime !== undefined;
+    });
+  },
+  produces: (events) => {
+    const naps = events.filter(isNap);
+    return events.map((e) => {
+      if (!(isDaycareDropoff(e) || isDaycarePickup(e))) return e;
+      if (e.lifecycle.state !== "projected") return e;
+      const containing = findContainingNap(naps, e.startTime);
+      if (!containing || containing.endTime === undefined) return e;
+      return { ...e, startTime: containing.endTime };
+    });
   },
 };
 
@@ -121,4 +184,4 @@ function weekdayOf(isoDate: string): Weekday | null {
   return WEEKDAYS[idx] ?? null;
 }
 
-export const RULES: Rule[] = [RuleProjectDaycareEvents];
+export const RULES: Rule[] = [RuleProjectDaycareEvents, RuleShiftDaycareOutOfNap];

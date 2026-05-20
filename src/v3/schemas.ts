@@ -231,12 +231,22 @@ export type OwnersConfig = {
 
 export type DaycareConfig = {
   enabled: boolean;
+  /**
+   * Nominal dropoff time. The engine shifts this forward to the end of
+   * any in-progress nap (R21.2) — Settings is the *approximate* time,
+   * not a wake-the-baby-up alarm.
+   */
   dropoffTime: TimeMin;
+  /** Nominal pickup time — same nap-shift behavior as dropoffTime. */
   pickupTime: TimeMin;
-  /** Parent who owns the daycare_dropoff event. */
-  dropoffOwnerSlot: OwnerSlot;
-  /** Parent who owns the daycare_pickup event. */
-  pickupOwnerSlot: OwnerSlot;
+  /**
+   * Optional for back-compat with pre-2026-05-20 settings docs that
+   * pinned a parent slot to dropoff/pickup. Read-ignored now; daycare
+   * events project owner-less and are assigned per-day via the
+   * timeline picker like every other event.
+   */
+  dropoffOwnerSlot?: OwnerSlot;
+  pickupOwnerSlot?: OwnerSlot;
   weekdays: WeekdayFlags;
 };
 

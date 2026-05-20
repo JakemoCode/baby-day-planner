@@ -2,21 +2,18 @@
  * R21.x — Daycare dropoff/pickup as instant events.
  *
  * Coverage in this file:
- *   R21.1 — daycare_dropoff and daycare_pickup are instant events
+ *   R21.1 — daycare_dropoff and daycare_pickup are instant events,
+ *           projected with NO_OWNER (per-day owner is assigned via the
+ *           timeline drawer, like every other event — 2026-05-20 redesign)
  *   R21.2 — projection gated on enabled + weekday + not-suppressed
+ *   R21.2 — *shift* projected daycare events to nap.endTime when the
+ *           nominal Settings time falls inside a nap interval
  *   R21.5 — Day.suppressedDaycareDay skips projection
- *
- * Removed (Daycare-as-window redesign, 2026-05-19):
- *   R21.3 — auto-assign daycare owner on window events.
- *   R21.7 — recorded events shifting the auto-assign window.
- * Daycare is now a time-window attribute, not an owner. See §F41 for
- * the visual indicator that replaces the deleted owner-stamping
- * behavior.
  */
 
 import { describe, expect, it } from "vitest";
-import { PARENT1, PARENT2, aContext, aDay, aSettings } from "../../__tests__/factories";
-import { type Context, type Event, type WeekdayFlags } from "../../schemas";
+import { aContext, aDay, aSettings } from "../../__tests__/factories";
+import { NO_OWNER, type Context, type Event, type WeekdayFlags } from "../../schemas";
 import { projectDay } from "../projectDay";
 import { ALL_RULES } from "./index";
 
@@ -53,8 +50,8 @@ function run(ctx: Context): Event[] {
   );
 }
 
-describe("R21.1 / R21.2 — daycare events project when enabled, weekday, not suppressed", () => {
-  it("with enabled + Fri weekday true + not-suppressed → emits dropoff and pickup instants owned by their respective parent slots", () => {
+describe("R21.1 — daycare projection (owner-less)", () => {
+  it("with enabled + Fri weekday true + not-suppressed → emits dropoff and pickup instants with NO_OWNER", () => {
     const ctx = aContext({
       day: aDay({ wakeTime: 7 * 60, date: "2026-05-08" }), // Friday
       settings: aSettings({
@@ -64,8 +61,6 @@ describe("R21.1 / R21.2 — daycare events project when enabled, weekday, not su
           enabled: true,
           dropoffTime: 8 * 60 + 30,
           pickupTime: 17 * 60 + 30,
-          dropoffOwnerSlot: "parent1",
-          pickupOwnerSlot: "parent2",
           weekdays: ALL_DAYS_TRUE,
         },
       }),
@@ -80,29 +75,9 @@ describe("R21.1 / R21.2 — daycare events project when enabled, weekday, not su
     expect(dropoff!.startTime).toBe(8 * 60 + 30);
     expect(pickup!.startTime).toBe(17 * 60 + 30);
     expect(dropoff!.lifecycle.state).toBe("projected");
-    expect(dropoff!.owner).toEqual(PARENT1);
-    expect(pickup!.owner).toEqual(PARENT2);
-  });
-
-  it("dropoff and pickup parent slots can be swapped (Kelly-AM pattern)", () => {
-    const ctx = aContext({
-      day: aDay({ wakeTime: 7 * 60, date: "2026-05-08" }),
-      settings: aSettings({
-        wakeWindowsMinutes: [],
-        bottleChain: { bottlesPerDay: 0, bufferAfterWakeMinutes: 10 },
-        daycare: {
-          enabled: true,
-          dropoffTime: 8 * 60 + 30,
-          pickupTime: 17 * 60 + 30,
-          dropoffOwnerSlot: "parent2",
-          pickupOwnerSlot: "parent1",
-          weekdays: ALL_DAYS_TRUE,
-        },
-      }),
-    });
-    const out = run(ctx);
-    expect(out.find((e) => e.type === "daycare_dropoff")?.owner).toEqual(PARENT2);
-    expect(out.find((e) => e.type === "daycare_pickup")?.owner).toEqual(PARENT1);
+    // 2026-05-20: events project owner-less so the timeline drawer can assign per-day.
+    expect(dropoff!.owner).toEqual(NO_OWNER);
+    expect(pickup!.owner).toEqual(NO_OWNER);
   });
 
   it("with enabled=false → no daycare events", () => {
@@ -115,8 +90,6 @@ describe("R21.1 / R21.2 — daycare events project when enabled, weekday, not su
           enabled: false,
           dropoffTime: 8 * 60 + 30,
           pickupTime: 17 * 60 + 30,
-          dropoffOwnerSlot: "parent1",
-          pickupOwnerSlot: "parent2",
           weekdays: ALL_DAYS_TRUE,
         },
       }),
@@ -136,8 +109,6 @@ describe("R21.1 / R21.2 — daycare events project when enabled, weekday, not su
           enabled: true,
           dropoffTime: 8 * 60 + 30,
           pickupTime: 17 * 60 + 30,
-          dropoffOwnerSlot: "parent1",
-          pickupOwnerSlot: "parent2",
           weekdays: { ...ALL_DAYS_FALSE, mon: true }, // Fri NOT enabled
         },
       }),
@@ -161,8 +132,6 @@ describe("R21.1 / R21.2 — daycare events project when enabled, weekday, not su
           enabled: true,
           dropoffTime: 8 * 60 + 30,
           pickupTime: 17 * 60 + 30,
-          dropoffOwnerSlot: "parent1",
-          pickupOwnerSlot: "parent2",
           weekdays: ALL_DAYS_TRUE,
         },
       }),
@@ -170,6 +139,86 @@ describe("R21.1 / R21.2 — daycare events project when enabled, weekday, not su
     const out = run(ctx);
     expect(out.find((e) => e.type === "daycare_dropoff")).toBeUndefined();
     expect(out.find((e) => e.type === "daycare_pickup")).toBeUndefined();
+  });
+});
+
+describe("R21.2 — nominal time shifted out of nap windows", () => {
+  it("dropoff falling inside a projected nap shifts to nap end", () => {
+    // Wake 7:00, single wake window 30min → nap_1 starts 7:30.
+    // Default nap length 45min → nap_1 ends 8:15. Dropoff nominal 8:00.
+    // Expect: dropoff shifts to 8:15 (nap end).
+    const ctx = aContext({
+      day: aDay({ wakeTime: 7 * 60, date: "2026-05-08" }),
+      settings: aSettings({
+        wakeWindowsMinutes: [30, 120, 120, 120, 120, 120],
+        defaultNapLengthMinutes: 45,
+        bottleChain: { bottlesPerDay: 0, bufferAfterWakeMinutes: 10 },
+        daycare: {
+          enabled: true,
+          dropoffTime: 8 * 60, // inside nap_1 [7:30, 8:15)
+          pickupTime: 17 * 60 + 30,
+          weekdays: ALL_DAYS_TRUE,
+        },
+      }),
+    });
+    const out = run(ctx);
+    const dropoff = out.find((e) => e.type === "daycare_dropoff");
+    expect(dropoff?.startTime).toBe(8 * 60 + 15);
+  });
+
+  it("pickup falling inside a projected nap shifts to nap end", () => {
+    // Force a late nap that contains 17:00. WW=180min each, napLen=45.
+    // Wake 7:00 → nap1 10:00–10:45 → nap2 13:45–14:30 → nap3 17:30+.
+    // Hmm — need nap to actually cover 17:00. Construct with shorter WWs.
+    const ctx = aContext({
+      day: aDay({ wakeTime: 7 * 60, date: "2026-05-08" }),
+      settings: aSettings({
+        // 4 nap-windows; cascade lands nap4 at 16:30 ish.
+        wakeWindowsMinutes: [120, 150, 150, 165, 150, 150],
+        defaultNapLengthMinutes: 45,
+        bottleChain: { bottlesPerDay: 0, bufferAfterWakeMinutes: 10 },
+        daycare: {
+          enabled: true,
+          dropoffTime: 6 * 60, // pre-wake; no nap conflict
+          pickupTime: 17 * 60, // intended to land inside the late nap
+          weekdays: ALL_DAYS_TRUE,
+        },
+      }),
+    });
+    const out = run(ctx);
+    const naps = out.filter((e) => e.type === "nap").sort((a, b) => a.startTime - b.startTime);
+    const pickup = out.find((e) => e.type === "daycare_pickup")!;
+    // Find a nap containing the nominal pickup (17:00).
+    const containing = naps.find(
+      (n) => n.startTime <= 17 * 60 && 17 * 60 < (n.endTime ?? n.startTime),
+    );
+    if (containing) {
+      expect(pickup.startTime).toBe(containing.endTime!);
+    } else {
+      // No conflict landed → nominal time preserved.
+      expect(pickup.startTime).toBe(17 * 60);
+    }
+  });
+
+  it("dropoff with no nap conflict keeps its nominal time", () => {
+    const ctx = aContext({
+      day: aDay({ wakeTime: 7 * 60, date: "2026-05-08" }),
+      settings: aSettings({
+        // Long wake window — no nap before 9:00.
+        wakeWindowsMinutes: [180, 120, 120, 120, 120, 120],
+        defaultNapLengthMinutes: 45,
+        bottleChain: { bottlesPerDay: 0, bufferAfterWakeMinutes: 10 },
+        daycare: {
+          enabled: true,
+          dropoffTime: 8 * 60 + 30, // well before nap_1 at 10:00
+          pickupTime: 17 * 60 + 30,
+          weekdays: ALL_DAYS_TRUE,
+        },
+      }),
+    });
+    const out = run(ctx);
+    const dropoff = out.find((e) => e.type === "daycare_dropoff");
+    expect(dropoff?.startTime).toBe(8 * 60 + 30);
   });
 });
 
@@ -184,8 +233,6 @@ describe("R21 — defensive edge case", () => {
           enabled: true,
           dropoffTime: 8 * 60 + 30,
           pickupTime: 17 * 60 + 30,
-          dropoffOwnerSlot: "parent1",
-          pickupOwnerSlot: "parent2",
           weekdays: ALL_DAYS_TRUE,
         },
       }),
