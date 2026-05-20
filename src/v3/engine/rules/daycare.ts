@@ -34,6 +34,7 @@ import { NO_OWNER } from "../../schemas";
 import { type Context, type Event, type OwnerRef, type TimeMin, type Weekday } from "../../schemas";
 import type { Rule } from "../evaluator";
 import { hasType, projectedEvent } from "../helpers";
+import { effectiveEndOf } from "../../lib/effectiveEnd";
 
 const isDaycareDropoff = hasType("daycare_dropoff");
 const isDaycarePickup = hasType("daycare_pickup");
@@ -83,22 +84,34 @@ const RuleProjectDaycareEvents: Rule = {
 // R21.2 — Shift dropoff/pickup out of nap windows
 // ---------------------------------------------------------------------------
 //
-// Settings.daycare.{dropoffTime,pickupTime} are *nominal*. If the nominal
-// time falls inside a nap interval [startTime, endTime), shift the daycare
-// event to the nap's endTime — we're not waking the baby up for daycare,
-// and we're not making him miss a nap for pickup.
+// Settings.daycare.{dropoffTime,pickupTime} are *nominal*. If a daycare
+// chip would land inside a nap, just move it to the end of the nap.
 //
-// Applies to PROJECTED daycare events only — once the parent records the
-// actual handoff time, that recorded value is canonical and not shifted.
+// "End of the nap" uses `effectiveEndOf` so we align with what the renderer
+// shows the user — auto-extended in-progress naps stretch past their raw
+// endTime, and the daycare chip needs to clear the visible block, not the
+// invisible raw boundary. Applies to BOTH projected and recorded daycare
+// events: if a recorded handoff is later contradicted by a nap moving over
+// it, the rendered chip still shifts (the persisted Firestore value stays
+// at the recorded time; this is render-side adjustment via the engine's
+// projection output).
 
-function findContainingNap(naps: Event[], startTime: TimeMin): Event | null {
+function napEnd(nap: Event, ctx: Context): TimeMin {
+  return effectiveEndOf(nap, ctx.settings.defaultNapLengthMinutes, ctx.nowMinutes ?? nap.startTime);
+}
+
+function findContainingNap(naps: Event[], startTime: TimeMin, ctx: Context): Event | null {
   // If multiple naps somehow overlap (shouldn't happen, but defensive),
-  // pick the one with the latest endTime so we shift past all of them.
+  // pick the one with the latest effective end so we shift past all of them.
   let latest: Event | null = null;
+  let latestEnd = -Infinity;
   for (const nap of naps) {
-    const end = nap.endTime ?? nap.startTime;
+    const end = napEnd(nap, ctx);
     if (nap.startTime <= startTime && startTime < end) {
-      if (!latest || (latest.endTime ?? latest.startTime) < end) latest = nap;
+      if (end > latestEnd) {
+        latest = nap;
+        latestEnd = end;
+      }
     }
   }
   return latest;
@@ -111,27 +124,27 @@ const RuleShiftDaycareOutOfNap: Rule = {
   // can detect overlap. R21.1 = daycare projection — daycare events must
   // exist before we can shift them.
   dependsOn: ["R3.1", "R21.1"],
-  matches: (events) => {
+  matches: (events, ctx) => {
     const daycareEvents = events.filter((e) => isDaycareDropoff(e) || isDaycarePickup(e));
     if (daycareEvents.length === 0) return false;
     const naps = events.filter(isNap);
     if (naps.length === 0) return false;
     return daycareEvents.some((dc) => {
-      // Only adjust projected daycare events — once recorded, the actual
-      // handoff time wins.
-      if (dc.lifecycle.state !== "projected") return false;
-      const containing = findContainingNap(naps, dc.startTime);
-      return containing !== null && containing.endTime !== undefined;
+      const containing = findContainingNap(naps, dc.startTime, ctx);
+      if (!containing) return false;
+      // Only fire when the shift would actually change something —
+      // otherwise the rule re-matches forever (idempotency for the
+      // fixed-point evaluator).
+      return napEnd(containing, ctx) !== dc.startTime;
     });
   },
-  produces: (events) => {
+  produces: (events, ctx) => {
     const naps = events.filter(isNap);
     return events.map((e) => {
       if (!(isDaycareDropoff(e) || isDaycarePickup(e))) return e;
-      if (e.lifecycle.state !== "projected") return e;
-      const containing = findContainingNap(naps, e.startTime);
-      if (!containing || containing.endTime === undefined) return e;
-      return { ...e, startTime: containing.endTime };
+      const containing = findContainingNap(naps, e.startTime, ctx);
+      if (!containing) return e;
+      return { ...e, startTime: napEnd(containing, ctx) };
     });
   },
 };

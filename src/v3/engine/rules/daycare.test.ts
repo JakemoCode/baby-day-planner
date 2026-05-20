@@ -192,6 +192,69 @@ describe("R21.2 — nominal time shifted out of nap windows", () => {
     expect(pickup?.startTime).toBe(17 * 60 + 20);
   });
 
+  it("recorded nap with no endTime: daycare shifts to nap.startTime + napLen", () => {
+    // Repro of Jake's bug: user moves nap_1 start to 7:55 (just before
+    // dropoff at 8:00). If the drawer leaves endTime undefined, raw
+    // endTime is missing — earlier R21.2 silently skipped the shift.
+    // Now: effectiveEndOf returns startTime + napLen as the base (=
+    // 7:55 + 45 = 8:40), so daycare correctly shifts to 8:40.
+    const recordedNap = {
+      id: "rec_nap_1",
+      dayId: "d1",
+      eventKey: "nap_1",
+      type: "nap" as const,
+      kind: "block" as const,
+      startTime: 7 * 60 + 55,
+      // endTime intentionally OMITTED — mirrors the broken state the
+      // drawer can leave a nap in after a start-time edit.
+      label: "Nap 1",
+      owner: NO_OWNER,
+      hasPutdown: false,
+      lifecycle: { state: "recorded" as const, annotatedAt: 7 * 60 + 55 },
+    };
+    const ctx = aContext({
+      day: aDay({ wakeTime: 7 * 60, date: "2026-05-08" }),
+      actuals: [recordedNap],
+      // nowMinutes < nap.startTime + napLen so no auto-extend kicks in.
+      nowMinutes: 8 * 60,
+      settings: aSettings({
+        wakeWindowsMinutes: [],
+        defaultNapLengthMinutes: 45,
+        bottleChain: { bottlesPerDay: 0, bufferAfterWakeMinutes: 10 },
+        daycare: {
+          enabled: true,
+          dropoffTime: 8 * 60, // inside [7:55, 8:40)
+          pickupTime: 17 * 60 + 30,
+          weekdays: ALL_DAYS_TRUE,
+        },
+      }),
+    });
+    const out = run(ctx);
+    const dropoff = out.find((e) => e.type === "daycare_dropoff");
+    expect(dropoff?.startTime).toBe(7 * 60 + 55 + 45);
+  });
+
+  it("rule is idempotent — running the engine twice produces the same shift", () => {
+    const ctx = aContext({
+      day: aDay({ wakeTime: 7 * 60, date: "2026-05-08" }),
+      settings: aSettings({
+        wakeWindowsMinutes: [30, 120, 120, 120, 120, 120],
+        defaultNapLengthMinutes: 45,
+        bottleChain: { bottlesPerDay: 0, bufferAfterWakeMinutes: 10 },
+        daycare: {
+          enabled: true,
+          dropoffTime: 8 * 60,
+          pickupTime: 17 * 60 + 30,
+          weekdays: ALL_DAYS_TRUE,
+        },
+      }),
+    });
+    const first = run(ctx);
+    const second = run(ctx);
+    expect(first.find((e) => e.type === "daycare_dropoff")?.startTime).toBe(8 * 60 + 15);
+    expect(second.find((e) => e.type === "daycare_dropoff")?.startTime).toBe(8 * 60 + 15);
+  });
+
   it("dropoff with no nap conflict keeps its nominal time", () => {
     const ctx = aContext({
       day: aDay({ wakeTime: 7 * 60, date: "2026-05-08" }),
