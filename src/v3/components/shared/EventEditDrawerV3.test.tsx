@@ -422,6 +422,44 @@ describe("EventEditDrawerV3", () => {
     expect(screen.queryByLabelText("Amount (oz)")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Jake" })).toBeInTheDocument();
   });
+
+  // PR #196 removed Settings per-day-owner for daycare with the intent that
+  // owner is assigned per-event via the timeline drawer like every other
+  // event. The drawer's `showOwner` flag silently omitted both daycare
+  // types, so dropoff/pickup had no owner UI anywhere.
+  it.each(["daycare_dropoff", "daycare_pickup"] as const)(
+    "%s form shows the owner picker",
+    (type) => {
+      const evt: Event = {
+        id: `${type}-1`,
+        dayId: "d-1",
+        eventKey: type,
+        type,
+        kind: "instant",
+        startTime: 8 * 60,
+        label: type === "daycare_dropoff" ? "Daycare dropoff" : "Daycare pickup",
+        hasPutdown: false,
+        owner: NO_OWNER,
+        lifecycle: { state: "projected" },
+      };
+      render(
+        <EventEditDrawerV3
+          open
+          mode="edit"
+          event={evt}
+          owners={owners}
+          nowMinutes={NOW}
+          bedtimeThreshold={THRESHOLD}
+          defaultWakeTime={DEFAULT_WAKE_TIME}
+          onSave={() => {}}
+          onCancel={() => {}}
+        />,
+      );
+      const ownerGroup = screen.getByRole("group", { name: /owner/i });
+      expect(within(ownerGroup).getByRole("button", { name: "Jake" })).toBeVisible();
+      expect(within(ownerGroup).getByRole("button", { name: "Sam" })).toBeVisible();
+    },
+  );
 });
 
 describe("Past-threshold prompt when editing a nap (physiology cascade)", () => {

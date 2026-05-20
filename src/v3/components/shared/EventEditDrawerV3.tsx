@@ -174,7 +174,9 @@ export function EventEditDrawerV3({
     type === "wake_window" ||
     type === "bottle" ||
     type === "extra" ||
-    type === "bedtime";
+    type === "bedtime" ||
+    type === "daycare_dropoff" ||
+    type === "daycare_pickup";
   const showLabel = type === "extra";
 
   const errors = validateForm(type, form.startTime, form.endTime, sourceEvent.id, existingEvents);
