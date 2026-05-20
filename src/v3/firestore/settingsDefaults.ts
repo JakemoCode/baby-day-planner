@@ -22,8 +22,8 @@ export const DEFAULT_WAKE_TIME = 7 * 60;
  * values without drift. The §F4 fast-follow will replace this with a
  * theme picker. */
 export const DEFAULT_OWNER_COLORS = {
-  parent1: "#7a8fa8",
-  parent2: "#ce8e7e",
+  parent1: "#649ec3",
+  parent2: "#bc5b2e",
 } as const;
 
 const DEFAULTS: Omit<Settings, "childId"> = {
@@ -91,16 +91,19 @@ const LEGACY_PLACEHOLDER_PX_PER_HOUR = 80;
  * separate migration script. Safe to remove once no `OwnersConfig` docs
  * carry the legacy placeholder values (§F4 theme picker supersedes).
  */
-const LEGACY_PLACEHOLDER_COLORS: Record<"parent1" | "parent2", string> = {
-  parent1: "#0af",
-  parent2: "#f0a",
+const LEGACY_PLACEHOLDER_COLORS: Record<"parent1" | "parent2", readonly string[]> = {
+  // Pre-palette-refresh defaults (2026-05-19) included — any settings doc
+  // still holding those exact hex values gets rolled forward to the new
+  // DEFAULT_OWNER_COLORS. Explicit user picks of any other hex stay put.
+  parent1: ["#0af", "#7a8fa8"],
+  parent2: ["#f0a", "#ce8e7e"],
 };
 
 function migrateOwnerSlot(
   slot: { displayName: string; color: string },
   key: "parent1" | "parent2",
 ): { displayName: string; color: string } {
-  if (slot.color === LEGACY_PLACEHOLDER_COLORS[key]) {
+  if (LEGACY_PLACEHOLDER_COLORS[key].includes(slot.color)) {
     return { ...slot, color: DEFAULT_OWNER_COLORS[key] };
   }
   return slot;

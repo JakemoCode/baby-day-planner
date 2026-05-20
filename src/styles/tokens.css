@@ -54,13 +54,13 @@
   /* Earth-tone owner palette. The current hex pair is calibrated for the
    * warm-cream/sage palette. When we expose theme presets, the
    * historical saturated variant lives here too as the 'loud' variant. */
-  --color-owner-jake: #7a8fa8; /* dusty blue */
-  --color-owner-kelly: #ce8e7e; /* warm coral */
+  --color-owner-jake: #649ec3; /* dusty blue (palette refresh 2026-05-19) */
+  --color-owner-kelly: #bc5b2e; /* terracotta (palette refresh 2026-05-19) */
   --color-owner-daycare: #9a8e82; /* warm gray */
 
   /* Owner tints (lighter shades — backgrounds for owned cards/blocks) */
-  --color-owner-jake-tint: #e1e8ef;
-  --color-owner-kelly-tint: #f3dcd2;
+  --color-owner-jake-tint: #d8e7f1;
+  --color-owner-kelly-tint: #f1cbb5;
   --color-owner-daycare-tint: #ece7e1;
 
   /* ─────── Spacing (4 px base) ─────── */
