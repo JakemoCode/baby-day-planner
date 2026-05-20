@@ -2,13 +2,14 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import type { Event, OwnershipTemplate } from "@/v3/schemas";
+import type { OwnershipTemplate } from "@/v3/schemas";
 import { useNowMinutes } from "@/hooks/useNowMinutes";
 import { useV3Day } from "@/v3/hooks/useV3Day";
 import { useV3Events } from "@/v3/hooks/useV3Events";
 import { useV3Projection } from "@/v3/hooks/useV3Projection";
 import { useV3Settings } from "@/v3/hooks/useV3Settings";
 import { useV3Templates } from "@/v3/hooks/useV3Templates";
+import { useDrawer } from "@/v3/hooks/useDrawer";
 import { LoadingState } from "@/components/shared/LoadingState";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { FAB } from "@/components/shared/FAB";
@@ -19,11 +20,6 @@ import { EventEditDrawerV3 } from "@/v3/components/shared/EventEditDrawerV3";
 import { TimelineV3 } from "@/v3/components/Timeline/TimelineV3";
 import styles from "./page.module.css";
 import { useCurrentChild } from "@/v3/context/ChildProvider";
-
-type DrawerState =
-  | { open: false }
-  | { open: true; mode: "create"; template: Event }
-  | { open: true; mode: "edit"; event: Event };
 
 function yesterdayDate(today: string): string {
   const [y, m, d] = today.split("-").map(Number);
@@ -42,7 +38,11 @@ export default function TimelinePage() {
   const { settings, loading: settingsLoading } = useV3Settings(CHILD_ID);
   const { events: actuals, saveEvent, deleteOptimistic } = useV3Events(CHILD_ID, day?.id ?? "");
   const { templates } = useV3Templates(CHILD_ID);
-  const [drawer, setDrawer] = useState<DrawerState>({ open: false });
+  const { drawer, openCreate, openEdit, close, onSave, onDelete } = useDrawer(
+    actuals,
+    saveEvent,
+    deleteOptimistic,
+  );
   const [pickerOpen, setPickerOpen] = useState(false);
 
   const template = useMemo<OwnershipTemplate | undefined>(() => {
@@ -90,7 +90,7 @@ export default function TimelinePage() {
         pxPerHour={settings.timelinePxPerHour}
         dimPast={settings.timelineDimPast}
         viewportPaddingMin={12}
-        onEventTap={(event) => setDrawer({ open: true, mode: "edit", event })}
+        onEventTap={openEdit}
       />
 
       <FAB label="Add an event" onClick={() => setPickerOpen(true)} />
@@ -107,7 +107,7 @@ export default function TimelinePage() {
             nowMinutes,
             projected,
           });
-          setDrawer({ open: true, mode: "create", template: tpl });
+          openCreate(tpl);
         }}
         onCancel={() => setPickerOpen(false)}
       />
@@ -128,40 +128,9 @@ export default function TimelinePage() {
         open={drawer.open}
         event={drawer.open ? (drawer.mode === "edit" ? drawer.event : drawer.template) : null}
         mode={drawer.open && drawer.mode === "edit" ? "edit" : "create"}
-        onSave={async (event) => {
-          if (
-            drawer.open &&
-            drawer.mode === "edit" &&
-            !actuals.some((e) => e.id === drawer.event.id)
-          ) {
-            // Editing a projected (non-persisted) event: re-ID so it lands
-            // as a new actual rather than colliding with the projected slot.
-            // §F37 follow-up: use a DETERMINISTIC id derived from eventKey
-            // (was random `newEventId("manual")`). Random ids meant each
-            // subsequent edit of the same projection created ANOTHER override
-            // doc — wake_window owners changed "intermittently" because R4.2
-            // picked the survivor by Map iteration order over the accumulated
-            // duplicates. Stable id → 2nd+ edit routes through `updateOptimistic`
-            // on the same doc.
-            await saveEvent({ ...event, id: `recorded_${event.eventKey}` });
-          } else {
-            await saveEvent(event);
-          }
-          setDrawer({ open: false });
-        }}
-        onCancel={() => setDrawer({ open: false })}
-        onDelete={async (event) => {
-          if (
-            drawer.open &&
-            drawer.mode === "edit" &&
-            !actuals.some((e) => e.id === drawer.event.id)
-          ) {
-            setDrawer({ open: false });
-            return;
-          }
-          await deleteOptimistic(event.id);
-          setDrawer({ open: false });
-        }}
+        onSave={onSave}
+        onCancel={close}
+        onDelete={onDelete}
       />
     </div>
   );

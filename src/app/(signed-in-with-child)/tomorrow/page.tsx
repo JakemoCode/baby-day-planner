@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import type { Day, Event, OwnerRef, OwnershipTemplate } from "@/v3/schemas";
 import { useV3Settings } from "@/v3/hooks/useV3Settings";
 import { useV3Templates } from "@/v3/hooks/useV3Templates";
@@ -23,6 +23,7 @@ import { TomorrowPreview } from "@/v3/components/Tomorrow/TomorrowPreview";
 import { PromoteTomorrowButton } from "@/v3/components/Tomorrow/PromoteTomorrowButton";
 import { TemplateOwnerPicker } from "@/v3/components/DayTemplates/TemplateOwnerPicker";
 import { setOwnerInTemplate } from "@/v3/components/DayTemplates/setOwnerInTemplate";
+import { useDrawer } from "@/v3/hooks/useDrawer";
 import styles from "./page.module.css";
 import { useCurrentChild } from "@/v3/context/ChildProvider";
 
@@ -30,11 +31,6 @@ import { useCurrentChild } from "@/v3/context/ChildProvider";
 // drawer constraints land in the middle of the planned day rather
 // than wherever the user happens to be browsing from.
 const TOMORROW_ANCHOR_MINUTES = 12 * 60;
-
-type DrawerState =
-  | { open: false }
-  | { open: true; mode: "create"; template: Event }
-  | { open: true; mode: "edit"; event: Event };
 
 function tomorrowDateString(): string {
   const d = new Date();
@@ -50,9 +46,31 @@ export default function TomorrowPage() {
 
   const [form, setForm] = useState<TomorrowFormValue>({ wakeTime: 7 * 60 });
   const [extras, setExtras] = useState<Event[]>([]);
-  const [drawer, setDrawer] = useState<DrawerState>({ open: false });
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pickedEvent, setPickedEvent] = useState<Event | null>(null);
+
+  // saveExtra routes create vs update by checking if the event id is
+  // already in the local extras array. Mirrors useV3Events.saveEvent's
+  // routing contract so useDrawer can treat Tomorrow's local state and
+  // the Firestore-backed pages identically.
+  const saveExtra = useCallback((event: Event) => {
+    setExtras((prev) => {
+      if (prev.some((e) => e.id === event.id)) {
+        return prev.map((e) => (e.id === event.id ? event : e));
+      }
+      return [...prev, event];
+    });
+  }, []);
+
+  const deleteExtra = useCallback((eventId: string) => {
+    setExtras((prev) => prev.filter((e) => e.id !== eventId));
+  }, []);
+
+  const { drawer, openCreate, openEdit, close, onSave, onDelete } = useDrawer(
+    extras,
+    saveExtra,
+    deleteExtra,
+  );
   // Local override of the selected template so owner edits in the
   // preview reflect immediately without waiting for the listener
   // round-trip. (V3 listTemplates is one-shot, so without this the
@@ -123,7 +141,7 @@ export default function TomorrowPage() {
       settings,
       nowMinutes: TOMORROW_ANCHOR_MINUTES,
     });
-    setDrawer({ open: true, mode: "create", template: tpl });
+    openCreate(tpl);
   };
 
   return (
@@ -143,7 +161,7 @@ export default function TomorrowPage() {
           extras={extras}
           onEventTap={(event) => {
             if (event.type === "extra") {
-              setDrawer({ open: true, mode: "edit", event });
+              openEdit(event);
               return;
             }
             // Owner picker only meaningful when a template is selected;
@@ -199,37 +217,9 @@ export default function TomorrowPage() {
         open={drawer.open}
         event={drawer.open ? (drawer.mode === "edit" ? drawer.event : drawer.template) : null}
         mode={drawer.open && drawer.mode === "edit" ? "edit" : "create"}
-        onSave={(event) => {
-          if (drawer.open && drawer.mode === "edit") {
-            if (extras.some((e) => e.id === drawer.event.id)) {
-              setExtras((prev) => prev.map((e) => (e.id === event.id ? event : e)));
-            } else {
-              // Don't re-ID — the projected event's id (built via
-              // `buildCreateTemplate`/`newEventId`) is already
-              // collision-safe. Re-IDing would make a SECOND edit of
-              // the same projected event miss `isPersistedActual`
-              // (which checks the original projected id) and fall
-              // into this branch again, duplicating the extra.
-              setExtras((prev) => [...prev, event]);
-            }
-          } else {
-            setExtras((prev) => [...prev, event]);
-          }
-          setDrawer({ open: false });
-        }}
-        onCancel={() => setDrawer({ open: false })}
-        onDelete={(event) => {
-          if (
-            drawer.open &&
-            drawer.mode === "edit" &&
-            !extras.some((e) => e.id === drawer.event.id)
-          ) {
-            setDrawer({ open: false });
-            return;
-          }
-          setExtras((prev) => prev.filter((e) => e.id !== event.id));
-          setDrawer({ open: false });
-        }}
+        onSave={onSave}
+        onCancel={close}
+        onDelete={onDelete}
       />
     </div>
   );

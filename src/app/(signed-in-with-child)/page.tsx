@@ -8,12 +8,12 @@ import { isInProgress } from "@/v3/lib/effectiveEnd";
 import { currentWakeWindow, nextBottle, nextNap, projectedBedtime } from "@/v3/selectors";
 import { nextDashboardEvent } from "@/v3/components/Dashboard/dashboardStats";
 import { useNowMinutes } from "@/hooks/useNowMinutes";
-import { newEventId } from "@/v3/lib/newEventId";
 import { useV3Day } from "@/v3/hooks/useV3Day";
 import { useV3Events } from "@/v3/hooks/useV3Events";
 import { useV3Settings } from "@/v3/hooks/useV3Settings";
 import { useV3Templates } from "@/v3/hooks/useV3Templates";
 import { useV3Projection } from "@/v3/hooks/useV3Projection";
+import { useDrawer } from "@/v3/hooks/useDrawer";
 import { getOrCreatePlannedDay, startNewDay } from "@/v3/repositories/days";
 import { createEvent } from "@/v3/repositories/events";
 import { db } from "@/lib/firebase/client";
@@ -35,11 +35,6 @@ import { WakeConfirmSheet } from "@/v3/components/Dashboard/WakeConfirmSheet";
 import styles from "./page.module.css";
 import { useCurrentChild } from "@/v3/context/ChildProvider";
 
-type DrawerState =
-  | { open: false }
-  | { open: true; mode: "create"; template: Event }
-  | { open: true; mode: "edit"; event: Event };
-
 function todayDate(): string {
   const d = new Date();
   const y = d.getFullYear();
@@ -53,9 +48,13 @@ export default function DashboardPage() {
   const nowMinutes = useNowMinutes();
   const { day, loading: dayLoading } = useV3Day(CHILD_ID);
   const { settings, loading: settingsLoading } = useV3Settings(CHILD_ID);
-  const { events: actuals, saveEvent } = useV3Events(CHILD_ID, day?.id ?? "");
+  const { events: actuals, saveEvent, deleteOptimistic } = useV3Events(CHILD_ID, day?.id ?? "");
   const { templates } = useV3Templates(CHILD_ID);
-  const [drawer, setDrawer] = useState<DrawerState>({ open: false });
+  const { drawer, openCreate, close, onSave, onDelete } = useDrawer(
+    actuals,
+    saveEvent,
+    deleteOptimistic,
+  );
   const [pickerOpen, setPickerOpen] = useState(false);
   const [wakeSheetOpen, setWakeSheetOpen] = useState(false);
 
@@ -278,7 +277,7 @@ export default function DashboardPage() {
             nowMinutes,
             projected,
           });
-          setDrawer({ open: true, mode: "create", template: tpl });
+          openCreate(tpl);
         }}
         onCancel={() => setPickerOpen(false)}
       />
@@ -299,21 +298,9 @@ export default function DashboardPage() {
         open={drawer.open}
         event={drawer.open ? (drawer.mode === "edit" ? drawer.event : drawer.template) : null}
         mode={drawer.open && drawer.mode === "edit" ? "edit" : "create"}
-        onSave={async (event) => {
-          if (
-            drawer.open &&
-            drawer.mode === "edit" &&
-            !actuals.some((e) => e.id === drawer.event.id)
-          ) {
-            // Editing a projected (non-persisted) event: re-ID so it lands
-            // as a new actual rather than colliding with the projected slot.
-            await saveEvent({ ...event, id: newEventId("manual") });
-          } else {
-            await saveEvent(event);
-          }
-          setDrawer({ open: false });
-        }}
-        onCancel={() => setDrawer({ open: false })}
+        onSave={onSave}
+        onDelete={onDelete}
+        onCancel={close}
       />
 
       {/* Conditionally mount so each open creates a fresh component
