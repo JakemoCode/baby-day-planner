@@ -34,7 +34,6 @@ import { NO_OWNER } from "../../schemas";
 import { type Context, type Event, type OwnerRef, type TimeMin, type Weekday } from "../../schemas";
 import type { Rule } from "../evaluator";
 import { hasType, projectedEvent } from "../helpers";
-import { effectiveEndOf } from "../../lib/effectiveEnd";
 
 const isDaycareDropoff = hasType("daycare_dropoff");
 const isDaycarePickup = hasType("daycare_pickup");
@@ -87,17 +86,18 @@ const RuleProjectDaycareEvents: Rule = {
 // Settings.daycare.{dropoffTime,pickupTime} are *nominal*. If a daycare
 // chip would land inside a nap, just move it to the end of the nap.
 //
-// "End of the nap" uses `effectiveEndOf` so we align with what the renderer
-// shows the user — auto-extended in-progress naps stretch past their raw
-// endTime, and the daycare chip needs to clear the visible block, not the
-// invisible raw boundary. Applies to BOTH projected and recorded daycare
-// events: if a recorded handoff is later contradicted by a nap moving over
-// it, the rendered chip still shifts (the persisted Firestore value stays
-// at the recorded time; this is render-side adjustment via the engine's
-// projection output).
+// "End of the nap" = the nap's raw `endTime`. The drawer preserves
+// duration on start-time edits (see EventEditDrawerV3.handleStartTimeChange),
+// so a user-edited recorded nap always has a real endTime. For the rare
+// case of a recorded nap without endTime (legacy data only), fall back to
+// `startTime + defaultNapLengthMinutes`.
+//
+// Applies to BOTH projected and recorded daycare events — per Jake's
+// simple rule: "if a daycare chip would land inside a nap, just move it
+// to the end of the nap."
 
 function napEnd(nap: Event, ctx: Context): TimeMin {
-  return effectiveEndOf(nap, ctx.settings.defaultNapLengthMinutes, ctx.nowMinutes ?? nap.startTime);
+  return nap.endTime ?? nap.startTime + ctx.settings.defaultNapLengthMinutes;
 }
 
 function findContainingNap(naps: Event[], startTime: TimeMin, ctx: Context): Event | null {
