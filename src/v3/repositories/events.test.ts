@@ -11,7 +11,11 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import type { RulesTestEnvironment } from "@firebase/rules-unit-testing";
 import type { Firestore } from "firebase/firestore";
-import { ALLOWED_USER, startTestEnv } from "../../../tests/integration/firestore-test-utils";
+import {
+  ALLOWED_USER,
+  seedAllowedUser,
+  startTestEnv,
+} from "../../../tests/integration/firestore-test-utils";
 import type { Event } from "../schemas";
 import { NO_OWNER } from "../schemas";
 import { createEvent, deleteEvent, listEvents, updateEvent, watchEvents } from "./events";
@@ -41,6 +45,7 @@ describe("v3 events repository", () => {
   });
   beforeEach(async () => {
     await env.clearFirestore();
+    await seedAllowedUser(env, ALLOWED_USER.uid, ["child-1"]);
   });
 
   function db(): Firestore {

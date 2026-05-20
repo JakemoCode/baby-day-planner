@@ -3,6 +3,7 @@
 import { db } from "@/lib/firebase/client";
 import { LoadingState } from "@/components/shared/LoadingState";
 import { SettingsAccount } from "@/v3/components/shared/SettingsAccount";
+import { InviteCoParentSection } from "@/v3/components/Settings/InviteCoParentSection";
 import { OwnersConfigEditor } from "@/v3/components/Settings/OwnersConfigEditor";
 import { withV3SettingsDefaults } from "@/v3/firestore/settingsDefaults";
 import { useLocalStorageString } from "@/v3/hooks/useLocalStorageString";
@@ -61,6 +62,14 @@ export default function SettingsPage() {
 
       <Section title="Owners" isOpen={openSlug === "owners"} onToggle={handleToggle}>
         <OwnersConfigEditor value={value.owners} onChange={(owners) => set("owners", owners)} />
+      </Section>
+
+      <Section
+        title="Invite a co-parent"
+        isOpen={openSlug === "invite-a-co-parent"}
+        onToggle={handleToggle}
+      >
+        <InviteCoParentSection />
       </Section>
 
       <Section title="Default times" isOpen={openSlug === "default-times"} onToggle={handleToggle}>

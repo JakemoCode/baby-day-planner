@@ -17,7 +17,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vites
 import { renderHook, waitFor } from "@testing-library/react";
 import type { RulesTestEnvironment } from "@firebase/rules-unit-testing";
 import type { Firestore } from "firebase/firestore";
-import { ALLOWED_USER, startTestEnv } from "../firestore-test-utils";
+import { ALLOWED_USER, seedAllowedUser, startTestEnv } from "../firestore-test-utils";
 import { createDay } from "../../../src/v3/repositories/days";
 import type { Day } from "../../../src/v3/schemas";
 import { useV3Day } from "../../../src/v3/hooks/useV3Day";
@@ -55,6 +55,7 @@ afterAll(async () => {
 
 beforeEach(async () => {
   await env.clearFirestore();
+  await seedAllowedUser(env, ALLOWED_USER.uid, ["child-1"]);
   const ctx = env.authenticatedContext(ALLOWED_USER.uid, { email: ALLOWED_USER.email });
   testDb = ctx.firestore() as unknown as Firestore;
 });

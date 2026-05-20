@@ -7,7 +7,11 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import type { RulesTestEnvironment } from "@firebase/rules-unit-testing";
 import type { Firestore } from "firebase/firestore";
-import { ALLOWED_USER, startTestEnv } from "../../../tests/integration/firestore-test-utils";
+import {
+  ALLOWED_USER,
+  seedAllowedUser,
+  startTestEnv,
+} from "../../../tests/integration/firestore-test-utils";
 import type { TomorrowPlan } from "../schemas";
 import { deleteTomorrowPlan, loadTomorrowPlan, saveTomorrowPlan } from "./tomorrowPlans";
 
@@ -29,6 +33,7 @@ describe("v3 tomorrowPlans repository", () => {
   });
   beforeEach(async () => {
     await env.clearFirestore();
+    await seedAllowedUser(env, ALLOWED_USER.uid, ["aden"]);
   });
 
   function db(): Firestore {

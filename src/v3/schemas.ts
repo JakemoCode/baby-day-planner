@@ -425,3 +425,27 @@ export type User = {
   /** ms epoch. */
   createdAt: number;
 };
+
+/**
+ * §F3 PR #2 Invite — single-use co-parent invite. Creator mints one, shares
+ * the token (via copy-link or stubbed email), recipient signs in and consumes
+ * it to gain access to the child.
+ *
+ * `token` is a Firebase auto-id and matches the doc id at `/invites/{token}`.
+ * `consumedBy` / `consumedAt` are set atomically with the user-doc childIds
+ * append in `consumeInvite`'s transaction — see invitesRepo.
+ */
+export type Invite = {
+  token: string;
+  childId: string;
+  /** uid of the user who minted the invite. */
+  createdBy: string;
+  /** ms epoch. */
+  createdAt: number;
+  /** ms epoch — invite is rejected if consumed after this. */
+  expiresAt: number;
+  /** Set on consumption. */
+  consumedBy?: string;
+  /** Set on consumption (ms epoch). */
+  consumedAt?: number;
+};

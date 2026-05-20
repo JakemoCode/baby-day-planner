@@ -16,6 +16,7 @@ import type {
   Child,
   Day,
   Event,
+  Invite,
   OwnershipTemplate,
   Settings,
   TomorrowPlan,
@@ -39,6 +40,8 @@ export const v3TomorrowPlanConverter = passthrough<TomorrowPlan>();
 export const v3ChildConverter = passthrough<Child>();
 
 export const v3UserConverter = passthrough<User>();
+
+export const v3InviteConverter = passthrough<Invite>();
 
 /**
  * Settings converter applies `withV3SettingsDefaults` on read so partial
