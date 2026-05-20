@@ -96,7 +96,9 @@ describe("drawer-edit nap + daycare overlap (2026-05-20 Jake bug)", () => {
       owner: NO_OWNER,
       lifecycle: { state: "recorded", annotatedAt: NOW },
     };
-    expect(resolvedEnd(editedNap, aSettings({ defaultNapLengthMinutes: napLen }), NOW)).toBe(9 * 60 + 10);
+    expect(
+      resolvedEnd(editedNap, aSettings({ defaultNapLengthMinutes: napLen }), NOW),
+    ).toBe(9 * 60 + 10);
   });
 
   it("end-to-end: edited nap + daycare overlap → daycare shifts to nap.endTime; nap stays 8:25–9:10", () => {
