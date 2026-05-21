@@ -905,6 +905,22 @@ Plus visual QA pass on every form (welcome, settings, drawer time picker, day-te
 
 ---
 
+## §F48 — Header cut off on rounded device screen corners (safe-area-inset)
+
+**Source**: Jake, 2026-05-21 — top bar clips into the iOS / curved-corner safe area.
+
+**Status**: `pending`
+
+**What**: the sticky header doesn't respect `env(safe-area-inset-top)`, so on devices with rounded screen corners (iPhone notches, Pixel curves, etc.) the leftmost / rightmost icons get clipped or sit too close to the corner.
+
+**Fix shape**: in `src/components/shared/Header.module.css` add `padding-top: max(env(safe-area-inset-top), <existing-padding>)` plus matching left/right insets. Also ensure `<meta name="viewport" content="...viewport-fit=cover">` is set in `src/app/layout.tsx` viewport config (required for safe-area-inset to expose values).
+
+**Why fast-follow**: cosmetic on mobile, invisible on desktop; trivial CSS fix.
+
+**Estimated effort**: ~15 min including a quick device test in Chrome's iPhone emulator.
+
+---
+
 ## §F47 — Square focus outline on InstantChip (block focus outline is rounded)
 
 **Source**: Jake, 2026-05-21.

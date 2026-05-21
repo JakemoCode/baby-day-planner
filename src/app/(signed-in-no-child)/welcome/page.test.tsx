@@ -17,13 +17,26 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 import type * as Firestore from "firebase/firestore";
 import { renderWithAuth, screen, userEvent } from "@/test-utils";
 
-const replaceMock = vi.fn();
 const commitMock = vi.fn().mockResolvedValue(undefined);
 const setBatchMock = vi.fn();
 
-vi.mock("next/navigation", () => ({
-  useRouter: () => ({ replace: replaceMock, push: vi.fn(), back: vi.fn() }),
-}));
+// PR 3 race fix: WelcomePage uses `window.location.href = "/"` (full
+// page navigation, not next/router) to defeat the Firestore listen-
+// stream race. Stub the location assignment to observe the redirect
+// without actually navigating jsdom.
+const locationHrefSetter = vi.fn();
+Object.defineProperty(window, "location", {
+  configurable: true,
+  value: new Proxy({} as Location, {
+    set(_t, p, v: string) {
+      if (p === "href") locationHrefSetter(v);
+      return true;
+    },
+    get() {
+      return undefined;
+    },
+  }),
+});
 
 vi.mock("firebase/firestore", async () => {
   const actual = await vi.importActual<typeof Firestore>("firebase/firestore");
@@ -33,11 +46,6 @@ vi.mock("firebase/firestore", async () => {
     collection: vi.fn(() => ({})),
     doc: vi.fn(() => stubDoc),
     writeBatch: vi.fn(() => ({ set: setBatchMock, commit: commitMock })),
-    // PR 3 race fix: WelcomePage now warms a server-side read after
-    // commit() to confirm rule-eval propagation before redirecting.
-    // Stub it to resolve so the test exercises the redirect. (Uses
-    // getDocFromServer, not getDoc — getDoc would hit the cache.)
-    getDocFromServer: vi.fn(async () => ({ exists: () => true, data: () => ({}) })),
   };
 });
 
@@ -132,7 +140,7 @@ describe("WelcomePage", () => {
       wakeTime: 7 * 60,
     });
 
-    expect(replaceMock).toHaveBeenCalledWith("/");
+    expect(locationHrefSetter).toHaveBeenCalledWith("/");
   });
 
   it("trims whitespace in displayName and falls back when parent names are emptied", async () => {
@@ -177,7 +185,7 @@ describe("WelcomePage", () => {
 
     const alert = await screen.findByRole("alert");
     expect(alert).toHaveTextContent(/permission denied/i);
-    expect(replaceMock).not.toHaveBeenCalled();
+    expect(locationHrefSetter).not.toHaveBeenCalled();
     // Button is re-enabled (label flips back from "Saving…")
     expect(screen.getByRole("button", { name: /Start tracking/i })).not.toBeDisabled();
   });

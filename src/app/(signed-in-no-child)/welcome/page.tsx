@@ -1,8 +1,7 @@
 "use client";
 
 import { useMemo, useState, type FormEvent } from "react";
-import { useRouter } from "next/navigation";
-import { collection, doc, getDocFromServer, writeBatch } from "firebase/firestore";
+import { collection, doc, writeBatch } from "firebase/firestore";
 import { useAuth } from "@/lib/auth/useAuth";
 import { db } from "@/lib/firebase/client";
 import { CHILDREN, childPath, dayPath, settingsPath, userPath } from "@/lib/firestore/paths";
@@ -58,7 +57,6 @@ function minutesFromTimeInput(value: string): number {
  */
 export default function WelcomePage() {
   const { user } = useAuth();
-  const router = useRouter();
 
   const [step, setStep] = useState<Step>(1);
   const [displayName, setDisplayName] = useState("");
@@ -184,25 +182,18 @@ export default function WelcomePage() {
       batch.set(doc(db, dayPath(newId, dayDocId)).withConverter(v3DayConverter), day1);
       await batch.commit();
 
-      // §F17 PR 3 — Firestore-rules propagation race. After commit()
-      // resolves, the server has the writes but the dashboard's
-      // snapshot listeners can attach while the server's rule-eval
-      // view hasn't fully caught up — leading to a transient
-      // permission-denied and the cascading SDK INTERNAL ASSERTION
-      // FAILED crash. Block the redirect on getDocFromServer (NOT
-      // getDoc, which returns from the local IndexedDB cache without
-      // hitting the network) so we actually force a server round-trip
-      // and prove the rule path works before any subscription attaches.
-      try {
-        await getDocFromServer(doc(db, childPath(newId)).withConverter(v3ChildConverter));
-        await getDocFromServer(doc(db, userPath(user.uid)).withConverter(v3UserConverter));
-      } catch {
-        setError("Couldn't load your child after setup. Try refreshing.");
-        setSubmitting(false);
-        return;
-      }
-
-      router.replace("/");
+      // §F17 PR 3 — Firestore SDK has a known race where a snapshot
+      // listener attached right after a writeBatch can deny because
+      // the listen-stream's internal target state lags the
+      // just-committed writes (the SDK then crashes with cascading
+      // INTERNAL ASSERTION FAILED errors). Tried `getDocFromServer`
+      // warm-ups; the warm-up succeeded but subscriptions still
+      // denied. A full-page navigation (NOT router.replace) is the
+      // robust fix: it tears down the entire Firebase SDK instance
+      // and re-inits with fresh auth + listen-stream state on the
+      // next page load. Tiny extra latency vs. an SPA redirect, no
+      // race window. The trailing "/" preserves the dashboard target.
+      window.location.href = "/";
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong.");
       setSubmitting(false);
