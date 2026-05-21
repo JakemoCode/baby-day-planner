@@ -10,6 +10,7 @@ import {
   aContext,
   aDay,
   aProjectedBottle,
+  aRecordedBedtime,
   aRecordedBottle,
   aRecordedNap,
   aSettings,
@@ -1353,5 +1354,65 @@ describe("Sequential bottle cascade — caps forward at bedtime (DOMAIN.md §1 +
       (b) => b.lifecycle.state === "projected" && b.startTime >= 19 * 60,
     );
     expect(projectedPastBedtime).toEqual([]);
+  });
+});
+
+describe("Overnight bottle does NOT interrupt the bedtime block (DOMAIN.md §3)", () => {
+  // Recording a bottle during the overnight stretch (between "Start
+  // Bedtime" and the next morning's "End Bedtime" — e.g. a 3 AM dream
+  // feed added via FAB) is normal bedtime behavior. The bedtime block
+  // must remain a single, continuous event: same id, same startTime,
+  // same endTime, same lifecycle. It must NOT split, end early, or
+  // morph into a nap.
+  it("a recorded 3 AM bottle leaves a recorded overnight bedtime untouched", () => {
+    const recordedBedtime = aRecordedBedtime({
+      id: "actual_bedtime",
+      start: 19 * 60, // 19:00
+      end: 31 * 60, // 07:00 next morning
+    });
+    const overnightBottle = aRecordedBottle({
+      id: "actual_bottle_3am",
+      start: 3 * 60, // 03:00 — inside the overnight stretch
+    });
+
+    const ctx = aContext({
+      day: aDay({ wakeTime: 7 * 60 }),
+      settings: aSettings({
+        bottleChain: { bottlesPerDay: 5, bufferAfterWakeMinutes: 10 },
+      }),
+      actuals: [recordedBedtime, overnightBottle],
+      nowMinutes: 3 * 60 + 5,
+    });
+
+    const out = projectDay(
+      {
+        day: ctx.day,
+        settings: ctx.settings,
+        actuals: ctx.actuals,
+        nowMinutes: ctx.nowMinutes,
+      },
+      { rules: ALL_WITH_BEDTIME },
+    );
+
+    // Exactly one bedtime event — the block did not split.
+    const bedtimes = out.filter((e) => e.type === "bedtime");
+    expect(bedtimes).toHaveLength(1);
+    const bedtime = bedtimes[0]!;
+
+    // The bedtime is the one we recorded, with identity and span intact.
+    expect(bedtime.id).toBe(recordedBedtime.id);
+    expect(bedtime.startTime).toBe(19 * 60);
+    expect(bedtime.endTime).toBe(31 * 60);
+    expect(bedtime.lifecycle.state).toBe("completed");
+
+    // The overnight bottle was not converted into a nap or anything else.
+    const naps = out.filter((e) => e.type === "nap");
+    expect(naps.find((n) => n.id === overnightBottle.id)).toBeUndefined();
+
+    // The overnight bottle itself is preserved as-recorded.
+    const preserved = out.find((e) => e.id === overnightBottle.id);
+    expect(preserved?.type).toBe("bottle");
+    expect(preserved?.startTime).toBe(3 * 60);
+    expect(preserved?.lifecycle.state).toBe("completed");
   });
 });
