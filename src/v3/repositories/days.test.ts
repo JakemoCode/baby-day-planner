@@ -24,10 +24,12 @@ import {
   getDay,
   getDayByDate,
   listArchivedDays,
+  promoteFromPlan,
   startNewDay,
   updateDay,
   watchActiveDay,
 } from "./days";
+import type { TomorrowPlan } from "../schemas";
 
 const day = (overrides: Partial<Day>): Day => ({
   id: "day-1",
@@ -63,6 +65,30 @@ describe("v3 days repository", () => {
     const got = await getDay(database, "child-1", "day-1");
     expect(got?.date).toBe("2026-05-09");
     expect(got?.suppressedDaycareDay).toBe(false);
+  });
+
+  // §F12 PR 1 — slice 2: Day carries optional per-event ownerOverrides
+  // that the engine consumes to color projected events with the user's
+  // planned assignments. `null` means explicit NO_OWNER (user
+  // unassigned a slot that would otherwise default to an owner).
+  it("round-trips ownerOverrides including null = explicit unassigned", async () => {
+    const database = db();
+    await createDay(
+      database,
+      day({
+        ownerOverrides: {
+          nap_1: { slot: "parent1" },
+          nap_2: null,
+          bottle_3: { slot: "other", otherId: "daycare-uuid" },
+        },
+      }),
+    );
+    const got = await getDay(database, "child-1", "day-1");
+    expect(got?.ownerOverrides).toEqual({
+      nap_1: { slot: "parent1" },
+      nap_2: null,
+      bottle_3: { slot: "other", otherId: "daycare-uuid" },
+    });
   });
 
   it("returns null when reading a missing day", async () => {
@@ -157,6 +183,48 @@ describe("v3 days repository", () => {
   // -------------------------------------------------------------------------
   // startNewDay (PR-A0.2)
   // -------------------------------------------------------------------------
+
+  // §F17 PR 1 — slice 5: callers can omit newDayId and startNewDay
+  // derives a deterministic `day-${childId}-${date}` id. This makes
+  // concurrent rollover safe (both clients write to the same doc id
+  // via idempotent setDoc) and removes a useless caller responsibility.
+  it("derives a deterministic id when newDayId is omitted", async () => {
+    const database = db();
+    const result = await startNewDay(database, "child-1", {
+      newDate: "2026-05-21",
+      newWakeTime: 7 * 60,
+    });
+    expect(result.newDayId).toBe("day-child-1-2026-05-21");
+    const got = await getDay(database, "child-1", "day-child-1-2026-05-21");
+    expect(got?.date).toBe("2026-05-21");
+    expect(got?.status).toBe("active");
+  });
+
+  // §F17 PR 1 — slice 6: deterministic id makes startNewDay idempotent
+  // under concurrent rollover. Two clients calling startNewDay for the
+  // same (childId, date) write to the same doc id; second call is a
+  // no-op overwrite. No duplicate active docs created.
+  it("idempotent under repeat calls for same (childId, date)", async () => {
+    const database = db();
+    const r1 = await startNewDay(database, "child-1", {
+      newDate: "2026-05-21",
+      newWakeTime: 7 * 60,
+    });
+    const r2 = await startNewDay(database, "child-1", {
+      newDate: "2026-05-21",
+      newWakeTime: 7 * 60,
+    });
+    expect(r1.newDayId).toBe(r2.newDayId);
+
+    // Only one active doc for the date — second call did not create a duplicate
+    // (would have collided with the first's id). Active across the whole child:
+    const list = await listArchivedDays(database, "child-1");
+    const activeDocsForDate = list.filter((d) => d.date === "2026-05-21");
+    expect(activeDocsForDate).toHaveLength(0); // active, not archived
+
+    const got = await getDay(database, "child-1", r1.newDayId);
+    expect(got?.status).toBe("active");
+  });
 
   it("startNewDay creates a V3-shape active day with TimeMin wakeTime", async () => {
     const database = db();
@@ -360,5 +428,96 @@ describe("v3 days repository", () => {
       expect(last?.id).toBe("day-today");
       expect(last?.status).toBe("active");
     });
+  });
+
+  // ---------------------------------------------------------------------------
+  // promoteFromPlan (§F17 PR 1 — slices 7, 8, 9)
+  // ---------------------------------------------------------------------------
+
+  const aPlan = (overrides: Partial<TomorrowPlan> = {}): TomorrowPlan => ({
+    childId: "child-1",
+    date: "2026-05-21",
+    status: "confirmed",
+    ownerOverrides: {},
+    extras: [],
+    ...overrides,
+  });
+
+  // §F17 PR 1 — slice 7: promoteFromPlan creates the new Day with the
+  // plan's wakeTime, templateId, and ownerOverrides. Uses the
+  // deterministic id so it composes with the auto-rollover hook's
+  // concurrent-safety story.
+  it("promoteFromPlan creates a Day with wakeTime + templateId + ownerOverrides from the plan", async () => {
+    const database = db();
+    const plan = aPlan({
+      wakeTime: 6 * 60 + 45,
+      startTemplateId: "tpl-saturday",
+      ownerOverrides: {
+        nap_1: { slot: "parent1" },
+        bottle_3: null,
+      },
+    });
+
+    const result = await promoteFromPlan(database, "child-1", plan);
+    expect(result.newDayId).toBe("day-child-1-2026-05-21");
+
+    const got = await getDay(database, "child-1", result.newDayId);
+    expect(got?.status).toBe("active");
+    expect(got?.date).toBe("2026-05-21");
+    expect(got?.wakeTime).toBe(6 * 60 + 45);
+    expect(got?.templateId).toBe("tpl-saturday");
+    expect(got?.ownerOverrides).toEqual({
+      nap_1: { slot: "parent1" },
+      bottle_3: null,
+    });
+  });
+
+  // §F17 PR 1 — slice 8: extras on the plan get persisted as projected
+  // Event docs against the newly-created Day. Their dayId must be
+  // rewritten from the placeholder ("tomorrow-…") on the plan to the
+  // real newDayId.
+  it("promoteFromPlan writes plan.extras as projected Event docs on the new Day", async () => {
+    const database = db();
+    const extra: Event = {
+      id: "extra-pediatrician",
+      dayId: "tomorrow-2026-05-21", // plan-side placeholder; should be rewritten
+      eventKey: "extra-pediatrician",
+      type: "extra",
+      kind: "instant",
+      startTime: 13 * 60 + 30,
+      label: "Pediatrician",
+      owner: { slot: "none" },
+      hasPutdown: false,
+      lifecycle: { state: "projected" },
+    };
+    const plan = aPlan({
+      wakeTime: 7 * 60,
+      extras: [extra],
+    });
+
+    const result = await promoteFromPlan(database, "child-1", plan);
+    const events = await listEvents(database, "child-1", result.newDayId);
+    expect(events).toHaveLength(1);
+    expect(events[0]?.id).toBe("extra-pediatrician");
+    expect(events[0]?.dayId).toBe(result.newDayId);
+    expect(events[0]?.label).toBe("Pediatrician");
+    expect(events[0]?.lifecycle.state).toBe("projected");
+  });
+
+  // §F17 PR 1 — slice 9: promoteFromPlan inherits startNewDay's
+  // archive seam. Any pre-existing active day flips to archived in
+  // the same transaction that creates the new one.
+  it("archives any pre-existing active day in the same transaction", async () => {
+    const database = db();
+    await createDay(database, day({ id: "day-yesterday", date: "2026-05-20", status: "active" }));
+
+    const plan = aPlan({ wakeTime: 7 * 60 });
+    const result = await promoteFromPlan(database, "child-1", plan);
+
+    expect(result.archivedDayId).toBe("day-yesterday");
+    const yesterday = await getDay(database, "child-1", "day-yesterday");
+    expect(yesterday?.status).toBe("archived");
+    const today = await getDay(database, "child-1", result.newDayId);
+    expect(today?.status).toBe("active");
   });
 });

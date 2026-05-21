@@ -29,7 +29,7 @@ import {
 import { dayPath, daysCollectionPath, eventsCollectionPath } from "@/lib/firestore/paths";
 import { v3DayConverter, v3EventConverter } from "../firestore/converters";
 import { reduceLifecycle } from "../lifecycle";
-import type { Day, Event, TimeMin } from "../schemas";
+import type { Day, Event, OwnerRef, TimeMin, TomorrowPlan } from "../schemas";
 
 function dayRef(db: Firestore, childId: string, dayId: string) {
   return doc(db, dayPath(childId, dayId)).withConverter(v3DayConverter);
@@ -146,11 +146,34 @@ export function watchActiveDay(
 // ---------------------------------------------------------------------------
 
 export type StartNewDayInput = {
-  newDayId: string;
+  /**
+   * Optional. When omitted, `startNewDay` derives a deterministic id
+   * `day-${childId}-${newDate}` so concurrent rollover calls land on
+   * the same doc (idempotent setDoc). Existing call sites that supply
+   * an explicit id still work for backwards-compat; new callers should
+   * omit this field.
+   */
+  newDayId?: string;
   newDate: string;
   newWakeTime: TimeMin;
   templateId?: string;
+  /**
+   * §F12/§F17 — per-event owner overrides copied from a confirmed
+   * TomorrowPlan at promote time. Persisted on the Day doc; the engine
+   * reads them during projection. Use `promoteFromPlan` to derive
+   * automatically from a TomorrowPlan.
+   */
+  ownerOverrides?: Record<string, OwnerRef | null>;
 };
+
+/**
+ * Deterministic id derivation for auto-rollover (§F17). `day-${childId}-${date}`
+ * keeps concurrent parent-opens from racing into duplicate docs (see
+ * docs/v3/F17_F12_SCOPE.md §2, decision #9).
+ */
+export function deterministicDayId(childId: string, date: string): string {
+  return `day-${childId}-${date}`;
+}
 
 export type StartNewDayResult = {
   archivedDayId: string | null;
@@ -206,6 +229,8 @@ export async function startNewDay(
   // startTime in the same frame.
   const trimEnd = input.newWakeTime + 24 * 60;
 
+  const newDayId = input.newDayId ?? deterministicDayId(childId, input.newDate);
+
   return runTransaction(db, async (tx) => {
     if (activeDoc) {
       tx.update(activeDoc.ref, { status: "archived" });
@@ -220,7 +245,7 @@ export async function startNewDay(
       });
     }
     const newDay: Day = {
-      id: input.newDayId,
+      id: newDayId,
       childId,
       date: input.newDate,
       status: "active",
@@ -228,11 +253,75 @@ export async function startNewDay(
       suppressedRecurringIds: [],
       suppressedDaycareDay: false,
       ...(input.templateId !== undefined ? { templateId: input.templateId } : {}),
+      ...(input.ownerOverrides !== undefined ? { ownerOverrides: input.ownerOverrides } : {}),
     };
-    tx.set(dayRef(db, childId, input.newDayId), newDay);
+    tx.set(dayRef(db, childId, newDayId), newDay);
     return {
       archivedDayId: activeDoc?.id ?? null,
-      newDayId: input.newDayId,
+      newDayId,
     };
   });
+}
+
+// ---------------------------------------------------------------------------
+// promoteFromPlan (§F12 + §F17)
+// ---------------------------------------------------------------------------
+
+/**
+ * Materialize a `TomorrowPlan` into an active `Day` for `plan.date`.
+ * Facade over `startNewDay` that:
+ *   - Uses `plan.wakeTime ?? defaultWakeTime` as the new day's wakeTime
+ *   - Copies `plan.startTemplateId` and `plan.ownerOverrides` onto the Day
+ *   - Archives any existing active day (inherited from `startNewDay`)
+ *   - Persists `plan.extras` as projected Event docs on the new Day
+ *     with their `dayId` rewritten to the real new day id
+ *
+ * `defaultWakeTime` is the settings fallback for when the plan didn't
+ * pin a wakeTime. Caller passes it explicitly rather than fetching
+ * inside the repo so this stays a pure write helper.
+ *
+ * Extras are written sequentially after the Day-create transaction
+ * commits. Non-atomic by design — Firestore transactions can't span
+ * the Day write + N event writes. If any extra fails the Day still
+ * exists; logged loudly, user can re-add. This mirrors the existing
+ * (pre-F12) /tomorrow page promote behavior.
+ */
+export async function promoteFromPlan(
+  db: Firestore,
+  childId: string,
+  plan: TomorrowPlan,
+  defaultWakeTime?: TimeMin,
+): Promise<StartNewDayResult> {
+  const wakeTime = plan.wakeTime ?? defaultWakeTime;
+  if (wakeTime === undefined) {
+    throw new Error(
+      "promoteFromPlan: plan has no wakeTime and no defaultWakeTime fallback supplied",
+    );
+  }
+  const result = await startNewDay(db, childId, {
+    newDate: plan.date,
+    newWakeTime: wakeTime,
+    ...(plan.startTemplateId !== undefined ? { templateId: plan.startTemplateId } : {}),
+    ownerOverrides: plan.ownerOverrides,
+  });
+
+  for (const extra of plan.extras) {
+    const eventForDay: Event = { ...extra, dayId: result.newDayId };
+    try {
+      await setDoc(
+        doc(db, eventsCollectionPath(childId, result.newDayId), extra.id).withConverter(
+          v3EventConverter,
+        ),
+        eventForDay,
+      );
+    } catch (err) {
+      console.error("[promoteFromPlan] failed to persist extra event", {
+        eventId: extra.id,
+        dayId: result.newDayId,
+        err,
+      });
+    }
+  }
+
+  return result;
 }
