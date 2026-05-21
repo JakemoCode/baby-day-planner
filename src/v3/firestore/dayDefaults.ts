@@ -31,6 +31,9 @@ export function withV3DayDefaults(input: Partial<Day> | null): Day | null {
   if (input.templateId !== undefined) {
     out.templateId = input.templateId;
   }
+  if (input.ownerOverrides !== undefined) {
+    out.ownerOverrides = input.ownerOverrides;
+  }
 
   return out;
 }

@@ -13,11 +13,18 @@ import {
   startTestEnv,
 } from "../../../tests/integration/firestore-test-utils";
 import type { TomorrowPlan } from "../schemas";
-import { deleteTomorrowPlan, loadTomorrowPlan, saveTomorrowPlan } from "./tomorrowPlans";
+import {
+  confirmTomorrowPlan,
+  deleteTomorrowPlan,
+  loadTomorrowPlan,
+  markPlanDraft,
+  saveTomorrowPlan,
+} from "./tomorrowPlans";
 
 const aPlan = (overrides: Partial<TomorrowPlan> = {}): TomorrowPlan => ({
   childId: "aden",
   date: "2026-05-19",
+  status: "draft",
   ownerOverrides: {},
   extras: [],
   ...overrides,
@@ -100,6 +107,44 @@ describe("v3 tomorrowPlans repository", () => {
     await deleteTomorrowPlan(db(), "aden", "2026-05-19");
     const got = await loadTomorrowPlan(db(), "aden", "2026-05-19");
     expect(got).toBeNull();
+  });
+
+  // §F12 PR 1 — slice 3: confirmTomorrowPlan flips a draft plan to
+  // confirmed and stamps confirmedAt. Caller passes the TimeMin in
+  // local-day frame (e.g. 19*60+42 for 7:42 PM) so tests stay
+  // deterministic and the prod call site stamps with currentLocalMinutes().
+  it("confirmTomorrowPlan flips a draft plan to confirmed and stamps confirmedAt", async () => {
+    await saveTomorrowPlan(db(), "aden", aPlan({ status: "draft" }));
+    await confirmTomorrowPlan(db(), "aden", "2026-05-19", 19 * 60 + 42);
+    const got = await loadTomorrowPlan(db(), "aden", "2026-05-19");
+    expect(got?.status).toBe("confirmed");
+    expect(got?.confirmedAt).toBe(19 * 60 + 42);
+  });
+
+  // §F12 PR 1 — slice 4: markPlanDraft reverts a confirmed plan back
+  // to draft and clears confirmedAt. Called whenever the user edits
+  // a confirmed plan — they must explicitly re-confirm.
+  it("markPlanDraft reverts a confirmed plan back to draft and clears confirmedAt", async () => {
+    await saveTomorrowPlan(db(), "aden", aPlan({ status: "confirmed", confirmedAt: 19 * 60 + 42 }));
+    await markPlanDraft(db(), "aden", "2026-05-19");
+    const got = await loadTomorrowPlan(db(), "aden", "2026-05-19");
+    expect(got?.status).toBe("draft");
+    expect(got?.confirmedAt).toBeUndefined();
+  });
+
+  // §F12 PR 1 — slice 1 tracer bullet: the new lifecycle fields
+  // (status, wakeTime, confirmedAt) round-trip through save/load.
+  it("round-trips status, wakeTime, and confirmedAt", async () => {
+    const plan = aPlan({
+      status: "confirmed",
+      wakeTime: 7 * 60 + 15,
+      confirmedAt: 19 * 60 + 42,
+    });
+    await saveTomorrowPlan(db(), "aden", plan);
+    const got = await loadTomorrowPlan(db(), "aden", "2026-05-19");
+    expect(got?.status).toBe("confirmed");
+    expect(got?.wakeTime).toBe(7 * 60 + 15);
+    expect(got?.confirmedAt).toBe(19 * 60 + 42);
   });
 
   it("keeps plans for different dates independent", async () => {

@@ -9,10 +9,18 @@
  * first wake event is recorded for `date`.
  */
 
-import { deleteDoc, doc, getDoc, setDoc, type Firestore } from "firebase/firestore";
+import {
+  deleteDoc,
+  deleteField,
+  doc,
+  getDoc,
+  setDoc,
+  updateDoc,
+  type Firestore,
+} from "firebase/firestore";
 import { tomorrowPlanPath } from "@/lib/firestore/paths";
 import { v3TomorrowPlanConverter } from "../firestore/converters";
-import type { TomorrowPlan } from "../schemas";
+import type { TimeMin, TomorrowPlan } from "../schemas";
 
 function planRef(db: Firestore, childId: string, date: string) {
   return doc(db, tomorrowPlanPath(childId, date)).withConverter(v3TomorrowPlanConverter);
@@ -41,4 +49,35 @@ export async function deleteTomorrowPlan(
   date: string,
 ): Promise<void> {
   await deleteDoc(planRef(db, childId, date));
+}
+
+/**
+ * Flip an existing plan to `confirmed` and stamp `confirmedAt`.
+ * Caller supplies the TimeMin in local-day frame (use
+ * `currentLocalMinutes()` in app code). Throws if the doc doesn't
+ * exist — call sites must have autosaved a draft first.
+ */
+export async function confirmTomorrowPlan(
+  db: Firestore,
+  childId: string,
+  date: string,
+  confirmedAt: TimeMin,
+): Promise<void> {
+  await updateDoc(planRef(db, childId, date), { status: "confirmed", confirmedAt });
+}
+
+/**
+ * Revert a plan to `draft` and clear `confirmedAt`. Called whenever
+ * the user edits a confirmed plan — they must explicitly re-confirm
+ * to keep auto-promote eligibility.
+ */
+export async function markPlanDraft(db: Firestore, childId: string, date: string): Promise<void> {
+  // Use deleteField for confirmedAt so the doc matches the schema
+  // (TimeMin | undefined) instead of storing a stray null that would
+  // surface to engine consumers as `confirmedAt = null` and break the
+  // `?: TimeMin` contract.
+  await updateDoc(planRef(db, childId, date), {
+    status: "draft",
+    confirmedAt: deleteField(),
+  });
 }

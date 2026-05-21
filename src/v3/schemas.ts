@@ -174,6 +174,15 @@ export type Day = {
   suppressedDaycareDay: boolean;
   /** Optional template id selected for this day. */
   templateId?: string;
+  /**
+   * §F12/§F17 — per-event owner overrides keyed by `eventKey`
+   * (e.g. `"nap_1"`, `"bottle_2"`). Carried forward from the
+   * `TomorrowPlan` at promote time. `null` = explicit NO_OWNER;
+   * missing key = no override (default cascade applies). The
+   * engine reads this during projection to color projected events
+   * with the user's planned assignments.
+   */
+  ownerOverrides?: Record<string, OwnerRef | null>;
 };
 
 // ---------------------------------------------------------------------------
@@ -389,15 +398,23 @@ export type ProjectInput = {
 };
 
 /**
- * §F39 TomorrowPlan — the user's per-date plan for "tomorrow". Persisted
- * only on first edit (page-idle → no doc). Auto-promoted when the first
- * wake event is recorded for `date`.
+ * §F39 / §F12 / §F17 TomorrowPlan — the user's per-date plan for "tomorrow".
+ * Persisted only on first edit (page-idle → no doc). Auto-promoted on
+ * calendar rollover when `status === "confirmed"` (see
+ * docs/v3/F17_F12_SCOPE.md).
  *
+ * - `status` — `"draft"` autosaves on every edit but does NOT auto-promote;
+ *   `"confirmed"` is eligible for auto-promotion when the calendar date
+ *   matches. Any edit to a confirmed plan reverts it to draft.
+ * - `wakeTime` — optional TimeMin override of `settings.defaultWakeTime`
+ *   for the planned day. Missing = use the setting default.
+ * - `confirmedAt` — TimeMin (local-day frame) when the user last confirmed.
+ *   Cleared when reverting to draft.
  * - `ownerOverrides` is keyed by eventKey (e.g. `"nap_1"`, `"bottle_2"`).
  *   `null` = explicit "None" (user unassigned); missing key = no override
  *   (fall back to template-projected default).
  * - `extras` are custom events the user added via the FAB on `/tomorrow`.
- *   They land on the new day as recorded events at promote time.
+ *   They land on the new day as projected events at promote time.
  * - `startTemplateId` is the template that was used as one-shot prefill,
  *   stored for traceability. Template edits do NOT propagate (snapshot
  *   semantics).
@@ -406,6 +423,9 @@ export type TomorrowPlan = {
   childId: string;
   /** ISO "YYYY-MM-DD" — matches `Day.date`. */
   date: string;
+  status: "draft" | "confirmed";
+  wakeTime?: TimeMin;
+  confirmedAt?: TimeMin;
   ownerOverrides: Record<string, OwnerRef | null>;
   extras: Event[];
   startTemplateId?: string;
