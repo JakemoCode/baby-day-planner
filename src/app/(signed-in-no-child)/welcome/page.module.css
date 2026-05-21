@@ -75,7 +75,20 @@
 .actions {
   display: flex;
   gap: var(--space-3);
-  justify-content: flex-end;
+  justify-content: stretch;
+}
+
+/* Wizard nav buttons fill the row evenly so taps are predictable and
+ * the "primary action" reads with weight comparable to the back. */
+.actions .button {
+  flex: 1 1 0;
+}
+
+.helperText {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  color: var(--color-fg-soft);
+  line-height: 1.4;
 }
 
 .error {
@@ -107,5 +120,8 @@
 .secondary {
   background: var(--color-surface);
   color: var(--color-fg);
-  border-color: var(--color-border);
+  /* `--color-border` is the page-divider weight — too faint for a
+   * standalone CTA. Step the border up to fg-soft so the Back button
+   * actually looks tappable. */
+  border-color: var(--color-fg-soft);
 }

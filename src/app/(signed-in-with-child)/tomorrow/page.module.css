@@ -46,9 +46,12 @@
   border: 1px solid var(--color-border);
 }
 .statusPill[data-status="draft"] {
-  /* Draft = something to act on; warm tint without alarm. */
-  background: color-mix(in srgb, var(--color-honey, var(--color-warning)) 20%, var(--color-bg));
+  /* Draft = something to act on; mix the warm honey/warning tint
+   * directly with surface (white) instead of bg (cream) so the pill
+   * sits proud of the page background instead of blending in. */
+  background: color-mix(in srgb, var(--color-warning) 32%, var(--color-surface));
   color: var(--color-fg);
+  border-color: color-mix(in srgb, var(--color-warning) 50%, transparent);
 }
 .statusPill[data-status="confirmed"] {
   /* Confirmed = ready/at-rest; sage tint. */

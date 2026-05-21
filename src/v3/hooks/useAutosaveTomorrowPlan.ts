@@ -29,25 +29,30 @@ export type UseAutosaveTomorrowPlanOptions = {
  * after a debounce. Caller passes `null` for "no input yet" so the
  * hook doesn't write the initial render's default form state.
  *
- * Edit-revert (confirmed → draft) is a separate concern handled by
- * the page-level state machine in PR 3 slice B.
+ * If `persistedPlan` is provided AND its content matches the current
+ * input exactly, the autosave skips the write. This prevents two
+ * races flagged by reviewer on 2026-05-21:
+ *   - confirm() → setDoc(status: "confirmed") → debounced autosave
+ *     fires later and overwrites with status: "draft", silently
+ *     undoing the confirmation
+ *   - hydration → form mirrors plan → autosave fires identical
+ *     content as a noisy no-op write
+ * Edit-revert (confirmed → draft on edit) survives because content
+ * differs when the user has actually edited something.
  */
 export function useAutosaveTomorrowPlan(
   childId: string,
   date: string,
   input: TomorrowPlanInput | null,
+  persistedPlan: TomorrowPlan | null,
   options: UseAutosaveTomorrowPlanOptions = {},
 ): void {
   const { debounceMs = 250 } = options;
 
   useEffect(() => {
     if (!input) return;
+    if (persistedPlan && inputMatchesPlan(input, persistedPlan)) return;
     const database = db as Firestore;
-    // Each form-field change rebuilds `input` (it's a useMemo at the
-    // call-site keyed on the form state), which retriggers this effect.
-    // The cleanup clears the previous timer — net behavior is a
-    // trailing-edge debounce that captures the latest input via the
-    // closure. No ref needed.
     const handle = setTimeout(() => {
       const plan: TomorrowPlan = {
         childId,
@@ -61,5 +66,52 @@ export function useAutosaveTomorrowPlan(
       void saveTomorrowPlan(database, childId, plan);
     }, debounceMs);
     return () => clearTimeout(handle);
-  }, [childId, date, input, debounceMs]);
+  }, [childId, date, input, persistedPlan, debounceMs]);
+}
+
+/**
+ * Content-equality between a TomorrowPlanInput and a persisted plan.
+ * Ignores `status` and `confirmedAt` (autosave never touches those
+ * meaningfully — confirm/clear actions own them). Returns true when
+ * the persisted plan already reflects everything in the input, so the
+ * autosave can safely skip the write.
+ */
+function inputMatchesPlan(input: TomorrowPlanInput, plan: TomorrowPlan): boolean {
+  if (plan.wakeTime !== input.wakeTime) return false;
+  if (plan.startTemplateId !== input.startTemplateId) return false;
+  if (!shallowEqualOwnerMap(plan.ownerOverrides, input.ownerOverrides)) return false;
+  if (!shallowEqualExtras(plan.extras, input.extras)) return false;
+  return true;
+}
+
+function shallowEqualOwnerMap(
+  a: Record<string, OwnerRef | null>,
+  b: Record<string, OwnerRef | null>,
+): boolean {
+  const aKeys = Object.keys(a);
+  const bKeys = Object.keys(b);
+  if (aKeys.length !== bKeys.length) return false;
+  for (const k of aKeys) {
+    const av = a[k];
+    const bv = b[k];
+    if (av === null || bv === null) {
+      if (av !== bv) return false;
+      continue;
+    }
+    if (av === undefined || bv === undefined) return false;
+    if (av.slot !== bv.slot) return false;
+    if (av.slot === "other" && bv.slot === "other" && av.otherId !== bv.otherId) return false;
+  }
+  return true;
+}
+
+function shallowEqualExtras(a: Event[], b: Event[]): boolean {
+  if (a.length !== b.length) return false;
+  // Extras are user-edited via the drawer; reference equality is
+  // sufficient for stable values and the failure mode of false-
+  // negative (writes when we don't need to) is harmless.
+  for (let i = 0; i < a.length; i++) {
+    if (a[i] !== b[i]) return false;
+  }
+  return true;
 }

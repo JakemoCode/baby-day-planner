@@ -52,7 +52,7 @@ describe("useAutosaveTomorrowPlan (emulator-backed)", () => {
     type Input = Parameters<typeof useAutosaveTomorrowPlan>[2];
     const { rerender } = renderHook(
       ({ input }: { input: Input }) =>
-        useAutosaveTomorrowPlan("child-1", DATE, input, { debounceMs: 50 }),
+        useAutosaveTomorrowPlan("child-1", DATE, input, null, { debounceMs: 50 }),
       { initialProps: { input: null as Input } },
     );
 
@@ -110,6 +110,7 @@ describe("useAutosaveTomorrowPlan (emulator-backed)", () => {
           ownerOverrides: {},
           extras: [],
         } satisfies NonNullable<Input>,
+        seeded,
         { debounceMs: 50 },
       ),
     );

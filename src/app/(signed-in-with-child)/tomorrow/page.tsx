@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import type { Day, Event, OwnerRef, OwnershipTemplate } from "@/v3/schemas";
 import { NO_OWNER, isNoOwner } from "@/v3/schemas";
 import { useV3Settings } from "@/v3/hooks/useV3Settings";
@@ -111,6 +112,7 @@ function TomorrowPageInner({
   clearConfirmOpen,
   setClearConfirmOpen,
 }: TomorrowPageInnerProps) {
+  const router = useRouter();
   const planState = useTomorrowPlanState(childId, tomorrowDate, settings);
 
   const { drawer, openCreate, openEdit, close, onSave, onDelete } = useDrawer(
@@ -130,8 +132,15 @@ function TomorrowPageInner({
       suppressedDaycareDay: false,
     };
     if (planState.templateId) day.templateId = planState.templateId;
+    // §F12 PR 3 bugfix — the preview Day must carry ownerOverrides so
+    // the engine's R12.10 rule applies them when projecting; otherwise
+    // chip-tap → owner picker writes to plan state but the preview
+    // never re-renders with the assigned owner.
+    if (Object.keys(planState.ownerOverrides).length > 0) {
+      day.ownerOverrides = planState.ownerOverrides;
+    }
     return day;
-  }, [planState.wakeTime, planState.templateId, childId, tomorrowDate]);
+  }, [planState.wakeTime, planState.templateId, planState.ownerOverrides, childId, tomorrowDate]);
 
   const selectedTemplate = useMemo<OwnershipTemplate | undefined>(() => {
     if (!planState.templateId) return undefined;
@@ -141,6 +150,10 @@ function TomorrowPageInner({
   const handlePromoteNow = async () => {
     setPromoteConfirmOpen(false);
     await planState.promoteNow();
+    // Route to /timeline so the user lands on the new day they just
+    // committed (the dashboard would also work but timeline is the
+    // expected "see what just happened" surface).
+    router.replace("/timeline");
   };
 
   const handleClear = async () => {
@@ -188,23 +201,6 @@ function TomorrowPageInner({
 
   return (
     <div className={styles.page}>
-      {/* §F12 PR 3: Promote-to-today CTA at TOP of the page (Jake's
-          2026-05-21 direction). Lives above the Plan section with
-          helper text so the destructive nature is visible before the
-          user has scrolled past their plan. */}
-      <section className={styles.section}>
-        <ActionButton
-          variant="primary"
-          onClick={() => setPromoteConfirmOpen(true)}
-          disabled={!canPromoteNow}
-        >
-          Promote to today
-        </ActionButton>
-        <p className={styles.helperText}>
-          Takes effect immediately and overrides anything currently saved in Today.
-        </p>
-      </section>
-
       <section className={styles.section}>
         <div className={styles.statusRow}>
           <span className={styles.statusPill} data-status={planState.status}>
@@ -223,6 +219,25 @@ function TomorrowPageInner({
             planState.setTemplateId(next.templateId);
           }}
         />
+      </section>
+
+      {/* §F12 PR 3: Promote-to-today CTA below Plan (Jake's
+          2026-05-21 direction — moved from top after click-test
+          felt the destructive primary button competed with the
+          status pill at first glance). Helper text spells out the
+          override behavior so the confirm dialog isn't the only
+          guardrail. */}
+      <section className={styles.section}>
+        <ActionButton
+          variant="primary"
+          onClick={() => setPromoteConfirmOpen(true)}
+          disabled={!canPromoteNow}
+        >
+          Promote to today
+        </ActionButton>
+        <p className={styles.helperText}>
+          Takes effect immediately and overrides anything currently saved in Today.
+        </p>
       </section>
 
       <section className={styles.section}>

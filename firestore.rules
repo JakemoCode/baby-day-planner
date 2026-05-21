@@ -16,9 +16,33 @@ service cloud.firestore {
     // The user doc lookup is one extra read per request; acceptable for the
     // dogfood / single-family scale and is the data-isolation primitive that
     // makes invite-based co-parent sharing safe.
+    //
+    // Two access paths (both fully gated by `isAllowlisted`):
+    //   1. Linked: user doc lists this child in `childIds` — the steady-state
+    //      access pattern post-onboarding and post-invite-accept.
+    //   2. Creator: the requester wrote the Child doc themselves
+    //      (`createdBy == auth.uid`). This is essential during the
+    //      onboarding race — after the writeBatch commits, the snapshot
+    //      listeners may fire before the local view of the user doc has
+    //      `childIds` propagated, so path 1 transiently denies. Path 2
+    //      keeps the creator's reads alive across the gap.
+    //
+    // The `exists(...)` guards are mandatory: without them,
+    // `get(...).data.X` on a missing doc throws a "Null value error"
+    // and the rule short-circuits to deny.
     function canAccessChild(childId) {
       return isAllowlisted()
+        && (isLinkedToChild(childId) || isChildCreator(childId));
+    }
+
+    function isLinkedToChild(childId) {
+      return exists(/databases/$(database)/documents/users/$(request.auth.uid))
         && childId in get(/databases/$(database)/documents/users/$(request.auth.uid)).data.childIds;
+    }
+
+    function isChildCreator(childId) {
+      return exists(/databases/$(database)/documents/children/$(childId))
+        && get(/databases/$(database)/documents/children/$(childId)).data.createdBy == request.auth.uid;
     }
 
     match /users/{uid} {

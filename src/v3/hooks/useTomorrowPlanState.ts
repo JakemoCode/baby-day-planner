@@ -127,7 +127,7 @@ export function useTomorrowPlanState(
     };
   }, [hydrated, hasEdits, plan, wakeTime, ownerOverrides, extras, templateId]);
 
-  useAutosaveTomorrowPlan(childId, date, autosaveInput);
+  useAutosaveTomorrowPlan(childId, date, autosaveInput, plan);
 
   const status: TomorrowPlanStatus = !plan ? "no-plan" : plan.status;
 
