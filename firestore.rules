@@ -97,11 +97,22 @@ service cloud.firestore {
 
       match /days/{dayId} {
         allow read: if canAccessChild(childId);
-        allow create: if canAccessChild(childId)
+        // Two legitimate create paths (mirrors /settings/current):
+        //   (a) Caller already has access (canAccessChild passes —
+        //       the normal in-app startNewDay / auto-rollover path).
+        //   (b) Caller is the §F17/§F12 PR-3 onboarding writeBatch —
+        //       the user doc isn't yet committed so canAccessChild
+        //       fails. Instead allow when the same-batch Child doc
+        //       has createdBy == request.auth.uid.
+        allow create: if isAllowlisted()
           && request.resource.data.childId == childId
           && request.resource.data.id == dayId
           && isString(request.resource.data.date)
-          && request.resource.data.status in ["planned", "active", "archived"];
+          && request.resource.data.status in ["planned", "active", "archived"]
+          && (
+            canAccessChild(childId)
+            || getAfter(/databases/$(database)/documents/children/$(childId)).data.createdBy == request.auth.uid
+          );
         allow update, delete: if canAccessChild(childId);
 
         match /events/{eventId} {

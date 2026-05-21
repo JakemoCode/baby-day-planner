@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 import { db } from "@/lib/firebase/client";
 import type { Firestore } from "firebase/firestore";
 import { saveTomorrowPlan } from "../repositories/tomorrowPlans";
@@ -39,29 +39,24 @@ export function useAutosaveTomorrowPlan(
   options: UseAutosaveTomorrowPlanOptions = {},
 ): void {
   const { debounceMs = 250 } = options;
-  // Capture latest input via ref so the timeout callback always reads
-  // the most recent values without re-firing the effect on every keystroke.
-  const inputRef = useRef(input);
-  useEffect(() => {
-    inputRef.current = input;
-  });
 
   useEffect(() => {
     if (!input) return;
     const database = db as Firestore;
+    // Each form-field change rebuilds `input` (it's a useMemo at the
+    // call-site keyed on the form state), which retriggers this effect.
+    // The cleanup clears the previous timer — net behavior is a
+    // trailing-edge debounce that captures the latest input via the
+    // closure. No ref needed.
     const handle = setTimeout(() => {
-      const current = inputRef.current;
-      if (!current) return;
       const plan: TomorrowPlan = {
         childId,
         date,
         status: "draft",
-        ownerOverrides: current.ownerOverrides,
-        extras: current.extras,
-        ...(current.wakeTime !== undefined ? { wakeTime: current.wakeTime } : {}),
-        ...(current.startTemplateId !== undefined
-          ? { startTemplateId: current.startTemplateId }
-          : {}),
+        ownerOverrides: input.ownerOverrides,
+        extras: input.extras,
+        ...(input.wakeTime !== undefined ? { wakeTime: input.wakeTime } : {}),
+        ...(input.startTemplateId !== undefined ? { startTemplateId: input.startTemplateId } : {}),
       };
       void saveTomorrowPlan(database, childId, plan);
     }, debounceMs);

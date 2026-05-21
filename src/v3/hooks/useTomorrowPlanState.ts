@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { db } from "@/lib/firebase/client";
 import type { Firestore } from "firebase/firestore";
 import { promoteFromPlan } from "../repositories/days";
-import { confirmTomorrowPlan, deleteTomorrowPlan } from "../repositories/tomorrowPlans";
+import { deleteTomorrowPlan, saveTomorrowPlan } from "../repositories/tomorrowPlans";
 import type { Event, OwnerRef, Settings, TimeMin, TomorrowPlan } from "../schemas";
 import { currentLocalDate, currentLocalMinutes } from "../ui/time";
 import { useV3TomorrowPlan } from "./useV3TomorrowPlan";
@@ -132,7 +132,22 @@ export function useTomorrowPlanState(
   const status: TomorrowPlanStatus = !plan ? "no-plan" : plan.status;
 
   const confirm = async () => {
-    await confirmTomorrowPlan(db as Firestore, childId, date, currentLocalMinutes());
+    // Write the FULL plan atomically with status=confirmed so the
+    // ~250ms debounced autosave can't race + revert us back to draft.
+    // (Reviewer-flagged 2026-05-21: confirmTomorrowPlan-via-updateDoc
+    // only flipped status; a pending autosave then overwrote with the
+    // newer form state at status=draft, silently undoing the confirm.)
+    const plan: TomorrowPlan = {
+      childId,
+      date,
+      status: "confirmed",
+      confirmedAt: currentLocalMinutes(),
+      ownerOverrides,
+      extras,
+      ...(wakeTime !== undefined ? { wakeTime } : {}),
+      ...(templateId !== undefined ? { startTemplateId: templateId } : {}),
+    };
+    await saveTomorrowPlan(db as Firestore, childId, plan);
   };
 
   const clear = async () => {
