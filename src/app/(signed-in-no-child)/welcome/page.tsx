@@ -290,17 +290,10 @@ export default function WelcomePage() {
             assign an owner, or skip — you can always assign later from the timeline.
           </p>
 
-          <TomorrowPreview
-            day={previewDay}
-            settings={previewSettings}
-            owners={previewSettings.owners}
-            extras={[]}
-            onEventTap={(event) => {
-              if (event.type === "extra") return;
-              setPickedEvent(event);
-            }}
-          />
-
+          {/* Actions ABOVE the preview so the primary CTA is visible
+              without scrolling past the bedtime block, which by
+              definition fills the lower half of the day. (Jake's
+              call 2026-05-21 click-test.) */}
           {error && (
             <p role="alert" className={styles.error}>
               {error}
@@ -322,6 +315,17 @@ export default function WelcomePage() {
               {submitting ? "Saving…" : "Start tracking"}
             </button>
           </div>
+
+          <TomorrowPreview
+            day={previewDay}
+            settings={previewSettings}
+            owners={previewSettings.owners}
+            extras={[]}
+            onEventTap={(event) => {
+              if (event.type === "extra") return;
+              setPickedEvent(event);
+            }}
+          />
         </form>
       )}
 
