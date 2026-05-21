@@ -70,6 +70,8 @@ src/app/
 
 **Decided hook shape:** expand the hook's union to include all auth states, AND rename `useChildResolution` → `useSessionResolution` while we're already touching every call site. Current name promises "resolves a child" but the implementation now resolves the full session state; the rename eliminates a naming-vs-behavior mismatch for free during PR A (search-and-replace cheap now, painful as call sites grow).
 
+**File split as part of the rename:** `ChildProvider.tsx` today exports both the `ChildProvider` component AND `useChildResolution`. After PR A: `ChildProvider.tsx` keeps the component only; `useSessionResolution` moves to its own file `src/v3/context/useSessionResolution.ts`. One concept per file.
+
 ```ts
 type ChildProviderResolution =
   | { status: "signed-out" }
@@ -105,48 +107,60 @@ function SignedInLayout({ children }: { children: ReactNode }) {
 **Onboarding submit** (provisional on Exp 2):
 ```ts
 // Welcome's submit handler — calls the helper from §3b.
-await onboardChild(inputs, { onError: setError });
-// No success-path code. The helper's shape enforces this — see §3b.
+try {
+  await onboardChild(inputs);
+  // §3a: do nothing after this resolves on success.
+} catch (err) {
+  setError(err.message);
+  setSubmitting(false);
+}
 ```
 
 ---
 
-## §3a Submit lifecycle — the unmount-during-await invariant
+## §3a Submit lifecycle — doc-only invariant for welcome submit
 
-The success path of `batch.commit()` resolves, the subscription echoes, the layout `switch` flips to `ready`, and `<Welcome />` **unmounts**. Any post-`await` code on the success path runs on an unmounted component → React warning at best, state-update-after-unmount class bugs at worst.
+The success path of `batch.commit()` resolves, the subscription echoes, the layout `switch` flips to `ready`, and `<Welcome />` **unmounts**. Post-`await` success-path code runs on an unmounted component → React `setState on unmounted component` warning. Class: dev-visible, no prod crash, no data loss.
 
-The invariant:
+The invariant for welcome's submit handler:
 
-| Path | Allowed after the batch resolves |
+| Path | Allowed after `await onboardChild(inputs)` |
 |---|---|
 | Success | **Nothing.** No `setState`, no logging, no navigation. The unmount is the success signal. |
 | Failure (catch) | `setError` + `setSubmitting(false)` are safe — the throw means no childIds were written, layout stays on `<Welcome />`, component stays mounted. |
 
-This invariant is enforced **structurally** by the §3b helper, not by reviewer vigilance — see next section. No `isMountedRef` / `AbortController` needed; telemetry (if added later) fires *before* the await or via an external queue.
+**Enforcement is reviewer discipline, not structural** — a `void`-returning helper with an `onError` callback was considered (would prevent post-await success code by removing the `await` chain entirely) and rejected: the ergonomic regression (no `try/catch`, no normal async) wasn't proportionate to a dev-warning-class bug exposed in only **one** handler (welcome). The add-another-child and switch-active-child flows that will arrive later don't trigger this race — they happen on a `ready` layout where the submitting modal unmounts on user action, not on layout flip.
+
+PR C's onboarding step 3 inherits the same shape and same invariant. Two handlers total; doc-level invariant is sufficient.
 
 ---
 
-## §3b Helper modules
+## §3b Helper module — `onboardChild`
 
-Two helpers extracted as part of PR A. Both convert friction in the proposed architecture into real seams.
-
-### `onboardChild(inputs, { onError })`
+Extracted as part of PR A. Lives at `src/v3/onboarding/onboardChild.ts` — new directory, future home for add-child / switch-child flows.
 
 **Replaces:** the inline 4-doc `writeBatch` (Child + Settings + User + Day 1) in `welcome/page.tsx` today, plus the duplicate batch shape PR C's onboarding step 3 would otherwise re-implement.
 
-**Shape:**
-- Takes the user-provided inputs (displayName, dob, parent1, parent2, wakeTime, and the optional `ownerOverrides` map PR C adds).
-- Internally constructs and commits the writeBatch.
-- Takes an `onError` callback (and *no* success callback by design — see §3a).
-- Returns nothing (success path is the layout flip).
+**Responsibilities (helper-owned):**
+- **Input normalization** — accepts raw form values (untrimmed parent names, etc.); applies `.trim()` and defaults (`"Parent 1"` / `"Parent 2"` for empty parent names) internally
+- **ID generation** — generates `childId` and `dayId` internally; returns `Promise<void>` (widen the return type later if a caller needs the IDs)
+- **Defaults** — calls `makeDefaultSettings(childId)` and constructs Day 1 boilerplate (`suppressedRecurringIds: []`, `suppressedDaycareDay: false`) internally
+- **Atomic commit** — constructs and commits the 4-doc writeBatch
 
-**Why it lives here:** locality — all onboarding-write logic in one module; one place to update when the doc set grows (e.g., daycareSchedule). Test surface — one emulator-backed test against the real batch; eliminates the mock-`batch.set()` theater in `welcome/page.test.tsx`. PR C reuses the helper rather than duplicating the batch.
+**Failure mode:** throws raw `FirebaseError`. Caller (welcome / PR C step 3) does `try/catch` and displays `err.message` directly. No domain-error wrapping — Firestore detail is preserved for debugging; user-friendly translation, if needed later, lives at the UI boundary.
 
-### Snapshot-await primitive — **deferred**
+**Test boundary:**
+- `src/v3/onboarding/onboardChild.test.ts` — real-emulator test asserting 4 docs written with correct shapes, atomicity, defaults applied, `ownerOverrides` flow through to Day 1
+- Welcome's component test mocks `onboardChild` and asserts it's called with the right raw inputs — wiring test only; the seam is covered by the emulator test above
+- Eliminates the current `vi.mock("firebase/firestore", ...)` + `batch.set` mock theater in `welcome/page.test.tsx`
 
-The §5 invite-accept flow inlines a 15-line `Promise` wrapping `onSnapshot` with a timeout. Today it has one consumer.
+**Future:** when add-another-child ships, decide between generalizing `onboardChild` to cover both first-child and additional-child (probably renaming to `provisionChild`) vs. siblings sharing internal helpers. Out of scope for PR A.
 
-**Extract only if:** Exp 2 fails (then §3 onboarding submit also needs an explicit await-snapshot-echo path → two consumers), OR a third write-then-wait flow appears. Don't pre-abstract for one caller per workspace `behavior.md` — "three similar lines is better than a premature abstraction."
+### Snapshot-await primitive — deferred
+
+The §5 invite-accept flow inlines a 15-line `Promise` wrapping `onSnapshot` with a timeout. One consumer today.
+
+**Extract only if:** Exp 2 fails (then §3 onboarding submit also needs an explicit await-snapshot-echo path → two consumers), OR a third write-then-wait flow appears. Per workspace `behavior.md`: "three similar lines is better than a premature abstraction."
 
 ---
 
@@ -201,7 +215,7 @@ PR C (re-applying onboarding step 3 on collapsed shell) is not "small follow-on.
 
 | Coupling | What PR C must address |
 |---|---|
-| Step 3 submit uses `window.location.href` | Replace with a call to the §3b `onboardChild` helper (pass `ownerOverrides` arg); §3a unmount invariant comes for free |
+| Step 3 submit uses `window.location.href` | Replace with a call to the §3b `onboardChild` helper (pass `ownerOverrides` arg); follow §3a unmount invariant in the submit handler (same shape as welcome) |
 | Day 1 doc commits with `status: "active"` | Verify `useReconcileActiveDay` no-ops because date matches today |
 | Any pre-Welcome rendered component (`TomorrowPreview`, F46 chip-tap drawer) | Must not transitively call `useCurrentChild()` (no ChildProvider mounted yet) |
 | `useV3User` stale-callback guard | Re-test under React 19 strict-mode double-effects |
@@ -219,8 +233,8 @@ Re-estimate PR C: roughly the original PR #213 onboarding step 3 effort, not "on
 |---|---|
 | 0 | Run §1 experiments. Branch on outcomes. |
 | 0a | Grep `src/`, `docs/`, and any invite email templates (PR #193 stub at `src/v3/repositories/invites.ts` and consumers) for `/welcome` and `/sign-in`. Add Next.js `redirects()` if any external refs exist. |
-| 1 | Expand the resolution union to include auth states AND rename `useChildResolution` → `useSessionResolution` across all call sites (§3) |
-| 2 | Extract `onboardChild` helper from current `welcome/page.tsx` submit (§3b) — covered by emulator-backed test, replaces inline batch |
+| 1 | Expand the resolution union to include auth states. Split `useSessionResolution` (renamed from `useChildResolution`) into its own file `src/v3/context/useSessionResolution.ts`; `ChildProvider.tsx` keeps only the component. Update all call sites. (§3) |
+| 2 | Create `src/v3/onboarding/` directory. Extract `onboardChild` per §3b — helper owns normalization + ID generation + defaults; emulator-backed test in `src/v3/onboarding/onboardChild.test.ts` replaces the inline batch test. |
 | 3 | Introduce `(signed-in)/layout.tsx` with the switch |
 | 4 | Move `WelcomePage` → `<Welcome />` component under `_welcome/`; submit calls `onboardChild` |
 | 5 | Migrate `(signed-in-with-child)/...` pages under `(signed-in)/` |
