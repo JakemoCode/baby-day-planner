@@ -220,7 +220,14 @@ export function TimelineV3({
             //   `--text-sm` × 1.2 line-height = 16.8px) to ensure the
             //   single-row label `Putdown · 8:08p · Kelly` doesn't clip.
             //   The matching `padding: 0 6px` lives in Block.module.css.
-            const naturalH = (end - event.startTime) * pxPerMin;
+            // Clamp the bottom edge to the viewport so overnight events
+            // (bedtime: 7pm → next-day wake at +24h) don't extend past
+            // the rendered container. Without this, the block paints
+            // past the midnight axis line and bleeds into the page
+            // below — most visible on preview surfaces where
+            // clampToEvents caps the viewport at midnight.
+            const clampedEnd = Math.min(end, endMinutes);
+            const naturalH = (clampedEnd - event.startTime) * pxPerMin;
             const minH = isPutdown ? 20 : 24;
             const heightPxBlock = Math.max(minH, naturalH);
             const tap = onEventTap && !isPutdown ? () => onEventTap(event) : undefined;
