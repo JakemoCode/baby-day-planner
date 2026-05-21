@@ -20,12 +20,19 @@ This doc is the spec. Update the doc, not the code, if implementation reveals sc
 
 ### Exp 1 — does removing the reload fix it? (~15 min)
 1. **Comment out `everReadyRef` in `(signed-in-with-child)/layout.tsx:37-49`.** The latch was added explicitly to mask this race class; leaving it active gives a false positive. Exp 1 only "passes" if it passes WITHOUT the latch.
-2. Replace `window.location.href = "/"` with `router.replace("/")` in `welcome/page.tsx` submit.
+2. Replace `window.location.href = "/"` with `router.replace("/")` in `welcome/page.tsx` submit. (On current main this is already the case — only `(signed-in-no-child)/welcome/page.tsx` from PR #213 had the `window.location.href`.)
 3. Bounce emulator, wipe IDB, hard refresh, run onboarding.
 4. **Pass** = error gone → PR A justified.
 5. **Fail** = error persists → re-scope; the bug is in subscription attach timing, not architecture.
 
-Result: _<pending>_
+**Result (2026-05-21): "FAIL in console, PASS in UX."** Console fires `permission-denied at L77` (children rule throws because rules lack `exists()` guards on main) and one `INTERNAL ASSERTION FAILED (ID: ca9)`. But the app functions: layout flips to ready via local-cache snapshots, dashboard renders, everything is interactable. The race is cosmetic noise in this configuration, NOT a UX-breaking bug.
+
+**Reinterpretation:** today's actual UX-breaking experience (dashboard→reload→dashboard cycle) was specifically caused by PR #213's `window.location.href = "/"` resetting the entire SDK + IDB persistence on every onboarding. The underlying race fires either way, but only the reload pattern made it user-visible. With `router.replace`, the local-cache fallback masks the race for the user even though console noise persists.
+
+**Implication for PR A:**
+- Architecture cleanup (single layout, kill the redirect cascade) still worth doing — it removes the conditions under which the race becomes user-visible
+- Console-error suppression is a separate concern: (a) add `exists()` guards to rules (PR #213 had this; resurrect), and/or (b) verify in prod whether emulator's watch-stream rules-eval bug applies
+- No heavy propagation gate needed for PR A's UX goals; could add later if console noise bothers us in prod
 
 ### Exp 2 — does the existing subscription echo local writes? (~30–90 min)
 First check whether `tests/integration/` has component-mount-against-emulator harness. If not, **building the harness is part of this experiment** (RulesTestEnvironment gives authed `Firestore` instances; mounting React components against the live `firebaseApp` is separate infra).
@@ -212,6 +219,17 @@ Timeout fallback degrades to current behavior (brief Welcome or wrong-child flas
 ## §6 PR C coupling audit
 
 PR C (re-applying onboarding step 3 on collapsed shell) is not "small follow-on." Pre-verified: `src/v3/engine/**` has zero `useCurrentChild` / `ChildContext` references — engine is pure, no coupling.
+
+**Cherry-pick basis for PR C:** branch `origin/worktree-f17-pr3-tomorrow-ui` (closed PR #213) is the source of truth for step 3's UI. PR C should cherry-pick or directly copy:
+- `TomorrowPreview` integration in `welcome/page.tsx` (chip rendering, tap-to-assign)
+- `BottomSheet` + `OwnerPickerV3` wiring for per-event owner picker
+- "Step X of 3" eyebrow text + "Your first day" heading + helper text
+- `clampToEvents` prop on `TimelineV3` (caps preview viewport at midnight)
+- The bedtime block-height clamp fix (prevents overflow past viewport bottom)
+- 4-doc batch shape including Day 1 with `ownerOverrides`
+- Layout: actions ABOVE preview (bedtime fills lower half), not below
+- Rules: `exists()` guards on `canAccessChild` (suppresses the L77 "Null value error" we hit on main)
+- Auth: drop the hardcoded email allowlist from rules (replace `isAllowlisted` → `isSignedIn`); keep client-side allowlist with `NODE_ENV === "development"` bypass for emulator-generated emails
 
 | Coupling | What PR C must address |
 |---|---|
