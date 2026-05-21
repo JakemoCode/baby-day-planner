@@ -2,7 +2,7 @@
 
 import { useMemo, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { collection, doc, getDoc, writeBatch } from "firebase/firestore";
+import { collection, doc, getDocFromServer, writeBatch } from "firebase/firestore";
 import { useAuth } from "@/lib/auth/useAuth";
 import { db } from "@/lib/firebase/client";
 import { CHILDREN, childPath, dayPath, settingsPath, userPath } from "@/lib/firestore/paths";
@@ -184,22 +184,19 @@ export default function WelcomePage() {
       batch.set(doc(db, dayPath(newId, dayDocId)).withConverter(v3DayConverter), day1);
       await batch.commit();
 
-      // §F17 PR 3 — Firestore-rules race fix. After commit() resolves,
-      // the server has the writes but the (signed-in-with-child) layout's
-      // snapshot listeners can fire while the server's rule-eval view
-      // hasn't fully caught up — leading to a transient permission-denied
-      // and the cascading Firestore SDK INTERNAL ASSERTION FAILED crash.
-      // Block the redirect on a single getDoc that confirms the rule
-      // engine can read this user's freshly-created child; that read
-      // both warms the local cache and proves the propagation has
-      // settled before any subscription attaches.
+      // §F17 PR 3 — Firestore-rules propagation race. After commit()
+      // resolves, the server has the writes but the dashboard's
+      // snapshot listeners can attach while the server's rule-eval
+      // view hasn't fully caught up — leading to a transient
+      // permission-denied and the cascading SDK INTERNAL ASSERTION
+      // FAILED crash. Block the redirect on getDocFromServer (NOT
+      // getDoc, which returns from the local IndexedDB cache without
+      // hitting the network) so we actually force a server round-trip
+      // and prove the rule path works before any subscription attaches.
       try {
-        await getDoc(doc(db, childPath(newId)).withConverter(v3ChildConverter));
-        await getDoc(doc(db, userPath(user.uid)).withConverter(v3UserConverter));
+        await getDocFromServer(doc(db, childPath(newId)).withConverter(v3ChildConverter));
+        await getDocFromServer(doc(db, userPath(user.uid)).withConverter(v3UserConverter));
       } catch {
-        // If the warm-up read still denies, the subscription would too;
-        // surface it as a normal error rather than redirecting into a
-        // broken state.
         setError("Couldn't load your child after setup. Try refreshing.");
         setSubmitting(false);
         return;

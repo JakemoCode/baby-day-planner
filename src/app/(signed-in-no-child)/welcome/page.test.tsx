@@ -33,10 +33,11 @@ vi.mock("firebase/firestore", async () => {
     collection: vi.fn(() => ({})),
     doc: vi.fn(() => stubDoc),
     writeBatch: vi.fn(() => ({ set: setBatchMock, commit: commitMock })),
-    // PR 3 race fix: WelcomePage now warms a read after commit() to
-    // confirm rule-eval propagation before redirecting. Stub it to
-    // resolve so the test exercises the redirect.
-    getDoc: vi.fn(async () => ({ exists: () => true, data: () => ({}) })),
+    // PR 3 race fix: WelcomePage now warms a server-side read after
+    // commit() to confirm rule-eval propagation before redirecting.
+    // Stub it to resolve so the test exercises the redirect. (Uses
+    // getDocFromServer, not getDoc — getDoc would hit the cache.)
+    getDocFromServer: vi.fn(async () => ({ exists: () => true, data: () => ({}) })),
   };
 });
 
