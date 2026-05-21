@@ -35,7 +35,7 @@ export function AppShell({ childId, childName, dateOfBirth, children }: AppShell
         }
       />
       <main className={styles.main}>{children}</main>
-      <BottomTabs />
+      <BottomTabs childId={childId} />
     </div>
   );
 }

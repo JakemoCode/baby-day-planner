@@ -77,7 +77,7 @@ describe("WelcomePage", () => {
     expect(screen.getByLabelText(/Date of birth/i)).toHaveValue("2025-04-10");
   });
 
-  it("Get started commits an atomic batch with Child + Settings + User docs and redirects to /", async () => {
+  it("Start tracking commits an atomic batch with Child + Settings + User + Day 1 docs and redirects to /", async () => {
     renderWithAuth(<WelcomePage />, { child: null });
 
     await userEvent.type(screen.getByLabelText(/Child's name/i), "Aden");
@@ -88,22 +88,20 @@ describe("WelcomePage", () => {
     await userEvent.type(screen.getByLabelText(/Parent 1 name/i), "Jake");
     await userEvent.clear(screen.getByLabelText(/Parent 2 name/i));
     await userEvent.type(screen.getByLabelText(/Parent 2 name/i), "Kelly");
-    // The default-wake-time input is type="time"; userEvent.type doesn't
-    // reliably set it across jsdom. Use fireEvent.change-style approach
-    // via userEvent's fill — keep the default 07:00 (= 420 min) for the
-    // assertion and rely on the field's controlled state.
+    // Step 2 → Step 3 (preview).
+    await userEvent.click(screen.getByRole("button", { name: /Next/i }));
 
-    await userEvent.click(screen.getByRole("button", { name: /Get started/i }));
+    await userEvent.click(screen.getByRole("button", { name: /Start tracking/i }));
 
-    // Three set() calls on the batch — order matters for atomicity test.
-    expect(setBatchMock).toHaveBeenCalledTimes(3);
+    // §F12 PR 3: now 4 set() calls — Child, Settings, User, Day 1.
+    expect(setBatchMock).toHaveBeenCalledTimes(4);
     expect(commitMock).toHaveBeenCalledTimes(1);
 
-    // Inspect the doc bodies. First = Child, second = Settings, third = User.
     const calls = setBatchMock.mock.calls as Array<[unknown, Record<string, unknown>]>;
     const childDoc = calls[0]?.[1];
     const settingsDoc = calls[1]?.[1];
     const userDoc = calls[2]?.[1];
+    const dayDoc = calls[3]?.[1];
 
     expect(childDoc).toMatchObject({
       id: "generated-child-id",
@@ -123,6 +121,11 @@ describe("WelcomePage", () => {
       uid: "test-uid-jake",
       childIds: ["generated-child-id"],
     });
+    expect(dayDoc).toMatchObject({
+      childId: "generated-child-id",
+      status: "active",
+      wakeTime: 7 * 60,
+    });
 
     expect(replaceMock).toHaveBeenCalledWith("/");
   });
@@ -139,7 +142,9 @@ describe("WelcomePage", () => {
     // Parent 1 is required so re-enter; Parent 2 stays empty → defaults to "Parent 2".
     await userEvent.type(screen.getByLabelText(/Parent 1 name/i), "   Jake   ");
 
-    await userEvent.click(screen.getByRole("button", { name: /Get started/i }));
+    // Step 2 → Step 3 → Start tracking.
+    await userEvent.click(screen.getByRole("button", { name: /Next/i }));
+    await userEvent.click(screen.getByRole("button", { name: /Start tracking/i }));
 
     const settingsDoc = setBatchMock.mock.calls[1]?.[1] as Record<string, unknown>;
     const owners = settingsDoc?.owners as {
@@ -162,12 +167,13 @@ describe("WelcomePage", () => {
     await userEvent.click(screen.getByRole("button", { name: /Next/i }));
     // Parent 1 is required — fill it so browser form-validation doesn't block submit.
     await userEvent.type(screen.getByLabelText(/Parent 1 name/i), "Jake");
-    await userEvent.click(screen.getByRole("button", { name: /Get started/i }));
+    await userEvent.click(screen.getByRole("button", { name: /Next/i }));
+    await userEvent.click(screen.getByRole("button", { name: /Start tracking/i }));
 
     const alert = await screen.findByRole("alert");
     expect(alert).toHaveTextContent(/permission denied/i);
     expect(replaceMock).not.toHaveBeenCalled();
     // Button is re-enabled (label flips back from "Saving…")
-    expect(screen.getByRole("button", { name: /Get started/i })).not.toBeDisabled();
+    expect(screen.getByRole("button", { name: /Start tracking/i })).not.toBeDisabled();
   });
 });
