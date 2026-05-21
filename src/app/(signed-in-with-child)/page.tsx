@@ -13,8 +13,10 @@ import { useV3Events } from "@/v3/hooks/useV3Events";
 import { useV3Settings } from "@/v3/hooks/useV3Settings";
 import { useV3Templates } from "@/v3/hooks/useV3Templates";
 import { useV3Projection } from "@/v3/hooks/useV3Projection";
+import { useV3TomorrowPlan } from "@/v3/hooks/useV3TomorrowPlan";
+import { useReconcileActiveDay } from "@/v3/hooks/useReconcileActiveDay";
 import { useDrawer } from "@/v3/hooks/useDrawer";
-import { getOrCreatePlannedDay, startNewDay } from "@/v3/repositories/days";
+import { getOrCreatePlannedDay, promoteFromPlan, startNewDay } from "@/v3/repositories/days";
 import { createEvent } from "@/v3/repositories/events";
 import { db } from "@/lib/firebase/client";
 import { LoadingState } from "@/components/shared/LoadingState";
@@ -50,6 +52,15 @@ export default function DashboardPage() {
   const { settings, loading: settingsLoading } = useV3Settings(CHILD_ID);
   const { events: actuals, saveEvent, deleteOptimistic } = useV3Events(CHILD_ID, day?.id ?? "");
   const { templates } = useV3Templates(CHILD_ID);
+  // §F17 — auto-reconcile the active day on every dashboard mount.
+  // Side-effect only; the new active day flows back through useV3Day's
+  // subscription. Defaults to settings.defaultWakeTime if no confirmed
+  // plan exists for today.
+  useReconcileActiveDay(CHILD_ID, todayDate(), settings?.defaultWakeTime ?? 7 * 60);
+  // §F12 — surface today's plan to the dev StartDayButton so it can
+  // re-promote from the plan vs defaults during dogfood iteration.
+  const { plan: todaysPlan } = useV3TomorrowPlan(CHILD_ID, todayDate());
+  const hasTomorrowPlan = todaysPlan?.status === "confirmed";
   const { drawer, openCreate, close, onSave, onDelete } = useDrawer(
     actuals,
     saveEvent,
@@ -192,12 +203,16 @@ export default function DashboardPage() {
       ...(day.templateId ? { templateId: day.templateId } : {}),
     });
   };
-  const handleStartDay = async ({ useTomorrowPlan: _ }: { useTomorrowPlan: boolean }) => {
-    // See note above — anchor the new day at `settings.defaultWakeTime`,
-    // not wall-clock. `settings` is always non-null here (past the loading
-    // + wake gates), so a fallback isn't structurally needed.
+  const handleStartDay = async ({ useTomorrowPlan }: { useTomorrowPlan: boolean }) => {
+    // Dev StartDayButton re-promote: archive today and re-create either
+    // from the confirmed plan (matches the auto-rollover path) or from
+    // settings defaults. Both paths use the deterministic id so the
+    // re-write replaces today's existing doc idempotently.
+    if (useTomorrowPlan && todaysPlan?.status === "confirmed") {
+      await promoteFromPlan(db, CHILD_ID, todaysPlan, settings.defaultWakeTime);
+      return;
+    }
     await startNewDay(db, CHILD_ID, {
-      newDayId: `day-${Date.now()}`,
       newDate: todayDate(),
       newWakeTime: settings.defaultWakeTime,
     });
@@ -258,7 +273,7 @@ export default function DashboardPage() {
             onEndBedtime={async () => setWakeSheetOpen(true)}
           />
           {process.env.NODE_ENV === "development" && (
-            <StartDayButton hasTomorrowPlan={false} onStart={handleStartDay} />
+            <StartDayButton hasTomorrowPlan={hasTomorrowPlan} onStart={handleStartDay} />
           )}
         </div>
       </div>

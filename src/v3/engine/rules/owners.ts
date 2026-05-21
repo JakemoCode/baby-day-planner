@@ -23,7 +23,13 @@
  *   R12.9 — extras / dailyRecurring carry their own defaults; not template-driven.
  */
 
-import { isNoOwner, type Event, type OwnerSlotEntry, type OwnershipTemplate } from "../../schemas";
+import {
+  isNoOwner,
+  NO_OWNER,
+  type Event,
+  type OwnerSlotEntry,
+  type OwnershipTemplate,
+} from "../../schemas";
 import type { Rule } from "../evaluator";
 import { hasType, isProjected } from "../helpers";
 
@@ -49,7 +55,12 @@ function templateOwnerByIndexRule(spec: {
     return list && list.length > 0 ? list : undefined;
   }
 
-  function isStampable(event: Event): boolean {
+  function isStampable(event: Event, overrides: Record<string, unknown> | undefined): boolean {
+    // Skip slots that have a Day.ownerOverrides entry (any value, including
+    // null = explicit NO_OWNER). R12.10 owns those eventKeys; if template
+    // rules also touched them we'd cycle: template stamps default → R12.10
+    // re-applies null override → template re-stamps → ...
+    if (overrides && Object.hasOwn(overrides, event.eventKey)) return false;
     return isType(event) && isProjected(event) && isNoOwner(event.owner);
   }
 
@@ -60,8 +71,9 @@ function templateOwnerByIndexRule(spec: {
     matches: (events, ctx) => {
       const owners = ownersFor(ctx.template);
       if (!owners) return false;
+      const overrides = ctx.day.ownerOverrides;
       return events.some((e) => {
-        if (!isStampable(e)) return false;
+        if (!isStampable(e, overrides)) return false;
         const idx = indexFromKey(e.eventKey, spec.keyPrefix);
         return idx !== null && idx <= owners.length;
       });
@@ -69,8 +81,9 @@ function templateOwnerByIndexRule(spec: {
     produces: (events, ctx) => {
       const owners = ownersFor(ctx.template);
       if (!owners) return events;
+      const overrides = ctx.day.ownerOverrides;
       return events.map((e) => {
-        if (!isStampable(e)) return e;
+        if (!isStampable(e, overrides)) return e;
         const idx = indexFromKey(e.eventKey, spec.keyPrefix);
         if (idx === null) return e;
         const owner = owners[idx - 1];
@@ -125,13 +138,26 @@ const RuleApplyTemplateBedtimeOwner: Rule = {
   dependsOn: ["R3.1"],
   matches: (events, ctx) => {
     if (!ctx.template?.bedtimeOwner) return false;
-    return events.some((e) => isBedtime(e) && isProjected(e) && isNoOwner(e.owner));
+    const overrides = ctx.day.ownerOverrides;
+    return events.some(
+      (e) =>
+        isBedtime(e) &&
+        isProjected(e) &&
+        isNoOwner(e.owner) &&
+        !(overrides && Object.hasOwn(overrides, e.eventKey)),
+    );
   },
   produces: (events, ctx) => {
     const owner = ctx.template?.bedtimeOwner;
     if (!owner) return events;
+    const overrides = ctx.day.ownerOverrides;
     return events.map((e) =>
-      isBedtime(e) && isProjected(e) && isNoOwner(e.owner) ? { ...e, owner } : e,
+      isBedtime(e) &&
+      isProjected(e) &&
+      isNoOwner(e.owner) &&
+      !(overrides && Object.hasOwn(overrides, e.eventKey))
+        ? { ...e, owner }
+        : e,
     );
   },
 };
@@ -153,9 +179,43 @@ function indexFromKey(eventKey: string, keyPrefix: string): number | null {
   return n;
 }
 
+// ---------------------------------------------------------------------------
+// R12.10 — Day.ownerOverrides (§F12 + §F17, see docs/v3/F17_F12_SCOPE.md §4)
+// ---------------------------------------------------------------------------
+
+/**
+ * Beats all template-driven owner inheritance for matching eventKeys.
+ * `null` in the map = explicit NO_OWNER (the user un-assigned a slot
+ * that would otherwise default to an owner). Missing key = no override.
+ *
+ * dependsOn includes all R12.x template rules so this rule runs after
+ * them and is the final say on projected-event ownership.
+ */
+const RuleApplyDayOwnerOverrides: Rule = {
+  id: "R12.10",
+  description: "Apply Day.ownerOverrides to projected events (beats template defaults)",
+  dependsOn: ["R12.2", "R12.3", "R12.5", "R12.6"],
+  matches: (events, ctx) => {
+    const map = ctx.day.ownerOverrides;
+    if (!map) return false;
+    return events.some((e) => isProjected(e) && Object.hasOwn(map, e.eventKey));
+  },
+  produces: (events, ctx) => {
+    const map = ctx.day.ownerOverrides;
+    if (!map) return events;
+    return events.map((e) => {
+      if (!isProjected(e)) return e;
+      if (!Object.hasOwn(map, e.eventKey)) return e;
+      const override = map[e.eventKey];
+      return { ...e, owner: override ?? NO_OWNER };
+    });
+  },
+};
+
 export const RULES: Rule[] = [
   RuleApplyTemplateNapOwners,
   RuleApplyTemplateWakeWindowOwners,
   RuleApplyTemplateBedtimeOwner,
   RuleApplyTemplateBottleOwners,
+  RuleApplyDayOwnerOverrides,
 ];

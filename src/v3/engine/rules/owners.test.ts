@@ -428,3 +428,105 @@ describe("R12.6 — projected bottles inherit template.bottleOwners[N-1] (chrono
     expect(bottles.every((b) => b.owner.slot === "none")).toBe(true);
   });
 });
+
+// ---------------------------------------------------------------------------
+// R12.10 — Day.ownerOverrides (§F12 + §F17 PR 2)
+// ---------------------------------------------------------------------------
+//
+// Per docs/v3/F17_F12_SCOPE.md §4: at projection time, for each projected
+// event whose eventKey matches a key in `day.ownerOverrides`, replace its
+// owner with the override value. `null` in the map = explicit NO_OWNER.
+// Beats template defaults; never touches recorded events (reality-wins).
+
+describe("R12.10 — Day.ownerOverrides applies to projected events", () => {
+  it("override on a projected nap eventKey beats the template default", () => {
+    const ctx = aContext({
+      day: aDay({
+        wakeTime: 7 * 60,
+        ownerOverrides: { nap_1: PARENT2 },
+      }),
+      settings: aSettings({
+        wakeWindowsMinutes: [120, 135],
+        defaultNapLengthMinutes: 60,
+        bedtimeThreshold: 23 * 60,
+      }),
+      template: aTemplate({ napOwners: [PARENT1, PARENT1] }),
+      actuals: [],
+    });
+
+    const out = run(ctx);
+    const naps = out.filter((e) => e.type === "nap").sort((a, b) => a.startTime - b.startTime);
+    expect(naps[0]!.owner).toEqual(PARENT2);
+    // nap_2 has no override → still inherits template default
+    expect(naps[1]!.owner).toEqual(PARENT1);
+  });
+
+  it("null in the map = explicit NO_OWNER (beats template default)", () => {
+    const ctx = aContext({
+      day: aDay({
+        wakeTime: 7 * 60,
+        ownerOverrides: { nap_1: null },
+      }),
+      settings: aSettings({
+        wakeWindowsMinutes: [120, 135],
+        defaultNapLengthMinutes: 60,
+        bedtimeThreshold: 23 * 60,
+      }),
+      template: aTemplate({ napOwners: [PARENT1, PARENT1] }),
+      actuals: [],
+    });
+
+    const out = run(ctx);
+    const nap1 = out.find((e) => e.eventKey === "nap_1");
+    expect(nap1?.owner).toEqual(NO_OWNER);
+  });
+
+  it("recorded events are not touched (reality-wins)", () => {
+    const recordedNap = aRecordedNap({
+      eventKey: "nap_1",
+      startTime: 9 * 60,
+      endTime: 10 * 60,
+      owner: PARENT1, // user recorded with PARENT1
+    });
+    const ctx = aContext({
+      day: aDay({
+        wakeTime: 7 * 60,
+        ownerOverrides: { nap_1: PARENT2 }, // override would be PARENT2
+      }),
+      settings: aSettings({
+        wakeWindowsMinutes: [120, 135],
+        defaultNapLengthMinutes: 60,
+        bedtimeThreshold: 23 * 60,
+      }),
+      template: aTemplate({}),
+      actuals: [recordedNap],
+    });
+
+    const out = run(ctx);
+    const nap1 = out.find((e) => e.eventKey === "nap_1");
+    // Recorded events keep their owner; override doesn't touch them
+    expect(nap1?.owner).toEqual(PARENT1);
+  });
+
+  it("no-ops when Day.ownerOverrides is undefined", () => {
+    const ctx = aContext({
+      day: aDay({ wakeTime: 7 * 60 }), // no ownerOverrides
+      settings: aSettings({
+        wakeWindowsMinutes: [120, 135],
+        defaultNapLengthMinutes: 60,
+        bedtimeThreshold: 23 * 60,
+      }),
+      template: aTemplate({ napOwners: [PARENT1, PARENT1] }),
+      actuals: [],
+    });
+
+    const out = run(ctx);
+    // Assert specifically on nap_1 and nap_2 (the slots template covers).
+    // Beyond that the cascade emits more naps that have no template entry,
+    // which is unrelated to R12.10's behavior.
+    const nap1 = out.find((e) => e.eventKey === "nap_1");
+    const nap2 = out.find((e) => e.eventKey === "nap_2");
+    expect(nap1?.owner).toEqual(PARENT1);
+    expect(nap2?.owner).toEqual(PARENT1);
+  });
+});

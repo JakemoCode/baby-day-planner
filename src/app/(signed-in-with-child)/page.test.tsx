@@ -11,6 +11,7 @@ import DashboardPage from "./page";
 
 const useV3DayMock = vi.fn();
 const useV3SettingsMock = vi.fn();
+const promoteFromPlanMock = vi.fn();
 const useV3EventsMock = vi.fn();
 const useV3TemplatesMock = vi.fn();
 const useV3ProjectionMock = vi.fn();
@@ -42,6 +43,16 @@ vi.mock("@/hooks/useNowMinutes", () => ({
 vi.mock("@/v3/repositories/days", () => ({
   startNewDay: (...args: unknown[]) => startNewDayMock(...args),
   getOrCreatePlannedDay: (...args: unknown[]) => getOrCreatePlannedDayMock(...args),
+  promoteFromPlan: (...args: unknown[]) => promoteFromPlanMock(...args),
+}));
+// §F12/§F17 hooks introduced in PR 2 — mocked to keep the page test
+// focused on dashboard rendering, not the rollover seam. The hook itself
+// is covered by tests/integration/hooks/useReconcileActiveDay.test.tsx.
+vi.mock("@/v3/hooks/useReconcileActiveDay", () => ({
+  useReconcileActiveDay: () => ({ done: true }),
+}));
+vi.mock("@/v3/hooks/useV3TomorrowPlan", () => ({
+  useV3TomorrowPlan: () => ({ plan: null, loading: false }),
 }));
 vi.mock("@/v3/repositories/events", () => ({
   createEvent: (...args: unknown[]) => createEventMock(...args),

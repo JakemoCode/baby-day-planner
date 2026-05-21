@@ -10,15 +10,20 @@
  */
 
 import {
+  collection,
   deleteDoc,
   deleteField,
   doc,
   getDoc,
+  getDocs,
+  query,
   setDoc,
   updateDoc,
+  where,
+  writeBatch,
   type Firestore,
 } from "firebase/firestore";
-import { tomorrowPlanPath } from "@/lib/firestore/paths";
+import { tomorrowPlanPath, tomorrowPlansCollectionPath } from "@/lib/firestore/paths";
 import { v3TomorrowPlanConverter } from "../firestore/converters";
 import type { TimeMin, TomorrowPlan } from "../schemas";
 
@@ -80,4 +85,32 @@ export async function markPlanDraft(db: Firestore, childId: string, date: string
     status: "draft",
     confirmedAt: deleteField(),
   });
+}
+
+/**
+ * Garbage-collect any TomorrowPlan docs whose `date` is strictly less
+ * than `today`. Called during calendar-rollover reconciliation (§F17
+ * scope §6) — once a plan's date has passed without being promoted,
+ * it can never auto-promote again, so keeping it around just creates
+ * stale state that surfaces in /tomorrow read paths.
+ *
+ * Best-effort: failures are swallowed at the caller (the hook logs).
+ */
+export async function deleteStaleTomorrowPlans(
+  db: Firestore,
+  childId: string,
+  today: string,
+): Promise<number> {
+  const plansRef = collection(db, tomorrowPlansCollectionPath(childId)).withConverter(
+    v3TomorrowPlanConverter,
+  );
+  const staleQuery = query(plansRef, where("date", "<", today));
+  const snap = await getDocs(staleQuery);
+  if (snap.empty) return 0;
+  const batch = writeBatch(db);
+  for (const d of snap.docs) {
+    batch.delete(d.ref);
+  }
+  await batch.commit();
+  return snap.size;
 }
