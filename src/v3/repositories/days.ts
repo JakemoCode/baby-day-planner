@@ -104,14 +104,30 @@ export async function updateDay(
 }
 
 export async function listArchivedDays(db: Firestore, childId: string, max = 7): Promise<Day[]> {
+  // Fetch extra so we have headroom to collapse same-date duplicates without
+  // shrinking the result below `max`. `startNewDay` mints
+  // `day-${date}-${Date.now()}` IDs so multiple calls on the same calendar
+  // date produce distinct docs with the same `date` — common in dev/dogfood.
+  // The /history page's invariant is "one row per calendar day," so dedupe
+  // here rather than at every consumer.
   const q = query(
     daysRef(db, childId),
     where("status", "==", "archived"),
     orderBy("date", "desc"),
-    limit(max),
+    limit(max * 3),
   );
   const snap = await getDocs(q);
-  return snap.docs.map((d) => d.data());
+  const byDate = new Map<string, Day>();
+  for (const d of snap.docs) {
+    const day = d.data();
+    const existing = byDate.get(day.date);
+    // Keep the lexicographically-greatest ID per date — IDs end in
+    // Date.now() so the newest dup wins.
+    if (!existing || day.id > existing.id) {
+      byDate.set(day.date, day);
+    }
+  }
+  return Array.from(byDate.values()).slice(0, max);
 }
 
 export function watchActiveDay(

@@ -107,6 +107,41 @@ describe("v3 days repository", () => {
     expect(list.map((d) => d.id)).toEqual(["d-2", "d-3", "d-1"]);
   });
 
+  // C2 from /design-audit 2026-05-20: /history showed three rows all titled
+  // "Wed, May 20" because Jake had hit Start New Day multiple times on the
+  // same calendar date during dogfood. `startNewDay` mints `day-${date}-${Date.now()}`
+  // IDs so the docs are distinct, but their `date` field collides. The repo
+  // is the right layer to dedupe — the invariant "one history row per
+  // calendar day" belongs here, not at every consumer.
+  it("dedupes archived days by date, keeping the most recently created", async () => {
+    const database = db();
+    // Same date, three different IDs. IDs sort lexicographically; the
+    // numerically-greater suffix (more recent Date.now()) wins.
+    await createDay(
+      database,
+      day({ id: "day-2026-05-20-1000", date: "2026-05-20", status: "archived" }),
+    );
+    await createDay(
+      database,
+      day({ id: "day-2026-05-20-3000", date: "2026-05-20", status: "archived" }),
+    );
+    await createDay(
+      database,
+      day({ id: "day-2026-05-20-2000", date: "2026-05-20", status: "archived" }),
+    );
+    // Plus a distinct earlier date to confirm normal ordering still works.
+    await createDay(
+      database,
+      day({ id: "day-2026-05-19-1000", date: "2026-05-19", status: "archived" }),
+    );
+
+    const list = await listArchivedDays(database, "child-1");
+    expect(list).toHaveLength(2);
+    expect(list[0]?.date).toBe("2026-05-20");
+    expect(list[0]?.id).toBe("day-2026-05-20-3000"); // newest of the three dupes
+    expect(list[1]?.date).toBe("2026-05-19");
+  });
+
   it("watches the active day and updates on change", async () => {
     const database = db();
     const seen: (Day | null)[] = [];
