@@ -1367,25 +1367,18 @@ describe("Overnight bottle does NOT interrupt the bedtime block (DOMAIN.md §3)"
   it("a recorded 3 AM bottle leaves a recorded overnight bedtime untouched", () => {
     const recordedBedtime = aRecordedBedtime({
       id: "actual_bedtime",
-      eventKey: "bedtime",
       start: 19 * 60, // 19:00
       end: 31 * 60, // 07:00 next morning
     });
     const overnightBottle = aRecordedBottle({
       id: "actual_bottle_3am",
-      eventKey: "bottle_3am",
       start: 3 * 60, // 03:00 — inside the overnight stretch
-      amountOz: 4,
     });
 
     const ctx = aContext({
       day: aDay({ wakeTime: 7 * 60 }),
       settings: aSettings({
         bottleChain: { bottlesPerDay: 5, bufferAfterWakeMinutes: 10 },
-        defaultBottleIntervalMinutes: 180,
-        defaultWakeTime: 7 * 60,
-        bedtimeThreshold: 19 * 60,
-        wakeWindowsMinutes: [120, 135, 135, 150],
       }),
       actuals: [recordedBedtime, overnightBottle],
       nowMinutes: 3 * 60 + 5,
