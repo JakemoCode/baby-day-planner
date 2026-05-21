@@ -877,6 +877,49 @@ Plus visual QA pass on every form (welcome, settings, drawer time picker, day-te
 
 ---
 
+## §F45 — /history/[date] detail header: bottle count + total oz + nap count
+
+**Source**: Jake, 2026-05-21 — clicking into a history day shows just the timeline, no roll-up stats.
+
+**Status**: `pending`
+
+**What**: render a small summary row at the top of `/history/[date]` showing the day's totals — e.g. `3 bottles · 18 oz · 4 naps · 4h 30m sleep`. Same shape as the existing `HistoryDayCard` summary (`HistoryDayCardSummary`) but at the page header. Optional: surface percentile/target deltas vs settings defaults.
+
+**Why fast-follow**: pure render layer; no engine work. Settings already carry the daily targets that would let us color a "X over/under target" indicator if we want.
+
+**Estimated effort**: ~half evening. Component already exists for the list-card variant; just thread the data + style at the page-header position.
+
+---
+
+## §F46 — /tomorrow chip tap → drawer (not owner picker)
+
+**Source**: Jake, 2026-05-21 — "Drawer does not open when clicking anything in /tomorrow."
+
+**Status**: `pending` (will be absorbed into PR 3 of the F17+F12 bundle; if PR 3 lands without this, file as standalone)
+
+**What**: today's `/tomorrow` page opens the `TemplateOwnerPicker` on chip tap (and only if a template is selected). It does NOT open the standard `EventEditDrawerV3`. Behavior is inconsistent with the dashboard, where chip taps always open the drawer.
+
+**Why fast-follow**: PR 3 of §F17/§F12 rebuilds the `/tomorrow` page with autosave + draft/confirm + clear + extras. The chip tap path will need to write through to the `TomorrowPlan.ownerOverrides` map (not the per-event template) — that's a different abstraction than the existing owner picker. Easier to redesign the tap behavior once than patch it twice.
+
+**Acceptance**: chip tap opens the drawer (or a streamlined per-event editor) that writes to `TomorrowPlan.ownerOverrides[eventKey]`. Time edits on projected events should also be possible.
+
+---
+
+## §F47 — Square focus outline on InstantChip (block focus outline is rounded)
+
+**Source**: Jake, 2026-05-21.
+
+**Status**: `pending`
+
+**What**: focus-visible outlines on Block (`src/v3/components/Timeline/Block.module.css`) appear with rounded corners, but the same-shape rule on InstantChip (`src/v3/components/Timeline/InstantChip.module.css`) looks square. Both use identical `outline: 2px solid var(--color-accent); outline-offset: 1px;` with `border-radius` set.
+
+**Cause**: at chip size (~24px tall, 12px radius), the `outline-offset: 1px` gap visually flattens the corner. Browsers follow border-radius on outlines but the perceptual effect at small sizes makes it look square. Block (50–100px tall) doesn't suffer the same issue.
+
+**Fix shape**: swap `outline` → `box-shadow: 0 0 0 2px var(--color-accent)` (respects radius perfectly, no offset gap). Apply consistently to Block too. Test against keyboard nav and screen-reader focus paths.
+
+**Why fast-follow**: visual polish; no semantic change.
+
+**Estimated effort**: ~½ hr (CSS + one cross-browser visual check + verify focus order intact).
 
 ---
 

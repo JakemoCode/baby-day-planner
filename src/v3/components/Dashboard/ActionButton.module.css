@@ -4,9 +4,10 @@
   padding: var(--space-3) var(--space-4);
   border-radius: var(--radius-md);
   border: none;
-  background: var(--color-accent);
-  /* White-on-sage was 3.09:1 (failed AA). Dark text on sage clears 4.5:1
-   * comfortably and matches the rest of the warm-earth palette. */
+  /* Lighter sage for the primary CTAs (Jake's call 2026-05-21 — dark
+   * accent felt too heavy). Dark text on accent-soft clears 4.5:1 by a
+   * wide margin (~8:1), so contrast remains comfortable AA. */
+  background: var(--color-accent-soft);
   color: var(--color-fg);
   font-size: var(--text-base);
   font-weight: var(--weight-semibold);

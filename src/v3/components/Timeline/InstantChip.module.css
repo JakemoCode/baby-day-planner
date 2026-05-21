@@ -43,8 +43,15 @@
   cursor: default;
 }
 
-.chip:hover {
-  background: var(--color-bg);
+/* Gate hover-bg swap to actual hover-capable devices. On touch the
+ * `:hover` state sticks after tap, which made the chip "disappear"
+ * into the page background (--color-bg matches the surrounding
+ * timeline canvas). `(hover: hover)` is true on mouse-driven UIs and
+ * false on touch, exactly what we want. */
+@media (hover: hover) {
+  .chip:hover {
+    background: var(--color-bg);
+  }
 }
 
 .chip:focus-visible {
