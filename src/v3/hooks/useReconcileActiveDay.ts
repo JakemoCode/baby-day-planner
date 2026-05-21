@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { collection, getDocs, limit, query, where, type Firestore } from "firebase/firestore";
 import { db } from "@/lib/firebase/client";
 import { daysCollectionPath } from "@/lib/firestore/paths";
@@ -37,6 +37,19 @@ export function useReconcileActiveDay(
 ): UseReconcileActiveDayResult {
   const [done, setDone] = useState(false);
   const [error, setError] = useState<Error | undefined>(undefined);
+  // Capture defaultWakeTime in a ref so the effect's deps stay
+  // `[childId, today]`. Without this, settings loading async after
+  // first render (e.g. `settings?.defaultWakeTime ?? FALLBACK`) flips
+  // the value once and re-fires the entire reconcile — the second
+  // promote would overwrite the first with the new wake time.
+  // Idempotent setDoc keeps the doc consistent but the side-effects
+  // double-fire. The ref keeps the LATEST value visible to the async
+  // work without retriggering it. Assignment in a no-dep effect (not
+  // during render) per react-hooks/rules-of-hooks.
+  const wakeTimeRef = useRef(defaultWakeTime);
+  useEffect(() => {
+    wakeTimeRef.current = defaultWakeTime;
+  });
 
   useEffect(() => {
     let cancelled = false;
@@ -67,11 +80,11 @@ export function useReconcileActiveDay(
       // fall back to settings defaults.
       const plan = await loadTomorrowPlan(database, childId, today);
       if (plan?.status === "confirmed") {
-        await promoteFromPlan(database, childId, plan, defaultWakeTime);
+        await promoteFromPlan(database, childId, plan, wakeTimeRef.current);
       } else {
         await startNewDay(database, childId, {
           newDate: today,
-          newWakeTime: defaultWakeTime,
+          newWakeTime: wakeTimeRef.current,
         });
       }
 
@@ -89,7 +102,7 @@ export function useReconcileActiveDay(
     return () => {
       cancelled = true;
     };
-  }, [childId, today, defaultWakeTime]);
+  }, [childId, today]);
 
   return error !== undefined ? { done, error } : { done };
 }
