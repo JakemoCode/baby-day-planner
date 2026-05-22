@@ -16,10 +16,16 @@ import { useV3Projection } from "@/v3/hooks/useV3Projection";
 import { useV3TomorrowPlan } from "@/v3/hooks/useV3TomorrowPlan";
 import { useReconcileActiveDay } from "@/v3/hooks/useReconcileActiveDay";
 import { useDrawer } from "@/v3/hooks/useDrawer";
-import { getOrCreatePlannedDay, promoteFromPlan, startNewDay } from "@/v3/repositories/days";
+import {
+  getOrCreatePlannedDay,
+  promoteFromPlan,
+  startNewDay,
+  updateDay,
+} from "@/v3/repositories/days";
 import { createEvent } from "@/v3/repositories/events";
 import { db } from "@/lib/firebase/client";
 import { DashboardSkeleton } from "@/v3/components/Dashboard/DashboardSkeleton";
+import { EditableWakeTime } from "@/v3/components/Dashboard/EditableWakeTime";
 import { FAB } from "@/components/shared/FAB";
 import { FABTypePicker } from "@/components/shared/FABTypePicker";
 import type { CreatableType } from "@/v3/components/shared/createEventTemplate";
@@ -197,8 +203,13 @@ export default function DashboardPage() {
     });
   };
 
+  const handleEditWakeTime = async (next: TimeMin) => {
+    await updateDay(db, CHILD_ID, day.id, { wakeTime: next });
+  };
+
   return (
     <div className={styles.page}>
+      <EditableWakeTime wakeTime={day.wakeTime} onChange={(t) => void handleEditWakeTime(t)} />
       <NowBanner
         {...(cww ? { wakeWindow: cww } : {})}
         {...(inProgressNap ? { inProgressNap } : {})}

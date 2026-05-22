@@ -21,3 +21,10 @@
 .backLink:hover {
   background: var(--color-bg);
 }
+
+/* Wraps the EditableWakeTime card inside the header next to the
+   Yesterday backlink. The header is already justify-content:
+   space-between, so this just needs to be the second flex child. */
+.wakeTimeContainer {
+  margin: 8px 2px;
+}

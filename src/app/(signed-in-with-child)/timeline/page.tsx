@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import type { OwnershipTemplate } from "@/v3/schemas";
+import type { OwnershipTemplate, TimeMin } from "@/v3/schemas";
 import { useNowMinutes } from "@/hooks/useNowMinutes";
 import { useV3Day } from "@/v3/hooks/useV3Day";
 import { useV3Events } from "@/v3/hooks/useV3Events";
@@ -10,6 +10,8 @@ import { useV3Projection } from "@/v3/hooks/useV3Projection";
 import { useV3Settings } from "@/v3/hooks/useV3Settings";
 import { useV3Templates } from "@/v3/hooks/useV3Templates";
 import { useDrawer } from "@/v3/hooks/useDrawer";
+import { db } from "@/lib/firebase/client";
+import { updateDay } from "@/v3/repositories/days";
 import { LoadingState } from "@/components/shared/LoadingState";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { FAB } from "@/components/shared/FAB";
@@ -17,6 +19,7 @@ import { FABTypePicker } from "@/components/shared/FABTypePicker";
 import type { CreatableType } from "@/v3/components/shared/createEventTemplate";
 import { buildCreateTemplate } from "@/v3/components/shared/createEventTemplate";
 import { EventEditDrawerV3 } from "@/v3/components/shared/EventEditDrawerV3";
+import { EditableWakeTime } from "@/v3/components/Dashboard/EditableWakeTime";
 import { TimelineV3 } from "@/v3/components/Timeline/TimelineV3";
 import styles from "./page.module.css";
 import { useCurrentChild } from "@/v3/context/ChildProvider";
@@ -73,6 +76,11 @@ export default function TimelinePage() {
     );
   }
 
+  const handleEditWakeTime = async (next: TimeMin) => {
+    if (day.wakeTime === undefined) return;
+    await updateDay(db, CHILD_ID, day.id, { wakeTime: next });
+  };
+
   return (
     <div className={styles.page}>
       <header className={styles.header}>
@@ -80,6 +88,16 @@ export default function TimelinePage() {
           ← Yesterday
         </Link>
       </header>
+
+      {day.wakeTime !== undefined && (
+        <div className={styles.wakeTimeContainer}>
+          <EditableWakeTime
+            wakeTime={day.wakeTime}
+            onChange={(t) => void handleEditWakeTime(t)}
+            variant="card"
+          />
+        </div>
+      )}
 
       <TimelineV3
         events={projected}
