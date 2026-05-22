@@ -45,7 +45,11 @@ describe("AuthProvider", () => {
 
   it("transitions to 'authorized' for any signed-in user (no email gate)", async () => {
     mockOnAuthStateChanged.mockImplementation((_auth, cb) => {
-      cb({ uid: "u1", email: "anyone@example.com" });
+      cb({
+        uid: "u1",
+        email: "anyone@example.com",
+        getIdToken: () => Promise.resolve("token"),
+      });
       return () => {};
     });
     render(

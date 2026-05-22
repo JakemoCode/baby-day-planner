@@ -32,8 +32,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     return onAuthStateChanged(auth, (u) => {
-      setUser(u);
-      setStatus(u ? "authorized" : "signed_out");
+      if (!u) {
+        setUser(null);
+        setStatus("signed_out");
+        return;
+      }
+      // Defer BOTH setUser and setStatus until getIdToken resolves. Why
+      // both: downstream hooks (useV3User, useV3Child via useChildResolution)
+      // key their subscription effects off `auth.user?.uid`, not `status`.
+      // If we set user before the token fetch completes, those subscriptions
+      // fire in the race window between auth.user populating and the
+      // Firestore SDK's internal auth integration receiving the token —
+      // → "Missing or insufficient permissions" denies that don't auto-retry.
+      //
+      // For a cached token (returning user) getIdToken resolves in <1ms.
+      // For a fresh popup sign-in it does a network call (~100–300ms) —
+      // that's the actual race window this gate closes.
+      u.getIdToken()
+        .then(() => {
+          setUser(u);
+          setStatus("authorized");
+        })
+        .catch(() => {
+          setUser(null);
+          setStatus("signed_out");
+        });
     });
   }, []);
 
