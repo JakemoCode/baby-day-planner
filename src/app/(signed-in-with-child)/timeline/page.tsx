@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useMemo, useState } from "react";
 import type { OwnershipTemplate, TimeMin } from "@/v3/schemas";
 import { useNowMinutes } from "@/hooks/useNowMinutes";
@@ -23,16 +22,6 @@ import { EditableWakeTime } from "@/v3/components/Dashboard/EditableWakeTime";
 import { TimelineV3 } from "@/v3/components/Timeline/TimelineV3";
 import styles from "./page.module.css";
 import { useCurrentChild } from "@/v3/context/ChildProvider";
-
-function yesterdayDate(today: string): string {
-  const [y, m, d] = today.split("-").map(Number);
-  const date = new Date(y ?? 1970, (m ?? 1) - 1, d ?? 1);
-  date.setDate(date.getDate() - 1);
-  const yy = date.getFullYear();
-  const mm = String(date.getMonth() + 1).padStart(2, "0");
-  const dd = String(date.getDate()).padStart(2, "0");
-  return `${yy}-${mm}-${dd}`;
-}
 
 export default function TimelinePage() {
   const CHILD_ID = useCurrentChild().id;
@@ -83,12 +72,6 @@ export default function TimelinePage() {
 
   return (
     <div className={styles.page}>
-      <header className={styles.header}>
-        <Link href={`/history/${yesterdayDate(day.date)}`} className={styles.backLink}>
-          ← Yesterday
-        </Link>
-      </header>
-
       {day.wakeTime !== undefined && (
         <div className={styles.wakeTimeContainer}>
           <EditableWakeTime
