@@ -32,6 +32,14 @@ export type TimelineV3Props = {
    * pass 0 to drop the gap.
    */
   viewportPaddingMin?: number;
+  /**
+   * When true, the viewport spans only the actual events plus padding —
+   * no default 5A-9P floor/ceiling. Used by preview surfaces (Tomorrow,
+   * History detail) where there's no reason to scroll past empty hours.
+   * Defaults to false so the canonical /timeline still shows the full
+   * day even when most of it is empty.
+   */
+  clampToEvents?: boolean;
 };
 
 const AXIS_W = 28;
@@ -49,6 +57,7 @@ const CUSTOM_LEFT_EXTRA = 110;
 const LEADER_LINE_W = 8;
 const VIEWPORT_PADDING_MIN = 30;
 const DEFAULT_VIEWPORT = { start: 5 * 60, end: 21 * 60 };
+const DEFAULT_VIEWPORT_END_CAP = 24 * 60; // midnight
 const SCROLL_TOP_PADDING_PX = 80;
 const DEFAULT_PX_PER_HOUR = 120;
 
@@ -96,6 +105,7 @@ export function TimelineV3({
   dimPast = false,
   colorMode = "type",
   viewportPaddingMin = VIEWPORT_PADDING_MIN,
+  clampToEvents = false,
 }: TimelineV3Props) {
   const rootRef = useRef<HTMLDivElement>(null);
   const hasScrolledRef = useRef(false);
@@ -114,8 +124,16 @@ export function TimelineV3({
 
     const starts = events.map((e) => e.startTime);
     const ends = events.map((e) => e.endTime ?? e.startTime);
-    const minMin = Math.min(...starts, DEFAULT_VIEWPORT.start);
-    const maxMin = Math.max(...ends, DEFAULT_VIEWPORT.end);
+    // Clamp-to-events mode: viewport is just the events' range plus
+    // padding, capped at midnight on the bottom. Default mode keeps
+    // the 5A-9P canonical floor/ceiling so the timeline reads as a
+    // full day even when most slots are empty — but still caps at
+    // midnight so overnight bedtime blocks don't paint past it.
+    const minMin = clampToEvents
+      ? Math.min(...starts)
+      : Math.min(...starts, DEFAULT_VIEWPORT.start);
+    const maxRaw = clampToEvents ? Math.max(...ends) : Math.max(...ends, DEFAULT_VIEWPORT.end);
+    const maxMin = Math.min(maxRaw, DEFAULT_VIEWPORT_END_CAP);
     const origin = Math.max(0, minMin - viewportPaddingMin);
     const height = (maxMin + viewportPaddingMin - origin) * pxPerMin;
 
@@ -125,7 +143,7 @@ export function TimelineV3({
       originMinutes: origin,
       heightPx: height,
     };
-  }, [events, pxPerMin, viewportPaddingMin]);
+  }, [events, pxPerMin, viewportPaddingMin, clampToEvents]);
 
   useEffect(() => {
     if (hasScrolledRef.current) return;
@@ -203,7 +221,14 @@ export function TimelineV3({
             //   `--text-sm` × 1.2 line-height = 16.8px) to ensure the
             //   single-row label `Putdown · 8:08p · Kelly` doesn't clip.
             //   The matching `padding: 0 6px` lives in Block.module.css.
-            const naturalH = (end - event.startTime) * pxPerMin;
+            // Clamp the bottom edge to the viewport so overnight events
+            // (bedtime: 7pm → next-day wake at +24h) don't extend past
+            // the rendered container. Without this, the block paints
+            // past the midnight axis line and bleeds into the page
+            // below — most visible on preview surfaces where
+            // clampToEvents caps the viewport at midnight.
+            const clampedEnd = Math.min(end, endMinutes);
+            const naturalH = (clampedEnd - event.startTime) * pxPerMin;
             const minH = isPutdown ? 20 : 24;
             const heightPxBlock = Math.max(minH, naturalH);
             const tap = onEventTap && !isPutdown ? () => onEventTap(event) : undefined;

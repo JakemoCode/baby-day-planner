@@ -923,6 +923,78 @@ Plus visual QA pass on every form (welcome, settings, drawer time picker, day-te
 
 ---
 
+## §F48 — "Last nap" line on dashboard shows wrong time after manual edit
+
+**Source**: Jake, 2026-05-22.
+
+**Status**: `pending`
+
+**What**: Manually edited the most recent nap on /timeline. The dashboard's "Last nap" line then read `"45m, 0 min ago (4:02p)"` — but it was ~2:30pm at the time, so 4:02p was ~2.5 hrs in the *future*. Two related symptoms:
+1. Display string says "0 min ago" but the time shown is in the future.
+2. Either the "ago" is computed off the original nap timestamp (pre-edit) while the parenthetical clock is post-edit, or the nap actually projected forward and the dashboard picked the projected nap as "last."
+
+**Hypotheses (need triage)**:
+- The dashboard "Last nap" summary may be reading the projected/predicted nap list rather than actual `nap` events, so an actual nap that ended in the past but had its end-time edited to a future time gets flagged as still in-progress AND the summary sees the *next projected* nap as "last".
+- "0 min ago" suggests `Math.max(0, now - endTime)` clamping on a negative delta — when endTime > now, the delta is negative and gets clamped to 0, but the clock string is still rendered from the raw (future) endTime.
+
+**Fix shape**: locate the "Last nap" summary component; verify it filters to events where `endTime <= now` before picking the most recent; show "in progress" / "ends in N min" when endTime is in the future, not "0 min ago".
+
+**Why fast-follow**: not blocking V3 functionality, but visibly wrong to a user dog-fooding the app.
+
+**Estimated effort**: ~1–2 hr (triage + fix + add seam test for the wrong-direction edit case).
+
+---
+
+## §F49 — Sync button: real refresh + spinner→check animation
+
+**Source**: Jake, 2026-05-22 dog-fooding feedback.
+
+**Status**: `pending`
+
+**What**: The cloud-sync button in the app shell is a visual-only no-op today (no `onRefresh` prop wired in `AppShell`). When Jake's wife Kelly accepted the invite, her dashboard showed 0 events even after both pushed sync. Two pieces:
+1. Actually trigger a network refresh: `disableNetwork(db)` then `enableNetwork(db)` to force Firestore to re-establish its listen streams (or, lighter touch, call `getDocs()` against `users/{uid}` and the active day's events with `source: 'server'`).
+2. Replace the static icon with an animation: idle → spinner while pending → check (1.5s) → idle.
+
+**Why fast-follow**: ships co-parent dog-fooding; cosmetic spinner without real refresh is worse than no button.
+
+**Estimated effort**: ~½–1 hr.
+
+---
+
+## §F50 — Display settings: font-size sm / md / lg
+
+**Source**: Jake, 2026-05-22.
+
+**Status**: `pending`
+
+**What**: Add a font-size selector (sm / md / lg) to Settings → Display alongside the existing timeline px/hour control. Wire to `--text-base` and let the cascade flow.
+
+**Why fast-follow**: accessibility nice-to-have; not blocking.
+
+**Estimated effort**: ~1 hr (settings field + CSS variable wiring + test).
+
+---
+
+## §F51 — Extend yesterday's overnight bedtime block to first wake event
+
+**Source**: Jake, 2026-05-22.
+
+**Status**: `pending`
+
+**What**: On `/timeline`, the overnight bedtime block from yesterday currently ends at midnight (or wherever the previous day's projection capped it). It should visually extend down to the first wake event of today — so the user sees a continuous "sleep" lane from yesterday's putdown to today's wake-up.
+
+**Why fast-follow**: visual continuity; doesn't change any underlying data.
+
+**Estimated effort**: ~1–2 hr (projection layer or render-time stitching of cross-day bedtime block).
+
+---
+
+## (Note) day-end clamp at midnight on canonical /timeline
+
+Folded into the PR adding onboarding step 3 (TimelineV3 `DEFAULT_VIEWPORT_END_CAP` + per-block `clampedEnd`). Listed here for traceability; no separate work needed.
+
+---
+
 ---
 
 ## How items land here
