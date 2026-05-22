@@ -202,12 +202,12 @@ function TomorrowPageInner({
   return (
     <div className={styles.page}>
       <section className={styles.section}>
-        <div className={styles.statusRow}>
+        <div className={styles.planHeader}>
+          <h2 className={styles.sectionTitle}>Plan</h2>
           <span className={styles.statusPill} data-status={planState.status}>
             {STATUS_LABEL[planState.status]}
           </span>
         </div>
-        <h2 className={styles.sectionTitle}>Plan</h2>
         <TomorrowForm
           value={{
             wakeTime: planState.wakeTime,
