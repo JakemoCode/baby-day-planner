@@ -8,7 +8,9 @@ import {
   signOut as fbSignOut,
   type User,
 } from "firebase/auth";
-import { auth } from "@/lib/firebase/client";
+import { doc, getDoc } from "firebase/firestore";
+import { auth, db } from "@/lib/firebase/client";
+import { userPath } from "@/lib/firestore/paths";
 
 // `"forbidden"` retained in the union for downstream type compatibility
 // (useSessionResolution / layouts may surface it for future server-side
@@ -37,26 +39,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setStatus("signed_out");
         return;
       }
-      // Defer BOTH setUser and setStatus until getIdToken resolves. Why
-      // both: downstream hooks (useV3User, useV3Child via useChildResolution)
-      // key their subscription effects off `auth.user?.uid`, not `status`.
-      // If we set user before the token fetch completes, those subscriptions
-      // fire in the race window between auth.user populating and the
-      // Firestore SDK's internal auth integration receiving the token —
-      // → "Missing or insufficient permissions" denies that don't auto-retry.
+      // Two-stage gate before flipping state to "authorized":
+      //   1. getIdToken — forces the Auth SDK to fetch + cache a token
+      //   2. getDoc(users/{uid}) — forces the Firestore SDK's internal
+      //      auth integration to actually attach that token to a request
       //
-      // For a cached token (returning user) getIdToken resolves in <1ms.
-      // For a fresh popup sign-in it does a network call (~100–300ms) —
-      // that's the actual race window this gate closes.
-      u.getIdToken()
-        .then(() => {
-          setUser(u);
-          setStatus("authorized");
-        })
-        .catch(() => {
-          setUser(null);
-          setStatus("signed_out");
-        });
+      // Why both: the Auth SDK and Firestore SDK each maintain their own
+      // listener on auth state changes. getIdToken only proves the Auth
+      // SDK is ready; the Firestore SDK's request-time auth pipeline may
+      // not have processed the auth change yet. A real Firestore read
+      // blocks until that pipeline has the token, eliminating the
+      // "Missing or insufficient permissions" cascade on first subscription
+      // mount after fresh sign-in.
+      //
+      // The users/{uid} read is the cheapest possible probe: rule is
+      // `request.auth.uid == uid` (no get() lookups), and the doc may or
+      // may not exist (newly-signed-in users have no doc yet). We swallow
+      // the result — only the side effect of "Firestore SDK now has auth"
+      // matters.
+      //
+      // Cost: ~50–200ms added to sign-in flow. Acceptable for a stable
+      // dashboard mount.
+      const initialize = async () => {
+        try {
+          await u.getIdToken();
+          await getDoc(doc(db, userPath(u.uid)));
+        } catch {
+          // Probe failure (network, doc-not-found, etc.) is non-fatal — we
+          // still proceed to authorized. If auth itself was broken, the
+          // outer onAuthStateChanged would have fired with u=null.
+        }
+        setUser(u);
+        setStatus("authorized");
+      };
+      void initialize();
     });
   }, []);
 

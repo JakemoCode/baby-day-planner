@@ -5,6 +5,12 @@ import { useAuth } from "./useAuth";
 
 vi.mock("@/lib/firebase/client", () => ({
   auth: { currentUser: null },
+  db: {},
+}));
+
+vi.mock("firebase/firestore", () => ({
+  doc: vi.fn(() => ({})),
+  getDoc: vi.fn().mockResolvedValue({ exists: () => false }),
 }));
 
 const mockOnAuthStateChanged = vi.fn();
