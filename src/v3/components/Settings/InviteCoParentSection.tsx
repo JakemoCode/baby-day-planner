@@ -80,8 +80,7 @@ export function InviteCoParentSection() {
     return (
       <div className={styles.section}>
         <p className={styles.lead}>
-          Share access to {child.displayName} with another caregiver. They&apos;ll see (and can
-          record) all of today&apos;s events.
+          {`Share access to ${child.displayName} with another caregiver. They'll see (and can record) all of today's events.`}
         </p>
         <button
           type="button"

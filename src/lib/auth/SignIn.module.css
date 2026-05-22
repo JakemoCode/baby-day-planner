@@ -115,6 +115,24 @@
   flex-shrink: 0;
 }
 
+/* Larger variant used in the "Signing you in…" transition card */
+.spinnerLarge {
+  width: 28px;
+  height: 28px;
+  border: 3px solid var(--color-border);
+  border-top-color: var(--color-accent);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+.loadingPanel {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 60px;
+  padding: var(--space-3);
+}
+
 @keyframes spin {
   to {
     transform: rotate(360deg);
