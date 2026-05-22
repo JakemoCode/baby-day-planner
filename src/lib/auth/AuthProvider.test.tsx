@@ -43,9 +43,9 @@ describe("AuthProvider", () => {
     expect(screen.getByTestId("status")).toHaveTextContent("loading");
   });
 
-  it("transitions to 'authorized' for an allowlisted email", async () => {
+  it("transitions to 'authorized' for any signed-in user (no email gate)", async () => {
     mockOnAuthStateChanged.mockImplementation((_auth, cb) => {
-      cb({ uid: "u1", email: "jake136@yahoo.com" });
+      cb({ uid: "u1", email: "anyone@example.com" });
       return () => {};
     });
     render(
@@ -56,22 +56,7 @@ describe("AuthProvider", () => {
     await waitFor(() => {
       expect(screen.getByTestId("status")).toHaveTextContent("authorized");
     });
-    expect(screen.getByTestId("email")).toHaveTextContent("jake136@yahoo.com");
-  });
-
-  it("transitions to 'forbidden' for a non-allowlisted email", async () => {
-    mockOnAuthStateChanged.mockImplementation((_auth, cb) => {
-      cb({ uid: "u2", email: "stranger@example.com" });
-      return () => {};
-    });
-    render(
-      <AuthProvider>
-        <Probe />
-      </AuthProvider>,
-    );
-    await waitFor(() => {
-      expect(screen.getByTestId("status")).toHaveTextContent("forbidden");
-    });
+    expect(screen.getByTestId("email")).toHaveTextContent("anyone@example.com");
   });
 
   it("transitions to 'signed_out' when no user", async () => {

@@ -9,8 +9,12 @@ import {
   type User,
 } from "firebase/auth";
 import { auth } from "@/lib/firebase/client";
-import { isAllowlisted } from "./allowlist";
 
+// `"forbidden"` retained in the union for downstream type compatibility
+// (useSessionResolution / layouts may surface it for future server-side
+// gating). The client today never sets it: any signed-in Google user
+// becomes `"authorized"`. Per-user data isolation is enforced by
+// Firestore rules (canAccessChild + createdBy), not by an email gate.
 export type AuthStatus = "loading" | "signed_out" | "authorized" | "forbidden";
 
 export type AuthContextValue = {
@@ -29,13 +33,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     return onAuthStateChanged(auth, (u) => {
       setUser(u);
-      if (!u) {
-        setStatus("signed_out");
-      } else if (isAllowlisted(u.email)) {
-        setStatus("authorized");
-      } else {
-        setStatus("forbidden");
-      }
+      setStatus(u ? "authorized" : "signed_out");
     });
   }, []);
 
