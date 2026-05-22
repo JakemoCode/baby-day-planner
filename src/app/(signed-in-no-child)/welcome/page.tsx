@@ -285,11 +285,8 @@ export default function WelcomePage() {
           <p className={styles.eyebrow}>First time setup · Step 3 of 3</p>
           <hr className={styles.divider} />
           <p className={styles.helperText}>
-            Here&apos;s a preview of your day based on the wake time you chose. Tap any chip to
-            assign an owner, or skip — you can always assign later from the timeline.
-          </p>
-          <p className={styles.helperText}>
-            Wake windows, bottle tempo, and much more are configured in Settings.
+            Tap any chip to assign an owner — or skip; assignments can be edited later from the
+            timeline.
           </p>
 
           {/* Actions ABOVE the preview so the primary CTA is visible
