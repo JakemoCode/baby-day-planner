@@ -1,0 +1,61 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+}
+
+.block {
+  background: var(--color-border);
+  border-radius: var(--radius-md);
+  position: relative;
+  overflow: hidden;
+  /* Subtle shimmer so it doesn't read as a static error/empty state */
+  background: linear-gradient(
+    90deg,
+    var(--color-border) 0%,
+    color-mix(in srgb, var(--color-border) 60%, var(--color-surface)) 50%,
+    var(--color-border) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+
+.banner {
+  height: 64px;
+}
+
+.next {
+  height: 96px;
+}
+
+.panel {
+  height: 112px;
+}
+
+.actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.actionButton {
+  height: 48px;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .block {
+    animation: none;
+    background: var(--color-border);
+  }
+}

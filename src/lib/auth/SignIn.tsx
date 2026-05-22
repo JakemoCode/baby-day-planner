@@ -59,25 +59,42 @@ export function SignIn() {
     }
   }
 
+  // When the user has just completed sign-in (status flipping
+  // loading → authorized via the redirect handshake) or is bootstrapping
+  // auth state on first paint, hide the sign-in card and show a "Signing
+  // you in…" state. Without this, the user briefly sees the sign-in
+  // card again before the layout redirects to /welcome or dashboard.
+  const isTransitioning = status === "loading" || status === "authorized";
+
   return (
     <main className={styles.root}>
       <div className={styles.card}>
         <div className={styles.branding}>
           <h1 className={styles.appName}>Baby Day Planner</h1>
-          <p className={styles.tagline}>See what&rsquo;s next, even when nothing goes to plan.</p>
+          <p className={styles.tagline}>
+            {isTransitioning
+              ? "Signing you in…"
+              : "See what’s next, even when nothing goes to plan."}
+          </p>
         </div>
 
         <hr className={styles.divider} />
 
-        <button
-          type="button"
-          onClick={handleClick}
-          disabled={loading}
-          className={styles.googleButton}
-        >
-          {loading ? <span className={styles.spinner} aria-hidden="true" /> : <GoogleLogo />}
-          <span className={styles.buttonText}>Sign in with Google</span>
-        </button>
+        {isTransitioning ? (
+          <div className={styles.loadingPanel} role="status" aria-label="Signing in">
+            <span className={styles.spinnerLarge} aria-hidden="true" />
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={handleClick}
+            disabled={loading}
+            className={styles.googleButton}
+          >
+            {loading ? <span className={styles.spinner} aria-hidden="true" /> : <GoogleLogo />}
+            <span className={styles.buttonText}>Sign in with Google</span>
+          </button>
+        )}
 
         {status === "forbidden" && (
           <p role="alert" className={styles.alert}>

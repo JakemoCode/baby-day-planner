@@ -49,3 +49,6 @@ next-env.d.ts
 # Claude Code session state: project-local settings, worktrees, agent
 # memory, launch configs. Not relevant to external readers and noisy.
 .claude/
+
+# Firebase CLI deploy cache — local artifact, regenerated on each deploy
+.firebase/

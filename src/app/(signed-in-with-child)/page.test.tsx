@@ -143,25 +143,30 @@ beforeEach(() => {
 });
 
 describe("DashboardPage (V3)", () => {
-  it("shows loading state while day or settings is loading", () => {
+  it("shows skeleton while day or settings is loading", () => {
     setupHooks({ dayLoading: true });
     renderWithAuth(<DashboardPage />);
-    expect(screen.getByText(/Loading today/i)).toBeVisible();
+    expect(screen.getByLabelText(/loading dashboard/i)).toBeVisible();
   });
 
-  it("shows Wake up button when there is no active day (settings present)", () => {
+  it("shows skeleton when there is no active day yet (useReconcileActiveDay will create one)", () => {
+    // Previously this branch rendered a "Start first day" CTA. Now the
+    // skeleton holds the space until useReconcileActiveDay's side-effect
+    // creates the active day and the subscription delivers it.
     setupHooks({ day: null, settings: makeSettings() });
     renderWithAuth(<DashboardPage />);
-    expect(screen.getByRole("button", { name: /Start first day/i })).toBeVisible();
+    expect(screen.getByLabelText(/loading dashboard/i)).toBeVisible();
+    expect(screen.queryByRole("button", { name: /Start first day/i })).toBeNull();
   });
 
-  it("wake-gate: Day with wakeTime undefined is treated as no active day", () => {
+  it("wake-gate: Day with wakeTime undefined still shows skeleton (no Wake-up CTA)", () => {
     setupHooks({ day: makeDay({ wakeTime: undefined as unknown as number }) });
     renderWithAuth(<DashboardPage />);
-    expect(screen.getByRole("button", { name: /Start first day/i })).toBeVisible();
+    expect(screen.getByLabelText(/loading dashboard/i)).toBeVisible();
+    expect(screen.queryByRole("button", { name: /Start first day/i })).toBeNull();
   });
 
-  it("settings missing post-§F3: dashboard renders loading, not the Wake up gate", () => {
+  it("settings missing post-§F3: dashboard renders skeleton, not the Wake up gate", () => {
     // After §F3 onboarding, the layout guarantees /users/{uid}.childIds[0]
     // → /children/{id} resolved AND its /settings/current doc exists. If
     // settings turns up null in the dashboard, treat as a transient load —
@@ -169,43 +174,7 @@ describe("DashboardPage (V3)", () => {
     setupHooks({ day: null, settings: null });
     renderWithAuth(<DashboardPage />);
     expect(screen.queryByRole("button", { name: /Start first day/i })).toBeNull();
-    expect(screen.getByText(/Loading today/i)).toBeVisible();
-  });
-
-  describe("Start New Day flow from the wake-gate", () => {
-    it("clicks Wake up → creates day at settings.defaultWakeTime (no settings seed)", async () => {
-      setupHooks({ day: null, settings: makeSettings({ defaultWakeTime: 8 * 60 + 15 }) });
-      renderWithAuth(<DashboardPage />);
-      await userEvent.click(screen.getByRole("button", { name: /Start first day/i }));
-
-      // §F3 PR #1: settings is guaranteed present by the layout gate —
-      // dashboard never seeds defaults.
-      expect(saveSettingsMock).not.toHaveBeenCalled();
-      // Day created with the actual configured wake time, not the default.
-      expect(startNewDayMock).toHaveBeenCalledTimes(1);
-      expect(startNewDayMock).toHaveBeenCalledWith(
-        expect.anything(),
-        expect.anything(),
-        expect.objectContaining({ newWakeTime: 8 * 60 + 15 }),
-      );
-    });
-
-    it("when day exists but wakeTime is undefined: same flow (creates day at settings wakeTime)", async () => {
-      setupHooks({
-        day: makeDay({ wakeTime: undefined as unknown as number }),
-        settings: makeSettings({ defaultWakeTime: 7 * 60 }),
-      });
-      renderWithAuth(<DashboardPage />);
-      await userEvent.click(screen.getByRole("button", { name: /Start first day/i }));
-
-      expect(saveSettingsMock).not.toHaveBeenCalled();
-      expect(startNewDayMock).toHaveBeenCalledTimes(1);
-      expect(startNewDayMock).toHaveBeenCalledWith(
-        expect.anything(),
-        expect.anything(),
-        expect.objectContaining({ newWakeTime: 7 * 60 }),
-      );
-    });
+    expect(screen.getByLabelText(/loading dashboard/i)).toBeVisible();
   });
 
   it("wake-gate: Day with wakeTime === 0 (midnight) is a valid active day", () => {

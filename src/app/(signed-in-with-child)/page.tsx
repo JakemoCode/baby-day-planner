@@ -19,14 +19,13 @@ import { useDrawer } from "@/v3/hooks/useDrawer";
 import { getOrCreatePlannedDay, promoteFromPlan, startNewDay } from "@/v3/repositories/days";
 import { createEvent } from "@/v3/repositories/events";
 import { db } from "@/lib/firebase/client";
-import { LoadingState } from "@/components/shared/LoadingState";
+import { DashboardSkeleton } from "@/v3/components/Dashboard/DashboardSkeleton";
 import { FAB } from "@/components/shared/FAB";
 import { FABTypePicker } from "@/components/shared/FABTypePicker";
 import type { CreatableType } from "@/v3/components/shared/createEventTemplate";
 import { buildCreateTemplate } from "@/v3/components/shared/createEventTemplate";
 import { EventEditDrawerV3 } from "@/v3/components/shared/EventEditDrawerV3";
 import { NowBanner } from "@/v3/components/Dashboard/NowBanner";
-import { ActionButton } from "@/v3/components/Dashboard/ActionButton";
 import { NapActionButton } from "@/v3/components/Dashboard/NapActionButton";
 import { NextBottlePanel } from "@/v3/components/Dashboard/NextBottlePanel";
 import { NextEventCard } from "@/v3/components/Dashboard/NextEventCard";
@@ -81,41 +80,21 @@ export default function DashboardPage() {
     ...(template ? { template } : {}),
   });
 
-  if (dayLoading || settingsLoading) {
-    return (
-      <div className={styles.page}>
-        <LoadingState label="Loading today" />
-      </div>
-    );
-  }
-
+  // Loading + just-mounted + post-onboarding all collapse to the same
+  // skeleton. The previous code flashed a "Start first day" CTA between
+  // (a) the active-day subscription emitting loading=false and (b) the
+  // day data actually arriving — looked like the dashboard was empty/
+  // broken for ~500ms post-onboarding. useReconcileActiveDay will write
+  // a Day if none exists, so we can always trust that one is coming;
+  // skeleton until then.
+  //
   // Wake gate: explicit undefined check — `wakeTime: 0` is technically
   // valid (midnight) and must NOT be treated as "no day yet". Settings
   // is guaranteed present post-§F3 onboarding (layout redirects to
   // /welcome otherwise), so `!settings` collapses to a defensive load
   // state rather than a first-time-bootstrap branch.
-  if (!settings) {
-    return (
-      <div className={styles.page}>
-        <LoadingState label="Loading today" />
-      </div>
-    );
-  }
-  if (!day || day.wakeTime === undefined) {
-    const handleStart = async () => {
-      await startNewDay(db, CHILD_ID, {
-        newDayId: `day-${Date.now()}`,
-        newDate: todayDate(),
-        newWakeTime: settings.defaultWakeTime,
-      });
-    };
-    return (
-      <div className={styles.firstDayGate}>
-        <ActionButton variant="primary" onClick={() => void handleStart()}>
-          Start first day
-        </ActionButton>
-      </div>
-    );
+  if (dayLoading || settingsLoading || !settings || !day || day.wakeTime === undefined) {
+    return <DashboardSkeleton />;
   }
 
   const next = nextDashboardEvent(projected, nowMinutes);
