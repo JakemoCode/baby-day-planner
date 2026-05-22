@@ -197,6 +197,25 @@ function TomorrowPageInner({
             planState.setTemplateId(next.templateId);
           }}
         />
+        <div className={styles.planActions}>
+          <ActionButton
+            variant="primary"
+            onClick={() => void planState.confirm()}
+            disabled={!planState.hasEdits || planState.status === "confirmed"}
+          >
+            Confirm plan
+          </ActionButton>
+          <ActionButton
+            variant="danger"
+            onClick={() => setClearConfirmOpen(true)}
+            disabled={planState.plan === null}
+          >
+            Clear plan
+          </ActionButton>
+        </div>
+        <p className={styles.helperText}>
+          Confirmed plans apply automatically when tomorrow begins.
+        </p>
       </section>
 
       <section className={styles.section}>
@@ -220,28 +239,6 @@ function TomorrowPageInner({
             setPickedEvent(event);
           }}
         />
-      </section>
-
-      <section className={styles.section}>
-        <div className={styles.planActions}>
-          <ActionButton
-            variant="primary"
-            onClick={() => void planState.confirm()}
-            disabled={!planState.hasEdits || planState.status === "confirmed"}
-          >
-            Confirm plan
-          </ActionButton>
-          <ActionButton
-            variant="danger"
-            onClick={() => setClearConfirmOpen(true)}
-            disabled={planState.plan === null}
-          >
-            Clear plan
-          </ActionButton>
-        </div>
-        <p className={styles.helperText}>
-          Confirmed plans apply automatically when tomorrow begins.
-        </p>
       </section>
 
       {pickedEvent && (
