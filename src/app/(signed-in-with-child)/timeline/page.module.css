@@ -4,20 +4,7 @@
   padding: 0 var(--space-4) var(--space-4);
 }
 
-.header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.backLink {
-  font-size: var(--text-sm);
-  color: var(--color-accent);
-  text-decoration: none;
-  padding: var(--space-1) var(--space-2);
-  border-radius: var(--radius-md);
-}
-
-.backLink:hover {
-  background: var(--color-bg);
+/* Wraps the EditableWakeTime card above the timeline. */
+.wakeTimeContainer {
+  margin-top: 14px;
 }
