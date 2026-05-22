@@ -1,11 +1,14 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    function isAllowlisted() {
-      return request.auth != null && request.auth.token.email in [
-        "jake136@yahoo.com",
-        "kellyrbarber@gmail.com"
-      ];
+    // Auth gate — any signed-in user. Replaces the prior email
+    // allowlist (jake136 + kellyrbarber). Per-user data isolation is
+    // enforced downstream by canAccessChild (user→child mapping +
+    // createdBy fallback) and by users/{uid} == request.auth.uid;
+    // signing in alone grants nothing beyond the ability to create
+    // YOUR OWN child + read YOUR OWN docs.
+    function isSignedIn() {
+      return request.auth != null;
     }
 
     function isString(value) {
@@ -16,13 +19,37 @@ service cloud.firestore {
     // The user doc lookup is one extra read per request; acceptable for the
     // dogfood / single-family scale and is the data-isolation primitive that
     // makes invite-based co-parent sharing safe.
+    //
+    // Two access paths:
+    //   1. Linked: user doc lists this child in `childIds` — the steady-state
+    //      access pattern post-onboarding and post-invite-accept.
+    //   2. Creator: the requester wrote the Child doc themselves
+    //      (`createdBy == auth.uid`). This is essential during the
+    //      onboarding race — after the writeBatch commits, the snapshot
+    //      listeners may fire before the local view of the user doc has
+    //      `childIds` propagated, so path 1 transiently denies. Path 2
+    //      keeps the creator's reads alive across the gap.
+    //
+    // The `exists(...)` guards are mandatory: without them,
+    // `get(...).data.X` on a missing doc throws a "Null value error"
+    // and the rule short-circuits to deny.
     function canAccessChild(childId) {
-      return isAllowlisted()
+      return isSignedIn()
+        && (isLinkedToChild(childId) || isChildCreator(childId));
+    }
+
+    function isLinkedToChild(childId) {
+      return exists(/databases/$(database)/documents/users/$(request.auth.uid))
         && childId in get(/databases/$(database)/documents/users/$(request.auth.uid)).data.childIds;
     }
 
+    function isChildCreator(childId) {
+      return exists(/databases/$(database)/documents/children/$(childId))
+        && get(/databases/$(database)/documents/children/$(childId)).data.createdBy == request.auth.uid;
+    }
+
     match /users/{uid} {
-      allow read, write: if isAllowlisted() && request.auth.uid == uid;
+      allow read, write: if isSignedIn() && request.auth.uid == uid;
     }
 
     // §F3 PR #2 — co-parent invite tokens.
@@ -48,12 +75,12 @@ service cloud.firestore {
     //
     // Delete: never (audit trail).
     match /invites/{token} {
-      allow create: if isAllowlisted()
+      allow create: if isSignedIn()
         && request.resource.data.createdBy == request.auth.uid
         && request.resource.data.childId in
             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.childIds;
-      allow read: if isAllowlisted();
-      allow update: if isAllowlisted()
+      allow read: if isSignedIn();
+      allow update: if isSignedIn()
         && resource.data.get("consumedBy", null) == null
         && resource.data.expiresAt > request.time.toMillis()
         && resource.data.createdBy != request.auth.uid
@@ -70,7 +97,7 @@ service cloud.firestore {
       // Create: any allowlisted user can mint a new child for themselves;
       // the onboarding writeBatch creates Child + Settings + User atomically.
       // After create, access is gated by user→child mapping.
-      allow create: if isAllowlisted()
+      allow create: if isSignedIn()
         && request.resource.data.createdBy == request.auth.uid
         && request.resource.data.id == childId;
       allow read, update, delete: if canAccessChild(childId);
@@ -85,7 +112,7 @@ service cloud.firestore {
         //       require getAfter on /children/{childId} to verify the
         //       child being created in the same batch is createdBy == uid.
         //       This blocks arbitrary squatters from seeding settings.
-        allow create: if isAllowlisted()
+        allow create: if isSignedIn()
           && request.resource.data.childId == childId
           && (
             canAccessChild(childId)
@@ -97,11 +124,22 @@ service cloud.firestore {
 
       match /days/{dayId} {
         allow read: if canAccessChild(childId);
-        allow create: if canAccessChild(childId)
+        // Two legitimate create paths (mirrors /settings/current):
+        //   (a) Caller already has access (canAccessChild passes —
+        //       the normal in-app startNewDay / auto-rollover path).
+        //   (b) Caller is the §F17/§F12 PR-3 onboarding writeBatch —
+        //       the user doc isn't yet committed so canAccessChild
+        //       fails. Instead allow when the same-batch Child doc
+        //       has createdBy == request.auth.uid.
+        allow create: if isSignedIn()
           && request.resource.data.childId == childId
           && request.resource.data.id == dayId
           && isString(request.resource.data.date)
-          && request.resource.data.status in ["planned", "active", "archived"];
+          && request.resource.data.status in ["planned", "active", "archived"]
+          && (
+            canAccessChild(childId)
+            || getAfter(/databases/$(database)/documents/children/$(childId)).data.createdBy == request.auth.uid
+          );
         allow update, delete: if canAccessChild(childId);
 
         match /events/{eventId} {
