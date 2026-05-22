@@ -43,4 +43,21 @@
 .icon {
   width: 22px;
   height: 22px;
+  position: relative;
+}
+
+/* §F12 PR 3 — unconfirmed-plan notification dot on the Tomorrow
+ * tab. Small absolutely-positioned dot anchored to the icon's
+ * top-right corner. Uses warm accent so it reads as "attention" not
+ * "alarm." */
+.dot {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-warning, var(--color-accent));
+  border: 1.5px solid var(--color-surface);
+  pointer-events: none;
 }

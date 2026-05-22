@@ -17,3 +17,49 @@
   font-weight: var(--weight-semibold);
   color: var(--color-fg-soft);
 }
+
+/* Helper text under the top-of-page Promote CTA. Compact and quiet
+ * so the button reads as the primary affordance and the text as
+ * supporting context. */
+.helperText {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--color-fg-soft);
+  line-height: 1.4;
+}
+
+.statusRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.statusPill {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-pill);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  background: var(--color-bg);
+  color: var(--color-fg-soft);
+  border: 1px solid var(--color-border);
+}
+.statusPill[data-status="draft"] {
+  /* Draft = something to act on; mix the warm honey/warning tint
+   * directly with surface (white) instead of bg (cream) so the pill
+   * sits proud of the page background instead of blending in. */
+  background: color-mix(in srgb, var(--color-warning) 32%, var(--color-surface));
+  color: var(--color-fg);
+  border-color: color-mix(in srgb, var(--color-warning) 50%, transparent);
+}
+.statusPill[data-status="confirmed"] {
+  /* Confirmed = ready/at-rest; sage tint. */
+  background: var(--color-accent-soft);
+  color: var(--color-fg);
+}
+
+.planActions {
+  display: flex;
+  gap: var(--space-2);
+}

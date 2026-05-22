@@ -7,6 +7,11 @@ vi.mock("next/navigation", () => ({
   usePathname: () => usePathnameMock(),
 }));
 
+const draftCountMock = vi.fn(() => 0);
+vi.mock("@/v3/hooks/useV3TomorrowDraftCount", () => ({
+  useV3TomorrowDraftCount: () => draftCountMock(),
+}));
+
 describe("BottomTabs", () => {
   it("renders three primary tabs", () => {
     usePathnameMock.mockReturnValue("/");
@@ -41,5 +46,26 @@ describe("BottomTabs", () => {
     usePathnameMock.mockReturnValue("/settings");
     renderWithAuth(<BottomTabs />);
     expect(screen.getByRole("link", { name: /dashboard/i })).not.toHaveAttribute("aria-current");
+  });
+
+  it("renders Tomorrow draft dot when childId is provided and drafts exist", () => {
+    usePathnameMock.mockReturnValue("/");
+    draftCountMock.mockReturnValue(1);
+    renderWithAuth(<BottomTabs childId="child-1" />);
+    expect(screen.getByTestId("tomorrow-draft-dot")).toBeVisible();
+  });
+
+  it("does not render the draft dot when count is 0", () => {
+    usePathnameMock.mockReturnValue("/");
+    draftCountMock.mockReturnValue(0);
+    renderWithAuth(<BottomTabs childId="child-1" />);
+    expect(screen.queryByTestId("tomorrow-draft-dot")).toBeNull();
+  });
+
+  it("does not render the draft dot when childId is omitted", () => {
+    usePathnameMock.mockReturnValue("/");
+    draftCountMock.mockReturnValue(5);
+    renderWithAuth(<BottomTabs />);
+    expect(screen.queryByTestId("tomorrow-draft-dot")).toBeNull();
   });
 });
