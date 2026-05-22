@@ -103,18 +103,17 @@ export default function WelcomePage() {
 
   const previewDay: Day | null = useMemo(() => {
     if (!previewSettings) return null;
-    const wakeMin = minutesFromTimeInput(wakeTimeStr);
     return {
       id: "preview-day",
       childId: "preview",
       date: currentLocalDate(),
       status: "active",
-      wakeTime: wakeMin,
+      wakeTime: previewSettings.defaultWakeTime,
       suppressedRecurringIds: [],
       suppressedDaycareDay: false,
       ownerOverrides,
     };
-  }, [previewSettings, wakeTimeStr, ownerOverrides]);
+  }, [previewSettings, ownerOverrides]);
 
   const handleOwnerOverrideChange = (event: Event, owner: OwnerRef | undefined) => {
     if (owner === undefined || isNoOwner(owner)) {
@@ -290,7 +289,7 @@ export default function WelcomePage() {
             assign an owner, or skip — you can always assign later from the timeline.
           </p>
           <p className={styles.helperText}>
-            Wake windows, bottle tempo, and everything else can be configured in Settings.
+            Wake windows, bottle tempo, and much more are configured in Settings.
           </p>
 
           {/* Actions ABOVE the preview so the primary CTA is visible
