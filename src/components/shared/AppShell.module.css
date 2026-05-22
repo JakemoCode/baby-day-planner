@@ -1,5 +1,11 @@
 .shell {
-  min-height: 100dvh;
+  /* §F52: pin to exact viewport height (not min-height) so .main
+   * can constrain its own scroll. Without this, .shell grows when
+   * page content is ~10px taller than the viewport, producing the
+   * "scroll wobble" — the whole page scrollable by a few px even
+   * when nothing meaningful sits below the fold. */
+  height: 100dvh;
+  overflow: hidden;
   background: var(--color-bg);
   display: flex;
   flex-direction: column;
@@ -7,7 +13,13 @@
 
 .main {
   flex: 1;
-  /* Bottom padding accounts for fixed bottom tab bar + safe-area */
+  /* min-height: 0 is required so a flex child can shrink below its
+   * intrinsic content height — without it, overflow-y: auto never
+   * activates because .main happily grows to fit. */
+  min-height: 0;
+  overflow-y: auto;
+  /* Bottom padding accounts for fixed bottom tab bar + safe-area.
+   * Inside the scroll container so the last item clears the tab bar. */
   padding-bottom: calc(var(--bottom-tabs-height) + env(safe-area-inset-bottom) + var(--space-4));
   max-width: var(--content-max);
   width: 100%;

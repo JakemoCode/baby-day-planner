@@ -1005,12 +1005,6 @@ Plus visual QA pass on every form (welcome, settings, drawer time picker, day-te
 
 ---
 
-## (Note) day-end clamp at midnight on canonical /timeline
-
-Folded into the PR adding onboarding step 3 (TimelineV3 `DEFAULT_VIEWPORT_END_CAP` + per-block `clampedEnd`). Listed here for traceability; no separate work needed.
-
----
-
 ---
 
 ## How items land here
