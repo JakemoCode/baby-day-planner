@@ -72,6 +72,13 @@
   font-size: var(--font-size-sm);
 }
 
+.helperText {
+  color: var(--color-fg-soft);
+  font-size: var(--font-size-sm);
+  margin: 0;
+  line-height: 1.4;
+}
+
 .actions {
   display: flex;
   gap: var(--space-3);

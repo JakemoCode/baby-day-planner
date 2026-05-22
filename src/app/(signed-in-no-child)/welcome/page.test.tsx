@@ -1,11 +1,12 @@
 /**
  * WelcomePage UI seam test.
  *
- * Exercises the form rendering, step 1 → step 2 transition, field-to-handler
- * wiring, and submit ordering. The actual Firestore writes are mocked here —
- * the real write chain (createChild + saveSettings + createUser order, schema
- * correctness, rule-friendliness) is covered by `tests/integration/onboarding.test.ts`
- * against the real emulator.
+ * Exercises form rendering, the three-step transition (identity →
+ * parents+wake → first-day preview), field-to-handler wiring, and
+ * submit ordering. The actual Firestore writes are mocked here — the
+ * real write chain (Child + Settings + User + Day 1 order, schema
+ * correctness, rule-friendliness) is covered by
+ * `tests/integration/onboarding.test.ts` against the real emulator.
  *
  * Together these two tests close the seam-coverage gap: this one catches UI
  * wiring regressions (field name typos, step-state loss, minutesFromTimeInput
@@ -38,6 +39,13 @@ vi.mock("firebase/firestore", async () => {
 
 vi.mock("@/lib/firebase/client", () => ({ db: {} }));
 
+// Step 3's preview mounts TimelineV3 → projectDay → renderProjection.
+// Stub TomorrowPreview to a lightweight marker so the seam test stays
+// focused on form wiring (the projection layer has its own tests).
+vi.mock("@/v3/components/Tomorrow/TomorrowPreview", () => ({
+  TomorrowPreview: () => <div data-testid="tomorrow-preview-stub" />,
+}));
+
 import WelcomePage from "./page";
 
 beforeEach(() => {
@@ -46,11 +54,10 @@ beforeEach(() => {
 });
 
 describe("WelcomePage", () => {
-  it("Step 1 renders child-identity fields; Next is disabled-equivalent until both filled", async () => {
+  it("Step 1 renders child-identity fields; parent fields belong to step 2", async () => {
     renderWithAuth(<WelcomePage />, { child: null });
     expect(screen.getByLabelText(/Child's name/i)).toBeVisible();
     expect(screen.getByLabelText(/Date of birth/i)).toBeVisible();
-    // Parent fields belong to step 2 — not shown yet.
     expect(screen.queryByLabelText(/Parent 1 name/i)).toBeNull();
   });
 
@@ -77,7 +84,21 @@ describe("WelcomePage", () => {
     expect(screen.getByLabelText(/Date of birth/i)).toHaveValue("2025-04-10");
   });
 
-  it("Get started commits an atomic batch with Child + Settings + User docs and redirects to /", async () => {
+  it("Step 2 → Next advances to step 3 preview (TomorrowPreview mounts)", async () => {
+    renderWithAuth(<WelcomePage />, { child: null });
+
+    await userEvent.type(screen.getByLabelText(/Child's name/i), "Aden");
+    await userEvent.type(screen.getByLabelText(/Date of birth/i), "2025-04-10");
+    await userEvent.click(screen.getByRole("button", { name: /Next/i }));
+
+    await userEvent.type(screen.getByLabelText(/Parent 1 name/i), "Jake");
+    await userEvent.click(screen.getByRole("button", { name: /Next/i }));
+
+    expect(screen.getByTestId("tomorrow-preview-stub")).toBeVisible();
+    expect(screen.getByRole("button", { name: /Start tracking/i })).toBeVisible();
+  });
+
+  it("Start tracking commits an atomic 4-doc batch (Child + Settings + User + Day 1) and redirects to /", async () => {
     renderWithAuth(<WelcomePage />, { child: null });
 
     await userEvent.type(screen.getByLabelText(/Child's name/i), "Aden");
@@ -88,22 +109,19 @@ describe("WelcomePage", () => {
     await userEvent.type(screen.getByLabelText(/Parent 1 name/i), "Jake");
     await userEvent.clear(screen.getByLabelText(/Parent 2 name/i));
     await userEvent.type(screen.getByLabelText(/Parent 2 name/i), "Kelly");
-    // The default-wake-time input is type="time"; userEvent.type doesn't
-    // reliably set it across jsdom. Use fireEvent.change-style approach
-    // via userEvent's fill — keep the default 07:00 (= 420 min) for the
-    // assertion and rely on the field's controlled state.
+    // Step 2 → Step 3 (preview), then Start tracking.
+    await userEvent.click(screen.getByRole("button", { name: /Next/i }));
+    await userEvent.click(screen.getByRole("button", { name: /Start tracking/i }));
 
-    await userEvent.click(screen.getByRole("button", { name: /Get started/i }));
-
-    // Three set() calls on the batch — order matters for atomicity test.
-    expect(setBatchMock).toHaveBeenCalledTimes(3);
+    // §F12 PR 3: now 4 set() calls — Child, Settings, User, Day 1.
+    expect(setBatchMock).toHaveBeenCalledTimes(4);
     expect(commitMock).toHaveBeenCalledTimes(1);
 
-    // Inspect the doc bodies. First = Child, second = Settings, third = User.
     const calls = setBatchMock.mock.calls as Array<[unknown, Record<string, unknown>]>;
     const childDoc = calls[0]?.[1];
     const settingsDoc = calls[1]?.[1];
     const userDoc = calls[2]?.[1];
+    const dayDoc = calls[3]?.[1];
 
     expect(childDoc).toMatchObject({
       id: "generated-child-id",
@@ -123,6 +141,11 @@ describe("WelcomePage", () => {
       uid: "test-uid-jake",
       childIds: ["generated-child-id"],
     });
+    expect(dayDoc).toMatchObject({
+      childId: "generated-child-id",
+      status: "active",
+      wakeTime: 7 * 60,
+    });
 
     expect(replaceMock).toHaveBeenCalledWith("/");
   });
@@ -139,7 +162,8 @@ describe("WelcomePage", () => {
     // Parent 1 is required so re-enter; Parent 2 stays empty → defaults to "Parent 2".
     await userEvent.type(screen.getByLabelText(/Parent 1 name/i), "   Jake   ");
 
-    await userEvent.click(screen.getByRole("button", { name: /Get started/i }));
+    await userEvent.click(screen.getByRole("button", { name: /Next/i }));
+    await userEvent.click(screen.getByRole("button", { name: /Start tracking/i }));
 
     const settingsDoc = setBatchMock.mock.calls[1]?.[1] as Record<string, unknown>;
     const owners = settingsDoc?.owners as {
@@ -160,14 +184,13 @@ describe("WelcomePage", () => {
     await userEvent.type(screen.getByLabelText(/Child's name/i), "Aden");
     await userEvent.type(screen.getByLabelText(/Date of birth/i), "2025-04-10");
     await userEvent.click(screen.getByRole("button", { name: /Next/i }));
-    // Parent 1 is required — fill it so browser form-validation doesn't block submit.
     await userEvent.type(screen.getByLabelText(/Parent 1 name/i), "Jake");
-    await userEvent.click(screen.getByRole("button", { name: /Get started/i }));
+    await userEvent.click(screen.getByRole("button", { name: /Next/i }));
+    await userEvent.click(screen.getByRole("button", { name: /Start tracking/i }));
 
     const alert = await screen.findByRole("alert");
     expect(alert).toHaveTextContent(/permission denied/i);
     expect(replaceMock).not.toHaveBeenCalled();
-    // Button is re-enabled (label flips back from "Saving…")
-    expect(screen.getByRole("button", { name: /Get started/i })).not.toBeDisabled();
+    expect(screen.getByRole("button", { name: /Start tracking/i })).not.toBeDisabled();
   });
 });

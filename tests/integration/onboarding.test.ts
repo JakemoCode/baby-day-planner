@@ -108,4 +108,27 @@ describe("§F3 + §F10 onboarding seam (data layer)", () => {
     expect(userDoc).not.toBeNull();
     expect(userDoc!.childIds).toEqual([]);
   });
+
+  // §F17/§F12 PR 3 — locks the rules behavior for the onboarding-batch
+  // race. After the writeBatch commits, the layout's child snapshot
+  // listener can fire BEFORE the local view of the user doc reflects
+  // its new `childIds`. canAccessChild's isLinkedToChild path returns
+  // false in that gap; the creator-fallback (isChildCreator) keeps
+  // reads alive. This test simulates the race by writing only the
+  // child doc and asserting the read still succeeds via createdBy.
+  it("creator-fallback: child readable without a user doc (onboarding race)", async () => {
+    const conn = db();
+    const newId = doc(collection(conn, CHILDREN)).id;
+    await createChild(conn, {
+      id: newId,
+      displayName: "Aden",
+      dateOfBirth: "2025-04-10",
+      createdAt: 0,
+      createdBy: ALLOWED_USER.uid,
+    });
+
+    const childDoc = await loadChild(conn, newId);
+    expect(childDoc).not.toBeNull();
+    expect(childDoc!.createdBy).toBe(ALLOWED_USER.uid);
+  });
 });

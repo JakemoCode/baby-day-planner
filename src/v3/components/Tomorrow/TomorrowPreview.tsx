@@ -58,6 +58,7 @@ export function TomorrowPreview({
       dimPast={false}
       {...(onEventTap ? { onEventTap } : {})}
       viewportPaddingMin={0}
+      clampToEvents
     />
   );
 }
