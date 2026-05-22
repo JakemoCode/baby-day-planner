@@ -1,0 +1,136 @@
+/* Sign-in page — calm-card pattern, earth-tone design system */
+
+.root {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100dvh;
+  padding: var(--space-4);
+  background: var(--color-bg);
+}
+
+.card {
+  width: 100%;
+  max-width: 32rem;
+  background: var(--color-surface);
+  border-left: 4px solid var(--color-accent-soft);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  padding: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+/* ─── Branding ─── */
+
+.branding {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.appName {
+  font-family: var(--font-sans);
+  font-size: var(--text-xl);
+  font-weight: var(--weight-semibold);
+  color: var(--color-fg);
+  margin: 0;
+  line-height: var(--line-tight);
+}
+
+.tagline {
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  color: var(--color-muted);
+  margin: 0;
+  line-height: var(--line-normal);
+}
+
+/* ─── Divider ─── */
+
+.divider {
+  border: 0;
+  border-top: 1px solid var(--color-border);
+  margin: 0;
+}
+
+/* ─── Google sign-in button ─── */
+
+.googleButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  width: 100%;
+  min-height: 44px;
+  padding: var(--space-3) var(--space-4);
+  background: #ffffff;
+  color: #1f1f1f;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  font-weight: var(--weight-medium);
+  cursor: pointer;
+  transition:
+    background var(--motion-fast) var(--easing-out),
+    box-shadow var(--motion-fast) var(--easing-out);
+}
+
+.googleButton:hover:not(:disabled) {
+  background: #f8f8f8;
+  box-shadow: var(--shadow-sm);
+}
+
+.googleButton:active:not(:disabled) {
+  background: #f0f0f0;
+}
+
+.googleButton:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.googleLogo {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+}
+
+.buttonText {
+  flex: 1;
+  text-align: center;
+}
+
+/* ─── Spinner ─── */
+
+.spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid #d4ccbf;
+  border-top-color: #1f1f1f;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ─── Error / forbidden alerts ─── */
+
+.alert {
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  color: var(--color-danger);
+  background: color-mix(in srgb, var(--color-danger) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-danger) 20%, transparent);
+  border-radius: var(--radius-sm);
+  padding: var(--space-3) var(--space-4);
+  margin: 0;
+  line-height: var(--line-normal);
+}
