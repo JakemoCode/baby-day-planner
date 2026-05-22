@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
 import type { Day, Event, OwnerRef, OwnershipTemplate } from "@/v3/schemas";
 import { NO_OWNER, isNoOwner } from "@/v3/schemas";
 import { useV3Settings } from "@/v3/hooks/useV3Settings";
@@ -50,7 +49,6 @@ export default function TomorrowPage() {
 
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pickedEvent, setPickedEvent] = useState<Event | null>(null);
-  const [promoteConfirmOpen, setPromoteConfirmOpen] = useState(false);
   const [clearConfirmOpen, setClearConfirmOpen] = useState(false);
 
   // Plan state — load + autosave + actions. Settings must be present
@@ -75,8 +73,6 @@ export default function TomorrowPage() {
       setPickerOpen={setPickerOpen}
       pickedEvent={pickedEvent}
       setPickedEvent={setPickedEvent}
-      promoteConfirmOpen={promoteConfirmOpen}
-      setPromoteConfirmOpen={setPromoteConfirmOpen}
       clearConfirmOpen={clearConfirmOpen}
       setClearConfirmOpen={setClearConfirmOpen}
     />
@@ -92,8 +88,6 @@ type TomorrowPageInnerProps = {
   setPickerOpen: (v: boolean) => void;
   pickedEvent: Event | null;
   setPickedEvent: (e: Event | null) => void;
-  promoteConfirmOpen: boolean;
-  setPromoteConfirmOpen: (v: boolean) => void;
   clearConfirmOpen: boolean;
   setClearConfirmOpen: (v: boolean) => void;
 };
@@ -107,12 +101,9 @@ function TomorrowPageInner({
   setPickerOpen,
   pickedEvent,
   setPickedEvent,
-  promoteConfirmOpen,
-  setPromoteConfirmOpen,
   clearConfirmOpen,
   setClearConfirmOpen,
 }: TomorrowPageInnerProps) {
-  const router = useRouter();
   const planState = useTomorrowPlanState(childId, tomorrowDate, settings);
 
   const { drawer, openCreate, openEdit, close, onSave, onDelete } = useDrawer(
@@ -146,15 +137,6 @@ function TomorrowPageInner({
     if (!planState.templateId) return undefined;
     return templates.find((t) => t.id === planState.templateId);
   }, [planState.templateId, templates]);
-
-  const handlePromoteNow = async () => {
-    setPromoteConfirmOpen(false);
-    await planState.promoteNow();
-    // Route to /timeline so the user lands on the new day they just
-    // committed (the dashboard would also work but timeline is the
-    // expected "see what just happened" surface).
-    router.replace("/timeline");
-  };
 
   const handleClear = async () => {
     setClearConfirmOpen(false);
@@ -195,10 +177,6 @@ function TomorrowPageInner({
     openCreate(tpl);
   };
 
-  // The promote button is only useful when there's actual plan content
-  // to push to today — i.e. a confirmed plan or a draft with edits.
-  const canPromoteNow = planState.plan !== null;
-
   return (
     <div className={styles.page}>
       <section className={styles.section}>
@@ -219,25 +197,6 @@ function TomorrowPageInner({
             planState.setTemplateId(next.templateId);
           }}
         />
-      </section>
-
-      {/* §F12 PR 3: Promote-to-today CTA below Plan (Jake's
-          2026-05-21 direction — moved from top after click-test
-          felt the destructive primary button competed with the
-          status pill at first glance). Helper text spells out the
-          override behavior so the confirm dialog isn't the only
-          guardrail. */}
-      <section className={styles.section}>
-        <ActionButton
-          variant="primary"
-          onClick={() => setPromoteConfirmOpen(true)}
-          disabled={!canPromoteNow}
-        >
-          Promote to today
-        </ActionButton>
-        <p className={styles.helperText}>
-          Takes effect immediately and overrides anything currently saved in Today.
-        </p>
       </section>
 
       <section className={styles.section}>
@@ -266,7 +225,7 @@ function TomorrowPageInner({
       <section className={styles.section}>
         <div className={styles.planActions}>
           <ActionButton
-            variant="secondary"
+            variant="primary"
             onClick={() => void planState.confirm()}
             disabled={!planState.hasEdits || planState.status === "confirmed"}
           >
@@ -280,6 +239,9 @@ function TomorrowPageInner({
             Clear plan
           </ActionButton>
         </div>
+        <p className={styles.helperText}>
+          Confirmed plans apply automatically when tomorrow begins.
+        </p>
       </section>
 
       {pickedEvent && (
@@ -327,16 +289,6 @@ function TomorrowPageInner({
         onSave={onSave}
         onCancel={close}
         onDelete={onDelete}
-      />
-
-      <ConfirmDialog
-        open={promoteConfirmOpen}
-        title="Promote to today?"
-        body="Today's day will be archived and replaced with this plan. Any recorded events for today will be archived alongside it."
-        confirmLabel="Promote"
-        cancelLabel="Cancel"
-        onConfirm={() => void handlePromoteNow()}
-        onCancel={() => setPromoteConfirmOpen(false)}
       />
 
       <ConfirmDialog

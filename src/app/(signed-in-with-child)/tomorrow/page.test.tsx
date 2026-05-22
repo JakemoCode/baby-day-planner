@@ -1,10 +1,11 @@
 /**
  * Tomorrow page (V3 + §F12 PR 3).
  *
- * Verifies the page composition of the F17+F12 draft/confirm/promote
- * UI: status pill, Promote-to-today CTA (with confirm dialog),
- * Confirm + Clear buttons, autosave indirection through
- * useTomorrowPlanState.
+ * Verifies the page composition of the F17+F12 draft/confirm UI:
+ * status pill, Confirm + Clear buttons, autosave indirection through
+ * useTomorrowPlanState. (Promote-to-today was dropped; the auto-
+ * apply-at-midnight behavior is exercised via useReconcileActiveDay
+ * integration tests, not here.)
  *
  * Plan-state mechanics (load, autosave, hydrate, edit-revert) are
  * covered in integration tests under tests/integration/hooks. This
@@ -104,23 +105,12 @@ describe("TomorrowPage (V3 + F12 PR 3)", () => {
     expect(screen.getByText(/loading tomorrow/i)).toBeVisible();
   });
 
-  it("renders Promote-to-today at the top with helper text", () => {
-    renderWithAuth(<TomorrowPage />);
-    expect(screen.getByRole("button", { name: /promote to today/i })).toBeVisible();
-    expect(screen.getByText(/overrides anything currently saved in today/i)).toBeVisible();
-  });
-
   it("renders status pill, Plan form, Preview, Confirm and Clear buttons", () => {
     renderWithAuth(<TomorrowPage />);
     expect(screen.getByText(/no plan yet/i)).toBeVisible();
     expect(screen.getByLabelText(/wake time/i)).toBeVisible();
     expect(screen.getByRole("button", { name: /confirm plan/i })).toBeVisible();
     expect(screen.getByRole("button", { name: /clear plan/i })).toBeVisible();
-  });
-
-  it("Promote-to-today is disabled when plan is null", () => {
-    renderWithAuth(<TomorrowPage />);
-    expect(screen.getByRole("button", { name: /promote to today/i })).toBeDisabled();
   });
 
   it("Confirm is disabled when there are no edits", () => {
@@ -172,23 +162,6 @@ describe("TomorrowPage (V3 + F12 PR 3)", () => {
     expect(confirm).toHaveBeenCalledTimes(1);
   });
 
-  it("Promote-to-today opens a confirm dialog; confirming calls planState.promoteNow", async () => {
-    const promoteNow = vi.fn(async () => undefined);
-    vi.mocked(useTomorrowPlanState).mockReturnValue(
-      stubPlanState({
-        plan: aConfirmedPlan(),
-        status: "confirmed",
-        promoteNow,
-      }),
-    );
-    renderWithAuth(<TomorrowPage />);
-    await userEvent.click(screen.getByRole("button", { name: /promote to today/i }));
-    // Confirm dialog appears
-    expect(screen.getByText(/today's day will be archived and replaced/i)).toBeVisible();
-    await userEvent.click(screen.getByRole("button", { name: /^promote$/i }));
-    expect(promoteNow).toHaveBeenCalledTimes(1);
-  });
-
   it("Clear opens a confirm dialog; confirming calls planState.clear", async () => {
     const clear = vi.fn(async () => undefined);
     vi.mocked(useTomorrowPlanState).mockReturnValue(
@@ -205,18 +178,4 @@ describe("TomorrowPage (V3 + F12 PR 3)", () => {
     expect(clear).toHaveBeenCalledTimes(1);
   });
 
-  it("dismissing the Promote confirm dialog does NOT call promoteNow", async () => {
-    const promoteNow = vi.fn(async () => undefined);
-    vi.mocked(useTomorrowPlanState).mockReturnValue(
-      stubPlanState({
-        plan: aConfirmedPlan(),
-        status: "confirmed",
-        promoteNow,
-      }),
-    );
-    renderWithAuth(<TomorrowPage />);
-    await userEvent.click(screen.getByRole("button", { name: /promote to today/i }));
-    await userEvent.click(screen.getByRole("button", { name: /^cancel$/i }));
-    expect(promoteNow).not.toHaveBeenCalled();
-  });
 });
