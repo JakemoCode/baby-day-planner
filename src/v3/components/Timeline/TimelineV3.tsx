@@ -166,17 +166,17 @@ export function TimelineV3({
     // window for any caller that mounts TimelineV3 outside AppShell.
     const scrollParent = findScrollParent(root);
     const targetTopWithinList = (nowMinutes - originMinutes) * pxPerMin;
-    if (scrollParent === window) {
-      const rootTopOnPage = root.getBoundingClientRect().top + window.scrollY;
-      const scrollTo = Math.max(0, rootTopOnPage + targetTopWithinList - SCROLL_TOP_PADDING_PX);
-      window.scrollTo({ top: scrollTo, behavior: "auto" });
-    } else {
+    if (scrollParent instanceof HTMLElement) {
       const rootTopInParent =
         root.getBoundingClientRect().top -
         scrollParent.getBoundingClientRect().top +
         scrollParent.scrollTop;
       const scrollTo = Math.max(0, rootTopInParent + targetTopWithinList - SCROLL_TOP_PADDING_PX);
       scrollParent.scrollTo({ top: scrollTo, behavior: "auto" });
+    } else {
+      const rootTopOnPage = root.getBoundingClientRect().top + window.scrollY;
+      const scrollTo = Math.max(0, rootTopOnPage + targetTopWithinList - SCROLL_TOP_PADDING_PX);
+      window.scrollTo({ top: scrollTo, behavior: "auto" });
     }
     hasScrolledRef.current = true;
   }, [scrollToNowOnMount, nowMinutes, events.length, originMinutes, pxPerMin]);
