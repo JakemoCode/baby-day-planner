@@ -289,6 +289,9 @@ export default function WelcomePage() {
             Here&apos;s a preview of your day based on the wake time you chose. Tap any chip to
             assign an owner, or skip — you can always assign later from the timeline.
           </p>
+          <p className={styles.helperText}>
+            Wake windows, bottle tempo, and everything else can be configured in Settings.
+          </p>
 
           {/* Actions ABOVE the preview so the primary CTA is visible
               without scrolling past the bedtime block, which by
