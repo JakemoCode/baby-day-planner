@@ -61,6 +61,16 @@ const DEFAULT_VIEWPORT_END_CAP = 24 * 60; // midnight
 const SCROLL_TOP_PADDING_PX = 80;
 const DEFAULT_PX_PER_HOUR = 120;
 
+function findScrollParent(el: HTMLElement): HTMLElement | Window {
+  let node: HTMLElement | null = el.parentElement;
+  while (node) {
+    const style = window.getComputedStyle(node);
+    if (/(auto|scroll)/.test(`${style.overflowY} ${style.overflow}`)) return node;
+    node = node.parentElement;
+  }
+  return window;
+}
+
 function formatHourLabel(hour24: number): string {
   const h = ((hour24 % 24) + 24) % 24;
   const period = h < 12 ? "A" : "P";
@@ -150,10 +160,24 @@ export function TimelineV3({
     if (!scrollToNowOnMount || nowMinutes === undefined || events.length === 0) return;
     const root = rootRef.current;
     if (!root) return;
+    // §F52: AppShell's <main> is now the scroll container (overflow-y:
+    // auto) instead of the window, so the now-bar scroll needs to
+    // walk up to find the actual scrolling ancestor. Falls back to
+    // window for any caller that mounts TimelineV3 outside AppShell.
+    const scrollParent = findScrollParent(root);
     const targetTopWithinList = (nowMinutes - originMinutes) * pxPerMin;
-    const rootTopOnPage = root.getBoundingClientRect().top + window.scrollY;
-    const scrollTo = Math.max(0, rootTopOnPage + targetTopWithinList - SCROLL_TOP_PADDING_PX);
-    window.scrollTo({ top: scrollTo, behavior: "auto" });
+    if (scrollParent === window) {
+      const rootTopOnPage = root.getBoundingClientRect().top + window.scrollY;
+      const scrollTo = Math.max(0, rootTopOnPage + targetTopWithinList - SCROLL_TOP_PADDING_PX);
+      window.scrollTo({ top: scrollTo, behavior: "auto" });
+    } else {
+      const rootTopInParent =
+        root.getBoundingClientRect().top -
+        scrollParent.getBoundingClientRect().top +
+        scrollParent.scrollTop;
+      const scrollTo = Math.max(0, rootTopInParent + targetTopWithinList - SCROLL_TOP_PADDING_PX);
+      scrollParent.scrollTo({ top: scrollTo, behavior: "auto" });
+    }
     hasScrolledRef.current = true;
   }, [scrollToNowOnMount, nowMinutes, events.length, originMinutes, pxPerMin]);
 

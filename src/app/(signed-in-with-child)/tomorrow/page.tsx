@@ -212,6 +212,15 @@ function TomorrowPageInner({
           >
             Clear plan
           </ActionButton>
+          {process.env.NODE_ENV === "development" && (
+            <ActionButton
+              variant="secondary"
+              onClick={() => void planState.promoteNow()}
+              disabled={planState.plan === null}
+            >
+              Promote now (dev)
+            </ActionButton>
+          )}
         </div>
         <p className={styles.helperText}>
           Confirmed plans apply automatically when tomorrow begins.
