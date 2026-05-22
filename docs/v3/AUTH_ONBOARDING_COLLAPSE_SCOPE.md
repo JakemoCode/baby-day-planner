@@ -263,7 +263,7 @@ Re-estimate PR C: roughly the original PR #213 onboarding step 3 effort, not "on
 
 **Estimate:** 4–8h for the architecture work. Exp 2 harness build (separate): 3–6h, possibly more if `@/lib/firebase/client`'s module-singleton `db` needs to be made injectable to point at the emulator instance. Honest framing: do Exp 1 first (~15 min); if it fails, the harness work is moot.
 
-**PR split point if needed:** between step 6 and step 7. Steps 1–6 must ship atomically (the rename, helper extraction, layout collapse, and route migration are inseparable — half-shipped leaves duplicate routes or duplicate batch logic). Steps 7–9 can ship as PR A.2 if PR A.1 needs to bake.
+**PR split point if needed:** between step 6 and step 7. Steps 1–6 must ship atomically (the rename, helper extraction, layout collapse, and route migration are inseparable — half-shipped leaves duplicate routes or duplicate batch logic). Steps 7–9 can ship as PR A.2 if PR A.1 needs a pause for any reason.
 
 ---
 
@@ -278,7 +278,7 @@ Re-estimate PR C: roughly the original PR #213 onboarding step 3 effort, not "on
 | Invite-accept flash | Mechanism specified in §5; smoke-test required |
 | React 19 strict-mode double-effects in layout switch | Pattern any new effects after the invite route's `startedRef` guard |
 | Next.js 16 caching/RSC quirks beyond what Exp 3 covers | Manual click-test of every sub-route after PR A; not theoretical |
-| Bug recurs silently in prod | Observability deferred — the ≥48h bake gate + the new seam test are the regression-detection plan. Add console-error → telemetry capture only if the bake catches anything. |
+| Bug recurs silently in prod | Observability deferred — the new seam test is the regression-detection plan. Add console-error → telemetry capture only if real-world usage reveals anything. |
 
 ---
 
@@ -313,4 +313,4 @@ Re-estimate PR C: roughly the original PR #213 onboarding step 3 effort, not "on
 
 PR A touches the auth/routing root. Routing/rendering changes only — no Firestore schema, doc shape, or writeBatch changes. Revert is `git revert <PR A merge>`.
 
-**Bake gate:** PR A must sit on main for ≥48h with manual smoke tests before PR B or PR C open. Within the bake window, regressions revert as a single PR. After PR B/C land, revert becomes a coordinated 3-PR unwind — much more expensive.
+**No bake gate** — pre-launch portfolio project with no live users. PR A, B, C can ship same-day if click-tests pass. If a regression surfaces after PR B/C land, revert is a coordinated 3-PR unwind; cost is real but acceptable given no production user impact. Add a bake gate later once the app has active users to protect.
