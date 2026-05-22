@@ -45,4 +45,7 @@ firestore-debug.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
-.claude/worktrees/
+
+# Claude Code session state: project-local settings, worktrees, agent
+# memory, launch configs. Not relevant to external readers and noisy.
+.claude/
