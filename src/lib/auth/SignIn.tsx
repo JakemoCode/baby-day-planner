@@ -64,7 +64,7 @@ export function SignIn() {
       <div className={styles.card}>
         <div className={styles.branding}>
           <h1 className={styles.appName}>Baby Day Planner</h1>
-          <p className={styles.tagline}>Plan ahead. Adjust on the fly.</p>
+          <p className={styles.tagline}>See what's next, even when nothing goes to plan.</p>
         </div>
 
         <hr className={styles.divider} />
