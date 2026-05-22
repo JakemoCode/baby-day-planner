@@ -8,13 +8,16 @@ vi.mock("@/lib/firebase/client", () => ({
 }));
 
 const mockOnAuthStateChanged = vi.fn();
+const mockGetRedirectResult = vi.fn().mockResolvedValue(null);
+const mockSignInWithRedirect = vi.fn().mockResolvedValue(undefined);
 vi.mock("firebase/auth", async () => {
   const actual = await vi.importActual("firebase/auth");
   return {
     ...actual,
     onAuthStateChanged: (...args: unknown[]) => mockOnAuthStateChanged(...args),
+    getRedirectResult: (...args: unknown[]) => mockGetRedirectResult(...args),
+    signInWithRedirect: (...args: unknown[]) => mockSignInWithRedirect(...args),
     signOut: vi.fn().mockResolvedValue(undefined),
-    signInWithPopup: vi.fn(),
   };
 });
 
@@ -31,6 +34,8 @@ function Probe() {
 describe("AuthProvider", () => {
   beforeEach(() => {
     mockOnAuthStateChanged.mockReset();
+    mockGetRedirectResult.mockReset().mockResolvedValue(null);
+    mockSignInWithRedirect.mockReset().mockResolvedValue(undefined);
   });
 
   it("starts in 'loading' state", () => {
@@ -45,11 +50,7 @@ describe("AuthProvider", () => {
 
   it("transitions to 'authorized' for any signed-in user (no email gate)", async () => {
     mockOnAuthStateChanged.mockImplementation((_auth, cb) => {
-      cb({
-        uid: "u1",
-        email: "anyone@example.com",
-        getIdToken: () => Promise.resolve("token"),
-      });
+      cb({ uid: "u1", email: "anyone@example.com" });
       return () => {};
     });
     render(

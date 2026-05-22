@@ -3,8 +3,9 @@
 import { createContext, useEffect, useState, type ReactNode } from "react";
 import {
   GoogleAuthProvider,
+  getRedirectResult,
   onAuthStateChanged,
-  signInWithPopup,
+  signInWithRedirect,
   signOut as fbSignOut,
   type User,
 } from "firebase/auth";
@@ -12,9 +13,9 @@ import { auth } from "@/lib/firebase/client";
 
 // `"forbidden"` retained in the union for downstream type compatibility
 // (useSessionResolution / layouts may surface it for future server-side
-// gating). The client today never sets it: any signed-in Google user
-// becomes `"authorized"`. Per-user data isolation is enforced by
-// Firestore rules (canAccessChild + createdBy), not by an email gate.
+// gating). The client today never sets it: any signed-in user becomes
+// `"authorized"`. Per-user data isolation is enforced by Firestore rules
+// (canAccessChild + createdBy), not by an email gate.
 export type AuthStatus = "loading" | "signed_out" | "authorized" | "forbidden";
 
 export type AuthContextValue = {
@@ -31,32 +32,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<AuthStatus>("loading");
 
   useEffect(() => {
+    // Resolve any pending redirect result. We don't use its return value —
+    // onAuthStateChanged below fires with the signed-in user on the same
+    // boot. Calling getRedirectResult signals to the Auth SDK that we've
+    // acknowledged the redirect; failure is non-fatal (typically means we
+    // weren't actually returning from a sign-in redirect).
+    getRedirectResult(auth).catch(() => {
+      /* non-fatal */
+    });
+
     return onAuthStateChanged(auth, (u) => {
-      if (!u) {
-        setUser(null);
-        setStatus("signed_out");
-        return;
-      }
-      // Defer BOTH setUser and setStatus until getIdToken resolves. Why
-      // both: downstream hooks (useV3User, useV3Child via useChildResolution)
-      // key their subscription effects off `auth.user?.uid`, not `status`.
-      // If we set user before the token fetch completes, those subscriptions
-      // fire in the race window between auth.user populating and the
-      // Firestore SDK's internal auth integration receiving the token —
-      // → "Missing or insufficient permissions" denies that don't auto-retry.
-      //
-      // For a cached token (returning user) getIdToken resolves in <1ms.
-      // For a fresh popup sign-in it does a network call (~100–300ms) —
-      // that's the actual race window this gate closes.
-      u.getIdToken()
-        .then(() => {
-          setUser(u);
-          setStatus("authorized");
-        })
-        .catch(() => {
-          setUser(null);
-          setStatus("signed_out");
-        });
+      setUser(u);
+      setStatus(u ? "authorized" : "signed_out");
     });
   }, []);
 
@@ -64,8 +51,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     user,
     status,
     async signIn() {
+      // signInWithRedirect navigates the browser to Google's OAuth flow,
+      // which redirects back to our app on completion. The next page load
+      // boots with auth fully attached — both the Auth SDK and the
+      // Firestore SDK initialize together against the established session.
+      // No popup, no COOP issues, no in-session race between auth state
+      // populating and Firestore's internal auth pipeline catching up.
       const provider = new GoogleAuthProvider();
-      await signInWithPopup(auth, provider);
+      await signInWithRedirect(auth, provider);
     },
     async signOut() {
       await fbSignOut(auth);
