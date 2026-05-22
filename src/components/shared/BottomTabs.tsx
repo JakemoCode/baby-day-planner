@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
+import { useV3TomorrowDraftCount } from "@/v3/hooks/useV3TomorrowDraftCount";
 import styles from "./BottomTabs.module.css";
 
 type Tab = {
@@ -74,7 +75,16 @@ const TABS: Tab[] = [
   },
 ];
 
-export function BottomTabs() {
+export type BottomTabsProps = {
+  /**
+   * Optional child id. When provided, BottomTabs subscribes to the
+   * child's TomorrowPlan drafts and renders a notification dot on the
+   * Tomorrow tab when any unconfirmed plan exists.
+   */
+  childId?: string;
+};
+
+export function BottomTabs({ childId }: BottomTabsProps = {}) {
   const pathname = usePathname();
 
   return (
@@ -88,11 +98,24 @@ export function BottomTabs() {
             className={styles.tab}
             {...(current ? { "aria-current": "page" as const } : {})}
           >
-            <span className={styles.icon}>{tab.icon}</span>
+            <span className={styles.icon}>
+              {tab.icon}
+              {tab.href === "/tomorrow" && childId !== undefined && (
+                <TomorrowDot childId={childId} />
+              )}
+            </span>
             <span>{tab.label}</span>
           </Link>
         );
       })}
     </nav>
+  );
+}
+
+function TomorrowDot({ childId }: { childId: string }) {
+  const draftCount = useV3TomorrowDraftCount(childId);
+  if (draftCount === 0) return null;
+  return (
+    <span className={styles.dot} aria-label="Unconfirmed plan" data-testid="tomorrow-draft-dot" />
   );
 }

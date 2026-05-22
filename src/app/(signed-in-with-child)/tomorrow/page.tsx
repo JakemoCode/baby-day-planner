@@ -1,29 +1,26 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useCallback, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import type { Day, Event, OwnerRef, OwnershipTemplate } from "@/v3/schemas";
+import { NO_OWNER, isNoOwner } from "@/v3/schemas";
 import { useV3Settings } from "@/v3/hooks/useV3Settings";
 import { useV3Templates } from "@/v3/hooks/useV3Templates";
-import { startNewDay } from "@/v3/repositories/days";
-import { createEvent } from "@/v3/repositories/events";
-import { saveTemplate } from "@/v3/repositories/templates";
-import { newDayId } from "@/v3/lib/newEventId";
-import { db } from "@/lib/firebase/client";
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { LoadingState } from "@/components/shared/LoadingState";
 import { FAB } from "@/components/shared/FAB";
 import { FABTypePicker } from "@/components/shared/FABTypePicker";
+import { BottomSheet } from "@/components/shared/BottomSheet";
 import { EventEditDrawerV3 } from "@/v3/components/shared/EventEditDrawerV3";
+import { OwnerPickerV3 } from "@/v3/components/shared/OwnerPickerV3";
 import {
   buildCreateTemplate,
   type CreatableType,
 } from "@/v3/components/shared/createEventTemplate";
-import { TomorrowForm, type TomorrowFormValue } from "@/v3/components/Tomorrow/TomorrowForm";
+import { TomorrowForm } from "@/v3/components/Tomorrow/TomorrowForm";
 import { TomorrowPreview } from "@/v3/components/Tomorrow/TomorrowPreview";
-import { PromoteTomorrowButton } from "@/v3/components/Tomorrow/PromoteTomorrowButton";
-import { TemplateOwnerPicker } from "@/v3/components/DayTemplates/TemplateOwnerPicker";
-import { setOwnerInTemplate } from "@/v3/components/DayTemplates/setOwnerInTemplate";
+import { ActionButton } from "@/v3/components/Dashboard/ActionButton";
 import { useDrawer } from "@/v3/hooks/useDrawer";
+import { useTomorrowPlanState } from "@/v3/hooks/useTomorrowPlanState";
 import styles from "./page.module.css";
 import { useCurrentChild } from "@/v3/context/ChildProvider";
 
@@ -38,65 +35,26 @@ function tomorrowDateString(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
+const STATUS_LABEL: Record<"no-plan" | "draft" | "confirmed", string> = {
+  "no-plan": "No plan yet",
+  draft: "Draft",
+  confirmed: "Confirmed — will auto-apply at midnight",
+};
+
 export default function TomorrowPage() {
   const CHILD_ID = useCurrentChild().id;
-  const router = useRouter();
+  const TOMORROW = tomorrowDateString();
   const { settings, loading: settingsLoading } = useV3Settings(CHILD_ID);
   const { templates, loading: templatesLoading } = useV3Templates(CHILD_ID);
 
-  const [form, setForm] = useState<TomorrowFormValue>({ wakeTime: 7 * 60 });
-  const [extras, setExtras] = useState<Event[]>([]);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pickedEvent, setPickedEvent] = useState<Event | null>(null);
+  const [clearConfirmOpen, setClearConfirmOpen] = useState(false);
 
-  // saveExtra routes create vs update by checking if the event id is
-  // already in the local extras array. Mirrors useV3Events.saveEvent's
-  // routing contract so useDrawer can treat Tomorrow's local state and
-  // the Firestore-backed pages identically.
-  const saveExtra = useCallback((event: Event) => {
-    setExtras((prev) => {
-      if (prev.some((e) => e.id === event.id)) {
-        return prev.map((e) => (e.id === event.id ? event : e));
-      }
-      return [...prev, event];
-    });
-  }, []);
-
-  const deleteExtra = useCallback((eventId: string) => {
-    setExtras((prev) => prev.filter((e) => e.id !== eventId));
-  }, []);
-
-  const { drawer, openCreate, openEdit, close, onSave, onDelete } = useDrawer(
-    extras,
-    saveExtra,
-    deleteExtra,
-  );
-  // Local override of the selected template so owner edits in the
-  // preview reflect immediately without waiting for the listener
-  // round-trip. (V3 listTemplates is one-shot, so without this the
-  // preview wouldn't update at all until next mount.)
-  const [templateOverride, setTemplateOverride] = useState<OwnershipTemplate | null>(null);
-
-  const tomorrowDay = useMemo<Day>(() => {
-    const day: Day = {
-      id: `tomorrow-${tomorrowDateString()}`,
-      childId: CHILD_ID,
-      date: tomorrowDateString(),
-      status: "planned",
-      wakeTime: form.wakeTime,
-      suppressedRecurringIds: [],
-      suppressedDaycareDay: false,
-    };
-    if (form.templateId) day.templateId = form.templateId;
-    return day;
-  }, [form.wakeTime, form.templateId]);
-
-  const selectedTemplate = useMemo<OwnershipTemplate | undefined>(() => {
-    if (!form.templateId) return undefined;
-    if (templateOverride && templateOverride.id === form.templateId) return templateOverride;
-    return templates.find((t) => t.id === form.templateId);
-  }, [form.templateId, templates, templateOverride]);
-
+  // Plan state — load + autosave + actions. Settings must be present
+  // before this can be set up (we read defaultWakeTime as the baseline).
+  // Render the loading state path below before invoking the hook to
+  // satisfy that contract.
   if (settingsLoading || !settings || templatesLoading) {
     return (
       <div className={styles.page}>
@@ -105,39 +63,114 @@ export default function TomorrowPage() {
     );
   }
 
-  const handlePromote = async () => {
-    const promotedDayId = newDayId();
-    await startNewDay(db, CHILD_ID, {
-      newDayId: promotedDayId,
-      newDate: tomorrowDateString(),
-      newWakeTime: form.wakeTime,
-      ...(form.templateId ? { templateId: form.templateId } : {}),
-    });
-    // Persist the planned extras to the freshly-created day. Jake's
-    // product call (2026-05-10): users planning Tomorrow must trust
-    // that extras survive promotion. Non-atomic by design — Firestore
-    // transactions can't span the day write + N event writes; if any
-    // event fails the day still exists with partial extras and the
-    // user can re-add. Log loudly so the failure isn't silent.
-    for (const extra of extras) {
-      try {
-        await createEvent(db, CHILD_ID, { ...extra, dayId: promotedDayId });
-      } catch (err) {
-        console.error("[tomorrow] failed to persist extra on promote", {
-          eventId: extra.id,
-          dayId: promotedDayId,
-          err,
-        });
-      }
+  return (
+    <TomorrowPageInner
+      childId={CHILD_ID}
+      tomorrowDate={TOMORROW}
+      settings={settings}
+      templates={templates}
+      pickerOpen={pickerOpen}
+      setPickerOpen={setPickerOpen}
+      pickedEvent={pickedEvent}
+      setPickedEvent={setPickedEvent}
+      clearConfirmOpen={clearConfirmOpen}
+      setClearConfirmOpen={setClearConfirmOpen}
+    />
+  );
+}
+
+type TomorrowPageInnerProps = {
+  childId: string;
+  tomorrowDate: string;
+  settings: NonNullable<ReturnType<typeof useV3Settings>["settings"]>;
+  templates: ReturnType<typeof useV3Templates>["templates"];
+  pickerOpen: boolean;
+  setPickerOpen: (v: boolean) => void;
+  pickedEvent: Event | null;
+  setPickedEvent: (e: Event | null) => void;
+  clearConfirmOpen: boolean;
+  setClearConfirmOpen: (v: boolean) => void;
+};
+
+function TomorrowPageInner({
+  childId,
+  tomorrowDate,
+  settings,
+  templates,
+  pickerOpen,
+  setPickerOpen,
+  pickedEvent,
+  setPickedEvent,
+  clearConfirmOpen,
+  setClearConfirmOpen,
+}: TomorrowPageInnerProps) {
+  const planState = useTomorrowPlanState(childId, tomorrowDate, settings);
+
+  const { drawer, openCreate, openEdit, close, onSave, onDelete } = useDrawer(
+    planState.extras,
+    (event) => planState.upsertExtra(event),
+    (eventId) => planState.removeExtra(eventId),
+  );
+
+  const tomorrowDay = useMemo<Day>(() => {
+    const day: Day = {
+      id: `tomorrow-${tomorrowDate}`,
+      childId,
+      date: tomorrowDate,
+      status: "planned",
+      wakeTime: planState.wakeTime,
+      suppressedRecurringIds: [],
+      suppressedDaycareDay: false,
+    };
+    if (planState.templateId) day.templateId = planState.templateId;
+    // §F12 PR 3 bugfix — the preview Day must carry ownerOverrides so
+    // the engine's R12.10 rule applies them when projecting; otherwise
+    // chip-tap → owner picker writes to plan state but the preview
+    // never re-renders with the assigned owner.
+    if (Object.keys(planState.ownerOverrides).length > 0) {
+      day.ownerOverrides = planState.ownerOverrides;
     }
-    router.replace("/");
+    return day;
+  }, [planState.wakeTime, planState.templateId, planState.ownerOverrides, childId, tomorrowDate]);
+
+  const selectedTemplate = useMemo<OwnershipTemplate | undefined>(() => {
+    if (!planState.templateId) return undefined;
+    return templates.find((t) => t.id === planState.templateId);
+  }, [planState.templateId, templates]);
+
+  const handleClear = async () => {
+    setClearConfirmOpen(false);
+    await planState.clear();
+  };
+
+  // §F12 PR 3 / F46 — chip tap → owner picker that writes to
+  // plan.ownerOverrides. Replaces the prior TemplateOwnerPicker path
+  // (which wrote to the underlying template, not the plan). Time
+  // edits on projected non-extras aren't supported yet — TomorrowPlan
+  // doesn't carry per-event time overrides; tracked as a follow-up.
+  const handleOwnerOverrideChange = (event: Event, owner: OwnerRef | undefined) => {
+    // `undefined` from OwnerPickerV3 means "no selection" — treat as
+    // explicit NO_OWNER (the documented schema convention: `null` in
+    // the ownerOverrides map = the user un-assigned this slot).
+    if (owner === undefined || isNoOwner(owner)) {
+      planState.setOwnerOverride(event.eventKey, null);
+    } else {
+      planState.setOwnerOverride(event.eventKey, owner);
+    }
+    setPickedEvent(null);
+  };
+
+  const ownerForPicked = (event: Event): OwnerRef => {
+    const override = planState.ownerOverrides[event.eventKey];
+    if (override !== undefined) return override ?? NO_OWNER;
+    return event.owner ?? NO_OWNER;
   };
 
   const handleAddEvent = (type: CreatableType) => {
     const tpl = buildCreateTemplate({
       type,
       dayId: tomorrowDay.id,
-      actuals: extras,
+      actuals: planState.extras,
       settings,
       nowMinutes: TOMORROW_ANCHOR_MINUTES,
     });
@@ -147,8 +180,42 @@ export default function TomorrowPage() {
   return (
     <div className={styles.page}>
       <section className={styles.section}>
-        <h2 className={styles.sectionTitle}>Plan</h2>
-        <TomorrowForm value={form} templates={templates} onChange={setForm} />
+        <div className={styles.planHeader}>
+          <h2 className={styles.sectionTitle}>Plan</h2>
+          <span className={styles.statusPill} data-status={planState.status}>
+            {STATUS_LABEL[planState.status]}
+          </span>
+        </div>
+        <TomorrowForm
+          value={{
+            wakeTime: planState.wakeTime,
+            ...(planState.templateId !== undefined ? { templateId: planState.templateId } : {}),
+          }}
+          templates={templates}
+          onChange={(next) => {
+            planState.setWakeTime(next.wakeTime);
+            planState.setTemplateId(next.templateId);
+          }}
+        />
+        <div className={styles.planActions}>
+          <ActionButton
+            variant="primary"
+            onClick={() => void planState.confirm()}
+            disabled={!planState.hasEdits || planState.status === "confirmed"}
+          >
+            Confirm plan
+          </ActionButton>
+          <ActionButton
+            variant="danger"
+            onClick={() => setClearConfirmOpen(true)}
+            disabled={planState.plan === null}
+          >
+            Clear plan
+          </ActionButton>
+        </div>
+        <p className={styles.helperText}>
+          Confirmed plans apply automatically when tomorrow begins.
+        </p>
       </section>
 
       <section className={styles.section}>
@@ -158,36 +225,35 @@ export default function TomorrowPage() {
           settings={settings}
           owners={settings.owners}
           {...(selectedTemplate ? { template: selectedTemplate } : {})}
-          extras={extras}
+          extras={planState.extras}
           onEventTap={(event) => {
             if (event.type === "extra") {
+              // Extras get the full drawer — owner + time + label.
               openEdit(event);
               return;
             }
-            // Owner picker only meaningful when a template is selected;
-            // without one there's nowhere to write the picked owner.
-            if (!selectedTemplate) return;
+            // §F46 — projected non-extras get an owner picker that
+            // writes to plan.ownerOverrides[eventKey]. Time edits on
+            // projected events aren't a thing on /tomorrow; the cascade
+            // owns event timing. No template-selected gating.
             setPickedEvent(event);
           }}
         />
       </section>
 
-      <PromoteTomorrowButton onPromote={handlePromote} />
-
-      {pickedEvent && selectedTemplate && (
-        <TemplateOwnerPicker
-          event={pickedEvent}
-          template={selectedTemplate}
-          owners={settings.owners}
+      {pickedEvent && (
+        <BottomSheet
+          open
           title={`Owner for ${pickedEvent.label}`}
           onCancel={() => setPickedEvent(null)}
-          onSelect={(owner: OwnerRef | undefined) => {
-            const next = setOwnerInTemplate(selectedTemplate, pickedEvent, owner);
-            setTemplateOverride(next);
-            setPickedEvent(null);
-            void saveTemplate(db, CHILD_ID, next);
-          }}
-        />
+        >
+          <OwnerPickerV3
+            owners={settings.owners}
+            value={ownerForPicked(pickedEvent)}
+            onChange={(owner) => handleOwnerOverrideChange(pickedEvent, owner)}
+            label={pickedEvent.label}
+          />
+        </BottomSheet>
       )}
 
       <FAB label="Add an event" onClick={() => setPickerOpen(true)} />
@@ -213,13 +279,23 @@ export default function TomorrowPage() {
         nowMinutes={TOMORROW_ANCHOR_MINUTES}
         bedtimeThreshold={settings.bedtimeThreshold}
         defaultWakeTime={settings.defaultWakeTime}
-        existingEvents={extras}
+        existingEvents={planState.extras}
         open={drawer.open}
         event={drawer.open ? (drawer.mode === "edit" ? drawer.event : drawer.template) : null}
         mode={drawer.open && drawer.mode === "edit" ? "edit" : "create"}
         onSave={onSave}
         onCancel={close}
         onDelete={onDelete}
+      />
+
+      <ConfirmDialog
+        open={clearConfirmOpen}
+        title="Clear this plan?"
+        body="The draft / confirmed plan for tomorrow will be deleted. You can start over from scratch."
+        confirmLabel="Clear"
+        cancelLabel="Cancel"
+        onConfirm={() => void handleClear()}
+        onCancel={() => setClearConfirmOpen(false)}
       />
     </div>
   );

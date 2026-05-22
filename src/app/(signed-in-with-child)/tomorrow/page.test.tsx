@@ -1,78 +1,96 @@
 /**
- * Tomorrow page (V3 cutover, PR-B3).
+ * Tomorrow page (V3 + §F12 PR 3).
  *
- * Verifies the V3 wiring contract:
- *   - V3 hooks gate the loading state.
- *   - Selecting a template feeds the V3 preview (engine output reflects
- *     the template, e.g. owner pills appear).
- *   - The promote button calls V3 `startNewDay` with the form values.
+ * Verifies the page composition of the F17+F12 draft/confirm UI:
+ * status pill, Confirm + Clear buttons, autosave indirection through
+ * useTomorrowPlanState. (Promote-to-today was dropped; the auto-
+ * apply-at-midnight behavior is exercised via useReconcileActiveDay
+ * integration tests, not here.)
  *
- * Hooks and the V3 days repo are mocked at the module boundary so the
- * test exercises the page composition, not Firestore.
+ * Plan-state mechanics (load, autosave, hydrate, edit-revert) are
+ * covered in integration tests under tests/integration/hooks. This
+ * file mocks useTomorrowPlanState at the module boundary so the page
+ * test exercises layout + confirm-flow wiring without re-testing
+ * Firestore.
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { renderWithAuth, screen } from "@/test-utils";
 import userEvent from "@testing-library/user-event";
-import type { OwnersConfig, OwnershipTemplate } from "@/v3/schemas";
+import type { Event, OwnersConfig, OwnershipTemplate, TomorrowPlan } from "@/v3/schemas";
 import { aSettings } from "@/v3/__tests__/factories";
 import { useV3Settings } from "@/v3/hooks/useV3Settings";
 import { useV3Templates } from "@/v3/hooks/useV3Templates";
-import { startNewDay } from "@/v3/repositories/days";
-import { createEvent } from "@/v3/repositories/events";
+import {
+  useTomorrowPlanState,
+  type UseTomorrowPlanStateResult,
+} from "@/v3/hooks/useTomorrowPlanState";
 import TomorrowPage from "./page";
 
-const replace = vi.fn();
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({ replace }),
+  useRouter: () => ({ replace: vi.fn() }),
 }));
-
-vi.mock("@/v3/hooks/useV3Settings", () => ({
-  useV3Settings: vi.fn(),
-}));
-
-vi.mock("@/v3/hooks/useV3Templates", () => ({
-  useV3Templates: vi.fn(),
-}));
-
-vi.mock("@/v3/repositories/days", () => ({
-  startNewDay: vi.fn(async () => ({ archivedDayId: null, newDayId: "day-x" })),
-}));
-
-vi.mock("@/v3/repositories/events", () => ({
-  createEvent: vi.fn(async () => undefined),
-}));
-
-vi.mock("@/v3/repositories/templates", () => ({
-  saveTemplate: vi.fn(async () => undefined),
-}));
-
-vi.mock("@/lib/firebase/client", () => ({
-  db: {},
-}));
+vi.mock("@/v3/hooks/useV3Settings", () => ({ useV3Settings: vi.fn() }));
+vi.mock("@/v3/hooks/useV3Templates", () => ({ useV3Templates: vi.fn() }));
+vi.mock("@/v3/hooks/useTomorrowPlanState", () => ({ useTomorrowPlanState: vi.fn() }));
+vi.mock("@/v3/repositories/templates", () => ({ saveTemplate: vi.fn(async () => undefined) }));
+vi.mock("@/lib/firebase/client", () => ({ db: {} }));
 
 const owners: OwnersConfig = {
   parent1: { displayName: "Jake", color: "#0af" },
   parent2: { displayName: "Sam", color: "#f0a" },
   other: [],
 };
-
 const settings = aSettings({ childId: "test-child-id", owners });
+const templates: OwnershipTemplate[] = [];
 
-const templates: OwnershipTemplate[] = [
-  {
-    id: "tmpl-saturday",
-    displayName: "Saturday",
-    napOwners: [{ slot: "parent1" }, { slot: "parent2" }, { slot: "parent1" }],
-    wakeWindowOwners: [{ slot: "parent2" }, { slot: "parent1" }, { slot: "parent2" }],
-  },
-];
+const stubPlanState = (
+  overrides: Partial<UseTomorrowPlanStateResult> = {},
+): UseTomorrowPlanStateResult => ({
+  plan: null,
+  loading: false,
+  status: "no-plan",
+  wakeTime: settings.defaultWakeTime,
+  templateId: undefined,
+  extras: [],
+  ownerOverrides: {},
+  hasEdits: false,
+  setWakeTime: vi.fn(),
+  setTemplateId: vi.fn(),
+  upsertExtra: vi.fn(),
+  removeExtra: vi.fn(),
+  setOwnerOverride: vi.fn(),
+  confirm: vi.fn(async () => undefined),
+  clear: vi.fn(async () => undefined),
+  promoteNow: vi.fn(async () => undefined),
+  ...overrides,
+});
 
-describe("TomorrowPage (V3)", () => {
+const aConfirmedPlan = (extras: Event[] = []): TomorrowPlan => ({
+  childId: "test-child-id",
+  date: "2026-05-22",
+  status: "confirmed",
+  wakeTime: 7 * 60,
+  ownerOverrides: {},
+  extras,
+  confirmedAt: 19 * 60,
+});
+
+const aDraftPlan = (extras: Event[] = []): TomorrowPlan => ({
+  childId: "test-child-id",
+  date: "2026-05-22",
+  status: "draft",
+  wakeTime: 7 * 60,
+  ownerOverrides: {},
+  extras,
+});
+
+describe("TomorrowPage (V3 + F12 PR 3)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(useV3Settings).mockReturnValue({ settings, loading: false });
     vi.mocked(useV3Templates).mockReturnValue({ templates, loading: false });
+    vi.mocked(useTomorrowPlanState).mockReturnValue(stubPlanState());
   });
 
   it("shows loading until settings resolve", () => {
@@ -81,125 +99,82 @@ describe("TomorrowPage (V3)", () => {
     expect(screen.getByText(/loading tomorrow/i)).toBeVisible();
   });
 
-  // V3 listTemplates is a one-shot fetch (not a snapshot listener), so
-  // the loading flag is the only signal the page has to wait on before
-  // the template <select> can render its options.
   it("shows loading until templates resolve", () => {
     vi.mocked(useV3Templates).mockReturnValueOnce({ templates: [], loading: true });
     renderWithAuth(<TomorrowPage />);
     expect(screen.getByText(/loading tomorrow/i)).toBeVisible();
   });
 
-  it("renders form, preview, and promote button when loaded", () => {
+  it("renders status pill, Plan form, Preview, Confirm and Clear buttons", () => {
     renderWithAuth(<TomorrowPage />);
+    expect(screen.getByText(/no plan yet/i)).toBeVisible();
     expect(screen.getByLabelText(/wake time/i)).toBeVisible();
-    expect(screen.getByLabelText(/ownership template/i)).toBeVisible();
-    expect(screen.getByRole("button", { name: /promote to today/i })).toBeVisible();
+    expect(screen.getByRole("button", { name: /confirm plan/i })).toBeVisible();
+    expect(screen.getByRole("button", { name: /clear plan/i })).toBeVisible();
   });
 
-  it("selecting a template updates the preview with template-derived owners", async () => {
+  it("Confirm is disabled when there are no edits", () => {
     renderWithAuth(<TomorrowPage />);
-    // Before selection: nap blocks have no owner attribute.
-    const initialNaps = screen
-      .getAllByTestId("timeline-block")
-      .filter((el) => el.dataset.type === "nap");
-    expect(initialNaps[0]?.dataset.owner).toBeFalsy();
-
-    await userEvent.selectOptions(screen.getByLabelText(/ownership template/i), "tmpl-saturday");
-
-    // After selection: nap blocks pick up owners from the template.
-    const naps = screen.getAllByTestId("timeline-block").filter((el) => el.dataset.type === "nap");
-    expect(naps[0]?.dataset.owner).toBe("parent1");
+    expect(screen.getByRole("button", { name: /confirm plan/i })).toBeDisabled();
   });
 
-  it("promote button calls V3 startNewDay with the form values", async () => {
+  it("Clear is disabled when no plan doc exists", () => {
     renderWithAuth(<TomorrowPage />);
-    await userEvent.click(screen.getByRole("button", { name: /promote to today/i }));
-    expect(startNewDay).toHaveBeenCalledTimes(1);
-    const args = vi.mocked(startNewDay).mock.calls[0]?.[2];
-    // The next assertion already proves `args` is defined (would throw
-    // on optional-chain undefined). Removing the redundant guard.
-    expect(args?.newWakeTime).toBe(7 * 60);
-    expect(replace).toHaveBeenCalledWith("/");
+    expect(screen.getByRole("button", { name: /clear plan/i })).toBeDisabled();
   });
 
-  it("persists buffered extras to the new day on promote", async () => {
+  it("status pill flips to 'Draft' when planState.status is draft", () => {
+    vi.mocked(useTomorrowPlanState).mockReturnValue(
+      stubPlanState({
+        plan: aDraftPlan(),
+        status: "draft",
+        hasEdits: true,
+      }),
+    );
     renderWithAuth(<TomorrowPage />);
-    // Add two extras through the drawer.
-    await userEvent.click(screen.getByRole("button", { name: /add an event/i }));
-    await userEvent.click(screen.getByRole("button", { name: /custom/i }));
-    await userEvent.click(screen.getByRole("button", { name: /^save$/i }));
-    await userEvent.click(screen.getByRole("button", { name: /add an event/i }));
-    await userEvent.click(screen.getByRole("button", { name: /custom/i }));
-    await userEvent.click(screen.getByRole("button", { name: /^save$/i }));
-
-    await userEvent.click(screen.getByRole("button", { name: /promote to today/i }));
-
-    // Both extras should be written to the events repo, stamped with
-    // the new day's id (the same id passed to startNewDay).
-    const promoteArgs = vi.mocked(startNewDay).mock.calls[0]?.[2];
-    const newDayId = promoteArgs?.newDayId;
-    // newDayId is the UUID-shaped string from newDayId() — assert the
-    // shape, not just "defined" (a non-empty string is more meaningful
-    // and the per-call dayId assertion below would have a misleading
-    // error if newDayId were `undefined`).
-    expect(newDayId).toMatch(/^day_[0-9a-f]{8}-/);
-    expect(createEvent).toHaveBeenCalledTimes(2);
-    for (const call of vi.mocked(createEvent).mock.calls) {
-      expect(call[2].dayId).toBe(newDayId);
-    }
+    expect(screen.getByText(/^draft$/i)).toBeVisible();
   });
 
-  it("uses a UUID-based newDayId (no Date.now()-style ids)", async () => {
+  it("status pill shows 'Confirmed' message when planState.status is confirmed", () => {
+    vi.mocked(useTomorrowPlanState).mockReturnValue(
+      stubPlanState({
+        plan: aConfirmedPlan(),
+        status: "confirmed",
+        hasEdits: true,
+      }),
+    );
     renderWithAuth(<TomorrowPage />);
-    await userEvent.click(screen.getByRole("button", { name: /promote to today/i }));
-    const args = vi.mocked(startNewDay).mock.calls[0]?.[2];
-    // V3 ids must come from crypto.randomUUID() (PR-C1 audit). The
-    // `day_` prefix + UUID shape is what newDayId() emits — the old
-    // `day-${Date.now()}` regression would not match.
-    expect(args?.newDayId).toMatch(/^day_[0-9a-f]{8}-/);
+    expect(screen.getByText(/will auto-apply at midnight/i)).toBeVisible();
   });
 
-  it("editing the same projected event twice does not duplicate the extra", async () => {
+  it("Confirm button calls planState.confirm when there are edits", async () => {
+    const confirm = vi.fn(async () => undefined);
+    vi.mocked(useTomorrowPlanState).mockReturnValue(
+      stubPlanState({
+        plan: aDraftPlan(),
+        status: "draft",
+        hasEdits: true,
+        confirm,
+      }),
+    );
     renderWithAuth(<TomorrowPage />);
-    // First "add extra" creates a projected template event and saves
-    // it into extras. Re-opening that same event via the timeline tap
-    // routes through the edit-of-projected branch; the bug being
-    // guarded against is a second save creating a duplicate entry.
-    //
-    // Extras now default to instant (kind upgraded to "block" only if
-    // the user enters an endTime), so the saved extra renders as an
-    // instant-chip, not a timeline-block.
-    await userEvent.click(screen.getByRole("button", { name: /add an event/i }));
-    await userEvent.click(screen.getByRole("button", { name: /custom/i }));
-    await userEvent.click(screen.getByRole("button", { name: /^save$/i }));
-
-    const extraChip = screen
-      .getAllByTestId("instant-chip")
-      .find((el) => el.dataset.type === "extra");
-    expect(extraChip).toBeDefined();
-    await userEvent.click(extraChip!);
-    await userEvent.click(screen.getByRole("button", { name: /^save$/i }));
-
-    // Tap and save again — verifies the dedup invariant on a 3rd pass.
-    const extraChips2 = screen
-      .getAllByTestId("instant-chip")
-      .filter((el) => el.dataset.type === "extra");
-    expect(extraChips2).toHaveLength(1);
-    await userEvent.click(extraChips2[0]!);
-    await userEvent.click(screen.getByRole("button", { name: /^save$/i }));
-
-    const finalExtras = screen
-      .getAllByTestId("instant-chip")
-      .filter((el) => el.dataset.type === "extra");
-    expect(finalExtras).toHaveLength(1);
+    await userEvent.click(screen.getByRole("button", { name: /confirm plan/i }));
+    expect(confirm).toHaveBeenCalledTimes(1);
   });
 
-  it("promote forwards the selected templateId", async () => {
+  it("Clear opens a confirm dialog; confirming calls planState.clear", async () => {
+    const clear = vi.fn(async () => undefined);
+    vi.mocked(useTomorrowPlanState).mockReturnValue(
+      stubPlanState({
+        plan: aConfirmedPlan(),
+        status: "confirmed",
+        clear,
+      }),
+    );
     renderWithAuth(<TomorrowPage />);
-    await userEvent.selectOptions(screen.getByLabelText(/ownership template/i), "tmpl-saturday");
-    await userEvent.click(screen.getByRole("button", { name: /promote to today/i }));
-    const args = vi.mocked(startNewDay).mock.calls[0]?.[2];
-    expect(args?.templateId).toBe("tmpl-saturday");
+    await userEvent.click(screen.getByRole("button", { name: /clear plan/i }));
+    expect(screen.getByText(/draft \/ confirmed plan for tomorrow will be deleted/i)).toBeVisible();
+    await userEvent.click(screen.getByRole("button", { name: /^clear$/i }));
+    expect(clear).toHaveBeenCalledTimes(1);
   });
 });

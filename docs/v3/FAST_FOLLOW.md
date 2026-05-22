@@ -989,6 +989,22 @@ Plus visual QA pass on every form (welcome, settings, drawer time picker, day-te
 
 ---
 
+## §F52 — Dashboard: clamp content height to viewport, kill scroll wobble
+
+**Source**: Jake, 2026-05-22.
+
+**What**: The dashboard's vertical content currently spills past the viewport by a few pixels, causing a tiny up-down "scroll wobble" — the page is scrollable for ~20-50px even when nothing meaningful is below the fold. Goal: render the dashboard at exactly viewport height (minus header / bottom-tabs / safe-area-inset). No scroll unless content genuinely overflows (e.g. action buttons would be clipped).
+
+**Fix shape**: on `(signed-in-with-child)/page.module.css` (or AppShell `.main`), set `height: calc(100dvh - <header-h> - <tabs-h>)` with `overflow: hidden` on the page container. Use `100dvh` (dynamic viewport height) so iOS Safari's URL-bar collapse doesn't add wobble. If primary CTAs (e.g. "Start new day") would be clipped at a particular viewport, allow scroll only at that breakpoint via `overflow-y: auto` + a small `min-height` floor.
+
+**Risks**: Existing internal scrolling elements (event lists, drawers) must not get clipped. Verify against the small-phone breakpoint where the dashboard is densest.
+
+**Why fast-follow**: visual polish; not blocking functionality.
+
+**Estimated effort**: ~1–2 hr (CSS + cross-breakpoint visual check + verify iOS dynamic-viewport behavior).
+
+---
+
 ## (Note) day-end clamp at midnight on canonical /timeline
 
 Folded into the PR adding onboarding step 3 (TimelineV3 `DEFAULT_VIEWPORT_END_CAP` + per-block `clampedEnd`). Listed here for traceability; no separate work needed.
