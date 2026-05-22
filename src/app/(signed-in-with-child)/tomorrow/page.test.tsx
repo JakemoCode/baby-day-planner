@@ -177,5 +177,4 @@ describe("TomorrowPage (V3 + F12 PR 3)", () => {
     await userEvent.click(screen.getByRole("button", { name: /^clear$/i }));
     expect(clear).toHaveBeenCalledTimes(1);
   });
-
 });
