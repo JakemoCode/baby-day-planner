@@ -112,3 +112,43 @@ Plan: `docs/_archive/superpowers/plans/2026-05-17-f32-retire-eod.md`.
 ## §F52 — Dashboard: kill scroll wobble
 
 Shipped in **PR #231** (`chore/tomorrow-dev-promote-and-scroll-wobble`). `AppShell.shell` switched from `min-height: 100dvh` to `height: 100dvh + overflow: hidden`; `.main` becomes the scroll container with `overflow-y: auto + min-height: 0`. TimelineV3's scroll-to-now adapted via `findScrollParent()` to walk up to the nearest overflow ancestor (falls back to window for tests / out-of-shell mounts).
+
+## §F3 — First-time user onboarding (dashboard)
+
+Shipped via **PR #191** (`feat(v3): §F3/§F10`) and extended in **PR #229** (`feat(onboarding): step 3 first-day preview`). Welcome flow + ChildProvider gate replace the empty-dashboard crash; first-day preview lets the user assign owners pre-commit. All §F3 acceptance criteria met.
+
+## §F10 — Onboarding flow: child name + DOB
+
+Shipped alongside §F3 in **PR #191**. `useCurrentChild().id` replaces `NEXT_PUBLIC_DEFAULT_CHILD ?? "aden"` everywhere in production code paths. DOB collected at onboarding.
+
+## §F12 — Confirm Tomorrow plan + auto-promote on Start Day
+
+Absorbed into §F39 and shipped across **PRs #187** (TomorrowPlan schema), **#210/#212** (auto-rollover hook), and **#230** (UI: autosave + confirm pill + draft dot + chip-tap owner picker). The /tomorrow page now persists a draft → confirm → auto-applies-at-midnight model via `useReconcileActiveDay`.
+
+## §F15 — Migrate duplicating test fixture files to `aSettings()` factory
+
+All six listed files now consume `aSettings()` — verified by grep against the audit list (`page.test.tsx`, `tomorrow/page.test.tsx`, `day-templates/page.test.tsx`, `TomorrowPreview.test.tsx`, `createEventTemplate.test.ts`, `settings.test.ts`). No standalone PR — landed organically as the engine rewrite progressed.
+
+## §F16 — Settings page row helpers should use CSS Modules
+
+Verified clean (2026-05-23 audit): 0 `style={{}}` hits in `src/app/(signed-in-with-child)/settings/`. Inline styles were removed organically as the settings UI evolved through subsequent PRs.
+
+## §F17 — Deprecate "Start Day" button; auto-anchor day at `defaultWakeTime`
+
+Shipped across **PRs #210/#212**. `useReconcileActiveDay` auto-anchors the day via `getOrCreatePlannedDay`; the legacy "Start Day" button is now gated behind `process.env.NODE_ENV === "development"` as dev scaffolding only. Day creation no longer requires user interaction.
+
+## §F18 — Retroactive edit of the day's wake time
+
+Shipped in **PR #228** (`feat(dashboard): edit today's wake time after the fact`). `EditableWakeTime` component on /timeline lets the user back-edit a day's wake time via inline `<input type="time">`; writes to `Day.wakeTime` and rebuilds the cascade.
+
+## §F36 — Owner cannot be unassigned from blocks or instant chips
+
+Shipped in **PR #186** (commit `e63dc67`). `Event.owner` is now required with `NO_OWNER = { slot: "none" }` as the absence value; OwnerPickerV3 surfaces a "None" option. Schema invariant locked via seam test.
+
+## §F39 — Tomorrow as a fully-editable plan with auto-promote at wake
+
+Three-PR arc complete: **PR #187** (TomorrowPlan schema + repo), **PR #212** (engine integration + auto-rollover via `useReconcileActiveDay`), **PR #230** (UI: `useTomorrowPlanState` + `useAutosaveTomorrowPlan` + `useV3TomorrowDraftCount` + chip-tap owner picker + draft pill + nav-dot).
+
+## §F46 — /tomorrow chip tap → drawer (not owner picker)
+
+Absorbed into the §F39 arc and shipped in **PR #230**. Chip tap on projected events opens the OwnerPickerV3 BottomSheet which writes to `TomorrowPlan.ownerOverrides[eventKey]`. Extras still get the full EventEditDrawerV3.
