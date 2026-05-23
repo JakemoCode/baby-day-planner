@@ -989,19 +989,102 @@ Plus visual QA pass on every form (welcome, settings, drawer time picker, day-te
 
 ---
 
-## §F52 — Dashboard: clamp content height to viewport, kill scroll wobble
+## §F53 — Recurring events with duration render behind other events
 
-**Source**: Jake, 2026-05-22.
+**Source**: Jake, 2026-05-23.
 
-**What**: The dashboard's vertical content currently spills past the viewport by a few pixels, causing a tiny up-down "scroll wobble" — the page is scrollable for ~20-50px even when nothing meaningful is below the fold. Goal: render the dashboard at exactly viewport height (minus header / bottom-tabs / safe-area-inset). No scroll unless content genuinely overflows (e.g. action buttons would be clipped).
+**Status**: `pending`
 
-**Fix shape**: on `(signed-in-with-child)/page.module.css` (or AppShell `.main`), set `height: calc(100dvh - <header-h> - <tabs-h>)` with `overflow: hidden` on the page container. Use `100dvh` (dynamic viewport height) so iOS Safari's URL-bar collapse doesn't add wobble. If primary CTAs (e.g. "Start new day") would be clipped at a particular viewport, allow scroll only at that breakpoint via `overflow-y: auto` + a small `min-height` floor.
+**What**: Recurring duration blocks (e.g. a daily 3pm walk) paint underneath naps / wake_windows / extras that overlap them. Likely cause: `TimelineV3.zOrder()` doesn't recognize recurring events as a distinct class and they fall through to the default `z=1` (wake_window-tier).
 
-**Risks**: Existing internal scrolling elements (event lists, drawers) must not get clipped. Verify against the small-phone breakpoint where the dashboard is densest.
+**Fix shape**: extend `zOrder()` in `src/v3/components/Timeline/TimelineV3.tsx` to give recurring blocks a tier above wake_windows but below naps (probably tier 1.5 → bump everything else, or add explicit recurring case).
 
-**Why fast-follow**: visual polish; not blocking functionality.
+**Estimated effort**: ~15 min once we confirm the canonical recurring-event discriminator (`isRecurring`? `event.recurringId`? — read the schema).
 
-**Estimated effort**: ~1–2 hr (CSS + cross-breakpoint visual check + verify iOS dynamic-viewport behavior).
+---
+
+## §F54 — Overnight bottle cascade should recalc when overnight bottle is close to wake
+
+**Source**: Jake, 2026-05-23.
+
+**Status**: `pending` (engine-shaped; may need a brief grill before coding)
+
+**What**: If an overnight bottle (e.g. 6oz at 5am) falls within one cascade "rule" of the projected first bottle of the day (e.g. 6oz at 7am wake), the bottle cascade should reflect what actually happened — baby isn't going to want 6oz two hours after 6oz. Today, the cascade ignores the overnight bottle and schedules the morning bottle as if the baby woke from a full sleep.
+
+**Hypothesis**: the cascade's "anchor" is the first wake-up of the day, not the most-recent actual bottle. The fix likely involves looking back across the night boundary to find the most-recent actual bottle event, and shifting/sizing the morning bottle off THAT anchor.
+
+**Risks**: tread carefully — bottle rules are the canonical "step back" trigger zone (per `feedback_step_back_when_complex` + 2026-05-12 simplification). Grill the model before coding so we don't add another patch-on-patch rule.
+
+**Estimated effort**: grill (~30 min) → ~1-2 hr engine + tests.
+
+---
+
+## §F55 — Overlapping instants UX (first label hidden, recurring drawer missing title, general polish)
+
+**Source**: Jake, 2026-05-23.
+
+**Status**: `pending`
+
+**What**: When two or more instant events fall within ~X minutes of each other, the cluster renders such that:
+1. The FIRST event's label is hidden / clipped.
+2. If the first event is a recurring event, there's also no label in the drawer when tapped (see §F56, which is the same root cause manifesting in the drawer surface).
+3. The general visual treatment of clustered instants "just looks bad" — needs an iteration pass for non-recurring too.
+
+**Files likely involved**: `src/v3/components/Timeline/InstantCluster.tsx`, `groupInstants.ts`, `InstantChip.tsx`.
+
+**Bundle**: ship with §F56 (drawer-title fix) since it's the same root cause for the recurring sub-case.
+
+**Estimated effort**: ~1-2 hr (render iteration + drawer fix bundled).
+
+---
+
+## §F56 — Recurring event drawer should show the event title
+
+**Source**: Jake, 2026-05-23.
+
+**Status**: `pending` (bundle with §F55)
+
+**What**: Tapping a recurring event opens the EventEditDrawerV3 with no title field populated. For good UX, the drawer should show the recurring event's name (e.g. "Tummy time", "Walk", etc.).
+
+**Fix shape**: `EventEditDrawerV3` likely resolves title via `event.label`, but recurring events may use `recurringId` to look up the name from `Settings.dailyRecurring[]`. Hydrate the title from there when present.
+
+**Estimated effort**: ~15 min (bundled with §F55).
+
+---
+
+## §F57 — Extra event with duration overlapping pump block renders as ellipses
+
+**Source**: Jake, 2026-05-23.
+
+**Status**: `pending`
+
+**What**: When an extra event with a duration overlaps a pump block in time, the layout correctly fans them horizontally — but the extra event's label text is replaced with ellipses ("…") instead of the title. Pump renders fine.
+
+**Cause hypothesis**: when the extra block's width is halved by the fan layout, the title CSS `text-overflow: ellipsis` triggers because the rendered width is below the threshold for the full label. Likely a width / min-width / padding issue in `Block.module.css` for the extra+pump fanned state.
+
+**Fix shape**: audit Block.module.css for the fanned-extra layout; either bump the line-height / wrapping to two lines, or shorten the chrome padding when the block is narrow, or use a smaller label font in the fanned state.
+
+**Estimated effort**: ~30 min (CSS iteration + visual verification).
+
+---
+
+## §F58 — Dream Feed: render at a configurable default time, always visible
+
+**Source**: Jake, 2026-05-23.
+
+**Status**: `pending` (needs design grill before coding)
+
+**What**: Currently, the dream feed bottle doesn't display on the timeline even with the right `bottlesPerDay` budget — Jake has to manually add one. Proposed shape: add a `defaultTime` field to Dream Feed settings; the dream feed bottle always renders at that time, and can be edited/adjusted (record actual time, skip, etc.).
+
+**Open design questions** (grill before coding):
+- Does the dream feed count toward the day's `bottlesPerDay` total, or is it additive?
+- If the baby wakes BEFORE the dream feed time (e.g. baby wakes at 11:30pm and dream feed default is 11pm), what happens? Skip it, shift it, or render it anyway?
+- Does enabling the dream feed surface a *new* event type or just a flagged bottle?
+- How does the "skip" path interact with the cascade for the next-morning bottle?
+
+**Why fast-follow / blocking**: currently Jake's manually adding a bottle every night, so this is real friction. But the model has a million edge cases — get the design crisp before shipping anything.
+
+**Estimated effort**: grill (~30 min) → ~1-2 hr settings field + engine + tests.
 
 ---
 
