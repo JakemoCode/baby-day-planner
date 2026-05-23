@@ -461,6 +461,52 @@ describe("R12.10 — Day.ownerOverrides applies to projected events", () => {
     expect(naps[1]!.owner).toEqual(PARENT1);
   });
 
+  // §F63: an ownerOverride is a render-time annotation, NOT an anchor.
+  // The cascade must be free to re-project the event's time. Without
+  // this guarantee, owner-only drawer edits would behave like recorded
+  // anchors (the bug Jake hit 2026-05-24 — projected nap with assigned
+  // owner stuck at original time as wake-window math pushed bedtime
+  // close).
+  it("§F63 — ownerOverride does NOT anchor the event's time or lifecycle", () => {
+    const baseSettings = aSettings({
+      wakeWindowsMinutes: [120, 135],
+      defaultNapLengthMinutes: 60,
+      bedtimeThreshold: 23 * 60,
+    });
+    // Baseline: no overrides at all.
+    const baseline = run(
+      aContext({
+        day: aDay({ wakeTime: 7 * 60 }),
+        settings: baseSettings,
+        actuals: [],
+      }),
+    );
+    const baselineNaps = baseline
+      .filter((e) => e.type === "nap")
+      .sort((a, b) => a.startTime - b.startTime);
+    const baselineNap1Start = baselineNaps[0]!.startTime;
+
+    // With override: same setup + nap_1 owner override.
+    const withOverride = run(
+      aContext({
+        day: aDay({
+          wakeTime: 7 * 60,
+          ownerOverrides: { nap_1: PARENT2 },
+        }),
+        settings: baseSettings,
+        actuals: [],
+      }),
+    );
+    const naps = withOverride
+      .filter((e) => e.type === "nap")
+      .sort((a, b) => a.startTime - b.startTime);
+
+    // Owner applied AND time identical to baseline AND lifecycle still projected.
+    expect(naps[0]!.owner).toEqual(PARENT2);
+    expect(naps[0]!.startTime).toBe(baselineNap1Start);
+    expect(naps[0]!.lifecycle.state).toBe("projected");
+  });
+
   it("null in the map = explicit NO_OWNER (beats template default)", () => {
     const ctx = aContext({
       day: aDay({

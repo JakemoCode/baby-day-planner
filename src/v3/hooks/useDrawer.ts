@@ -116,16 +116,17 @@ export function useDrawer(
     setDrawer({ open: false });
   };
 
-  // True iff the only field that changed between source and edited is `owner`.
-  // Time / endTime / amountOz / label all unchanged → it's an owner-only edit.
+  // True iff (a) every non-owner field is unchanged, AND (b) owner
+  // actually differs. The owner-differs check matters: without it,
+  // tapping Save with no changes at all would still fire a Firestore
+  // write via setOwnerOverride. JSON.stringify is fine here — OwnerRef
+  // is a flat object (slot + optional otherId).
   function isOwnerOnlyEdit(source: Event, edited: Event): boolean {
     if (source.startTime !== edited.startTime) return false;
     if (source.endTime !== edited.endTime) return false;
     if (source.amountOz !== edited.amountOz) return false;
     if (source.label !== edited.label) return false;
-    // Owner must actually differ (else the save is a no-op; still route
-    // to ownerOverride to be safe — idempotent).
-    return true;
+    return JSON.stringify(source.owner) !== JSON.stringify(edited.owner);
   }
 
   const onDelete = async (event: Event) => {
