@@ -65,6 +65,8 @@ const DEFAULT_PX_PER_HOUR = 120;
 // §F55 — chip + breathing room. Two instant clusters whose vertical
 // pixel ranges fall within this window collapse into a single "N events"
 // chip. 38 px ≈ wrapped chip height; 4 px ≈ leader-line breathing room.
+// If the chip's padding/font in CollapsedInstantCluster.module.css
+// changes, recompute COLLAPSE_CHIP_HEIGHT_PX here.
 const COLLAPSE_CHIP_HEIGHT_PX = 38;
 const COLLAPSE_VERTICAL_GAP_PX = 4;
 

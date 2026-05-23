@@ -219,7 +219,7 @@ describe("TimelineV3", () => {
     ];
     render(<TimelineV3 events={events} owners={owners} />);
     // The two near-overlapping instants collapse into one chip.
-    expect(screen.getByTestId("collapsed-instant-cluster")).toBeInTheDocument();
+    expect(screen.getByTestId("collapsed-instant-cluster")).toBeVisible();
     expect(screen.queryAllByTestId("instant-chip")).toHaveLength(0);
   });
 
@@ -243,7 +243,7 @@ describe("TimelineV3", () => {
     render(<TimelineV3 events={events} owners={owners} onEventTap={() => {}} />);
     await userEvent.click(screen.getByRole("button", { name: /2 events/ }));
     // BottomSheet uses role="dialog"
-    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    expect(screen.getByRole("dialog")).toBeVisible();
     expect(screen.getByText("Vitamin")).toBeVisible();
     expect(screen.getByText("Diaper")).toBeVisible();
   });
@@ -268,7 +268,7 @@ describe("TimelineV3", () => {
     await userEvent.click(screen.getByRole("button", { name: /2 events/ }));
     await userEvent.click(screen.getByRole("button", { name: /Diaper/ }));
     expect(onEventTap).toHaveBeenCalledWith(diaper);
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(screen.queryByRole("dialog")).toBeNull();
   });
 
   it("§F55: chips far apart in time still render individually (no collapse)", () => {
@@ -277,7 +277,7 @@ describe("TimelineV3", () => {
       ev({ id: "b", type: "bottle", kind: "instant", startTime: 13 * 60, label: "Bottle 2" }),
     ];
     render(<TimelineV3 events={events} owners={owners} />);
-    expect(screen.queryByTestId("collapsed-instant-cluster")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("collapsed-instant-cluster")).toBeNull();
     expect(screen.queryAllByTestId("instant-chip")).toHaveLength(2);
   });
 

@@ -48,7 +48,8 @@ export function CollapsedInstantCluster({
     startMinutes === endMinutes
       ? formatTimeShort(startMinutes)
       : `${formatTimeShort(startMinutes)}–${formatTimeShort(endMinutes)}`;
-  const a11y = `${count} events from ${range}, tap to view`;
+  const preposition = startMinutes === endMinutes ? "at" : "from";
+  const a11y = `${count} events ${preposition} ${range}, tap to view`;
 
   // Cap displayed dots at 4 so the chip width stays bounded. The full
   // list lives in the sheet anyway.
@@ -68,8 +69,8 @@ export function CollapsedInstantCluster({
     >
       <button type="button" className={styles.chip} onClick={onTap} aria-label={a11y}>
         <span className={styles.dotStack} aria-hidden="true">
-          {dotEvents.map((e, i) => (
-            <span key={i} className={styles.dot} data-type={e.type} />
+          {dotEvents.map((e) => (
+            <span key={e.id} className={styles.dot} data-type={e.type} />
           ))}
         </span>
         <span className={styles.body}>
