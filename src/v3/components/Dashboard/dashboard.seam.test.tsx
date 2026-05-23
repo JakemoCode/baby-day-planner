@@ -177,21 +177,21 @@ describe("Dashboard seam — real projectDay + new panels", () => {
     expect(next?.startTime).toBeGreaterThan(11 * 60 + 45);
 
     // Panel totals via helpers (independent confirmation of the join).
-    // §F48c: the in-progress nap's placeholder endTime is in the
-    // future (11:45 > now=11:00), so it's excluded from today's
-    // totals — it'll get counted when actually completed. Same
-    // filter that prevents back-edited future-endTime naps from
-    // inflating the line.
+    // §F48d: the in-progress nap (startTime=10:45, placeholder
+    // endTime=11:45, now=11:00) contributes its ELAPSED 15 min —
+    // not the full 60-min placeholder duration. Future-startTime
+    // naps would be fully excluded; in-progress ones clamp endTime
+    // to now.
     const bTotals = bottleTotals(actuals, now);
     expect(bTotals).toEqual({ count: 2, oz: 9 });
 
     const nTotals = napTotals(actuals, now);
-    // Only the genuinely-completed nap (9:00–10:00) contributes.
-    expect(nTotals).toEqual({ count: 1, totalMinutes: 60 });
+    // Completed 9:00–10:00 (60 min) + in-progress 10:45–now (15 min).
+    expect(nTotals).toEqual({ count: 2, totalMinutes: 75 });
 
     // Rendered text matches.
     expect(screen.getByText(/today: 2 bottles · 9oz/i)).toBeVisible();
-    expect(screen.getByText(/today: 1 nap · 1h/i)).toBeVisible();
+    expect(screen.getByText(/today: 2 naps · 1h 15m/i)).toBeVisible();
   });
 
   it("past bedtime threshold with bedtime completed: NextEventCard shows the end-of-day empty copy", () => {

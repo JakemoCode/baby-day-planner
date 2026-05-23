@@ -38,9 +38,18 @@ export function napTotals(events: Event[], now: TimeMin): { count: number; total
     if (e.type !== "nap") continue;
     if (!isRecorded(e.lifecycle)) continue;
     if (e.endTime === undefined) continue;
-    if (e.endTime > now) continue;
+    // §F48c: skip naps that haven't started yet (genuinely future
+    // back-edits, e.g. user fat-fingers tomorrow's nap onto today).
+    if (e.startTime > now) continue;
+    // §F48d: a nap in-progress right now (startTime <= now < endTime,
+    // typically with a placeholder endTime = startTime + defaultNapLen)
+    // should contribute its ELAPSED time to today's total, not its
+    // placeholder duration. Naive `endTime > now → exclude` dropped
+    // legitimately-in-progress naps entirely and overcounted them
+    // before. Clamp endTime to now for the duration sum.
+    const effectiveEnd = e.endTime > now ? now : e.endTime;
     count += 1;
-    totalMinutes += e.endTime - e.startTime;
+    totalMinutes += effectiveEnd - e.startTime;
   }
   return { count, totalMinutes };
 }

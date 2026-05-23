@@ -90,14 +90,31 @@ describe("napTotals", () => {
     expect(napTotals(events, END_OF_DAY)).toEqual({ count: 2, totalMinutes: 60 + 78 });
   });
 
-  // §F48c regression: a nap back-edited to a future endTime must not
-  // inflate today's count or totalMinutes.
-  it("excludes naps whose endTime is in the future relative to now", () => {
-    const now = (14 * 60 + 30) as TimeMin;
+  // §F48d: an in-progress nap (startTime in past, endTime in future
+  // — typically a placeholder = startTime + defaultNapLen) contributes
+  // its ELAPSED time, not its placeholder duration. Excluding it
+  // outright would hide the fact that the baby is napping right now.
+  it("clamps in-progress nap's contribution to elapsed time (now - startTime)", () => {
+    const now = (14 * 60 + 30) as TimeMin; // 2:30pm
+    const events: Event[] = [
+      // Completed: 1 hr.
+      nap({ startTime: (9 * 60) as TimeMin, endTime: (10 * 60) as TimeMin }),
+      // In-progress: started 1:15pm, placeholder endTime 4:02pm.
+      // 75 min elapsed so far.
+      nap({ startTime: (13 * 60 + 15) as TimeMin, endTime: (16 * 60 + 2) as TimeMin }),
+    ];
+    expect(napTotals(events, now)).toEqual({ count: 2, totalMinutes: 60 + 75 });
+  });
+
+  // §F48c: a nap whose startTime is genuinely in the future (e.g. a
+  // fat-fingered next-day nap accidentally on today's doc) is fully
+  // excluded — it hasn't started yet.
+  it("excludes naps whose startTime is in the future relative to now", () => {
+    const now = (14 * 60) as TimeMin;
     const events: Event[] = [
       nap({ startTime: (9 * 60) as TimeMin, endTime: (10 * 60) as TimeMin }),
-      // User back-edited a nap's endTime to 4:02pm (in the future).
-      nap({ startTime: (13 * 60 + 15) as TimeMin, endTime: (16 * 60 + 2) as TimeMin }),
+      // Not-yet-started.
+      nap({ startTime: (16 * 60) as TimeMin, endTime: (17 * 60) as TimeMin }),
     ];
     expect(napTotals(events, now)).toEqual({ count: 1, totalMinutes: 60 });
   });
