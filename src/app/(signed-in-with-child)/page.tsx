@@ -240,6 +240,7 @@ export default function DashboardPage() {
           defaultAmountOz={settings.defaultBottleAmountOz}
           dayId={day.id}
           nextNumber={nextBottleNumber}
+          {...(nb ? { nextProjectedBottle: nb } : {})}
           onLog={handleLogBottle}
           minIntervalMinutes={settings.minBottleIntervalMinutes ?? 20}
           {...(lastBottleTime !== undefined ? { lastBottleTime } : {})}
