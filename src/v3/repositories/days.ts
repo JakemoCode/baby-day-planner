@@ -104,6 +104,36 @@ export async function updateDay(
 }
 
 /**
+ * Annotate a single event slot's owner on the active day without
+ * anchoring its time.
+ *
+ * Why: drawer owner-only edits on projected events previously
+ * promoted lifecycle to "recorded", which the engine treats as an
+ * anchor — the cascade then refused to re-project the event's time.
+ * Symptom: a recorded nap from 4:35-5:20 with bedtime at 6:20 because
+ * the user assigned an owner to projected nap_3 hours earlier and
+ * the wake-window cascade was no longer free to push it.
+ *
+ * Fix: route owner-only edits to `Day.ownerOverrides[eventKey]`. The
+ * engine's R12.10 rule applies these overrides at render time
+ * without touching projected event times.
+ *
+ * Field-path update via Firestore's dot-notation so we merge into
+ * the existing `ownerOverrides` map rather than replacing it.
+ */
+export async function updateDayOwnerOverride(
+  db: Firestore,
+  childId: string,
+  dayId: string,
+  eventKey: string,
+  owner: OwnerRef,
+): Promise<void> {
+  await updateDoc(dayRef(db, childId, dayId), {
+    [`ownerOverrides.${eventKey}`]: owner,
+  });
+}
+
+/**
  * Edit today's wakeTime AND close any in-progress overnight bedtime
  * event in the same transaction.
  *

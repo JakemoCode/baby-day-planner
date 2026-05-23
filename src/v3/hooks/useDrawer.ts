@@ -50,11 +50,21 @@ export type UseDrawerResult = {
  *                  or a local-state updater for the Tomorrow page).
  * @param deleteOptimistic Delete an event by id. Only called for events
  *                  that are confirmed to be in actuals.
+ * @param setOwnerOverride OPTIONAL — write a single owner override to
+ *                  `Day.ownerOverrides[eventKey]` without anchoring the
+ *                  event's time. When provided, owner-only edits on
+ *                  projected events route here instead of through
+ *                  `saveEvent`, keeping the event projected and letting
+ *                  the cascade re-project its time freely. Without this
+ *                  callback, the legacy behavior (write a recorded doc)
+ *                  applies — used by /tomorrow page which has its own
+ *                  ownerOverrides plumbing.
  */
 export function useDrawer(
   actuals: Event[],
   saveEvent: (event: Event) => Promise<void> | void,
   deleteOptimistic: (eventId: string) => Promise<void> | void,
+  setOwnerOverride?: (eventKey: string, owner: Event["owner"]) => Promise<void> | void,
 ): UseDrawerResult {
   const [drawer, setDrawer] = useState<DrawerState>({ open: false });
 
@@ -73,11 +83,28 @@ export function useDrawer(
   const onSave = async (event: Event) => {
     if (drawer.open && drawer.mode === "edit") {
       const originalId = drawer.event.id;
+      const source = drawer.event;
       const isActual = actuals.some((e) => e.id === originalId);
+      // Owner-only edit on a projected event: route to Day.ownerOverrides
+      // so the cascade stays free to re-project the event's time. Without
+      // this, the drawer's lifecycle-reducer would promote to "recorded"
+      // and anchor the projected nap/bottle's time — bug Jake hit
+      // 2026-05-24 (nap 4:35-5:20 stuck while bedtime threshold approached).
+      if (
+        !isActual &&
+        setOwnerOverride &&
+        source.lifecycle.state === "projected" &&
+        isOwnerOnlyEdit(source, event)
+      ) {
+        await setOwnerOverride(event.eventKey, event.owner);
+        setDrawer({ open: false });
+        return;
+      }
       if (!isActual) {
-        // Projected event: re-ID deterministically so subsequent edits
-        // route through update (not create) — fixes the intermittent
-        // wake-window owner bug from PR #186.
+        // Projected event with a time/amount/label change: re-ID
+        // deterministically so subsequent edits route through update
+        // (not create) — fixes the intermittent wake-window owner bug
+        // from PR #186.
         await saveEvent({ ...event, id: `recorded_${event.eventKey}` });
       } else {
         await saveEvent(event);
@@ -88,6 +115,19 @@ export function useDrawer(
     }
     setDrawer({ open: false });
   };
+
+  // True iff (a) every non-owner field is unchanged, AND (b) owner
+  // actually differs. The owner-differs check matters: without it,
+  // tapping Save with no changes at all would still fire a Firestore
+  // write via setOwnerOverride. JSON.stringify is fine here — OwnerRef
+  // is a flat object (slot + optional otherId).
+  function isOwnerOnlyEdit(source: Event, edited: Event): boolean {
+    if (source.startTime !== edited.startTime) return false;
+    if (source.endTime !== edited.endTime) return false;
+    if (source.amountOz !== edited.amountOz) return false;
+    if (source.label !== edited.label) return false;
+    return JSON.stringify(source.owner) !== JSON.stringify(edited.owner);
+  }
 
   const onDelete = async (event: Event) => {
     if (drawer.open && drawer.mode === "edit") {

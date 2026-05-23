@@ -16,7 +16,12 @@ import { useV3Projection } from "@/v3/hooks/useV3Projection";
 import { useV3TomorrowPlan } from "@/v3/hooks/useV3TomorrowPlan";
 import { useReconcileActiveDay } from "@/v3/hooks/useReconcileActiveDay";
 import { useDrawer } from "@/v3/hooks/useDrawer";
-import { getOrCreatePlannedDay, promoteFromPlan, startNewDay } from "@/v3/repositories/days";
+import {
+  getOrCreatePlannedDay,
+  promoteFromPlan,
+  startNewDay,
+  updateDayOwnerOverride,
+} from "@/v3/repositories/days";
 import { createEvent, reconcileDuplicateEventDocs } from "@/v3/repositories/events";
 import { db } from "@/lib/firebase/client";
 import { DashboardSkeleton } from "@/v3/components/Dashboard/DashboardSkeleton";
@@ -72,6 +77,9 @@ export default function DashboardPage() {
     actuals,
     saveEvent,
     deleteOptimistic,
+    day?.id
+      ? (eventKey, owner) => updateDayOwnerOverride(db, CHILD_ID, day.id, eventKey, owner)
+      : undefined,
   );
   const [pickerOpen, setPickerOpen] = useState(false);
   const [wakeSheetOpen, setWakeSheetOpen] = useState(false);
