@@ -101,13 +101,6 @@
   flex: 1 1 auto;
 }
 
-.topRow {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 6px;
-  min-width: 0;
-}
-
 .label {
   font-size: 12px;
   font-weight: var(--weight-semibold);
@@ -125,10 +118,11 @@
   flex-shrink: 0;
 }
 
-.secondRow {
+.hint {
   font-size: 11px;
   line-height: 1.1;
   color: var(--color-muted);
+  font-style: italic;
 }
 
 .chevron {

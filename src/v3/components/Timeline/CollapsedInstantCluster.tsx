@@ -73,11 +73,9 @@ export function CollapsedInstantCluster({
           ))}
         </span>
         <span className={styles.body}>
-          <span className={styles.topRow}>
-            <span className={styles.label}>{count} events</span>
-            <span className={styles.time}>{range}</span>
-          </span>
-          <span className={styles.secondRow}>Tap to view</span>
+          <span className={styles.label}>{count} events</span>
+          <span className={styles.time}>{range}</span>
+          <span className={styles.hint}>Tap to view</span>
         </span>
         <span className={styles.chevron} aria-hidden="true">
           ▾
