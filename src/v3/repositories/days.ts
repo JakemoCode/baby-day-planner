@@ -103,6 +103,62 @@ export async function updateDay(
   await updateDoc(dayRef(db, childId, dayId), patch);
 }
 
+/**
+ * Edit today's wakeTime AND close any in-progress overnight bedtime
+ * event in the same transaction.
+ *
+ * Without the bedtime trim, the dashboard's `inProgressBedtime` query
+ * (`actuals.find(e => e.type === "bedtime" && e.lifecycle.state === "recorded")`
+ * in `(signed-in-with-child)/page.tsx`) keeps treating yesterday's
+ * bedtime as in-progress — the banner renders "Bedtime in progress —
+ * 0m" and the primary CTA stays "End overnight sleep" even after the
+ * user clearly indicated wake-up by editing today's wakeTime.
+ *
+ * Mirrors `startNewDay`'s bedtime-trim shape: `lifecycle` reduces via
+ * TIME_EDIT (→ "completed"), `endTime = newWakeTime + 24*60` so the
+ * value lands after the bedtime's startTime in the same cross-day
+ * frame the engine expects.
+ *
+ * Idempotent: if no in-progress bedtime exists, only the Day write
+ * runs.
+ */
+export async function editWakeTime(
+  db: Firestore,
+  childId: string,
+  dayId: string,
+  newWakeTime: TimeMin,
+): Promise<void> {
+  // Read first (outside the tx) — runTransaction doesn't support
+  // queries, only direct doc fetches. The in-progress bedtime is
+  // discovered by enumerating today's events collection.
+  const eventsSnap = await getDocs(
+    collection(db, eventsCollectionPath(childId, dayId)).withConverter(v3EventConverter),
+  );
+  let bedtimeToTrim: { ref: ReturnType<typeof doc>; current: Event } | null = null;
+  for (const d of eventsSnap.docs) {
+    const e = d.data();
+    if (e.type === "bedtime" && e.lifecycle.state === "recorded") {
+      bedtimeToTrim = { ref: d.ref, current: e };
+      break;
+    }
+  }
+
+  const trimEnd: TimeMin = newWakeTime + 24 * 60;
+
+  await runTransaction(db, async (tx) => {
+    tx.update(dayRef(db, childId, dayId), { wakeTime: newWakeTime });
+    if (bedtimeToTrim) {
+      tx.update(bedtimeToTrim.ref, {
+        endTime: trimEnd,
+        lifecycle: reduceLifecycle(bedtimeToTrim.current.lifecycle, {
+          type: "TIME_EDIT",
+          at: trimEnd,
+        }),
+      });
+    }
+  });
+}
+
 export async function listArchivedDays(db: Firestore, childId: string, max = 7): Promise<Day[]> {
   // Fetch extra so we have headroom to collapse same-date duplicates without
   // shrinking the result below `max`. `startNewDay` mints

@@ -21,6 +21,7 @@ import { createEvent, listEvents } from "./events";
 import {
   archiveDay,
   createDay,
+  editWakeTime,
   getDay,
   getDayByDate,
   listArchivedDays,
@@ -365,6 +366,69 @@ describe("v3 days repository", () => {
     // Archive completed; new day created. Just confirm the call didn't throw.
     const yesterday = await getDay(database, "child-1", "day-yesterday");
     expect(yesterday?.status).toBe("archived");
+  });
+
+  // -------------------------------------------------------------------------
+  // editWakeTime — the /timeline EditableWakeTime affordance must also
+  // close any in-progress overnight bedtime in TODAY's events, otherwise
+  // the dashboard renders "Bedtime in progress — 0m" forever even
+  // though the user clearly woke up by setting today's wakeTime.
+  // -------------------------------------------------------------------------
+
+  it("editWakeTime updates Day.wakeTime AND trims an in-progress bedtime in today's events", async () => {
+    const database = db();
+    await createDay(database, day({ id: "day-today", wakeTime: 7 * 60 }));
+    // Yesterday's bedtime ended up on today's events (the dashboard's
+    // inProgressBedtime query reads from today's actuals).
+    await createEvent(database, "child-1", recordedBedtime({ dayId: "day-today" }));
+
+    await editWakeTime(database, "child-1", "day-today", 6 * 60);
+
+    const got = await getDay(database, "child-1", "day-today");
+    expect(got?.wakeTime).toBe(6 * 60);
+
+    const events = await listEvents(database, "child-1", "day-today");
+    const bedtime = events.find((e) => e.type === "bedtime");
+    expect(bedtime).toBeDefined();
+    // Trimmed in the cross-day frame so it lands after bedtime.startTime.
+    expect(bedtime!.endTime).toBe(6 * 60 + 24 * 60);
+    // TIME_EDIT transitions a "recorded" lifecycle to "completed".
+    expect(bedtime!.lifecycle.state).toBe("completed");
+  });
+
+  it("editWakeTime is a no-op for bedtime trim when no in-progress bedtime exists", async () => {
+    const database = db();
+    await createDay(database, day({ id: "day-today", wakeTime: 7 * 60 }));
+    // No bedtime in events.
+
+    await editWakeTime(database, "child-1", "day-today", 6 * 60);
+
+    const got = await getDay(database, "child-1", "day-today");
+    expect(got?.wakeTime).toBe(6 * 60);
+    const events = await listEvents(database, "child-1", "day-today");
+    expect(events).toEqual([]);
+  });
+
+  it("editWakeTime leaves an already-completed bedtime alone", async () => {
+    const database = db();
+    await createDay(database, day({ id: "day-today", wakeTime: 7 * 60 }));
+    const userEnd = 5 * 60 + 30 + 24 * 60;
+    await createEvent(
+      database,
+      "child-1",
+      recordedBedtime({
+        dayId: "day-today",
+        endTime: userEnd,
+        lifecycle: { state: "completed", committedAt: userEnd },
+      }),
+    );
+
+    await editWakeTime(database, "child-1", "day-today", 6 * 60);
+
+    const events = await listEvents(database, "child-1", "day-today");
+    const bedtime = events.find((e) => e.type === "bedtime");
+    expect(bedtime!.endTime).toBe(userEnd);
+    expect(bedtime!.lifecycle.state).toBe("completed");
   });
 
   // -------------------------------------------------------------------------

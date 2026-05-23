@@ -10,7 +10,7 @@ import { useV3Settings } from "@/v3/hooks/useV3Settings";
 import { useV3Templates } from "@/v3/hooks/useV3Templates";
 import { useDrawer } from "@/v3/hooks/useDrawer";
 import { db } from "@/lib/firebase/client";
-import { updateDay } from "@/v3/repositories/days";
+import { editWakeTime } from "@/v3/repositories/days";
 import { LoadingState } from "@/components/shared/LoadingState";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { FAB } from "@/components/shared/FAB";
@@ -67,7 +67,7 @@ export default function TimelinePage() {
 
   const handleEditWakeTime = async (next: TimeMin) => {
     if (day.wakeTime === undefined) return;
-    await updateDay(db, CHILD_ID, day.id, { wakeTime: next });
+    await editWakeTime(db, CHILD_ID, day.id, next);
   };
 
   return (
