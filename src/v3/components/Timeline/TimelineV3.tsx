@@ -1,12 +1,14 @@
 "use client";
 
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { Event, OwnersConfig, TimeMin } from "../../schemas";
 import { Block } from "./Block";
 import { InstantCluster } from "./InstantCluster";
+import { CollapsedInstantCluster } from "./CollapsedInstantCluster";
+import { GroupedEventsSheet } from "./GroupedEventsSheet";
 import { NowBar } from "./NowBar";
 import { PUTDOWN_KIND_TAG } from "./expandPutdown";
-import { groupInstants } from "./groupInstants";
+import { groupInstants, mergeNearbyGroups, type InstantGroup } from "./groupInstants";
 import styles from "./TimelineV2.module.css";
 
 export type TimelineV3Props = {
@@ -60,6 +62,11 @@ const DEFAULT_VIEWPORT = { start: 5 * 60, end: 21 * 60 };
 const DEFAULT_VIEWPORT_END_CAP = 24 * 60; // midnight
 const SCROLL_TOP_PADDING_PX = 80;
 const DEFAULT_PX_PER_HOUR = 120;
+// §F55 — chip + breathing room. Two instant clusters whose vertical
+// pixel ranges fall within this window collapse into a single "N events"
+// chip. 38 px ≈ wrapped chip height; 4 px ≈ leader-line breathing room.
+const COLLAPSE_CHIP_HEIGHT_PX = 38;
+const COLLAPSE_VERTICAL_GAP_PX = 4;
 
 function findScrollParent(el: HTMLElement): HTMLElement | Window {
   let node: HTMLElement | null = el.parentElement;
@@ -147,13 +154,19 @@ export function TimelineV3({
     const origin = Math.max(0, minMin - viewportPaddingMin);
     const height = (maxMin + viewportPaddingMin - origin) * pxPerMin;
 
+    const rawGroups = groupInstants(events);
+    const collisionMinutes = (COLLAPSE_CHIP_HEIGHT_PX + COLLAPSE_VERTICAL_GAP_PX) / pxPerMin;
+    const mergedGroups = mergeNearbyGroups(rawGroups, collisionMinutes);
     return {
       blocks: events.filter((e) => e.kind === "block"),
-      groups: groupInstants(events),
+      groups: mergedGroups,
       originMinutes: origin,
       heightPx: height,
     };
   }, [events, pxPerMin, viewportPaddingMin, clampToEvents]);
+
+  // §F55 sheet state — populated when the user taps a collapsed cluster.
+  const [groupedSheet, setGroupedSheet] = useState<InstantGroup | null>(null);
 
   useEffect(() => {
     if (hasScrolledRef.current) return;
@@ -272,29 +285,59 @@ export function TimelineV3({
             );
           })}
 
-        {groups.map((g) => (
-          <InstantCluster
-            key={g.key}
-            items={g.items}
-            topPx={yOf(
-              g.startMinutes,
-            )} /* §F2b: was -12 magic offset; cluster self-centers via translateY(-50%) so vertical alignment stays correct as chip grows in height */
-            rightPx={4} /* §F2b: was BLOCK_RIGHT_INSET - GUTTER_W (24) — chips hug viewport edge */
-            widthPx={
-              140
-            } /* §F2b: was GUTTER_W - 8 (116) — give labels room; max-safe vs BLOCK_RIGHT_INSET 148 */
-            leaderWidthPx={LEADER_LINE_W}
-            owners={owners}
-            colorMode={colorMode}
-            past={isPast(g.startMinutes)}
-            {...(onEventTap ? { onEventTap } : {})}
-          />
-        ))}
+        {groups.map((g) => {
+          const topPx = yOf(g.startMinutes);
+          const past = isPast(g.startMinutes);
+          // §F55: clusters with 2+ events render collapsed; tap opens
+          // a sheet that lists each event with its own tap target.
+          if (g.items.length >= 2) {
+            return (
+              <CollapsedInstantCluster
+                key={g.key}
+                items={g.items}
+                startMinutes={g.startMinutes}
+                endMinutes={g.endMinutes}
+                topPx={topPx}
+                rightPx={4}
+                widthPx={140}
+                leaderWidthPx={LEADER_LINE_W}
+                past={past}
+                onTap={() => setGroupedSheet(g)}
+              />
+            );
+          }
+          return (
+            <InstantCluster
+              key={g.key}
+              items={g.items}
+              topPx={topPx} /* §F2b: cluster self-centers via translateY(-50%) */
+              rightPx={4}
+              widthPx={140}
+              leaderWidthPx={LEADER_LINE_W}
+              owners={owners}
+              colorMode={colorMode}
+              past={past}
+              {...(onEventTap ? { onEventTap } : {})}
+            />
+          );
+        })}
 
         {nowMinutes !== undefined && (
           <NowBar topPx={yOf(nowMinutes)} axisWidthPx={AXIS_W} nowMinutes={nowMinutes} />
         )}
       </div>
+      <GroupedEventsSheet
+        open={groupedSheet !== null}
+        items={groupedSheet?.items ?? []}
+        startMinutes={groupedSheet?.startMinutes ?? 0}
+        endMinutes={groupedSheet?.endMinutes ?? 0}
+        owners={owners}
+        onCancel={() => setGroupedSheet(null)}
+        onTapEvent={(event) => {
+          setGroupedSheet(null);
+          onEventTap?.(event);
+        }}
+      />
     </div>
   );
 }

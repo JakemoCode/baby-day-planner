@@ -200,6 +200,87 @@ describe("TimelineV3", () => {
     expect(height120).toBeCloseTo(height60 * 2, 0);
   });
 
+  it("§F55: renders a collapsed cluster when two instants would overlap vertically", async () => {
+    const events: Event[] = [
+      ev({
+        id: "v",
+        type: "daily_recurring",
+        kind: "instant",
+        startTime: 9 * 60 + 30,
+        label: "Vitamin",
+      }),
+      ev({
+        id: "d",
+        type: "daily_recurring",
+        kind: "instant",
+        startTime: 9 * 60 + 35,
+        label: "Diaper",
+      }),
+    ];
+    render(<TimelineV3 events={events} owners={owners} />);
+    // The two near-overlapping instants collapse into one chip.
+    expect(screen.getByTestId("collapsed-instant-cluster")).toBeInTheDocument();
+    expect(screen.queryAllByTestId("instant-chip")).toHaveLength(0);
+  });
+
+  it("§F55: tapping the collapsed cluster opens a sheet listing both events", async () => {
+    const events: Event[] = [
+      ev({
+        id: "v",
+        type: "daily_recurring",
+        kind: "instant",
+        startTime: 9 * 60 + 30,
+        label: "Vitamin",
+      }),
+      ev({
+        id: "d",
+        type: "daily_recurring",
+        kind: "instant",
+        startTime: 9 * 60 + 35,
+        label: "Diaper",
+      }),
+    ];
+    render(<TimelineV3 events={events} owners={owners} onEventTap={() => {}} />);
+    await userEvent.click(screen.getByRole("button", { name: /2 events/ }));
+    // BottomSheet uses role="dialog"
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    expect(screen.getByText("Vitamin")).toBeVisible();
+    expect(screen.getByText("Diaper")).toBeVisible();
+  });
+
+  it("§F55: tapping a sheet row calls onEventTap with that event and closes the sheet", async () => {
+    const onEventTap = vi.fn();
+    const vitamin = ev({
+      id: "v",
+      type: "daily_recurring",
+      kind: "instant",
+      startTime: 9 * 60 + 30,
+      label: "Vitamin",
+    });
+    const diaper = ev({
+      id: "d",
+      type: "daily_recurring",
+      kind: "instant",
+      startTime: 9 * 60 + 35,
+      label: "Diaper",
+    });
+    render(<TimelineV3 events={[vitamin, diaper]} owners={owners} onEventTap={onEventTap} />);
+    await userEvent.click(screen.getByRole("button", { name: /2 events/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Diaper/ }));
+    expect(onEventTap).toHaveBeenCalledWith(diaper);
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("§F55: chips far apart in time still render individually (no collapse)", () => {
+    const events: Event[] = [
+      ev({ id: "a", type: "bottle", kind: "instant", startTime: 9 * 60, label: "Bottle 1" }),
+      ev({ id: "b", type: "bottle", kind: "instant", startTime: 13 * 60, label: "Bottle 2" }),
+    ];
+    render(<TimelineV3 events={events} owners={owners} />);
+    expect(screen.queryByTestId("collapsed-instant-cluster")).not.toBeInTheDocument();
+    expect(screen.queryAllByTestId("instant-chip")).toHaveLength(2);
+  });
+
   // §11.A wake-instant deduplication: WAIVED. V3's EventType union does not
   // include "wake" (per src/v3/schemas.ts — wake is derived from Day.wakeTime,
   // never a top-level event), so the conflict the V2 test guarded against

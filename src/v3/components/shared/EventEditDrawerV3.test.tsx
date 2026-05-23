@@ -106,6 +106,36 @@ describe("EventEditDrawerV3", () => {
     expect(screen.queryByLabelText("End time")).not.toBeInTheDocument();
   });
 
+  it("§F56: drawer heading for a recurring event includes the event label", () => {
+    const recurring: Event = {
+      id: "rec-1",
+      dayId: "d-1",
+      eventKey: "recurring_tummy",
+      type: "daily_recurring",
+      kind: "instant",
+      startTime: 10 * 60,
+      label: "Tummy time",
+      hasPutdown: false,
+      owner: NO_OWNER,
+      lifecycle: { state: "projected" },
+    };
+    render(
+      <EventEditDrawerV3
+        open
+        mode="edit"
+        event={recurring}
+        owners={owners}
+        nowMinutes={NOW}
+        bedtimeThreshold={THRESHOLD}
+        defaultWakeTime={DEFAULT_WAKE_TIME}
+        onSave={() => {}}
+        onCancel={() => {}}
+      />,
+    );
+    const heading = screen.getByRole("heading", { level: 2 });
+    expect(heading).toHaveTextContent("Tummy time");
+  });
+
   it("saves owner-only edit as overridden lifecycle", async () => {
     const onSave = vi.fn();
     render(

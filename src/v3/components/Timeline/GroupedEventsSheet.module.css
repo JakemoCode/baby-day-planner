@@ -1,0 +1,105 @@
+/*
+ * §F55 — list-sheet rendered for a collapsed cluster of 2+ nearby
+ * instant events. Each row is a tap target that routes to the existing
+ * EventEditDrawer flow via the parent.
+ */
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.row + .row .rowButton {
+  border-top: 1px solid var(--color-border);
+}
+
+.row {
+  margin: 0;
+}
+
+.rowButton {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 12px 8px;
+  background: transparent;
+  border: none;
+  font: inherit;
+  color: var(--color-fg);
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--motion-fast) var(--easing-out);
+}
+
+@media (hover: hover) {
+  .rowButton:hover {
+    background: var(--color-bg);
+  }
+}
+
+.rowButton:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: -2px;
+  border-radius: var(--radius-sm);
+}
+
+.dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--color-muted);
+}
+.dot[data-type="bottle"] {
+  background: var(--color-rust);
+}
+.dot[data-type="pump"] {
+  background: var(--color-pump);
+}
+.dot[data-type="extra"] {
+  background: var(--color-honey);
+}
+.dot[data-type="daily_recurring"] {
+  background: var(--color-honey);
+}
+.dot[data-type="bedtime"] {
+  background: var(--color-success);
+}
+
+.body {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.label {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.meta {
+  font-size: var(--text-xs);
+  color: var(--color-muted);
+  line-height: 1.2;
+}
+
+.owner {
+  color: var(--owner-color, var(--color-fg-soft));
+  font-weight: var(--weight-medium);
+}
+
+.chevron {
+  color: var(--color-muted);
+  font-size: 16px;
+  flex-shrink: 0;
+}

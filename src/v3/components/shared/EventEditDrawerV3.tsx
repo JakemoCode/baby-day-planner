@@ -169,8 +169,15 @@ export function EventEditDrawerV3({
   if (!sourceEvent) return null;
 
   const type = sourceEvent.type;
-  const title =
+  const baseTitle =
     mode === "create" ? (CREATE_TITLE_BY_TYPE[type] ?? "Add event") : EDIT_TITLE_BY_TYPE[type];
+  // §F56: recurring events carry their human name in `event.label`
+  // (e.g. "Tummy time"). The drawer's generic "Edit recurring event"
+  // gives no indication of which one — bake the label into the heading.
+  const title =
+    mode === "edit" && type === "daily_recurring" && sourceEvent.label
+      ? `${baseTitle}: ${sourceEvent.label}`
+      : baseTitle;
 
   // Delete is only meaningful for events that exist in Firestore — i.e.
   // already-recorded. Projected events have no doc to delete.
