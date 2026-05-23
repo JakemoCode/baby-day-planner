@@ -65,17 +65,32 @@ function makeDeleteFn() {
   return fn as unknown as ((eventId: string) => Promise<void>) & ReturnType<typeof vi.fn>;
 }
 
+function makeSetOwnerOverride() {
+  const fn = vi.fn();
+  fn.mockResolvedValue(undefined);
+  return fn as unknown as ((
+    eventKey: string,
+    owner: Event["owner"],
+  ) => Promise<void>) &
+    ReturnType<typeof vi.fn>;
+}
+
 function setup({
   actuals = [] as Event[],
   saveEvent = makeSaveEvent(),
   deleteOptimistic = makeDeleteFn(),
+  setOwnerOverride,
 }: {
   actuals?: Event[];
   saveEvent?: ((event: Event) => Promise<void>) & ReturnType<typeof vi.fn>;
   deleteOptimistic?: ((eventId: string) => Promise<void>) & ReturnType<typeof vi.fn>;
+  setOwnerOverride?: ((eventKey: string, owner: Event["owner"]) => Promise<void>) &
+    ReturnType<typeof vi.fn>;
 } = {}) {
-  const result = renderHook(() => useDrawer(actuals, saveEvent, deleteOptimistic));
-  return { ...result, saveEvent, deleteOptimistic };
+  const result = renderHook(() =>
+    useDrawer(actuals, saveEvent, deleteOptimistic, setOwnerOverride),
+  );
+  return { ...result, saveEvent, deleteOptimistic, setOwnerOverride };
 }
 
 // ---------------------------------------------------------------------------
@@ -179,6 +194,96 @@ describe("useDrawer", () => {
     });
 
     expect(saveEvent).toHaveBeenCalledWith(expect.objectContaining({ id: "recorded_bottle_3" }));
+  });
+
+  // §F63: owner-only edit on projected event → setOwnerOverride, NOT saveEvent.
+  // Without this routing, the lifecycle reducer promotes the projected nap
+  // to "recorded", which anchors its time and prevents the cascade from
+  // re-projecting. Jake hit this 2026-05-24 — nap 4:35-5:20 stuck while
+  // bedtime threshold approached because owner was assigned hours earlier.
+  it("owner-only edit on projected event routes to setOwnerOverride (not saveEvent)", async () => {
+    const projected = makeEvent({ id: "proj-nap-3", eventKey: "nap_3" });
+    const saveEvent = makeSaveEvent();
+    const setOwnerOverride = makeSetOwnerOverride();
+    const { result } = setup({ actuals: [], saveEvent, setOwnerOverride });
+
+    act(() => result.current.openEdit(projected));
+
+    const newOwner = { slot: "parent2" as const };
+    const edited = { ...projected, owner: newOwner };
+    await act(async () => {
+      await result.current.onSave(edited);
+    });
+
+    expect(setOwnerOverride).toHaveBeenCalledTimes(1);
+    expect(setOwnerOverride).toHaveBeenCalledWith("nap_3", newOwner);
+    expect(saveEvent).not.toHaveBeenCalled();
+    expect(result.current.drawer).toEqual({ open: false });
+  });
+
+  it("time edit on projected event still routes to saveEvent (not setOwnerOverride)", async () => {
+    const projected = makeEvent({ id: "proj-nap-3", eventKey: "nap_3" });
+    const saveEvent = makeSaveEvent();
+    const setOwnerOverride = makeSetOwnerOverride();
+    const { result } = setup({ actuals: [], saveEvent, setOwnerOverride });
+
+    act(() => result.current.openEdit(projected));
+
+    // User changes startTime AND owner — time-change forces a recorded
+    // doc (cascade should re-anchor, not push the nap).
+    const edited = {
+      ...projected,
+      startTime: 10 * 60 + 30,
+      owner: { slot: "parent2" as const },
+    };
+    await act(async () => {
+      await result.current.onSave(edited);
+    });
+
+    expect(saveEvent).toHaveBeenCalledTimes(1);
+    expect(saveEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "recorded_nap_3", startTime: 10 * 60 + 30 }),
+    );
+    expect(setOwnerOverride).not.toHaveBeenCalled();
+  });
+
+  it("owner-only edit on a persisted actual still routes to saveEvent (overrides only apply to projected)", async () => {
+    const actual = makeActualEvent({
+      id: "evt-actual-nap1",
+      eventKey: "nap_1",
+      lifecycle: { state: "recorded", annotatedAt: 9 * 60 },
+    });
+    const saveEvent = makeSaveEvent();
+    const setOwnerOverride = makeSetOwnerOverride();
+    const { result } = setup({ actuals: [actual], saveEvent, setOwnerOverride });
+
+    act(() => result.current.openEdit(actual));
+
+    const edited = { ...actual, owner: { slot: "parent2" as const } };
+    await act(async () => {
+      await result.current.onSave(edited);
+    });
+
+    expect(saveEvent).toHaveBeenCalledTimes(1);
+    expect(setOwnerOverride).not.toHaveBeenCalled();
+  });
+
+  it("falls back to legacy recorded-doc path when setOwnerOverride callback is omitted", async () => {
+    const projected = makeEvent({ id: "proj-nap-3", eventKey: "nap_3" });
+    const saveEvent = makeSaveEvent();
+    // Note: no setOwnerOverride passed — simulates the /tomorrow page
+    // which has its own ownerOverrides plumbing.
+    const { result } = setup({ actuals: [], saveEvent });
+
+    act(() => result.current.openEdit(projected));
+
+    const edited = { ...projected, owner: { slot: "parent2" as const } };
+    await act(async () => {
+      await result.current.onSave(edited);
+    });
+
+    expect(saveEvent).toHaveBeenCalledTimes(1);
+    expect(saveEvent).toHaveBeenCalledWith(expect.objectContaining({ id: "recorded_nap_3" }));
   });
 
   // 7. onDelete where event is in actuals → deleteOptimistic(event.id)

@@ -28,6 +28,7 @@ import {
   promoteFromPlan,
   startNewDay,
   updateDay,
+  updateDayOwnerOverride,
   watchActiveDay,
 } from "./days";
 import type { TomorrowPlan } from "../schemas";
@@ -114,6 +115,49 @@ describe("v3 days repository", () => {
     await updateDay(database, "child-1", "day-1", { wakeTime: 7 * 60 + 5 });
     const got = await getDay(database, "child-1", "day-1");
     expect(got?.wakeTime).toBe(7 * 60 + 5);
+  });
+
+  // §F63 — owner-only edits on projected events route through this fn
+  // to Day.ownerOverrides (not the events collection), preserving the
+  // engine's freedom to re-project the event's time.
+  it("updateDayOwnerOverride merges into existing ownerOverrides map (does not replace)", async () => {
+    const database = db();
+    await createDay(
+      database,
+      day({ ownerOverrides: { nap_1: { slot: "parent1" } } }),
+    );
+    await updateDayOwnerOverride(database, "child-1", "day-1", "nap_2", {
+      slot: "parent2",
+    });
+    const got = await getDay(database, "child-1", "day-1");
+    // Both entries present — dot-notation update merges into the map.
+    expect(got?.ownerOverrides).toEqual({
+      nap_1: { slot: "parent1" },
+      nap_2: { slot: "parent2" },
+    });
+  });
+
+  it("updateDayOwnerOverride creates ownerOverrides field when missing", async () => {
+    const database = db();
+    await createDay(database, day({})); // no ownerOverrides on the doc
+    await updateDayOwnerOverride(database, "child-1", "day-1", "bottle_3", {
+      slot: "parent1",
+    });
+    const got = await getDay(database, "child-1", "day-1");
+    expect(got?.ownerOverrides).toEqual({ bottle_3: { slot: "parent1" } });
+  });
+
+  it("updateDayOwnerOverride can change an existing entry", async () => {
+    const database = db();
+    await createDay(
+      database,
+      day({ ownerOverrides: { nap_1: { slot: "parent1" } } }),
+    );
+    await updateDayOwnerOverride(database, "child-1", "day-1", "nap_1", {
+      slot: "parent2",
+    });
+    const got = await getDay(database, "child-1", "day-1");
+    expect(got?.ownerOverrides).toEqual({ nap_1: { slot: "parent2" } });
   });
 
   it("archives by flipping status", async () => {

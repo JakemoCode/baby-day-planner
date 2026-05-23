@@ -10,7 +10,7 @@ import { useV3Settings } from "@/v3/hooks/useV3Settings";
 import { useV3Templates } from "@/v3/hooks/useV3Templates";
 import { useDrawer } from "@/v3/hooks/useDrawer";
 import { db } from "@/lib/firebase/client";
-import { editWakeTime } from "@/v3/repositories/days";
+import { editWakeTime, updateDayOwnerOverride } from "@/v3/repositories/days";
 import { LoadingState } from "@/components/shared/LoadingState";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { FAB } from "@/components/shared/FAB";
@@ -34,6 +34,9 @@ export default function TimelinePage() {
     actuals,
     saveEvent,
     deleteOptimistic,
+    day?.id
+      ? (eventKey, owner) => updateDayOwnerOverride(db, CHILD_ID, day.id, eventKey, owner)
+      : undefined,
   );
   const [pickerOpen, setPickerOpen] = useState(false);
 
