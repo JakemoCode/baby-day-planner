@@ -18,7 +18,14 @@ import {
 } from "../../../tests/integration/firestore-test-utils";
 import type { Event } from "../schemas";
 import { NO_OWNER } from "../schemas";
-import { createEvent, deleteEvent, listEvents, updateEvent, watchEvents } from "./events";
+import {
+  createEvent,
+  deleteEvent,
+  listEvents,
+  reconcileDuplicateEventDocs,
+  updateEvent,
+  watchEvents,
+} from "./events";
 
 const ev = (overrides: Partial<Event>): Event => ({
   id: "e-1",
@@ -184,6 +191,87 @@ describe("v3 events repository", () => {
     );
     expect(ww2Docs2).toHaveLength(1);
     expect(ww2Docs2[0]!.owner).toEqual(NO_OWNER);
+  });
+
+  describe("reconcileDuplicateEventDocs (§F59 orphan cleanup)", () => {
+    // Pre-§F59, NapActionButton wrote `id: nap_N` and useDrawer wrote
+    // `id: recorded_nap_N` for the same logical slot — leaving two
+    // Firestore docs with the same eventKey but different ids. This
+    // function cleans those up: keep the most-recent-annotation winner,
+    // delete the losers.
+    it("deletes the loser when two docs share (type, eventKey); keeps the most-recent annotation", async () => {
+      const database = db();
+      // Drawer-edited orphan (older annotation).
+      await createEvent(
+        database,
+        "child-1",
+        ev({
+          id: "recorded_nap_4",
+          eventKey: "nap_4",
+          type: "nap",
+          kind: "block",
+          startTime: 15 * 60,
+          endTime: 15 * 60 + 45,
+          label: "Nap 4",
+          lifecycle: { state: "recorded", annotatedAt: 15 * 60 },
+        }),
+      );
+      // Later Start-Nap-Now tap (newer annotation — the winner).
+      await createEvent(
+        database,
+        "child-1",
+        ev({
+          id: "nap_4",
+          eventKey: "nap_4",
+          type: "nap",
+          kind: "block",
+          startTime: 15 * 60 + 35,
+          label: "Nap 4",
+          lifecycle: { state: "recorded", annotatedAt: 15 * 60 + 35 },
+        }),
+      );
+
+      const { deleted } = await reconcileDuplicateEventDocs(database, "child-1", "day-1");
+
+      expect(deleted).toEqual(["recorded_nap_4"]);
+
+      const remaining = await listEvents(database, "child-1", "day-1");
+      const naps = remaining.filter((e) => e.type === "nap" && e.eventKey === "nap_4");
+      expect(naps).toHaveLength(1);
+      expect(naps[0]!.id).toBe("nap_4");
+      expect(naps[0]!.startTime).toBe(15 * 60 + 35);
+    });
+
+    it("is a no-op on a clean day (idempotent)", async () => {
+      const database = db();
+      await createEvent(database, "child-1", ev({ id: "e-a", eventKey: "bottle_1" }));
+      await createEvent(database, "child-1", ev({ id: "e-b", eventKey: "bottle_2" }));
+
+      const { deleted } = await reconcileDuplicateEventDocs(database, "child-1", "day-1");
+      expect(deleted).toEqual([]);
+      const remaining = await listEvents(database, "child-1", "day-1");
+      expect(remaining).toHaveLength(2);
+    });
+
+    it("only collapses events sharing both type AND eventKey (different types pass through)", async () => {
+      const database = db();
+      // Same eventKey but different types — these are NOT duplicates.
+      await createEvent(
+        database,
+        "child-1",
+        ev({ id: "x-1", eventKey: "ambiguous", type: "bottle" }),
+      );
+      await createEvent(
+        database,
+        "child-1",
+        ev({ id: "x-2", eventKey: "ambiguous", type: "extra" }),
+      );
+
+      const { deleted } = await reconcileDuplicateEventDocs(database, "child-1", "day-1");
+      expect(deleted).toEqual([]);
+      const remaining = await listEvents(database, "child-1", "day-1");
+      expect(remaining).toHaveLength(2);
+    });
   });
 
   it("watches events ordered by startTime", async () => {

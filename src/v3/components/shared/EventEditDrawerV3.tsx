@@ -245,7 +245,10 @@ export function EventEditDrawerV3({
     // Lifecycle is `recorded` (user is anchoring bedtime in reality;
     // "in progress" is a time property, not a lifecycle state).
     const bedtimeBase: Event = {
-      id: "bedtime",
+      // §F59: align id convention with useDrawer (`recorded_${eventKey}`)
+      // so this and any subsequent edit / Start-Bedtime tap write to the
+      // same Firestore doc instead of orphaning a `bedtime`-id doc.
+      id: "recorded_bedtime",
       dayId: napCandidate.dayId,
       eventKey: "bedtime",
       type: "bedtime",

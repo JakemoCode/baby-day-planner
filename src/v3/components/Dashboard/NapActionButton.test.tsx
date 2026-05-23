@@ -94,7 +94,10 @@ describe("NapActionButton", () => {
     expect(onStart).toHaveBeenCalledTimes(1);
     const arg = onStart.mock.calls[0]?.[0] as Event;
     expect(arg).toMatchObject({
-      id: "nap_2",
+      // §F59: doc id is `recorded_${eventKey}` to match useDrawer's
+      // convention, so subsequent drawer edits / Start-Nap taps overwrite
+      // the same Firestore doc.
+      id: "recorded_nap_2",
       type: "nap",
       kind: "block",
       eventKey: "nap_2",
@@ -168,7 +171,8 @@ describe("NapActionButton — CTA swap past bedtime threshold (§F8)", () => {
     expect(onStartBedtime).toHaveBeenCalledTimes(1);
     const arg = onStartBedtime.mock.calls[0]?.[0] as Event;
     expect(arg).toMatchObject({
-      id: "bedtime",
+      // §F59: doc id is `recorded_${eventKey}` to match useDrawer's convention.
+      id: "recorded_bedtime",
       type: "bedtime",
       kind: "block",
       eventKey: "bedtime",

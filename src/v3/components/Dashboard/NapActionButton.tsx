@@ -100,7 +100,11 @@ export function NapActionButton({
     // once it's bedtime o'clock (DOMAIN.md §3).
     if (mode.kind === "start-bedtime") {
       const bedtime: Event = {
-        id: "bedtime",
+        // §F59: align id convention with useDrawer (`recorded_${eventKey}`)
+        // so subsequent drawer edits / Start-Bedtime taps overwrite the
+        // same Firestore doc instead of creating an orphan with a
+        // divergent id.
+        id: "recorded_bedtime",
         dayId,
         eventKey: "bedtime",
         type: "bedtime",
@@ -129,7 +133,10 @@ export function NapActionButton({
       // the marker that distinguishes "in progress" from "user-committed
       // extent" (Jake's 2026-05-20 bug fix).
       const nap: Event = {
-        id: mode.projected.eventKey,
+        // §F59: align id convention with useDrawer (`recorded_${eventKey}`)
+        // so subsequent drawer edits / Start-Nap taps overwrite the same
+        // Firestore doc instead of creating an orphan with a divergent id.
+        id: `recorded_${mode.projected.eventKey}`,
         dayId,
         eventKey: mode.projected.eventKey,
         type: "nap",
