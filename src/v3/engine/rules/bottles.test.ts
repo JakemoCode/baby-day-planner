@@ -719,29 +719,18 @@ describe("R5.1 — recorded bottles anchor the cascade", () => {
     expect(bottles.slice(1).every((b) => b.lifecycle.state === "projected")).toBe(true);
   });
 
-  it("R5.8 + backfill together fill the morning when recorded anchor is late-day", () => {
-    // Mirrors Jake's 2026-05-12 screenshot: recorded bottle at 19:10
-    // (post-bedtime threshold), bottlesPerDay=5, defaultWakeTime=7:00.
+  it("late-day recorded anchor: forward-only cascade to midnight (no backfill per DOMAIN §2)", () => {
+    // §F54: backward backfill removed. DOMAIN.md §2 spec: "the moment
+    // a real recording exists, the cascade follows cadence to
+    // midnight" — forward-only from the latest anchor. A late-day
+    // recorded bottle does NOT phantom-anchor missing morning slots;
+    // those bottles weren't recorded because they didn't happen.
     //
-    // With bidirectional sequential cascade + midnight rule (cascade
-    // caps at 1440, not tomorrowWake), and bottlesPerDay treated as
-    // cold-start target only:
+    // Recorded anchor 19:10, defaultBottleIntervalMinutes=180:
+    //   Forward from 19:10: 22:10 → 25:10 (≥ 1440) STOP
     //
-    //   Backfill from 19:10 (anchor) — runs until wake+buffer:
-    //     19:10 - 180 = 16:10 ✓ → push
-    //     16:10 - 180 = 13:10 ✓ → push
-    //     13:10 - 180 = 10:10 ✓ → push
-    //     10:10 - 180 = 7:10 (== wake+buffer 7:10) ✓ → push
-    //     7:10 - 180 = 4:10 (< 7:10) → stop
-    //   Forward from 19:10 — runs until midnight:
-    //     19:10 + 180 = 22:10 ✓ → push
-    //     22:10 + 180 = 25:10 (≥ 1440) → stop
-    //
-    // Result: [7:10, 10:10, 13:10, 16:10, 19:10, 22:10] — 6 bottles.
-    // Predict-don't-prescribe: even though anchor + backfill gave 5
-    // and that equals bottlesPerDay, the engine still predicts the
-    // 22:10 evening bottle because the cascade follows cadence, not
-    // count, in the anchored case.
+    // Result: [19:10, 22:10] — 2 bottles, the recorded anchor + one
+    // forward projection.
     const overridden: Event = aProjectedBottle({
       id: "manual_bottle_1",
       eventKey: "bottle_1",
@@ -773,16 +762,8 @@ describe("R5.1 — recorded bottles anchor the cascade", () => {
       .filter((e) => e.type === "bottle")
       .sort((a, b) => a.startTime - b.startTime);
 
-    expect(bottles.map((b) => b.startTime)).toEqual([
-      7 * 60 + 10,
-      10 * 60 + 10,
-      13 * 60 + 10,
-      16 * 60 + 10,
-      19 * 60 + 10,
-      22 * 60 + 10,
-    ]);
-    // Each slot is distinct — the screenshot symptom (3 bottles at 19:10)
-    // would fail this assertion.
+    expect(bottles.map((b) => b.startTime)).toEqual([19 * 60 + 10, 22 * 60 + 10]);
+    // Each slot is distinct (the dup-render regression bug).
     const uniqueStarts = new Set(bottles.map((b) => b.startTime));
     expect(uniqueStarts.size).toBe(bottles.length);
     // Anchor preserved.
@@ -1054,22 +1035,18 @@ describe("Sequential bottle cascade — midnight rule (DOMAIN.md §2)", () => {
   });
 });
 
-describe("Sequential bottle cascade — backward backfill (§F19b / §F21)", () => {
-  it("when the only non-projected bottle is mid-day, backfill morning slots", () => {
-    // User recorded bottle_X at 13:00 (mid-day). bottlesPerDay 4
-    // (cold-start target only; anchored cascade runs to midnight).
-    // Wake 7:00, buffer 10, interval 180.
+describe("Sequential bottle cascade — forward-only from anchor (§F54)", () => {
+  it("mid-day recorded anchor: forward-only cascade to midnight, no backfill", () => {
+    // §F54: backward backfill removed (DOMAIN.md §2: "the moment a
+    // real recording exists, the cascade follows cadence to midnight").
+    // A mid-day recording does NOT phantom-anchor missing morning
+    // slots — those bottles weren't recorded because they didn't
+    // happen.
     //
-    // Backfill from 13:00 (walks backward to wake+buffer):
-    //   13:00 - 180 = 10:00 ✓ → push
-    //   10:00 - 180 = 7:00 (< 7:10) → stop
-    // Forward from 13:00 (walks to midnight):
-    //   13:00 + 180 = 16:00 → push
-    //   16:00 + 180 = 19:00 → push
-    //   19:00 + 180 = 22:00 → push
-    //   22:00 + 180 = 25:00 (≥ 1440) → stop
+    // Recorded anchor at 13:00, defaultBottleIntervalMinutes=180:
+    //   Forward: 16:00 → 19:00 → 22:00 → 25:00 (≥ 1440) STOP
     //
-    // Total: [10:00, 13:00 (anchor), 16:00, 19:00, 22:00] — 5 bottles.
+    // Total: [13:00 (anchor), 16:00, 19:00, 22:00] — 4 bottles.
     const recorded = aRecordedBottle({
       id: "actual_bottle_midday",
       eventKey: "bottle_midday",
@@ -1098,7 +1075,6 @@ describe("Sequential bottle cascade — backward backfill (§F19b / §F21)", () 
       .filter((e) => e.type === "bottle")
       .sort((a, b) => a.startTime - b.startTime);
     expect(bottles.map((b) => b.startTime)).toEqual([
-      10 * 60, // backfill
       13 * 60, // anchor
       16 * 60, // forward
       19 * 60, // forward
@@ -1107,6 +1083,89 @@ describe("Sequential bottle cascade — backward backfill (§F19b / §F21)", () 
     // The recorded anchor is preserved.
     const recordedOut = bottles.find((b) => b.id === recorded.id);
     expect(recordedOut?.lifecycle.state).toBe("completed");
+  });
+
+  it("§F54 — overnight bottle close to wake shifts the cold-start seed forward", () => {
+    // Baby fed at 5am with 6oz (240min interval), waking at 7am.
+    // Without the §F54 guard: cold-start would seed first morning
+    // bottle at 7:10am (wake+buffer). Baby just ate 2 hours ago and
+    // isn't ready for another bottle yet.
+    // With the guard: 5am + 240min = 9am > 7:10am wake+buffer → seed
+    // moves to 9am.
+    const overnight = aRecordedBottle({
+      id: "overnight_5am",
+      eventKey: "bottle_overnight",
+      start: 5 * 60,
+      amountOz: 6,
+    });
+    const ctx = aContext({
+      day: aDay({ wakeTime: 7 * 60 }),
+      settings: aSettings({
+        bottleChain: { bottlesPerDay: 4, bufferAfterWakeMinutes: 10 },
+        defaultBottleIntervalMinutes: 240,
+      }),
+      actuals: [overnight],
+    });
+    const out = projectDay(
+      {
+        day: ctx.day,
+        settings: ctx.settings,
+        actuals: ctx.actuals,
+        nowMinutes: ctx.nowMinutes,
+      },
+      { rules: ALL },
+    );
+    const bottles = out
+      .filter((e) => e.type === "bottle")
+      .sort((a, b) => a.startTime - b.startTime);
+    // Overnight tallied but not anchoring the chain (cold-start
+    // case). First in-chain bottle at 9:00 (5am + 240min), then
+    // forward at 240min intervals until bottlesPerDay cap (4 total).
+    expect(bottles.map((b) => b.startTime)).toEqual([
+      5 * 60, // overnight (tallied; not in chain)
+      9 * 60, // §F54: shifted seed (overnight + interval)
+      13 * 60, // forward
+      17 * 60, // forward (4th total → cold-start cap)
+    ]);
+  });
+
+  it("§F54 — overnight bottle far from wake leaves cold-start seed at wake+buffer", () => {
+    // Overnight feed at 2am with 240min interval. 2am + 240min = 6am
+    // which is BEFORE wake+buffer 7:10am. No shift needed — baby's
+    // hunger cue lands during sleep; first bottle anchors at the
+    // normal 7:10 cold-start seed.
+    const overnight = aRecordedBottle({
+      id: "overnight_2am",
+      eventKey: "bottle_overnight",
+      start: 2 * 60,
+      amountOz: 6,
+    });
+    const ctx = aContext({
+      day: aDay({ wakeTime: 7 * 60 }),
+      settings: aSettings({
+        bottleChain: { bottlesPerDay: 4, bufferAfterWakeMinutes: 10 },
+        defaultBottleIntervalMinutes: 240,
+      }),
+      actuals: [overnight],
+    });
+    const out = projectDay(
+      {
+        day: ctx.day,
+        settings: ctx.settings,
+        actuals: ctx.actuals,
+        nowMinutes: ctx.nowMinutes,
+      },
+      { rules: ALL },
+    );
+    const bottles = out
+      .filter((e) => e.type === "bottle")
+      .sort((a, b) => a.startTime - b.startTime);
+    expect(bottles.map((b) => b.startTime)).toEqual([
+      2 * 60, // overnight (tallied)
+      7 * 60 + 10, // wake+buffer (no shift)
+      11 * 60 + 10, // forward
+      15 * 60 + 10, // forward (4th total → cold-start cap)
+    ]);
   });
 });
 

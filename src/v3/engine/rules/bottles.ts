@@ -14,16 +14,24 @@
  *
  * Key behaviors (per DOMAIN.md + SIMPLIFICATION_SCOPE.md):
  *   - Anchor: latest non-projected bottle with `startTime >= wakeTime`,
- *     OR `wakeTime + bufferAfterWakeMinutes` when no anchor exists.
- *     Overnight bottles (startTime < wakeTime) tally toward
- *     `bottlesPerDay` but do NOT anchor the cascade — the "midnight
- *     rule": morning rhythm is driven by wake-up, not by mid-night
- *     feeds.
+ *     OR `wakeTime + bufferAfterWakeMinutes` when no anchor exists
+ *     (cold-start seed). Overnight bottles (startTime < wakeTime) tally
+ *     toward `bottlesPerDay` but do NOT anchor the cascade — the
+ *     "midnight rule": morning rhythm is driven by wake-up, not by
+ *     mid-night feeds.
+ *   - Overnight-near-wake guard (§F54): if a non-projected overnight
+ *     bottle exists and its `startTime + intervalForAmount(amountOz)`
+ *     lands AFTER `wakeTime + bufferAfterWakeMinutes`, the cold-start
+ *     seed shifts forward to that later time. Baby fed at 5am with
+ *     6oz (240min interval) waking at 7am shouldn't be projected to
+ *     eat again at 7:30am — the first morning bottle anchors at 9am.
  *   - Forward cascade walks from the anchor at
  *     `intervalForAmount(prev.amountOz, ...)`. Stops at midnight
  *     (1440) — past-midnight bottles belong to tomorrow's chain.
- *   - Backward backfill walks from the EARLIEST non-projected anchor
- *     downward at the same interval, stopping at `wakeTime + buffer`.
+ *   - DOMAIN.md §2: "The moment a real recording exists, the cascade
+ *     follows cadence to midnight." Forward-only; no backward backfill.
+ *     A real recording PROJECTING earlier ghosts contradicts the
+ *     forecast-from-reality principle.
  *   - No-feed region is the nap itself only — `[nap.start, nap.end]`,
  *     NOT extended through putdown. Wind-down is render-only; a
  *     bottle can land at or during the wind-down. A bottle landing
@@ -178,11 +186,12 @@ const RuleSequentialBottleCascade: Rule = {
  *
  *   2. Anchored (at least one non-projected morning bottle): no
  *      total-count cap. Predict-don't-prescribe (DOMAIN.md §2):
- *      forward cascade always extends to midnight; backfill always
- *      walks to wake+buffer; `bottlesPerDay` is the *cold-start
- *      target*, not a hard upper bound on the day's predictions.
- *      Match returns true if the cascade could add forward OR
- *      backward, false once both directions are saturated.
+ *      forward cascade extends to midnight; `bottlesPerDay` is the
+ *      *cold-start target*, not a hard upper bound on the day's
+ *      predictions. Match returns true if the cascade could add
+ *      forward, false once forward is saturated. (No backfill: per
+ *      DOMAIN §2 "the moment a real recording exists, the cascade
+ *      follows cadence to midnight" — forward only.)
  *
  * Idempotency: once `produces` has filled all addable slots, this
  * predicate returns false and the evaluator stops re-firing.
@@ -214,18 +223,14 @@ function canCascade(events: Event[], ctx: Context): boolean {
     return bottles.length < target;
   }
 
-  // Anchored case: check if cascade could extend in either direction.
-  const wakeBuffer = wakeTime + ctx.settings.bottleChain.bufferAfterWakeMinutes;
+  // Anchored case: check if cascade could extend forward. DOMAIN §2:
+  // "moment a real recording exists, the cascade follows cadence to
+  // midnight" — forward-only, no backward backfill.
   const defaultInterval = ctx.settings.defaultBottleIntervalMinutes;
   const rules = ctx.settings.bottleIntervalRules;
   const latest = chainBottles[chainBottles.length - 1]!;
-  const earliest = chainBottles[0]!;
   const forwardInterval = intervalForAmount(rules, latest.amountOz, defaultInterval);
-  const canExtendForward = forwardInterval > 0 && latest.startTime + forwardInterval < cap;
-  const backwardInterval = intervalForAmount(rules, earliest.amountOz, defaultInterval);
-  const canExtendBackward =
-    backwardInterval > 0 && earliest.startTime - backwardInterval >= wakeBuffer;
-  return canExtendForward || canExtendBackward;
+  return forwardInterval > 0 && latest.startTime + forwardInterval < cap;
 }
 
 function projectBottleChain(events: Event[], ctx: Context): Event[] {
@@ -285,40 +290,32 @@ function projectBottleChain(events: Event[], ctx: Context): Event[] {
   // should still predict the rest of the afternoon.
   const reachedColdStartCap = () => !isAnchored && totalCount >= target;
 
-  // === Backward backfill ===
-  // Walks from the EARLIEST morning bottle backward at -interval steps,
-  // gated on:
-  //   - Only fires if there's a non-projected anchor somewhere in the
-  //     chain (otherwise we'd phantom-anchor a cold-start chain at its
-  //     own wake+buffer seed).
-  //   - Stops at wake+buffer.
-  //   - Uses the earliest CURRENT morning bottle as the walker's `prev`
-  //     so subsequent evaluator passes extend from prior projections
-  //     instead of re-emitting them (idempotency).
-  if (isAnchored && chainBottles.length > 0) {
-    let prev = chainBottles[0]!;
-    // No total-count cap here: backfill only fires in the anchored
-    // case, which has no cap (see reachedColdStartCap()).
-    while (true) {
-      // Defensive: an interval ≤ 0 from malformed rules / fixtures
-      // would cause an infinite loop. Treat as "no further cascade
-      // possible in this direction."
-      const interval = intervalForAmount(rules, prev.amountOz, defaultInterval);
-      if (interval <= 0) break;
-      const proposed = prev.startTime - interval;
-      if (proposed < wakeBuffer) break;
-      const placed = snap(proposed);
-      if (placed < wakeBuffer) break;
-      // Snap can land at a region edge that equals (or is past) the
-      // previous prev.startTime, which would loop. Strict-monotonic
-      // guard:
-      if (placed >= prev.startTime) break;
-      const projection = buildProjectedBottle(ctx, nextIndex++, placed);
-      projections.push(projection);
-      totalCount++;
-      prev = projection;
-    }
-  }
+  // §F54 — Overnight-near-wake guard. If a non-projected overnight
+  // bottle (startTime < wakeTime) lands close enough to wake that its
+  // forward interval extends past wake+buffer, shift the cold-start
+  // seed forward. Without this, baby fed at 5am with 240min interval
+  // and waking at 7am would still get a projected morning bottle at
+  // 7:30am — but baby isn't hungry yet. DOMAIN §2: "interval-until-
+  // next-feed depends on what was actually consumed."
+  //
+  // Only matters when there's no in-chain anchor (cold start). An
+  // anchored chain already uses the latest in-chain bottle as prev
+  // for the forward walk; the overnight bottle is structurally
+  // outside the chain by the midnight rule (chainBottles filter at
+  // line ~261).
+  const overnightAnchors = bottles
+    .filter((b) => !isProjected(b) && b.startTime < wakeTime)
+    .sort((a, b) => a.startTime - b.startTime);
+  const latestOvernight = overnightAnchors.at(-1);
+  const overnightProposedSeed =
+    latestOvernight !== undefined
+      ? latestOvernight.startTime +
+        intervalForAmount(rules, latestOvernight.amountOz, defaultInterval)
+      : undefined;
+  const seedTime =
+    overnightProposedSeed !== undefined && overnightProposedSeed > wakeBuffer
+      ? overnightProposedSeed
+      : wakeBuffer;
 
   // === Forward cascade ===
   // Uses the LATEST chain bottle (recorded, recorded, OR projected
@@ -331,10 +328,12 @@ function projectBottleChain(events: Event[], ctx: Context): Event[] {
   if (chainBottles.length > 0) {
     prev = chainBottles[chainBottles.length - 1]!;
   } else {
-    // Cold start: seed the first bottle at wake+buffer.
+    // Cold start: seed the first bottle at `seedTime` — typically
+    // wake+buffer, shifted later by the §F54 overnight-near-wake
+    // guard above when an overnight feed is close to wake.
     if (reachedColdStartCap()) return [...trimmedEvents, ...projections];
-    if (wakeBuffer >= cap) return [...trimmedEvents, ...projections];
-    const seed = snap(wakeBuffer);
+    if (seedTime >= cap) return [...trimmedEvents, ...projections];
+    const seed = snap(seedTime);
     if (seed >= cap) return [...trimmedEvents, ...projections];
     // If snap pushed the seed before wakeTime, the cold-start slot
     // can't be placed cleanly (a recorded nap straddles the
