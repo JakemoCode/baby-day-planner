@@ -39,6 +39,8 @@ const nap = (overrides: Partial<Event> = {}): Event => ({
   ...overrides,
 });
 
+const END_OF_DAY: TimeMin = (24 * 60) as TimeMin;
+
 describe("bottleTotals", () => {
   it("counts only recorded bottles and sums amountOz", () => {
     const events: Event[] = [
@@ -50,16 +52,27 @@ describe("bottleTotals", () => {
         lifecycle: { state: "projected" },
       }),
     ];
-    expect(bottleTotals(events)).toEqual({ count: 2, oz: 9 });
+    expect(bottleTotals(events, END_OF_DAY)).toEqual({ count: 2, oz: 9 });
   });
 
   it("treats missing amountOz as 0", () => {
     const events: Event[] = [bottle({ amountOz: undefined as unknown as number })];
-    expect(bottleTotals(events)).toEqual({ count: 1, oz: 0 });
+    expect(bottleTotals(events, END_OF_DAY)).toEqual({ count: 1, oz: 0 });
   });
 
   it("returns 0/0 for no bottles", () => {
-    expect(bottleTotals([])).toEqual({ count: 0, oz: 0 });
+    expect(bottleTotals([], END_OF_DAY)).toEqual({ count: 0, oz: 0 });
+  });
+
+  // §F48b regression: a bottle back-edited to a future startTime must
+  // not inflate today's count or oz total.
+  it("excludes bottles whose startTime is in the future relative to now", () => {
+    const now = (14 * 60) as TimeMin;
+    const events: Event[] = [
+      bottle({ startTime: (8 * 60) as TimeMin, amountOz: 4 }),
+      bottle({ startTime: (16 * 60) as TimeMin, amountOz: 6 }), // future
+    ];
+    expect(bottleTotals(events, now)).toEqual({ count: 1, oz: 4 });
   });
 });
 
@@ -74,7 +87,36 @@ describe("napTotals", () => {
         lifecycle: { state: "projected" },
       }),
     ];
-    expect(napTotals(events)).toEqual({ count: 2, totalMinutes: 60 + 78 });
+    expect(napTotals(events, END_OF_DAY)).toEqual({ count: 2, totalMinutes: 60 + 78 });
+  });
+
+  // §F48d: an in-progress nap (startTime in past, endTime in future
+  // — typically a placeholder = startTime + defaultNapLen) contributes
+  // its ELAPSED time, not its placeholder duration. Excluding it
+  // outright would hide the fact that the baby is napping right now.
+  it("clamps in-progress nap's contribution to elapsed time (now - startTime)", () => {
+    const now = (14 * 60 + 30) as TimeMin; // 2:30pm
+    const events: Event[] = [
+      // Completed: 1 hr.
+      nap({ startTime: (9 * 60) as TimeMin, endTime: (10 * 60) as TimeMin }),
+      // In-progress: started 1:15pm, placeholder endTime 4:02pm.
+      // 75 min elapsed so far.
+      nap({ startTime: (13 * 60 + 15) as TimeMin, endTime: (16 * 60 + 2) as TimeMin }),
+    ];
+    expect(napTotals(events, now)).toEqual({ count: 2, totalMinutes: 60 + 75 });
+  });
+
+  // §F48c: a nap whose startTime is genuinely in the future (e.g. a
+  // fat-fingered next-day nap accidentally on today's doc) is fully
+  // excluded — it hasn't started yet.
+  it("excludes naps whose startTime is in the future relative to now", () => {
+    const now = (14 * 60) as TimeMin;
+    const events: Event[] = [
+      nap({ startTime: (9 * 60) as TimeMin, endTime: (10 * 60) as TimeMin }),
+      // Not-yet-started.
+      nap({ startTime: (16 * 60) as TimeMin, endTime: (17 * 60) as TimeMin }),
+    ];
+    expect(napTotals(events, now)).toEqual({ count: 1, totalMinutes: 60 });
   });
 });
 
@@ -85,11 +127,31 @@ describe("lastBottle", () => {
       bottle({ startTime: (12 * 60) as TimeMin }),
       bottle({ startTime: (15 * 60) as TimeMin, lifecycle: { state: "projected" } }),
     ];
-    expect(lastBottle(events)?.startTime).toBe(12 * 60);
+    expect(lastBottle(events, END_OF_DAY)?.startTime).toBe(12 * 60);
   });
 
   it("returns undefined when no recorded bottles", () => {
-    expect(lastBottle([bottle({ lifecycle: { state: "projected" } })])).toBeUndefined();
+    expect(lastBottle([bottle({ lifecycle: { state: "projected" } })], END_OF_DAY)).toBeUndefined();
+  });
+
+  // §F48b regression: same shape as §F48 (lastCompletedNap) — a
+  // bottle back-edited to a future startTime must not be returned as
+  // "last bottle" or NextBottlePanel renders "Last: 4oz, 0 min ago
+  // (4:00p)" at 2:30pm (Math.max(0, now - future) clamps the delta
+  // while the clock string prints the future time).
+  it("excludes bottles whose startTime is in the future relative to now", () => {
+    const now = (14 * 60) as TimeMin;
+    const events: Event[] = [
+      bottle({ startTime: (8 * 60) as TimeMin }),
+      bottle({ startTime: (16 * 60) as TimeMin }), // future
+    ];
+    expect(lastBottle(events, now)?.startTime).toBe(8 * 60);
+  });
+
+  it("returns undefined when all recorded bottles have future startTimes", () => {
+    const now = (14 * 60) as TimeMin;
+    const events: Event[] = [bottle({ startTime: (16 * 60) as TimeMin })];
+    expect(lastBottle(events, now)).toBeUndefined();
   });
 });
 

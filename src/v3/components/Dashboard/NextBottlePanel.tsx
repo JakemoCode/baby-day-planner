@@ -21,8 +21,8 @@ function formatDelta(deltaMinutes: number): string {
 }
 
 export function NextBottlePanel({ nextBottle, actuals, nowMinutes, owners }: NextBottlePanelProps) {
-  const last = lastBottle(actuals);
-  const totals = bottleTotals(actuals);
+  const last = lastBottle(actuals, nowMinutes);
+  const totals = bottleTotals(actuals, nowMinutes);
 
   return (
     <section className={styles.card} aria-label="Bottle stats">
