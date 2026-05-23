@@ -1019,16 +1019,19 @@ describe("Sequential bottle cascade — midnight rule (DOMAIN.md §2)", () => {
       .filter((e) => e.type === "bottle")
       .sort((a, b) => a.startTime - b.startTime);
     // Overnight bottle present, but morning cascade starts at 7:10 anyway.
-    // 5 bottles total (overnight counts toward bottlesPerDay):
-    //   2:00 (overnight, recorded)
+    // DOMAIN §2: overnight tallies toward the day but doesn't consume
+    // a daytime slot. bottlesPerDay=5 = 5 chain bottles; overnight is
+    // extra.
+    //   2:00 (overnight, recorded; not in chain)
     //   7:10 (wake+buffer anchor)
-    //   10:10, 13:10, 16:10 (cascade — 4 more to reach 5 total)
+    //   10:10, 13:10, 16:10, 19:10 (cascade — 4 more to reach 5 in chain)
     expect(bottles.map((b) => b.startTime)).toEqual([
       2 * 60,
       7 * 60 + 10,
       10 * 60 + 10,
       13 * 60 + 10,
       16 * 60 + 10,
+      19 * 60 + 10,
     ]);
     // The overnight bottle is preserved as-recorded.
     expect(bottles[0]?.id).toBe(overnight.id);
@@ -1120,12 +1123,14 @@ describe("Sequential bottle cascade — forward-only from anchor (§F54)", () =>
       .sort((a, b) => a.startTime - b.startTime);
     // Overnight tallied but not anchoring the chain (cold-start
     // case). First in-chain bottle at 9:00 (5am + 240min), then
-    // forward at 240min intervals until bottlesPerDay cap (4 total).
+    // forward at 240min intervals until bottlesPerDay cap (4 chain
+    // bottles; overnight doesn't consume a daytime slot per DOMAIN §2).
     expect(bottles.map((b) => b.startTime)).toEqual([
       5 * 60, // overnight (tallied; not in chain)
       9 * 60, // §F54: shifted seed (overnight + interval)
       13 * 60, // forward
-      17 * 60, // forward (4th total → cold-start cap)
+      17 * 60, // forward
+      21 * 60, // forward (4th chain bottle → cold-start cap)
     ]);
   });
 
@@ -1161,10 +1166,11 @@ describe("Sequential bottle cascade — forward-only from anchor (§F54)", () =>
       .filter((e) => e.type === "bottle")
       .sort((a, b) => a.startTime - b.startTime);
     expect(bottles.map((b) => b.startTime)).toEqual([
-      2 * 60, // overnight (tallied)
+      2 * 60, // overnight (tallied; doesn't consume daytime slot)
       7 * 60 + 10, // wake+buffer (no shift)
       11 * 60 + 10, // forward
-      15 * 60 + 10, // forward (4th total → cold-start cap)
+      15 * 60 + 10, // forward
+      19 * 60 + 10, // forward (4th chain bottle → cold-start cap)
     ]);
   });
 });

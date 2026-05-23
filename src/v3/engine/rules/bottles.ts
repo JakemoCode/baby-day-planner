@@ -219,8 +219,13 @@ function canCascade(events: Event[], ctx: Context): boolean {
   const target = ctx.settings.bottleChain.bottlesPerDay;
 
   if (anchors.length === 0) {
-    // Cold-start case: gated on count.
-    return bottles.length < target;
+    // Cold-start case: gated on count. DOMAIN §2: bottlesPerDay is
+    // the cold-start target for the DAYTIME RHYTHM, not the day's
+    // total feed count. Overnight bottles tally toward the day but
+    // don't consume a daytime slot — a baby who ate overnight
+    // shouldn't get fewer morning/afternoon predictions than one
+    // who didn't. Compare against chainBottles, not bottles.
+    return chainBottles.length < target;
   }
 
   // Anchored case: check if cascade could extend forward. DOMAIN §2:
@@ -277,7 +282,11 @@ function projectBottleChain(events: Event[], ctx: Context): Event[] {
 
   let nextIndex = maxIndex + 1;
   const projections: Event[] = [];
-  let totalCount = bottles.length;
+  // Count daytime-chain bottles only — `bottlesPerDay` is the
+  // cold-start target for the daytime rhythm, not the day's total
+  // feed count. Overnight bottles tally toward the day but don't
+  // consume a daytime slot (paired with canCascade's same fix).
+  let chainCount = chainBottles.length;
 
   const snap = (proposed: number) => snapOutOfNap(proposed, regions, ctx.nowMinutes);
 
@@ -288,7 +297,7 @@ function projectBottleChain(events: Event[], ctx: Context): Event[] {
   // predictions. Predict-don't-prescribe (DOMAIN.md §2): if baby has
   // already had bottlesPerDay+ feeds (e.g., on a sick day), the engine
   // should still predict the rest of the afternoon.
-  const reachedColdStartCap = () => !isAnchored && totalCount >= target;
+  const reachedColdStartCap = () => !isAnchored && chainCount >= target;
 
   // §F54 — Overnight-near-wake guard. If a non-projected overnight
   // bottle (startTime < wakeTime) lands close enough to wake that its
@@ -343,7 +352,7 @@ function projectBottleChain(events: Event[], ctx: Context): Event[] {
     if (seed < wakeTime) return [...trimmedEvents, ...projections];
     const firstProj = buildProjectedBottle(ctx, nextIndex++, seed);
     projections.push(firstProj);
-    totalCount++;
+    chainCount++;
     prev = firstProj;
   }
 
@@ -362,7 +371,7 @@ function projectBottleChain(events: Event[], ctx: Context): Event[] {
     if (placed <= prev.startTime) break;
     const projection = buildProjectedBottle(ctx, nextIndex++, placed);
     projections.push(projection);
-    totalCount++;
+    chainCount++;
     prev = projection;
   }
 
