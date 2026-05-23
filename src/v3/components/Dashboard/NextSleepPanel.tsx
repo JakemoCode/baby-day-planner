@@ -30,7 +30,7 @@ export function NextSleepPanel({
   putdownLeadMinutes,
   owners,
 }: NextSleepPanelProps) {
-  const last = lastCompletedNap(actuals);
+  const last = lastCompletedNap(actuals, nowMinutes);
   const totals = napTotals(actuals);
   const putdownTime = nextNap && (Math.max(0, nextNap.startTime - putdownLeadMinutes) as TimeMin);
 

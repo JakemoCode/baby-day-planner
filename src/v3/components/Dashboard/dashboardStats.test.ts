@@ -99,7 +99,29 @@ describe("lastCompletedNap", () => {
       nap({ startTime: (9 * 60) as TimeMin, endTime: (10 * 60) as TimeMin }),
       nap({ startTime: (13 * 60) as TimeMin, endTime: (14 * 60) as TimeMin }),
     ];
-    expect(lastCompletedNap(events)?.endTime).toBe(14 * 60);
+    expect(lastCompletedNap(events, (15 * 60) as TimeMin)?.endTime).toBe(14 * 60);
+  });
+
+  // §F48 regression: a nap back-edited to a future endTime must be
+  // excluded so the "Last nap" line doesn't render a future time
+  // clamped to "0 min ago".
+  it("excludes naps whose endTime is in the future relative to now", () => {
+    const now = (14 * 60 + 30) as TimeMin; // 2:30pm
+    const events: Event[] = [
+      nap({ startTime: (9 * 60) as TimeMin, endTime: (10 * 60) as TimeMin }),
+      // User back-edited a nap's endTime to 4:02pm (in the future).
+      nap({ startTime: (13 * 60 + 15) as TimeMin, endTime: (16 * 60 + 2) as TimeMin }),
+    ];
+    const result = lastCompletedNap(events, now);
+    expect(result?.endTime).toBe(10 * 60);
+  });
+
+  it("returns undefined when all recorded naps have future endTimes", () => {
+    const now = (14 * 60) as TimeMin;
+    const events: Event[] = [
+      nap({ startTime: (13 * 60) as TimeMin, endTime: (16 * 60) as TimeMin }),
+    ];
+    expect(lastCompletedNap(events, now)).toBeUndefined();
   });
 });
 
