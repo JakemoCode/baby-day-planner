@@ -10,6 +10,19 @@ import { ActionButton } from "./ActionButton";
 export type StartBottleButtonProps = {
   defaultAmountOz: number;
   dayId: string;
+  /**
+   * The next-upcoming projected bottle. Start Bottle PROMOTES that
+   * projection (reuses its eventKey + label + owner) so the cascade
+   * keys off the same `bottle_N` slot and `dedupBySlotKey` cleanly
+   * collapses the projected-vs-recorded pair into one render-list
+   * entry. Mirrors NapActionButton's §F24 nap-promotion shape.
+   *
+   * When undefined (rare — past bedtime / past the last projected
+   * bottle in the chain), falls back to inventing a fresh slot via
+   * `nextNumber` so the user can still log an out-of-chain bottle.
+   */
+  nextProjectedBottle?: Event;
+  /** Fallback slot index when no projected bottle exists. */
   nextNumber: number;
   onLog: (bottle: Event) => Promise<void>;
   /** Minutes between Day.wakeTime and the soon-after-last guard threshold. */
@@ -23,6 +36,7 @@ const FEEDBACK_DURATION_MS = 1500;
 export function StartBottleButton({
   defaultAmountOz,
   dayId,
+  nextProjectedBottle,
   nextNumber,
   onLog,
   minIntervalMinutes,
@@ -40,17 +54,29 @@ export function StartBottleButton({
 
   const buildBottle = (): Event => {
     const startTime = currentLocalMinutes();
+    // §F60: promote the next projected bottle's eventKey so the cascade
+    // and renderProjection.dedupBySlotKey treat the new recorded bottle
+    // as filling the SAME slot the engine had projected — no duplicate
+    // chip, and the forward cascade re-anchors off this bottle's
+    // startTime. Falls back to inventing a fresh slot only when no
+    // projected bottle is available (e.g. past last projected bottle).
+    const eventKey = nextProjectedBottle?.eventKey ?? `bottle_${nextNumber}`;
+    const label = nextProjectedBottle?.label ?? `Bottle ${nextNumber}`;
+    const owner = nextProjectedBottle?.owner ?? NO_OWNER;
     return {
-      id: newEventId("bottle"),
+      // §F59: deterministic id keyed to eventKey so subsequent drawer
+      // edits / re-taps overwrite the same Firestore doc instead of
+      // creating an orphan with a divergent id. Mirrors NapActionButton.
+      id: nextProjectedBottle ? `recorded_${eventKey}` : newEventId("bottle"),
       dayId,
-      eventKey: `bottle_${nextNumber}`,
+      eventKey,
       type: "bottle",
       kind: "instant",
-      label: `Bottle ${nextNumber}`,
+      label,
       startTime,
       amountOz: defaultAmountOz,
       hasPutdown: false,
-      owner: NO_OWNER, // §F37: owner required
+      owner, // §F37: owner required
       lifecycle: { state: "completed", committedAt: startTime },
     };
   };
