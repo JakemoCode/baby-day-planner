@@ -18,43 +18,6 @@
 
 ---
 
-## §F3 — First-time user onboarding (dashboard)
-
-**Source**: cutover dogfooding, 2026-05-09 — Jake noted the dashboard
-isn't friendly to a first-time user with an empty Firestore.
-
-**Status**: `pending`
-
-**What**: when no settings doc exists yet, the dashboard should walk
-the user through initial setup instead of crashing or showing an
-empty/broken state. Minimum bar:
-- Detect "no settings" / "no day" state and route to a setup flow
-  rather than rendering a partial timeline / dashboard.
-- Setup flow collects: parent display names, default wake time,
-  bedtime threshold, default nap length, wake-window minutes.
-- Daycare + dailyRecurring + dream feed deferred to a "later" panel
-  inside the regular Settings page once basic setup is done.
-- After setup: write a complete V3 settings doc and redirect to
-  the dashboard with a "Start the day" CTA prominent.
-
-**Why fast-follow, not pre-V3**: not blocking the cutover (current
-users have data already). Becomes blocking the moment we want anyone
-besides Jake to try the app.
-
-**Estimated effort**: 1–2 days. Single PR after the cross-surface
-cutover stabilizes.
-
-**Acceptance**:
-- Visiting any authed route with no settings doc redirects to
-  `/welcome` (or wherever the setup flow lives).
-- Setup flow fields validate before the user can proceed.
-- After setup, settings doc satisfies the V3 schema with no
-  fall-through to `withV3SettingsDefaults`.
-- Existing users (with a complete settings doc) never see the
-  flow.
-
----
-
 ## §F4 — Owner color picker as themes, not raw hex
 
 **Source**: cutover dogfooding, 2026-05-09 — `OwnersConfigEditor`
@@ -197,26 +160,6 @@ in `src/v3/components/shared/`, then call sites swap in.
 
 ---
 
-## §F10 — Onboarding flow: child name + DOB (replace hardcoded `?? "aden"`)
-
-**Source**: Jake, 2026-05-10.
-
-**Status**: `pending`
-
-**What**: today the app reads `process.env.NEXT_PUBLIC_DEFAULT_CHILD_ID ?? "aden"` in multiple places (AppShell, page routes, hooks) and `childName="Aden"` is wired in similarly. Build a real first-run onboarding flow that captures child name + DOB, persists to Firestore (e.g. `/children/{childId}` doc with `displayName` + `dateOfBirth`), and routes everything off that instead of the env var fallback.
-
-**Why fast-follow, not in V3**: pure product/onboarding feature; engine-orthogonal. The hardcoded fallback is currently fine for the two-user (Jake/Kelly) deployment but blocks any broader use.
-
-**Bonus**: enables this codebase to be useful to other new parents. Worth designing the model with multi-child / multi-family support in mind even if v1 ships single-child.
-
-**Acceptance**:
-- New users land on an onboarding screen if no `/children/*` doc exists
-- `childId` derived from Firestore data, not env
-- All `?? "aden"` / `childName="Aden"` references removed
-- Existing data migration path documented (a one-shot script or just "type in Aden + DOB once")
-
----
-
 ## §F11 — Settings: explicit Save button + success feedback
 
 **Source**: Jake, 2026-05-10.
@@ -244,24 +187,6 @@ Replace with: explicit **Save** button at section or page level + a transient su
 
 ---
 
-## §F12 — Confirm Tomorrow plan + auto-promote on Start Day
-
-**Source**: Jake, 2026-05-10 (during PR-B3 review).
-
-**Status**: `pending`
-
-**What**: today, promoting Tomorrow is a manual action that the user must remember to take when they wake. Add a "Confirm tomorrow plan" affordance on the Tomorrow page (Save / Confirm button) that captures the planned wakeTime / templateId / extras into a persisted "tomorrow plan" doc. Then on the Dashboard's "Start Day" action, if a confirmed tomorrow plan exists for today's date, auto-promote it instead of starting empty.
-
-**Why fast-follow**: PR-B3 already persists extras on promote (data correctness). This is the next-level UX — relieves the user of remembering to promote, gives confidence the night-before planning isn't wasted.
-
-**Open design questions**:
-- Schema: new `/children/{id}/tomorrowPlan/{date}` doc, or extend `Day` shape with a `planned` status?
-- Confirm vs save — one-tap commit or preview-then-lock?
-- Edits after confirmation: re-confirm, or auto-update?
-- If user manually taps Start Day with a confirmed plan present, prompt or apply silently?
-
----
-
 ## §F14 — Settings defaults audit + Settings UX pass
 
 **Source**: Jake click-test feedback, 2026-05-11.
@@ -285,84 +210,6 @@ Replace with: explicit **Save** button at section or page level + a transient su
 
 ### Missing dailyRecurring / extras editor
 Jake noted "I don't see extra recurring events in settings? where'd that go?" — `Settings.dailyRecurring[]` exists in the schema but the V3 Settings page doesn't expose it. Investigate; restore the editor (or add to §F1 accordion when it lands).
-
----
-
-## §F15 — Migrate duplicating test fixture files to `aSettings()` factory
-
-**Source**: code-simplifier review of PR #111, 2026-05-11.
-
-**Status**: `pending`
-
-**What**: six test files duplicate full `Settings` literals instead of calling the existing `aSettings(overrides)` factory in `src/v3/__tests__/factories.ts`. Every schema field addition makes all six fail to compile and requires a synchronized edit (PR #111 used `re.sub` — that ritual is the smell).
-
-Files to migrate:
-- `src/app/(authed)/page.test.tsx`
-- `src/app/(authed)/day-templates/page.test.tsx`
-- `src/app/(authed)/tomorrow/page.test.tsx`
-- `src/v3/components/Tomorrow/TomorrowPreview.test.tsx`
-- `src/v3/components/shared/createEventTemplate.test.ts`
-- `src/v3/repositories/settings.test.ts`
-
-Each ~20-line literal collapses to 3-5 lines using `aSettings({ /* overrides */ })`. After this, schema additions only touch the factory.
-
-**Estimated effort**: 30 minutes, one PR, mechanical.
-
----
-
-## §F16 — Settings page row helpers should use CSS Modules
-
-**Source**: code-reviewer of PR #111, 2026-05-11.
-
-**Status**: `pending`
-
-**What**: every row helper in `src/app/(authed)/settings/page.tsx` (`Section`, `TimeRow`, `NumberRow`, `WakeWindowsRow`, `PumpTimesRow`, `OwnerSlotRow`, `ColorModeRow`, `CheckboxRow`) uses inline `style={{ ... }}` for layout, font size, and colors. Project standard (`CLAUDE.md`) is CSS Modules + tokens only — no runtime CSS-in-JS.
-
-The whole file violates the standard, not just the two new helpers added in PR #111. PR #111 matched the existing convention rather than departing from it for two rows — the proper fix is to migrate the whole file in one pass.
-
-**Estimated effort**: 1-2 hours. Move all row layout into `page.module.css` with proper class names.
-
----
-
-## §F17 — Deprecate "Start Day" button; auto-anchor day at `defaultWakeTime`
-
-**Source**: Jake, 2026-05-11 — extending §F12. The deeper architectural take behind "fixing the day starting at 2:30pm or 7pm or whenever Start Day is pressed."
-
-**Status**: `pending`
-
-**What**: today, a Day doc only gains a `wakeTime` (and starts rendering as "active") when the user taps **Start Day** on the Dashboard. The button has been a source of two distinct bugs:
-1. **Wall-clock anchoring** (fixed in PR #107): `wakeTime` used to be the click time. If Jake forgot to tap until 2:30 PM, the timeline rotated to start at 2:30 PM. Now uses `settings.defaultWakeTime`.
-2. **Forgetting to tap at all**: the button is a manual ritual on top of a fact the system already knows (today's date + `defaultWakeTime`). It exists only because the data model conflates "day exists" with "day has been confirmed by a human."
-
-**Architectural fix**: the Day should auto-anchor at `defaultWakeTime` the moment the calendar date flips. No button required. The "started" affordance moves to *Bedtime end* (which already exists and is the actual semantic boundary). Combined with §F12, the user's only morning interaction is recording the first bottle / wake-up — no ceremonial taps.
-
-**Why fast-follow, not pre-V3**: the engine doesn't care — `wakeTime` is just a `TimeMin` on the Day doc. This is a UX + day-creation-lifecycle change, not a rules change.
-
-**Open design questions**:
-- Where does day creation happen? Client-side on first load of the new date, or a cron / scheduled job?
-- What if the user wakes earlier than `defaultWakeTime`? Recording the first bottle / "End bedtime" event should retroactively update `wakeTime` (or the engine should treat `defaultWakeTime` as a fallback when no real wake event has been recorded yet).
-- Backwards compat with the "planned" / "active" status field on `Day` — does "active" still mean anything if days auto-anchor?
-- Combine with §F12: if a confirmed tomorrow plan exists, apply it on date-flip; otherwise auto-create with `defaultWakeTime` and an empty template.
-
-**Acceptance**:
-- "Start Day" button removed from the Dashboard.
-- Opening the app on a new calendar date shows today's timeline anchored at `defaultWakeTime` with zero taps.
-- Recording the first event of the day Just Works without any "you need to start the day first" gating.
-- Click-time NEVER influences `Day.wakeTime`.
-
----
-
-## §F18 — Retroactive edit of the day's wake time
-
-**Source**: Jake, 2026-05-12 click-test.
-
-**Status**: `pending`
-
-**What**: there's currently no UI to change `Day.wakeTime` once the day exists. If the user discovers they need to correct the wake time (e.g. baby actually woke at 6:45 not 7:00), the cascade is stuck. Add an editable wake-time control on the timeline or dashboard, probably on the wake event itself (or wherever the day's start is visually rooted).
-
-**Why fast-follow**: data correctness affordance; engine already supports any `wakeTime` value, just missing the UI write path.
-
-**Related**: §F17 (auto-anchor at `defaultWakeTime`) — once §F17 lands, this edit affordance is still needed for cases where the actual wake-up diverges from the default.
 
 ---
 
@@ -578,40 +425,6 @@ need to ship before F2b — could be folded into the same PR.
 
 ---
 
-## §F36 — Owner cannot be unassigned from blocks or instant chips
-
-> Note: commit messages and in-code comments call this `§F37` — the
-> number we wrote the fix under, before docs/PR #183 renumbered it to
-> §F36 during the docs-hygiene sweep. Same item, same fix.
-
-**Source**: Jake, 2026-05-18 (click-test of §F2b timeline).
-
-**Status**: `in-progress` (this PR).
-
-**Root cause** turned out to be deeper than "missing None button": the
-picker already had a None option that called `onChange(undefined)`. The
-bug was in the write path — `useV3Events.saveEvent` calls Firestore's
-`updateDoc`, which is field-merge: a patch that omits `owner` does NOT
-clear the field on the server (the stale owner survives).
-
-**Fix** (this PR) per Jake's "discrete value" direction: stop using
-`undefined` as the absence-of-owner representation. Schema change:
-- Add `{ slot: "none" }` to the `OwnerRef` union (exposed as `NO_OWNER`).
-- Make `Event.owner` REQUIRED (was optional). Read-seam defaulter
-  migrates pre-F37 docs missing the field to `NO_OWNER` on load.
-- Picker emits `NO_OWNER` when None is selected (was `undefined`).
-- `formToEvent` writes `owner: NO_OWNER` (no more `delete` of the field).
-- Engine rules (`R12.x`, `R21.x`) updated to check `isNoOwner(owner)`
-  instead of `owner === undefined`.
-
-Net effect: every write now includes an explicit `owner` field, so
-Firestore `updateDoc`'s merge semantics can't strand a stale value.
-
-**Seam test** added to `src/v3/repositories/events.test.ts` covering
-the full PARENT1 → NO_OWNER → PARENT2 round-trip via the real emulator.
-
----
-
 ## §F2c — §F2b chip phase-switch + BottomTab regressions
 
 **Source**: Jake, 2026-05-18 (click-test after §F2b PR #178 merged).
@@ -661,50 +474,6 @@ slightly smaller font to fit.
 **Estimated effort**: 0.5 day (per-chip ResizeObserver already in
 InstantChip for the wrap detection — extend the same effect to also
 measure and toggle a `data-near-fit` attribute).
-
-## §F39 — Tomorrow as a fully-editable plan with auto-promote at wake
-
-**Source**: Jake, 2026-05-18 (after F13 click-test exposed the silent template-gate on /tomorrow).
-
-**Status**: `pending`. **Absorbs §F12** (its "confirm + auto-promote on Start Day" intent is a strict subset).
-
-**Required behaviors on `/tomorrow`**:
-- Assign or unassign event owners on any projected event (no template-gate).
-- Add or remove custom events (FAB shipped via PR #179; delete already works via drawer).
-- Edits auto-promote in the morning when tomorrow becomes today.
-
-**Shape**:
-
-| Block | What | Lift |
-|---|---|---|
-| Schema | New `TomorrowPlan` doc: `{ childId, date, ownerOverrides, extras, startTemplateId? }` | ½d |
-| Persistence | Tomorrow page reads/writes to this doc instead of in-memory state | ½d |
-| Auto-promote | On first wake event recorded for date `D`, look up `TomorrowPlan[D]`; fold `ownerOverrides` onto the day's projected events and create `extras` as recorded events on the day | 1d |
-| Tests | Round-trip persistence; auto-promote-on-wake; override-then-promote integration; no-plan-no-op | bundled |
-
-Templates' role: pure prefill. "Start from template" copies its owners into `ownerOverrides`; further edits don't touch the template.
-
-**Design decisions** (locked 2026-05-18):
-
-| Decision | Locked |
-|---|---|
-| Auto-promote trigger | **First wake event recorded for the plan's date.** Piggy-backs on existing lifecycle; robust to late wakes. |
-| Plan doc materialization | **On first edit.** Opening `/tomorrow` and leaving it idle creates no doc. The first owner-pick / extra / template-prefill action is what writes the `TomorrowPlan` to Firestore. |
-| Template-link semantics | **One-shot snapshot.** "Start from template" copies its owners into `ownerOverrides` once; subsequent template edits do not propagate. |
-
-**Out of scope**:
-- Multi-day forward planning (use §F35).
-- Per-event time edits on tomorrow's projected events (own follow-up; tomorrow's wake-time anchor stays the only time control).
-- Undoing auto-promote (no rollback button; user-recorded actuals on the day win as normal).
-
-**Estimated effort**: 2–3 days. Three PRs:
-1. Schema + repository for `TomorrowPlan` (no UI changes).
-2. Engine: materialize-on-wake rule + tests.
-3. UI: drop the template gate; rewire owner picker to write overrides; "Start from template" prefill button.
-
----
-
----
 
 ## §F38 — Template extras (FAB on `/day-templates`)
 
@@ -891,20 +660,6 @@ Plus visual QA pass on every form (welcome, settings, drawer time picker, day-te
 
 ---
 
-## §F46 — /tomorrow chip tap → drawer (not owner picker)
-
-**Source**: Jake, 2026-05-21 — "Drawer does not open when clicking anything in /tomorrow."
-
-**Status**: `pending` (will be absorbed into PR 3 of the F17+F12 bundle; if PR 3 lands without this, file as standalone)
-
-**What**: today's `/tomorrow` page opens the `TemplateOwnerPicker` on chip tap (and only if a template is selected). It does NOT open the standard `EventEditDrawerV3`. Behavior is inconsistent with the dashboard, where chip taps always open the drawer.
-
-**Why fast-follow**: PR 3 of §F17/§F12 rebuilds the `/tomorrow` page with autosave + draft/confirm + clear + extras. The chip tap path will need to write through to the `TomorrowPlan.ownerOverrides` map (not the per-event template) — that's a different abstraction than the existing owner picker. Easier to redesign the tap behavior once than patch it twice.
-
-**Acceptance**: chip tap opens the drawer (or a streamlined per-event editor) that writes to `TomorrowPlan.ownerOverrides[eventKey]`. Time edits on projected events should also be possible.
-
----
-
 ## §F47 — Square focus outline on InstantChip (block focus outline is rounded)
 
 **Source**: Jake, 2026-05-21.
@@ -1085,8 +840,6 @@ Plus visual QA pass on every form (welcome, settings, drawer time picker, day-te
 **Why fast-follow / blocking**: currently Jake's manually adding a bottle every night, so this is real friction. But the model has a million edge cases — get the design crisp before shipping anything.
 
 **Estimated effort**: grill (~30 min) → ~1-2 hr settings field + engine + tests.
-
----
 
 ---
 
