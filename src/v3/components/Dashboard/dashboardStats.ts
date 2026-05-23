@@ -47,12 +47,19 @@ export function lastBottle(events: Event[]): Event | undefined {
   return best;
 }
 
-export function lastCompletedNap(events: Event[]): Event | undefined {
+export function lastCompletedNap(events: Event[], now: TimeMin): Event | undefined {
   let best: Event | undefined;
   for (const e of events) {
     if (e.type !== "nap") continue;
     if (!isRecorded(e.lifecycle)) continue;
     if (e.endTime === undefined) continue;
+    // §F48: a recorded nap whose endTime was back-edited to a future
+    // value isn't "completed" from the user's POV — without this
+    // filter the dashboard rendered `"45m, 0 min ago (4:02p)"` at
+    // 2:30pm because Math.max(0, now - future) clamps the negative
+    // delta to "0 min ago" while the clock string still printed the
+    // future endTime. Future-end naps are excluded from "Last nap".
+    if (e.endTime > now) continue;
     if (!best || (best.endTime !== undefined && e.endTime > best.endTime)) best = e;
   }
   return best;
