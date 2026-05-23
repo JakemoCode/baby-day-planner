@@ -68,10 +68,7 @@ function makeDeleteFn() {
 function makeSetOwnerOverride() {
   const fn = vi.fn();
   fn.mockResolvedValue(undefined);
-  return fn as unknown as ((
-    eventKey: string,
-    owner: Event["owner"],
-  ) => Promise<void>) &
+  return fn as unknown as ((eventKey: string, owner: Event["owner"]) => Promise<void>) &
     ReturnType<typeof vi.fn>;
 }
 

@@ -122,10 +122,7 @@ describe("v3 days repository", () => {
   // engine's freedom to re-project the event's time.
   it("updateDayOwnerOverride merges into existing ownerOverrides map (does not replace)", async () => {
     const database = db();
-    await createDay(
-      database,
-      day({ ownerOverrides: { nap_1: { slot: "parent1" } } }),
-    );
+    await createDay(database, day({ ownerOverrides: { nap_1: { slot: "parent1" } } }));
     await updateDayOwnerOverride(database, "child-1", "day-1", "nap_2", {
       slot: "parent2",
     });
@@ -149,10 +146,7 @@ describe("v3 days repository", () => {
 
   it("updateDayOwnerOverride can change an existing entry", async () => {
     const database = db();
-    await createDay(
-      database,
-      day({ ownerOverrides: { nap_1: { slot: "parent1" } } }),
-    );
+    await createDay(database, day({ ownerOverrides: { nap_1: { slot: "parent1" } } }));
     await updateDayOwnerOverride(database, "child-1", "day-1", "nap_1", {
       slot: "parent2",
     });
