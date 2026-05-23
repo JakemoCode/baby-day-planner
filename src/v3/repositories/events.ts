@@ -21,6 +21,7 @@ import {
 } from "firebase/firestore";
 import { eventPath, eventsCollectionPath } from "@/lib/firestore/paths";
 import { v3EventConverter } from "../firestore/converters";
+import { annotationTime } from "../lib/annotationTime";
 import type { Event } from "../schemas";
 
 function eventRef(db: Firestore, childId: string, dayId: string, eventId: string) {
@@ -116,8 +117,3 @@ export async function reconcileDuplicateEventDocs(
   return { deleted };
 }
 
-function annotationTime(e: Event): number {
-  if (e.lifecycle.state === "recorded") return e.lifecycle.annotatedAt;
-  if (e.lifecycle.state === "completed") return e.lifecycle.committedAt;
-  return -1;
-}

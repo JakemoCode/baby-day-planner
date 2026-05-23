@@ -32,6 +32,7 @@
  */
 
 import type { Event, Settings, TimeMin } from "../schemas";
+import { annotationTime } from "../lib/annotationTime";
 import { resolvedEnd } from "../lib/effectiveEnd";
 import { applyDreamFeedLabel } from "./dreamFeedLabel";
 import { expandPutdownBlocks } from "../components/Timeline/expandPutdown";
@@ -100,8 +101,3 @@ function dedupBySlotKey(events: Event[]): Event[] {
   return positionalKeys.map((k) => winnerByKey.get(k)!);
 }
 
-function annotationTime(e: Event): number {
-  if (e.lifecycle.state === "recorded") return e.lifecycle.annotatedAt;
-  if (e.lifecycle.state === "completed") return e.lifecycle.committedAt;
-  return -1;
-}
