@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { Event, OwnershipTemplate, TimeMin } from "@/v3/schemas";
 import { isRecorded } from "@/v3/schemas";
 import { reduceLifecycle } from "@/v3/lifecycle";
@@ -17,7 +17,7 @@ import { useV3TomorrowPlan } from "@/v3/hooks/useV3TomorrowPlan";
 import { useReconcileActiveDay } from "@/v3/hooks/useReconcileActiveDay";
 import { useDrawer } from "@/v3/hooks/useDrawer";
 import { getOrCreatePlannedDay, promoteFromPlan, startNewDay } from "@/v3/repositories/days";
-import { createEvent } from "@/v3/repositories/events";
+import { createEvent, reconcileDuplicateEventDocs } from "@/v3/repositories/events";
 import { db } from "@/lib/firebase/client";
 import { DashboardSkeleton } from "@/v3/components/Dashboard/DashboardSkeleton";
 import { FAB } from "@/components/shared/FAB";
@@ -56,6 +56,14 @@ export default function DashboardPage() {
   // subscription. Defaults to settings.defaultWakeTime if no confirmed
   // plan exists for today.
   useReconcileActiveDay(CHILD_ID, todayDate(), settings?.defaultWakeTime ?? 7 * 60);
+  // §F59 — one-shot orphan cleanup per day load. Pre-§F59 inconsistent
+  // write-path id conventions could leave two Firestore docs sharing
+  // `(type, eventKey)` (one `nap_N`, one `recorded_nap_N`). Deletes the
+  // loser (most-recent annotation wins). Idempotent — no-op once clean.
+  useEffect(() => {
+    if (!day?.id) return;
+    void reconcileDuplicateEventDocs(db, CHILD_ID, day.id);
+  }, [CHILD_ID, day?.id]);
   // §F12 — surface today's plan to the dev StartDayButton so it can
   // re-promote from the plan vs defaults during dogfood iteration.
   const { plan: todaysPlan } = useV3TomorrowPlan(CHILD_ID, todayDate());

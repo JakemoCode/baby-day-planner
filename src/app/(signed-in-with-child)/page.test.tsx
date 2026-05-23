@@ -56,6 +56,9 @@ vi.mock("@/v3/hooks/useV3TomorrowPlan", () => ({
 }));
 vi.mock("@/v3/repositories/events", () => ({
   createEvent: (...args: unknown[]) => createEventMock(...args),
+  // §F59 fire-and-forget effect on mount; mock to a no-op so tests don't
+  // hit the real Firestore module.
+  reconcileDuplicateEventDocs: vi.fn().mockResolvedValue({ deleted: [] }),
 }));
 vi.mock("@/v3/repositories/settings", () => ({
   saveSettings: (...args: unknown[]) => saveSettingsMock(...args),
