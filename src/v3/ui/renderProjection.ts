@@ -1,7 +1,16 @@
 /**
  * renderProjection — the named seam between engine output and the screen.
  *
- * Three post-projection render passes are composed here in order:
+ * Four post-projection render passes are composed here in order:
+ *
+ * 0. Slot-key dedup: when two recorded events share `(type, eventKey)` —
+ *    an orphan condition from inconsistent write-path id conventions
+ *    (e.g. NapActionButton's `id: nap_N` vs useDrawer's
+ *    `id: recorded_nap_N`) — collapse to one for display. The engine
+ *    invariant ("every recorded event in input appears in output")
+ *    prevents the engine from doing this itself; render is the legal
+ *    layer for dropping duplicates. Policy: most-recent annotation wins;
+ *    stable id tie-break. Jake 2026-05-22 — "duplicate Nap 4 chip" bug.
  *
  * 1. Dream-feed label (DOMAIN.md §5): when dream feed is enabled, the first
  *    post-bedtime bottle gets relabeled "Dream Feed". Operates on bottles;
@@ -32,8 +41,10 @@ export function renderProjection(
   settings: Settings,
   nowMinutes?: TimeMin,
 ): Event[] {
+  // Pass 0: collapse duplicate (type, eventKey) recorded events for display.
+  const deduped = dedupBySlotKey(events);
   // Pass 1: dream-feed label (operates on bottles, no structural changes).
-  const labeled = applyDreamFeedLabel(events, settings);
+  const labeled = applyDreamFeedLabel(deduped, settings);
   // Pass 2: bake resolvedEnd into in-progress recorded sleeps so the
   // renderer draws them to their auto-extended end. resolvedEnd only
   // extends recorded events whose endTime < now; everything else passes
@@ -59,4 +70,38 @@ export function renderProjection(
     defaultNapLengthMinutes: settings.defaultNapLengthMinutes,
     ...(nowMinutes !== undefined ? { nowMinutes } : {}),
   });
+}
+
+/**
+ * Collapse events that share `(type, eventKey)` — orphans from
+ * inconsistent write-path id conventions. Most-recent annotation wins;
+ * stable id tie-break. Events without an eventKey, and projections, pass
+ * through (projections are deterministic and shouldn't duplicate; we
+ * still dedup them defensively under the same policy).
+ */
+function dedupBySlotKey(events: Event[]): Event[] {
+  const winnerByKey = new Map<string, Event>();
+  const positionalKeys: string[] = [];
+  for (let i = 0; i < events.length; i++) {
+    const e = events[i]!;
+    const key = e.eventKey ? `${e.type}:${e.eventKey}` : `::no-key::${i}`;
+    const incumbent = winnerByKey.get(key);
+    if (!incumbent) {
+      winnerByKey.set(key, e);
+      positionalKeys.push(key);
+      continue;
+    }
+    if (annotationTime(e) > annotationTime(incumbent)) {
+      winnerByKey.set(key, e);
+    } else if (annotationTime(e) === annotationTime(incumbent) && e.id < incumbent.id) {
+      winnerByKey.set(key, e);
+    }
+  }
+  return positionalKeys.map((k) => winnerByKey.get(k)!);
+}
+
+function annotationTime(e: Event): number {
+  if (e.lifecycle.state === "recorded") return e.lifecycle.annotatedAt;
+  if (e.lifecycle.state === "completed") return e.lifecycle.committedAt;
+  return -1;
 }

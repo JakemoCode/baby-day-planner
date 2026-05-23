@@ -14,6 +14,7 @@ import {
   aRecordedNap,
   aSettings,
 } from "../../__tests__/factories";
+import { NO_OWNER } from "../../schemas";
 import type { Event } from "../../schemas";
 import { projectDay } from "../projectDay";
 import { RULES as NAP_RULES } from "./naps";
@@ -960,5 +961,72 @@ describe("Cascade extends past wakeWindowsMinutes.length (physiology cascade)", 
     const ww5 = out.find((e) => e.eventKey === "wake_window_5");
     expect(ww5).toBeDefined();
     expect(ww5!.endTime).toBe(16 * 60);
+  });
+});
+
+describe("Start Nap Now mid-window — recorded nap absorbs the slot (Jake 2026-05-22)", () => {
+  // Bug report: at 15:35 (inside wake_window_4 14:20–16:20), tapping
+  // "Start Nap Now" produced TWO nap_4 events: the recorded one at
+  // 15:35–16:20 AND the originally-projected one at 16:20–17:05.
+  //
+  // The NapActionButton writes the started nap with:
+  //   { eventKey: <projected nap_N's eventKey>,
+  //     lifecycle: { state: "recorded", annotatedAt: nowMin },
+  //     startTime: nowMin,
+  //     endTime: undefined }
+  //
+  // The cascade should see eventKey "nap_4" in existing, absorb the slot,
+  // emit wake_window_4 ending at the recorded start, and NOT emit a
+  // projected nap_4. We assert exactly that.
+  it("a 'recorded' (in-progress, no endTime) nap_4 produces exactly one nap_4 and shrinks ww_4", () => {
+    const startedNap4: Event = {
+      id: "nap_4",
+      dayId: "day_test",
+      eventKey: "nap_4",
+      type: "nap",
+      kind: "block",
+      startTime: 15 * 60 + 35, // 15:35
+      label: "Nap 4",
+      hasPutdown: false,
+      owner: NO_OWNER,
+      lifecycle: { state: "recorded", annotatedAt: 15 * 60 + 35 },
+      // No endTime: "in progress" — render-time effectiveEndOf auto-extends.
+    };
+
+    const ctx = aContext({
+      day: aDay({ wakeTime: 7 * 60 }),
+      settings: aSettings({
+        // Five 2h wake windows lay out: nap_1 9:00, nap_2 11:45, nap_3 14:20,
+        // nap_4 (projected) 16:20 — matching the screenshot's "Nap 4 4:20-5:05p".
+        wakeWindowsMinutes: [120, 120, 120, 120, 120],
+        defaultNapLengthMinutes: 45,
+        bedtimeThreshold: 19 * 60,
+        defaultWakeTime: 7 * 60,
+      }),
+      actuals: [startedNap4],
+      nowMinutes: 15 * 60 + 35,
+    });
+
+    const out = projectDay(
+      {
+        day: ctx.day,
+        settings: ctx.settings,
+        actuals: ctx.actuals,
+        nowMinutes: ctx.nowMinutes,
+      },
+      { rules: ALL_RULES },
+    );
+
+    // Exactly one nap_4 — the recorded one. No projected duplicate.
+    const nap4s = out.filter((e) => e.type === "nap" && e.eventKey === "nap_4");
+    expect(nap4s).toHaveLength(1);
+    expect(nap4s[0]!.id).toBe(startedNap4.id);
+    expect(nap4s[0]!.lifecycle.state).toBe("recorded");
+    expect(nap4s[0]!.startTime).toBe(15 * 60 + 35);
+
+    // wake_window_4 ends at the recorded nap's startTime (15:35),
+    // NOT at the projected start (16:20).
+    const ww4 = out.find((e) => e.eventKey === "wake_window_4");
+    expect(ww4?.endTime).toBe(15 * 60 + 35);
   });
 });
