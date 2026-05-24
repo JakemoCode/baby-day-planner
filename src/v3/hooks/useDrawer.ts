@@ -65,6 +65,14 @@ export function useDrawer(
   saveEvent: (event: Event) => Promise<void> | void,
   deleteOptimistic: (eventId: string) => Promise<void> | void,
   setOwnerOverride?: (eventKey: string, owner: Event["owner"]) => Promise<void> | void,
+  /**
+   * §F65 OPTIONAL — when provided AND the deleted event is a
+   * `daily_recurring`, route through `Day.suppressedRecurringIds`
+   * (R11.6) instead of (or in addition to, if the event is also
+   * recorded) the regular `deleteOptimistic` path. Caller closes
+   * over the dayId and forwards to {@link suppressRecurringForDay}.
+   */
+  suppressRecurring?: (recurringId: string) => Promise<void> | void,
 ): UseDrawerResult {
   const [drawer, setDrawer] = useState<DrawerState>({ open: false });
 
@@ -136,7 +144,19 @@ export function useDrawer(
       if (isActual) {
         await deleteOptimistic(event.id);
       }
-      // projected: close only, no persist
+      // §F65: recurring events live in Settings.dailyRecurring; the
+      // engine projects them per-day via R11.2. "Delete from today"
+      // ≠ "remove from settings" — instead suppress the recurring id
+      // on this Day, which R11.6 honors. If the user had recorded the
+      // event (above branch ran), the suppression *also* runs so the
+      // freshly-deleted slot doesn't immediately re-project.
+      if (suppressRecurring && event.type === "daily_recurring") {
+        const recurringId = event.eventKey.startsWith("recurring:")
+          ? event.eventKey.slice("recurring:".length)
+          : event.eventKey;
+        await suppressRecurring(recurringId);
+      }
+      // projected non-recurring: close only, no persist
     }
     setDrawer({ open: false });
   };

@@ -379,6 +379,69 @@ describe("EventEditDrawerV3", () => {
     expect(screen.getByRole("button", { name: "Delete" })).toBeInTheDocument();
   });
 
+  it("§F65: delete button is shown for a PROJECTED daily_recurring event", () => {
+    const recurring: Event = {
+      id: "proj_recurring:rec-tummy",
+      dayId: "d-1",
+      eventKey: "recurring:rec-tummy",
+      type: "daily_recurring",
+      kind: "instant",
+      startTime: 10 * 60,
+      label: "Tummy time",
+      hasPutdown: false,
+      owner: NO_OWNER,
+      lifecycle: { state: "projected" },
+    };
+    render(
+      <EventEditDrawerV3
+        open
+        mode="edit"
+        event={recurring}
+        owners={owners}
+        nowMinutes={NOW}
+        bedtimeThreshold={THRESHOLD}
+        defaultWakeTime={DEFAULT_WAKE_TIME}
+        onSave={() => {}}
+        onCancel={() => {}}
+        onDelete={() => {}}
+      />,
+    );
+    expect(screen.getByRole("button", { name: "Delete" })).toBeVisible();
+  });
+
+  it("§F65: delete confirmation for a daily_recurring uses skip-today copy", async () => {
+    const recurring: Event = {
+      id: "proj_recurring:rec-tummy",
+      dayId: "d-1",
+      eventKey: "recurring:rec-tummy",
+      type: "daily_recurring",
+      kind: "instant",
+      startTime: 10 * 60,
+      label: "Tummy time",
+      hasPutdown: false,
+      owner: NO_OWNER,
+      lifecycle: { state: "projected" },
+    };
+    render(
+      <EventEditDrawerV3
+        open
+        mode="edit"
+        event={recurring}
+        owners={owners}
+        nowMinutes={NOW}
+        bedtimeThreshold={THRESHOLD}
+        defaultWakeTime={DEFAULT_WAKE_TIME}
+        onSave={() => {}}
+        onCancel={() => {}}
+        onDelete={() => {}}
+      />,
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Delete" }));
+    // Dialog uses role=alertdialog or dialog depending on ConfirmDialog impl.
+    expect(screen.getByText(/Skip Tummy time today/i)).toBeVisible();
+    expect(screen.getByText(/come back tomorrow/i)).toBeVisible();
+  });
+
   // §F9 PORT — drawer per-type form coverage previously asserted in V2.
 
   it("wake_window form shows only the owner picker (no time / amount / label inputs)", () => {

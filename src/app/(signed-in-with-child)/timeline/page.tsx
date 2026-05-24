@@ -10,7 +10,11 @@ import { useV3Settings } from "@/v3/hooks/useV3Settings";
 import { useV3Templates } from "@/v3/hooks/useV3Templates";
 import { useDrawer } from "@/v3/hooks/useDrawer";
 import { db } from "@/lib/firebase/client";
-import { editWakeTime, updateDayOwnerOverride } from "@/v3/repositories/days";
+import {
+  editWakeTime,
+  suppressRecurringForDay,
+  updateDayOwnerOverride,
+} from "@/v3/repositories/days";
 import { LoadingState } from "@/components/shared/LoadingState";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { FAB } from "@/components/shared/FAB";
@@ -36,6 +40,10 @@ export default function TimelinePage() {
     deleteOptimistic,
     day?.id
       ? (eventKey, owner) => updateDayOwnerOverride(db, CHILD_ID, day.id, eventKey, owner)
+      : undefined,
+    // §F65 — recurring delete = skip for today via Day.suppressedRecurringIds.
+    day?.id
+      ? (recurringId) => suppressRecurringForDay(db, CHILD_ID, day.id, recurringId)
       : undefined,
   );
   const [pickerOpen, setPickerOpen] = useState(false);

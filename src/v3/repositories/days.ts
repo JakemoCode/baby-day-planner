@@ -12,6 +12,7 @@
  */
 
 import {
+  arrayUnion,
   collection,
   doc,
   getDoc,
@@ -130,6 +131,30 @@ export async function updateDayOwnerOverride(
 ): Promise<void> {
   await updateDoc(dayRef(db, childId, dayId), {
     [`ownerOverrides.${eventKey}`]: owner,
+  });
+}
+
+/**
+ * §F65 — skip a daily-recurring entry for this single day without
+ * touching the recurring template in Settings. R11.6 in
+ * `engine/rules/dailyRecurring.ts` already honors
+ * `Day.suppressedRecurringIds`, so the engine stops emitting that
+ * recurring's projected event for the rest of the day; tomorrow's
+ * fresh Day doc starts with an empty `suppressedRecurringIds` and the
+ * recurring re-appears.
+ *
+ * Uses Firestore `arrayUnion` so duplicate suppressions are a no-op —
+ * the drawer's "delete" handler can call this without first reading
+ * the current array.
+ */
+export async function suppressRecurringForDay(
+  db: Firestore,
+  childId: string,
+  dayId: string,
+  recurringId: string,
+): Promise<void> {
+  await updateDoc(dayRef(db, childId, dayId), {
+    suppressedRecurringIds: arrayUnion(recurringId),
   });
 }
 
