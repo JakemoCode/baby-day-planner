@@ -72,22 +72,30 @@ function makeSetOwnerOverride() {
     ReturnType<typeof vi.fn>;
 }
 
+function makeSuppressRecurring() {
+  const fn = vi.fn();
+  fn.mockResolvedValue(undefined);
+  return fn as unknown as ((recurringId: string) => Promise<void>) & ReturnType<typeof vi.fn>;
+}
+
 function setup({
   actuals = [] as Event[],
   saveEvent = makeSaveEvent(),
   deleteOptimistic = makeDeleteFn(),
   setOwnerOverride,
+  suppressRecurring,
 }: {
   actuals?: Event[];
   saveEvent?: ((event: Event) => Promise<void>) & ReturnType<typeof vi.fn>;
   deleteOptimistic?: ((eventId: string) => Promise<void>) & ReturnType<typeof vi.fn>;
   setOwnerOverride?: ((eventKey: string, owner: Event["owner"]) => Promise<void>) &
     ReturnType<typeof vi.fn>;
+  suppressRecurring?: ((recurringId: string) => Promise<void>) & ReturnType<typeof vi.fn>;
 } = {}) {
   const result = renderHook(() =>
-    useDrawer(actuals, saveEvent, deleteOptimistic, setOwnerOverride),
+    useDrawer(actuals, saveEvent, deleteOptimistic, setOwnerOverride, suppressRecurring),
   );
-  return { ...result, saveEvent, deleteOptimistic, setOwnerOverride };
+  return { ...result, saveEvent, deleteOptimistic, setOwnerOverride, suppressRecurring };
 }
 
 // ---------------------------------------------------------------------------
@@ -313,6 +321,83 @@ describe("useDrawer", () => {
     });
 
     expect(deleteOptimistic).not.toHaveBeenCalled();
+    expect(result.current.drawer).toEqual({ open: false });
+  });
+
+  // §F65 — daily_recurring delete routes through suppressRecurring,
+  // not through Firestore doc deletion (the recurring is projected, not
+  // persisted as a Day event).
+  it("onDelete on a projected daily_recurring routes through suppressRecurring", async () => {
+    const recurring = makeEvent({
+      id: "proj_recurring:rec-tummy",
+      eventKey: "recurring:rec-tummy",
+      type: "daily_recurring",
+      kind: "instant",
+      label: "Tummy time",
+    });
+    const deleteOptimistic = makeDeleteFn();
+    const suppressRecurring = makeSuppressRecurring();
+    const { result } = setup({ actuals: [], deleteOptimistic, suppressRecurring });
+
+    act(() => result.current.openEdit(recurring));
+    await act(async () => {
+      await result.current.onDelete(recurring);
+    });
+
+    expect(suppressRecurring).toHaveBeenCalledTimes(1);
+    expect(suppressRecurring).toHaveBeenCalledWith("rec-tummy");
+    expect(deleteOptimistic).not.toHaveBeenCalled();
+    expect(result.current.drawer).toEqual({ open: false });
+  });
+
+  it("onDelete on a recorded daily_recurring deletes the doc AND suppresses for the day", async () => {
+    // User recorded a recurring event then changed their mind — both
+    // the persisted doc and the projection-suppression need to run so
+    // the slot stays empty for the rest of the day.
+    const recurring = makeActualEvent({
+      id: "recorded_recurring:rec-tummy",
+      eventKey: "recurring:rec-tummy",
+      type: "daily_recurring",
+      kind: "instant",
+      label: "Tummy time",
+    });
+    const deleteOptimistic = makeDeleteFn();
+    const suppressRecurring = makeSuppressRecurring();
+    const { result } = setup({
+      actuals: [recurring],
+      deleteOptimistic,
+      suppressRecurring,
+    });
+
+    act(() => result.current.openEdit(recurring));
+    await act(async () => {
+      await result.current.onDelete(recurring);
+    });
+
+    expect(deleteOptimistic).toHaveBeenCalledWith("recorded_recurring:rec-tummy");
+    expect(suppressRecurring).toHaveBeenCalledWith("rec-tummy");
+    expect(result.current.drawer).toEqual({ open: false });
+  });
+
+  it("onDelete on a daily_recurring falls back to plain delete when suppressRecurring is not wired", async () => {
+    // Defensive: pages that don't pass the suppress callback (e.g. a
+    // read-only history view) shouldn't crash on a recurring delete.
+    const recurring = makeActualEvent({
+      id: "recorded_recurring:rec-tummy",
+      eventKey: "recurring:rec-tummy",
+      type: "daily_recurring",
+      kind: "instant",
+      label: "Tummy time",
+    });
+    const deleteOptimistic = makeDeleteFn();
+    const { result } = setup({ actuals: [recurring], deleteOptimistic });
+
+    act(() => result.current.openEdit(recurring));
+    await act(async () => {
+      await result.current.onDelete(recurring);
+    });
+
+    expect(deleteOptimistic).toHaveBeenCalledWith("recorded_recurring:rec-tummy");
     expect(result.current.drawer).toEqual({ open: false });
   });
 });

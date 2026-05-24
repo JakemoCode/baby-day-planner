@@ -177,9 +177,14 @@ export function EventEditDrawerV3({
       ? `${baseTitle}: ${sourceEvent.label}`
       : baseTitle;
 
-  // Delete is only meaningful for events that exist in Firestore — i.e.
-  // already-recorded. Projected events have no doc to delete.
-  const canDelete = mode === "edit" && onDelete !== undefined && isRecorded(sourceEvent.lifecycle);
+  // Delete is meaningful for events that exist in Firestore (already-
+  // recorded) OR for daily_recurring events — for recurring, "delete"
+  // means "skip today" via Day.suppressedRecurringIds (§F65), not a
+  // Firestore doc delete. useDrawer routes both cases.
+  const canDelete =
+    mode === "edit" &&
+    onDelete !== undefined &&
+    (isRecorded(sourceEvent.lifecycle) || type === "daily_recurring");
 
   const showStartTime = type !== "wake_window";
   const showEndTime = type === "nap" || type === "extra" || type === "pump";
@@ -412,9 +417,13 @@ export function EventEditDrawerV3({
 
       <ConfirmDialog
         open={confirmOpen}
-        title={`Delete this ${type === "extra" ? "event" : type.replace("_", " ")}?`}
-        body="This cannot be undone."
-        confirmLabel="Delete"
+        title={
+          type === "daily_recurring"
+            ? `Skip ${sourceEvent.label} today?`
+            : `Delete this ${type === "extra" ? "event" : type.replace("_", " ")}?`
+        }
+        body={type === "daily_recurring" ? "It'll come back tomorrow." : "This cannot be undone."}
+        confirmLabel={type === "daily_recurring" ? "Skip today" : "Delete"}
         cancelLabel="Keep"
         onCancel={() => setConfirmOpen(false)}
         onConfirm={() => {

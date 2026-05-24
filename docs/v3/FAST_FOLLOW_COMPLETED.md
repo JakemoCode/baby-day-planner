@@ -152,3 +152,13 @@ Three-PR arc complete: **PR #187** (TomorrowPlan schema + repo), **PR #212** (en
 ## §F46 — /tomorrow chip tap → drawer (not owner picker)
 
 Absorbed into the §F39 arc and shipped in **PR #230**. Chip tap on projected events opens the OwnerPickerV3 BottomSheet which writes to `TomorrowPlan.ownerOverrides[eventKey]`. Extras still get the full EventEditDrawerV3.
+
+## §F65 — Delete recurring event from today's timeline
+
+Shipped in **PR #<TBD>** (`feat/f65-delete-recurring-from-today`). New
+repo fn `suppressRecurringForDay` (arrayUnion into
+`Day.suppressedRecurringIds`); `useDrawer` routes `daily_recurring`
+delete through it; `EventEditDrawerV3` shows a Delete button on
+projected recurring events with "Skip <event> today? It'll come back
+tomorrow." confirmation copy. Engine's R11.6 already honored
+suppression — this just adds the UI affordance.

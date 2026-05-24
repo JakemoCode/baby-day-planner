@@ -28,6 +28,7 @@ import {
   promoteFromPlan,
   startNewDay,
   updateDay,
+  suppressRecurringForDay,
   updateDayOwnerOverride,
   watchActiveDay,
 } from "./days";
@@ -152,6 +153,34 @@ describe("v3 days repository", () => {
     });
     const got = await getDay(database, "child-1", "day-1");
     expect(got?.ownerOverrides).toEqual({ nap_1: { slot: "parent2" } });
+  });
+
+  // §F65 — "delete recurring from today" routes the user's intent
+  // through Day.suppressedRecurringIds (which R11.6 already honors)
+  // instead of mutating Settings.dailyRecurring (the recurring template
+  // stays intact for tomorrow).
+  it("suppressRecurringForDay adds a recurring id to an empty suppression list", async () => {
+    const database = db();
+    await createDay(database, day({ suppressedRecurringIds: [] }));
+    await suppressRecurringForDay(database, "child-1", "day-1", "rec-tummy");
+    const got = await getDay(database, "child-1", "day-1");
+    expect(got?.suppressedRecurringIds).toEqual(["rec-tummy"]);
+  });
+
+  it("suppressRecurringForDay preserves existing ids when adding a new one", async () => {
+    const database = db();
+    await createDay(database, day({ suppressedRecurringIds: ["rec-vitamin"] }));
+    await suppressRecurringForDay(database, "child-1", "day-1", "rec-tummy");
+    const got = await getDay(database, "child-1", "day-1");
+    expect(got?.suppressedRecurringIds?.sort()).toEqual(["rec-tummy", "rec-vitamin"]);
+  });
+
+  it("suppressRecurringForDay is idempotent — adding the same id twice keeps one entry", async () => {
+    const database = db();
+    await createDay(database, day({ suppressedRecurringIds: ["rec-tummy"] }));
+    await suppressRecurringForDay(database, "child-1", "day-1", "rec-tummy");
+    const got = await getDay(database, "child-1", "day-1");
+    expect(got?.suppressedRecurringIds).toEqual(["rec-tummy"]);
   });
 
   it("archives by flipping status", async () => {
