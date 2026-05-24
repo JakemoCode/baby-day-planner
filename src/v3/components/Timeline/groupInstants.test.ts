@@ -6,7 +6,7 @@
 import { describe, expect, it } from "vitest";
 import type { Event } from "../../schemas";
 import { NO_OWNER } from "../../schemas";
-import { groupInstants } from "./groupInstants";
+import { groupInstants, mergeNearbyGroups } from "./groupInstants";
 
 const ev = (overrides: Partial<Event>): Event => ({
   id: "e",
@@ -55,5 +55,80 @@ describe("v3 groupInstants", () => {
   it("emits a stable string key suitable for React reconciliation", () => {
     const groups = groupInstants([ev({ id: "a", startTime: 9 * 60 })]);
     expect(groups[0]?.key).toBe("instant-group-540");
+  });
+});
+
+describe("v3 mergeNearbyGroups (§F55)", () => {
+  it("returns groups unchanged when none overlap vertically", () => {
+    const groups = groupInstants([
+      ev({ id: "a", startTime: 9 * 60 }),
+      ev({ id: "b", startTime: 12 * 60 }),
+    ]);
+    const merged = mergeNearbyGroups(groups, 30);
+    expect(merged).toHaveLength(2);
+    expect(merged[0]?.items.map((e) => e.id)).toEqual(["a"]);
+    expect(merged[1]?.items.map((e) => e.id)).toEqual(["b"]);
+  });
+
+  it("merges two groups within the collision window into one", () => {
+    const groups = groupInstants([
+      ev({ id: "a", startTime: 9 * 60 }),
+      ev({ id: "b", startTime: 9 * 60 + 5 }),
+    ]);
+    const merged = mergeNearbyGroups(groups, 15);
+    expect(merged).toHaveLength(1);
+    expect(merged[0]?.items.map((e) => e.id)).toEqual(["a", "b"]);
+  });
+
+  it("transitively chains: A near B, B near C, all collapse into one", () => {
+    const groups = groupInstants([
+      ev({ id: "a", startTime: 9 * 60 }),
+      ev({ id: "b", startTime: 9 * 60 + 8 }),
+      ev({ id: "c", startTime: 9 * 60 + 15 }),
+    ]);
+    const merged = mergeNearbyGroups(groups, 10);
+    expect(merged).toHaveLength(1);
+    expect(merged[0]?.items.map((e) => e.id)).toEqual(["a", "b", "c"]);
+  });
+
+  it("merged group startMinutes is the earliest member's startTime (axis anchor)", () => {
+    const groups = groupInstants([
+      ev({ id: "early", startTime: 9 * 60 }),
+      ev({ id: "late", startTime: 9 * 60 + 7 }),
+    ]);
+    const merged = mergeNearbyGroups(groups, 15);
+    expect(merged[0]?.startMinutes).toBe(9 * 60);
+  });
+
+  it("merged group preserves the full time range for display purposes", () => {
+    const groups = groupInstants([
+      ev({ id: "a", startTime: 9 * 60 }),
+      ev({ id: "b", startTime: 9 * 60 + 5 }),
+    ]);
+    const merged = mergeNearbyGroups(groups, 15);
+    expect(merged[0]?.endMinutes).toBe(9 * 60 + 5);
+  });
+
+  it("emits a stable key that distinguishes merged groups from single groups", () => {
+    const groups = groupInstants([
+      ev({ id: "a", startTime: 9 * 60 }),
+      ev({ id: "b", startTime: 9 * 60 + 5 }),
+    ]);
+    const merged = mergeNearbyGroups(groups, 15);
+    // Different key shape so React doesn't try to reuse a single-group DOM node
+    expect(merged[0]?.key).not.toBe("instant-group-540");
+    expect(merged[0]?.key).toContain("540");
+  });
+
+  it("does not merge across a gap exactly equal to the collision window", () => {
+    // 30-min collision window; groups exactly 30 apart should NOT merge.
+    // Strict less-than keeps the semantics easy to reason about at
+    // exact thresholds (axis tick boundaries, etc.).
+    const groups = groupInstants([
+      ev({ id: "a", startTime: 9 * 60 }),
+      ev({ id: "b", startTime: 9 * 60 + 30 }),
+    ]);
+    const merged = mergeNearbyGroups(groups, 30);
+    expect(merged).toHaveLength(2);
   });
 });

@@ -37,7 +37,6 @@ Shipped items move to [`FAST_FOLLOW_COMPLETED.md`](./FAST_FOLLOW_COMPLETED.md) (
 - [§F53](./fast-follow/now/f53-recurring-duration-zindex.md)
 - [§F55](./fast-follow/now/f55-overlapping-instants-ux.md)
 - [§F56](./fast-follow/now/f56-recurring-drawer-title.md)
-- [§F57](./fast-follow/now/f57-extra-pump-overlap-ellipses.md)
 
 ## grill/
 
@@ -45,6 +44,7 @@ Shipped items move to [`FAST_FOLLOW_COMPLETED.md`](./FAST_FOLLOW_COMPLETED.md) (
 - [§F35](./fast-follow/grill/f35-named-multi-templates.md)
 - [§F41](./fast-follow/grill/f41-onboarding-tutorial.md)
 - [§F54](./fast-follow/grill/f54-bottle-cascade-overnight.md)
+- [§F57](./fast-follow/grill/f57-extra-pump-overlap-ellipses.md)
 - [§F58](./fast-follow/grill/f58-dream-feed-default-time.md)
 - [§F62](./fast-follow/grill/f62-cancascade-idempotency-hole.md)
 - [§F64](./fast-follow/grill/f64-nap-bedtime-too-aggressive.md)

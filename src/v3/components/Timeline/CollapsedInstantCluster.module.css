@@ -1,0 +1,132 @@
+/*
+ * §F55 — collapsed cluster for ≥2 nearby instant events.
+ * Same right-gutter geometry as `InstantCluster.module.css`; the chip
+ * itself is a simple compound that signals "tap to expand."
+ */
+
+.cluster {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  transform: translateY(-50%);
+  transition: opacity var(--motion-fast) var(--easing-out);
+}
+
+.cluster[data-past="true"] {
+  opacity: 0.45;
+}
+
+.cluster::before {
+  content: "";
+  position: absolute;
+  right: 100%;
+  top: 46%;
+  width: var(--leader-width, 8px);
+  height: 0;
+  border-top: 3px solid var(--color-border-strong);
+  pointer-events: none;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border-radius: 12px;
+  background: var(--color-surface-raised);
+  border: 1px dashed var(--color-border-strong);
+  font: inherit;
+  color: var(--color-fg);
+  cursor: pointer;
+  line-height: 1;
+  text-align: left;
+  max-width: 100%;
+  width: 100%;
+  transition:
+    background var(--motion-fast) var(--easing-out),
+    border-color var(--motion-fast) var(--easing-out);
+}
+
+@media (hover: hover) {
+  .chip:hover {
+    background: var(--color-bg);
+    border-color: var(--color-fg-soft);
+  }
+}
+
+.chip:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+}
+
+.dotStack {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-muted);
+}
+.dot[data-type="bottle"] {
+  background: var(--color-rust);
+}
+.dot[data-type="pump"] {
+  background: var(--color-pump);
+}
+.dot[data-type="extra"] {
+  background: var(--color-honey);
+}
+.dot[data-type="daily_recurring"] {
+  background: var(--color-honey);
+}
+.dot[data-type="bedtime"] {
+  background: var(--color-success);
+}
+.dot[data-type="daycare_dropoff"],
+.dot[data-type="daycare_pickup"] {
+  background: var(--color-muted);
+}
+
+.body {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.label {
+  font-size: 12px;
+  font-weight: var(--weight-semibold);
+  white-space: nowrap;
+  line-height: 1.1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.time {
+  font-size: 11px;
+  color: var(--color-muted);
+  line-height: 1.1;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.hint {
+  font-size: 11px;
+  line-height: 1.1;
+  color: var(--color-muted);
+  font-style: italic;
+}
+
+.chevron {
+  color: var(--color-muted);
+  font-size: 10px;
+  flex-shrink: 0;
+}
