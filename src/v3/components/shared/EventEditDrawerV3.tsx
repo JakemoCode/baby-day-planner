@@ -186,6 +186,19 @@ export function EventEditDrawerV3({
     onDelete !== undefined &&
     (isRecorded(sourceEvent.lifecycle) || type === "daily_recurring");
 
+  const confirmCopy =
+    type === "daily_recurring"
+      ? {
+          title: `Skip ${sourceEvent.label} today?`,
+          body: "It'll come back tomorrow.",
+          confirmLabel: "Skip today",
+        }
+      : {
+          title: `Delete this ${type === "extra" ? "event" : type.replace("_", " ")}?`,
+          body: "This cannot be undone.",
+          confirmLabel: "Delete",
+        };
+
   const showStartTime = type !== "wake_window";
   const showEndTime = type === "nap" || type === "extra" || type === "pump";
   const showAmount = type === "bottle";
@@ -417,13 +430,9 @@ export function EventEditDrawerV3({
 
       <ConfirmDialog
         open={confirmOpen}
-        title={
-          type === "daily_recurring"
-            ? `Skip ${sourceEvent.label} today?`
-            : `Delete this ${type === "extra" ? "event" : type.replace("_", " ")}?`
-        }
-        body={type === "daily_recurring" ? "It'll come back tomorrow." : "This cannot be undone."}
-        confirmLabel={type === "daily_recurring" ? "Skip today" : "Delete"}
+        title={confirmCopy.title}
+        body={confirmCopy.body}
+        confirmLabel={confirmCopy.confirmLabel}
         cancelLabel="Keep"
         onCancel={() => setConfirmOpen(false)}
         onConfirm={() => {
