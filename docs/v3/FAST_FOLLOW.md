@@ -35,8 +35,6 @@ Shipped items move to [`FAST_FOLLOW_COMPLETED.md`](./FAST_FOLLOW_COMPLETED.md) (
 - [§F48](./fast-follow/now/f48-last-nap-future-time.md)
 - [§F49](./fast-follow/now/f49-sync-button-refresh-animation.md)
 - [§F53](./fast-follow/now/f53-recurring-duration-zindex.md)
-- [§F55](./fast-follow/now/f55-overlapping-instants-ux.md)
-- [§F56](./fast-follow/now/f56-recurring-drawer-title.md)
 
 ## grill/
 
