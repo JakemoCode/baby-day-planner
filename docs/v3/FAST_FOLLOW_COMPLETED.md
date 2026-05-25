@@ -155,7 +155,7 @@ Absorbed into the §F39 arc and shipped in **PR #230**. Chip tap on projected ev
 
 ## §F65 — Delete recurring event from today's timeline
 
-Shipped in **PR #<TBD>** (`feat/f65-delete-recurring-from-today`). New
+Shipped in **PR #245** (`feat/f65-delete-recurring-from-today`). New
 repo fn `suppressRecurringForDay` (arrayUnion into
 `Day.suppressedRecurringIds`); `useDrawer` routes `daily_recurring`
 delete through it; `EventEditDrawerV3` shows a Delete button on
