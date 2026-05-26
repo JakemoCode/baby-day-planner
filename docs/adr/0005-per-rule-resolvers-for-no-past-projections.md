@@ -1,5 +1,11 @@
 # Per-rule resolvers + seam dispatch for no-past-projections
 
+**Status:** **superseded by [ADR-0006](./0006-now-cross-and-no-retroactive-shift.md)** (2026-05-26 course-correction). **Never implemented.** Kept for history.
+
+> **Why superseded:** the F4 architecture rested on [ADR-0004](./0004-no-past-projections.md)'s "engine never emits past-now projections" framing, which itself was wrong (see ADR-0004's supersede note). The F4 seam was attempted in PR 3b on branch `feat/f66-no-past-projections-seam`; activating it broke 144 existing tests because the engine routinely emits past-now projections by design (cascade produces the day's full forecast regardless of clock position). The implementation was reverted before commit. ADR-0006 replaces this with a much narrower per-rule check, applied only in rules that retroactively shift events.
+
+**Original (pre-supersede) text follows.**
+
 **Status:** accepted (2026-05-26, §F66 architecture-deepening grill). Implements ADR-0004.
 
 ADR-0004 mandated the no-past-projections invariant but didn't say *where* the placement logic lives. We choose **per-rule resolvers + a thin seam-dispatcher**: each producing rule exports a `resolveNoPast(event, ctx, allEvents): Event | null` function that knows how to shift an event of its own type to a valid future slot; the evaluator's post-process seam iterates projected events, looks up the owning rule by event type, and dispatches. Rejects: (a) dumb shift + fixed-point reconciliation (F1), (b) centralized smart shift inside the seam (F2), (c) every rule enforcing inline at emit time (F3 / Path 3).
