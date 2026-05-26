@@ -45,6 +45,33 @@ export function nextBottle(events: Event[], nowMinutes: TimeMin): Event | undefi
   );
 }
 
+/**
+ * Returns the bottle event whose `startTime` is closest to `nowMinutes`
+ * (in either direction), within ±`windowMinutes`. Used by the dashboard
+ * contextual button's Log Bottle Time window — symmetric around the
+ * projected/recorded slot so the user can confirm "yes, that happened"
+ * up to `windowMinutes` after the projected time as well as before it.
+ */
+export function nearestBottleInWindow(
+  events: Event[],
+  nowMinutes: TimeMin,
+  windowMinutes: number,
+): Event | undefined {
+  let best: Event | undefined;
+  let bestDelta = Number.POSITIVE_INFINITY;
+  for (const e of events) {
+    if (e.type !== "bottle") continue;
+    if (!isEngineEvent(e)) continue;
+    const delta = Math.abs(e.startTime - nowMinutes);
+    if (delta > windowMinutes) continue;
+    if (delta < bestDelta) {
+      best = e;
+      bestDelta = delta;
+    }
+  }
+  return best;
+}
+
 /** `nextEvent` filtered to `type === "nap"`. */
 export function nextNap(events: Event[], nowMinutes: TimeMin): Event | undefined {
   return nextEvent(

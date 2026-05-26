@@ -58,7 +58,6 @@ function makeProps(
     dayId: "d1",
     defaultBottleAmountOz: 6,
     nowMinutes: hm(10),
-    fallbackBottleNumber: 1,
     onEndNap: vi.fn().mockResolvedValue(undefined),
     onWakeRequest: vi.fn(),
     onLogBottle: vi.fn().mockResolvedValue(undefined),

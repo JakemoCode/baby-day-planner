@@ -2,10 +2,15 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { Event, OwnershipTemplate, TimeMin } from "@/v3/schemas";
-import { isRecorded } from "@/v3/schemas";
 import { reduceLifecycle } from "@/v3/lifecycle";
 import { isInProgress } from "@/v3/lib/effectiveEnd";
-import { currentWakeWindow, nextBottle, nextNap, projectedBedtime } from "@/v3/selectors";
+import {
+  currentWakeWindow,
+  nearestBottleInWindow,
+  nextNap,
+  projectedBedtime,
+} from "@/v3/selectors";
+import { LOG_BOTTLE_WINDOW_MIN } from "@/v3/components/Dashboard/decideMode";
 import { nextDashboardEvent } from "@/v3/components/Dashboard/dashboardStats";
 import { useNowMinutes } from "@/hooks/useNowMinutes";
 import { useV3Day } from "@/v3/hooks/useV3Day";
@@ -114,7 +119,12 @@ export default function DashboardPage() {
 
   const next = nextDashboardEvent(projected, nowMinutes);
 
-  const nb = nextBottle(projected, nowMinutes);
+  // Symmetric ±15min window around the nearest projected bottle slot —
+  // the contextual button's Log Bottle Time mode shows BOTH before and
+  // after the projected time (engine auto-promote flips lifecycle when
+  // Now crosses startTime, but the user can still confirm with a real
+  // log up to LOG_BOTTLE_WINDOW_MIN after).
+  const nb = nearestBottleInWindow(projected, nowMinutes, LOG_BOTTLE_WINDOW_MIN);
   const nn = nextNap(projected, nowMinutes);
   const cww = currentWakeWindow(projected, nowMinutes);
   const inProgressNap = actuals.find(
@@ -131,20 +141,6 @@ export default function DashboardPage() {
   const inProgressBedtime = actuals.find(
     (e) => e.type === "bedtime" && e.lifecycle.state === "recorded",
   );
-  // "Next" ordinals = unique nap/bottle slots that are RECORDED (the
-  // user committed a specific time). Owner-only annotations have a
-  // non-recorded lifecycle and don't bump the ordinal. Dedupe by
-  // eventKey so the Start/End pair (same doc updated) doesn't double-count.
-  const uniqueRecordedKeys = (type: Event["type"]) => {
-    const seen = new Set<string>();
-    for (const e of actuals) {
-      if (e.type !== type) continue;
-      if (!isRecorded(e.lifecycle)) continue;
-      seen.add(e.eventKey);
-    }
-    return seen.size;
-  };
-  const nextBottleNumber = uniqueRecordedKeys("bottle") + 1;
   const bedtime = projectedBedtime(projected);
 
   const handleLogBottle = async (bottle: Event) => {
@@ -242,7 +238,6 @@ export default function DashboardPage() {
           dayId={day.id}
           defaultBottleAmountOz={settings.defaultBottleAmountOz}
           nowMinutes={nowMinutes}
-          fallbackBottleNumber={nextBottleNumber}
           onEndNap={handleEndNap}
           onWakeRequest={() => setWakeSheetOpen(true)}
           onLogBottle={handleLogBottle}

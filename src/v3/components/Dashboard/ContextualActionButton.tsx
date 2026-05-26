@@ -1,7 +1,6 @@
 "use client";
 
 import { NO_OWNER, type Event, type TimeMin } from "@/v3/schemas";
-import { newEventId } from "@/v3/lib/newEventId";
 import { currentLocalMinutes } from "@/v3/ui/time";
 import { ActionButton } from "./ActionButton";
 import { decideMode, type ContextMode } from "./decideMode";
@@ -13,8 +12,6 @@ export type ContextualActionButtonProps = {
   dayId: string;
   defaultBottleAmountOz: number;
   nowMinutes: TimeMin;
-  /** Fallback bottle slot index when no projected bottle has an eventKey. */
-  fallbackBottleNumber: number;
   onEndNap: (nap: Event, endTime: TimeMin) => Promise<void> | void;
   onWakeRequest: () => void;
   onLogBottle: (bottle: Event) => Promise<void> | void;
@@ -28,30 +25,26 @@ const MODE_LABEL: Record<Exclude<ContextMode["kind"], "hidden">, string> = {
 
 function buildLoggedBottle(
   projected: Event,
-  fallbackBottleNumber: number,
   dayId: string,
   defaultBottleAmountOz: number,
   startTime: TimeMin,
 ): Event {
   // §F59/§F60: promote the projected bottle's eventKey so dedupBySlotKey
   // collapses the projected/recorded pair into one chip, and downstream
-  // cascade re-anchors off this bottle's startTime. Falls back to a
-  // fresh slot only if the projected bottle somehow lacks an eventKey
-  // (defensive — projected events always have one in current cascade).
-  const eventKey = projected.eventKey ?? `bottle_${fallbackBottleNumber}`;
-  const label = projected.label ?? `Bottle ${fallbackBottleNumber}`;
-  const owner = projected.owner ?? NO_OWNER;
+  // cascade re-anchors off this bottle's startTime. The deterministic
+  // `recorded_${eventKey}` id makes subsequent drawer edits / re-taps
+  // overwrite the same Firestore doc.
   return {
-    id: projected.eventKey ? `recorded_${eventKey}` : newEventId("bottle"),
+    id: `recorded_${projected.eventKey}`,
     dayId,
-    eventKey,
+    eventKey: projected.eventKey,
     type: "bottle",
     kind: "instant",
-    label,
+    label: projected.label,
     startTime,
     amountOz: defaultBottleAmountOz,
     hasPutdown: false,
-    owner,
+    owner: projected.owner ?? NO_OWNER,
     lifecycle: { state: "completed", committedAt: startTime },
   };
 }
@@ -63,15 +56,14 @@ export function ContextualActionButton({
   dayId,
   defaultBottleAmountOz,
   nowMinutes,
-  fallbackBottleNumber,
   onEndNap,
   onWakeRequest,
   onLogBottle,
 }: ContextualActionButtonProps) {
   const mode = decideMode({
-    ...(inProgressBedtime ? { inProgressBedtime } : {}),
-    ...(inProgressNap ? { inProgressNap } : {}),
-    ...(nextProjectedBottle ? { nextProjectedBottle } : {}),
+    inProgressBedtime,
+    inProgressNap,
+    nextProjectedBottle,
     nowMinutes,
   });
 
@@ -87,13 +79,7 @@ export function ContextualActionButton({
         void onEndNap(mode.nap, nowMin);
         return;
       case "log-bottle": {
-        const bottle = buildLoggedBottle(
-          mode.projected,
-          fallbackBottleNumber,
-          dayId,
-          defaultBottleAmountOz,
-          nowMin,
-        );
+        const bottle = buildLoggedBottle(mode.projected, dayId, defaultBottleAmountOz, nowMin);
         void onLogBottle(bottle);
         return;
       }

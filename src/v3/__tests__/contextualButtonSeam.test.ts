@@ -13,8 +13,8 @@ import type { Event, TimeMin } from "../schemas";
 import { NO_OWNER } from "../schemas";
 import { projectDay } from "../engine/projectDay";
 import { renderProjection } from "../ui/renderProjection";
-import { nextBottle } from "../selectors";
-import { decideMode } from "../components/Dashboard/decideMode";
+import { nearestBottleInWindow } from "../selectors";
+import { decideMode, LOG_BOTTLE_WINDOW_MIN } from "../components/Dashboard/decideMode";
 import { aContext, aSettings } from "./factories";
 
 const hm = (h: number, m = 0): TimeMin => h * 60 + m;
@@ -72,7 +72,7 @@ describe("Contextual button — seam (engine + render + decideMode)", () => {
     // At 10:50 (10min before), the Log Bottle window is open.
     const now = hm(10, 50);
     const events = project(now, [recordedBottle("bottle_1", hm(8))]);
-    const nb = nextBottle(events, now);
+    const nb = nearestBottleInWindow(events, now, LOG_BOTTLE_WINDOW_MIN);
     expect(nb?.startTime).toBe(hm(11));
 
     const mode = decideMode({
@@ -85,14 +85,31 @@ describe("Contextual button — seam (engine + render + decideMode)", () => {
   it("stays hidden when next projected bottle is more than 15min away", () => {
     const now = hm(9, 30);
     const events = project(now, [recordedBottle("bottle_1", hm(8))]);
-    const nb = nextBottle(events, now);
-    expect(nb?.startTime).toBe(hm(11));
+    // 90min gap to the projected 11:00 bottle — selector returns undefined.
+    const nb = nearestBottleInWindow(events, now, LOG_BOTTLE_WINDOW_MIN);
+    expect(nb).toBeUndefined();
 
     const mode = decideMode({
       ...(nb ? { nextProjectedBottle: nb } : {}),
       nowMinutes: now,
     });
     expect(mode.kind).toBe("hidden");
+  });
+
+  it("still lights up Log Bottle Time +10min after a projected bottle has passed", () => {
+    // Engine projects bottle at 11:00. At 11:10 (after Now-cross + engine
+    // auto-promote), Jake still wants the button visible so he can tap to
+    // confirm an actual log at 11:10 — overwriting the auto-promoted slot.
+    const now = hm(11, 10);
+    const events = project(now, [recordedBottle("bottle_1", hm(8))]);
+    const nb = nearestBottleInWindow(events, now, LOG_BOTTLE_WINDOW_MIN);
+    expect(nb?.startTime).toBe(hm(11));
+
+    const mode = decideMode({
+      ...(nb ? { nextProjectedBottle: nb } : {}),
+      nowMinutes: now,
+    });
+    expect(mode.kind).toBe("log-bottle");
   });
 
   it("prefers End Nap over Log Bottle when both windows overlap", () => {
@@ -102,7 +119,7 @@ describe("Contextual button — seam (engine + render + decideMode)", () => {
     const now = hm(10, 55);
     const inProgressNap = recordedInProgressNap(hm(10, 45));
     const events = project(now, [recordedBottle("bottle_1", hm(8)), inProgressNap]);
-    const nb = nextBottle(events, now);
+    const nb = nearestBottleInWindow(events, now, LOG_BOTTLE_WINDOW_MIN);
     expect(nb?.startTime).toBe(hm(11));
 
     const mode = decideMode({
