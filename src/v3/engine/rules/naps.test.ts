@@ -964,6 +964,155 @@ describe("Cascade extends past wakeWindowsMinutes.length (physiology cascade)", 
   });
 });
 
+describe("§F66 bedtime cascade — ADR-0002", () => {
+  // ADR-0002 redefines the bedtime cascade rule:
+  //
+  //   NEW: bedtimeThreshold = latest endTime a PROJECTED nap may have.
+  //        Drop any projected nap with nap.endTime > bedtimeThreshold.
+  //        bedtime.startTime = max(earliestBedtime, lastNapEnd + WW)
+  //
+  //   OLD (naps.ts:121): napStart >= threshold || napStart + napLen > threshold
+  //        → substitute the nap with bedtime at napStart.
+  //        This caused §F64: a nap projecting to e.g. 16:46-17:31 with
+  //        threshold=17:30 produced "bedtime at 16:46", before
+  //        earliestBedtime=18:00.
+  //
+  // All three tests FAIL against the current naps.ts:121 rule.
+  // They pass once Task 2.2 ships the new implementation.
+
+  it("drop projected nap whose endTime > bedtimeThreshold; bedtime lands at earliestBedtime floor", () => {
+    // Settings: bedtimeThreshold=17:30, earliestBedtime=18:00, WW=120, napLen=45.
+    // No actuals. Wake at 7:00. Cascade walks:
+    //   ww_1 7-9, nap_1 9-9:45
+    //   ww_2 9:45-11:45, nap_2 11:45-12:30
+    //   ww_3 12:30-14:30, nap_3 14:30-15:15
+    //   ww_4 15:15-17:15, proj nap_4 17:15-18:00
+    //     nap_4.endTime=18:00 > 17:30 → NEW: drop, bedtime=max(18:00,17:15)=18:00
+    //     OLD: 17:15+45=18:00>17:30 → bedtime at napStart=17:15 < 18:00 ← BUG
+    //
+    // Assert: no projected nap has endTime > 17:30.
+    // Assert: bedtime.startTime === 18:00 (floor applies).
+    const ctx = aContext({
+      day: aDay({ wakeTime: 7 * 60 }),
+      settings: aSettings({
+        wakeWindowsMinutes: [120],
+        defaultNapLengthMinutes: 45,
+        bedtimeThreshold: 17 * 60 + 30,
+        earliestBedtime: 18 * 60,
+        defaultWakeTime: 7 * 60,
+      }),
+      actuals: [],
+    });
+
+    const out = projectDay(
+      {
+        day: ctx.day,
+        settings: ctx.settings,
+        actuals: ctx.actuals,
+        nowMinutes: ctx.nowMinutes,
+      },
+      { rules: ALL_RULES },
+    );
+
+    const projectedNapsPastThreshold = out.filter(
+      (e) => e.type === "nap" && e.lifecycle.state === "projected" && (e.endTime ?? 0) > 17 * 60 + 30,
+    );
+    expect(projectedNapsPastThreshold).toHaveLength(0);
+
+    const bedtime = out.find((e) => e.type === "bedtime");
+    expect(bedtime).toBeDefined();
+    expect(bedtime!.startTime).toBe(18 * 60);
+  });
+
+  it("bedtime floor: startTime = max(earliestBedtime, lastNapEnd + WW) when cascade-natural time < floor", () => {
+    // Settings: bedtimeThreshold=17:30, earliestBedtime=18:00, WW=120, napLen=60.
+    // Recorded nap_1: 13:30-15:00. After nap_1:
+    //   ww_2: 15:00-17:00 (120 min)
+    //   proj nap_2: 17:00-18:00 → endTime=18:00 > 17:30
+    //     NEW: drop. Bedtime = max(18:00, 15:00+120) = max(18:00, 17:00) = 18:00
+    //     OLD: 17:00+60=18:00>17:30 → bedtime at napStart=17:00 < 18:00 ← BUG
+    const recordedNap1 = aRecordedNap({
+      eventKey: "nap_1",
+      start: 13 * 60 + 30,
+      end: 15 * 60,
+    });
+
+    const ctx = aContext({
+      day: aDay({ wakeTime: 7 * 60 }),
+      settings: aSettings({
+        wakeWindowsMinutes: [120],
+        defaultNapLengthMinutes: 60,
+        bedtimeThreshold: 17 * 60 + 30,
+        earliestBedtime: 18 * 60,
+        defaultWakeTime: 7 * 60,
+      }),
+      actuals: [recordedNap1],
+    });
+
+    const out = projectDay(
+      {
+        day: ctx.day,
+        settings: ctx.settings,
+        actuals: ctx.actuals,
+        nowMinutes: ctx.nowMinutes,
+      },
+      { rules: ALL_RULES },
+    );
+
+    const bedtime = out.find((e) => e.type === "bedtime");
+    expect(bedtime).toBeDefined();
+    expect(bedtime!.startTime).toBe(18 * 60);
+  });
+
+  it("§F64 regression: bedtime.startTime >= earliestBedtime; no projected nap past threshold", () => {
+    // Settings: bedtimeThreshold=17:30, earliestBedtime=18:00, WW=120, napLen=45.
+    // Recorded nap ending at 13:14. Cascade after that:
+    //   ww 13:14-15:14, proj nap_? 15:14-15:59 (endTime 15:59 ≤ 17:30 → keep)
+    //   ww 15:59-17:59, proj nap 17:59-18:44 (endTime 18:44 > 17:30 → drop)
+    //     NEW: bedtime = max(18:00, 17:59) = 18:00
+    //     OLD: napStart=17:59>=17:30 → bedtime at 17:59 < 18:00 ← §F64 bug
+    //
+    // Assert: bedtime.startTime >= 18:00.
+    // Assert: no projected nap has endTime > 17:30.
+    const recordedNap1 = aRecordedNap({
+      eventKey: "nap_1",
+      start: 12 * 60 + 30,
+      end: 13 * 60 + 14,
+    });
+
+    const ctx = aContext({
+      day: aDay({ wakeTime: 7 * 60 }),
+      settings: aSettings({
+        wakeWindowsMinutes: [120],
+        defaultNapLengthMinutes: 45,
+        bedtimeThreshold: 17 * 60 + 30,
+        earliestBedtime: 18 * 60,
+        defaultWakeTime: 7 * 60,
+      }),
+      actuals: [recordedNap1],
+    });
+
+    const out = projectDay(
+      {
+        day: ctx.day,
+        settings: ctx.settings,
+        actuals: ctx.actuals,
+        nowMinutes: ctx.nowMinutes,
+      },
+      { rules: ALL_RULES },
+    );
+
+    const bedtime = out.find((e) => e.type === "bedtime");
+    expect(bedtime).toBeDefined();
+    expect(bedtime!.startTime).toBeGreaterThanOrEqual(18 * 60);
+
+    const projectedNapsPastThreshold = out.filter(
+      (e) => e.type === "nap" && e.lifecycle.state === "projected" && (e.endTime ?? 0) > 17 * 60 + 30,
+    );
+    expect(projectedNapsPastThreshold).toHaveLength(0);
+  });
+});
+
 describe("Start Nap Now mid-window — recorded nap absorbs the slot (Jake 2026-05-22)", () => {
   // Bug report: at 15:35 (inside wake_window_4 14:20–16:20), tapping
   // "Start Nap Now" produced TWO nap_4 events: the recorded one at
