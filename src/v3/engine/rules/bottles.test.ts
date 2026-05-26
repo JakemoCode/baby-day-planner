@@ -1666,3 +1666,118 @@ describe("§F66 PR 3c — putdown bottle-anchor rule (CONTEXT.md + ADR-0006 Conc
     expect(bottles.find((b) => b.startTime === 11 * 60 + 45)).toBeUndefined();
   });
 });
+
+describe("R5.5 — dream-feed emission (§F66)", () => {
+  it("emits a projected dream-feed bottle at settings.dreamFeedTime when enabled", () => {
+    const ctx = aContext({
+      day: aDay({ wakeTime: 7 * 60 }),
+      settings: aSettings({
+        dreamFeedEnabled: true,
+        dreamFeedTime: 23 * 60,
+      }),
+      actuals: [],
+    });
+    const out = projectDay(
+      {
+        day: ctx.day,
+        settings: ctx.settings,
+        actuals: ctx.actuals,
+        nowMinutes: ctx.nowMinutes,
+      },
+      { rules: ALL_WITH_NAPS },
+    );
+    const dream = out.find((e) => e.type === "bottle" && e.eventKey === "bottle_dream");
+    expect(dream).toBeDefined();
+    expect(dream?.startTime).toBe(23 * 60);
+    expect(dream?.label).toBe("Dream Feed");
+    expect(dream?.lifecycle.state).toBe("projected");
+  });
+
+  it("does NOT emit a dream-feed when disabled", () => {
+    const ctx = aContext({
+      day: aDay({ wakeTime: 7 * 60 }),
+      settings: aSettings({ dreamFeedEnabled: false }),
+      actuals: [],
+    });
+    const out = projectDay(
+      {
+        day: ctx.day,
+        settings: ctx.settings,
+        actuals: ctx.actuals,
+        nowMinutes: ctx.nowMinutes,
+      },
+      { rules: ALL_WITH_NAPS },
+    );
+    expect(out.find((e) => e.type === "bottle" && e.eventKey === "bottle_dream")).toBeUndefined();
+  });
+
+  it("is idempotent — re-running the engine on the same input yields the same dream-feed", () => {
+    const ctx = aContext({
+      day: aDay({ wakeTime: 7 * 60 }),
+      settings: aSettings({ dreamFeedEnabled: true, dreamFeedTime: 23 * 60 }),
+      actuals: [],
+    });
+    const input = {
+      day: ctx.day,
+      settings: ctx.settings,
+      actuals: ctx.actuals,
+      nowMinutes: ctx.nowMinutes,
+    };
+    const a = projectDay(input, { rules: ALL_WITH_NAPS });
+    const b = projectDay(input, { rules: ALL_WITH_NAPS });
+    expect(b).toEqual(a);
+    // Exactly one dream-feed event in the output.
+    const dreams = a.filter((e) => e.type === "bottle" && e.eventKey === "bottle_dream");
+    expect(dreams).toHaveLength(1);
+  });
+
+  it("auto-promotes to recorded when Now crosses dreamFeedTime (ADR-0001 / PR #255)", () => {
+    const ctx = aContext({
+      day: aDay({ wakeTime: 7 * 60 }),
+      settings: aSettings({ dreamFeedEnabled: true, dreamFeedTime: 23 * 60 }),
+      actuals: [],
+      nowMinutes: 23 * 60 + 30, // 30min past dream-feed time
+    });
+    const out = projectDay(
+      {
+        day: ctx.day,
+        settings: ctx.settings,
+        actuals: ctx.actuals,
+        nowMinutes: ctx.nowMinutes,
+      },
+      { rules: ALL_WITH_NAPS },
+    );
+    const dream = out.find((e) => e.type === "bottle" && e.eventKey === "bottle_dream");
+    expect(dream?.lifecycle.state).toBe("recorded");
+  });
+
+  it("rhythm cascade does not renumber the dream-feed slot via R5.4", () => {
+    const ctx = aContext({
+      day: aDay({ wakeTime: 7 * 60 }),
+      settings: aSettings({ dreamFeedEnabled: true, dreamFeedTime: 23 * 60 }),
+      actuals: [],
+    });
+    const out = projectDay(
+      {
+        day: ctx.day,
+        settings: ctx.settings,
+        actuals: ctx.actuals,
+        nowMinutes: ctx.nowMinutes,
+      },
+      { rules: ALL_WITH_NAPS },
+    );
+    const dream = out.find((e) => e.type === "bottle" && e.eventKey === "bottle_dream");
+    // Dream-feed eventKey + label preserved even after R5.4 renumbers
+    // the rhythm bottles chronologically.
+    expect(dream?.eventKey).toBe("bottle_dream");
+    expect(dream?.label).toBe("Dream Feed");
+    // Rhythm bottles still numbered 1..N (dream-feed excluded from the
+    // chronological renumber). No bottle_N collision with the dream slot.
+    const rhythmKeys = out
+      .filter((e) => e.type === "bottle" && e.eventKey !== "bottle_dream")
+      .map((e) => e.eventKey);
+    for (const key of rhythmKeys) {
+      expect(key).toMatch(/^bottle_\d+$/);
+    }
+  });
+});

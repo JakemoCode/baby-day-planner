@@ -100,6 +100,27 @@ function buildProjectedBottle(ctx: Context, n: number, startTime: number): Event
   });
 }
 
+const DREAM_FEED_EVENT_KEY = "bottle_dream";
+
+/**
+ * The dream-feed slot — a special projected bottle anchored to
+ * `settings.dreamFeedTime` (post-bedtime). Distinct `eventKey` so the
+ * cascade and dedup paths can identify it without time-window heuristics.
+ * Subject to Now-cross auto-promote like any projected bottle (ADR-0001).
+ */
+function buildProjectedDreamFeed(ctx: Context, startTime: number): Event {
+  return projectedEvent({
+    ctx,
+    id: `proj_${DREAM_FEED_EVENT_KEY}`,
+    eventKey: DREAM_FEED_EVENT_KEY,
+    type: "bottle",
+    kind: "instant",
+    startTime,
+    label: "Dream Feed",
+    amountOz: ctx.settings.defaultBottleAmountOz,
+  });
+}
+
 type Region = { start: number; end: number };
 
 /**
@@ -269,9 +290,13 @@ function canCascade(events: Event[], ctx: Context): boolean {
   // Trimming check: any PROJECTED bottle outside the rhythm chain
   // [wakeTime, cap) needs to be removed. Fires when bedtime appears
   // mid-flight and pass-1's midnight-capped projections are now
-  // past-bedtime stragglers.
+  // past-bedtime stragglers. Dream-feed slot lives outside the cap
+  // by design (see R5.5) and is preserved.
   const needsTrim = bottles.some(
-    (b) => isProjected(b) && (b.startTime < wakeTime || b.startTime >= cap),
+    (b) =>
+      isProjected(b) &&
+      b.eventKey !== DREAM_FEED_EVENT_KEY &&
+      (b.startTime < wakeTime || b.startTime >= cap),
   );
   if (needsTrim) return true;
 
@@ -321,6 +346,8 @@ function projectBottleChain(events: Event[], ctx: Context): Event[] {
   const trimmedEvents = events.filter((e) => {
     if (!isBottle(e)) return true;
     if (!isProjected(e)) return true;
+    // Dream-feed slot (R5.5) lives outside [wakeTime, cap) by design.
+    if (e.eventKey === DREAM_FEED_EVENT_KEY) return true;
     return e.startTime >= wakeTime && e.startTime < cap;
   });
 
@@ -493,6 +520,11 @@ const RuleRenumberBottlesChronologically: Rule = {
     });
     return events.map((e) => {
       if (!isBottle(e)) return e;
+      // Dream-feed slot has its own stable eventKey + label; renumber
+      // would rename it to `bottle_N` and reset the label to `Bottle N`,
+      // breaking the dream-feed identity AND looping the cascade
+      // (R5's "alreadyHasDream" check keys on eventKey).
+      if (e.eventKey === DREAM_FEED_EVENT_KEY) return e;
       const next = renamed.get(e.id);
       if (!next) return e;
       if (e.eventKey === next.eventKey && e.label === next.label) return e;
@@ -502,7 +534,42 @@ const RuleRenumberBottlesChronologically: Rule = {
 };
 
 function bottlesByStartTime(events: Event[]): Event[] {
-  return events.filter(isBottle).sort((a, b) => a.startTime - b.startTime);
+  // Exclude dream-feed from the chronological order — it's a sentinel
+  // slot, not a rhythm-chain bottle. Including it would shift its index
+  // when its position relative to rhythm bottles changes.
+  return events
+    .filter(isBottle)
+    .filter((b) => b.eventKey !== DREAM_FEED_EVENT_KEY)
+    .sort((a, b) => a.startTime - b.startTime);
 }
 
-export const RULES: Rule[] = [RuleSequentialBottleCascade, RuleRenumberBottlesChronologically];
+// ---------------------------------------------------------------------------
+// R5.5 — Dream-feed emission
+// ---------------------------------------------------------------------------
+
+/**
+ * Emits the projected dream-feed bottle at `settings.dreamFeedTime`
+ * when enabled, idempotently. Runs after the rhythm cascade so it
+ * doesn't interact with R5's trim/saturation logic. Subject to
+ * Now-cross auto-promote like any projected bottle (ADR-0001).
+ */
+const RuleDreamFeedEmit: Rule = {
+  id: "R5.5",
+  description: "Emit projected dream-feed bottle at settings.dreamFeedTime",
+  dependsOn: ["R5"],
+  matches: (events, ctx) => {
+    if (!ctx.settings.dreamFeedEnabled) return false;
+    return !events.some((e) => isBottle(e) && e.eventKey === DREAM_FEED_EVENT_KEY);
+  },
+  produces: (events, ctx) => {
+    if (!ctx.settings.dreamFeedEnabled) return events;
+    if (events.some((e) => isBottle(e) && e.eventKey === DREAM_FEED_EVENT_KEY)) return events;
+    return [...events, buildProjectedDreamFeed(ctx, ctx.settings.dreamFeedTime)];
+  },
+};
+
+export const RULES: Rule[] = [
+  RuleSequentialBottleCascade,
+  RuleRenumberBottlesChronologically,
+  RuleDreamFeedEmit,
+];

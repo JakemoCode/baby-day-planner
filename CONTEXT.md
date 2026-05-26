@@ -238,19 +238,29 @@ Established 2026-05-25 (§F66 grill). Implemented in §F66 PR 5.
 
 ## dream feed
 
-A special bottle anchored to a `dreamFeedTime` setting (e.g. 11pm).
+A special projected bottle anchored to the `dreamFeedTime` setting
+(default 11pm). Lives at a stable `eventKey === "bottle_dream"` so
+the rhythm cascade and renumber pass can identify it without time-
+window heuristics.
 
-- Counts toward `bottlesPerDay`.
-- Subject to the Now-cross auto-promote rule like any bottle: when
-  Now crosses `dreamFeedTime`, it auto-records at the setting time +
-  default amount.
+- Emitted by engine rule R5.5 (`src/v3/engine/rules/bottles.ts`) when
+  `dreamFeedEnabled` is true. Lives outside the rhythm chain
+  `[wakeTime, forwardCap)` — doesn't consume a cold-start slot, isn't
+  subject to the bedtime cap, and isn't renumbered by R5.4.
+- Label baked in by R5.5 ("Dream Feed"). The
+  [[future-event drawer rule]] still applies — owner is editable on
+  the projection; time + amount lock until Now crosses `dreamFeedTime`.
+- Subject to the Now-cross auto-promote rule like any projected
+  bottle (ADR-0001): when Now crosses `dreamFeedTime`, the engine
+  flips it to recorded at the setting time + default amount.
 - If baby wakes and is fed before `dreamFeedTime`, the actual
-  recorded feed becomes the cascade anchor; the dream feed slot can
-  be deleted via the drawer (or stays unfulfilled).
+  recorded feed is a separate bottle (different eventKey) and the
+  dream-feed slot stays projected until Now crosses, then auto-records
+  in addition. User deletes via the drawer if not actually given.
 
 Resolves §F58 / §F66 dogfood issue #1.
 
-Established 2026-05-25 (§F66 grill).
+Established 2026-05-25 (§F66 grill). Implemented in §F66 PR 6.
 
 ## happened-fact
 

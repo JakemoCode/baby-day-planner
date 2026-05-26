@@ -227,10 +227,17 @@ export default function SettingsPage() {
       <Section title="Dream feed" isOpen={openSlug === "dream-feed"} onToggle={handleToggle}>
         <CheckboxRow
           id="dreamFeedEnabled"
-          label="Label first post-bedtime bottle as Dream Feed"
+          label="Project a dream-feed bottle"
           value={value.dreamFeedEnabled}
           onChange={(v) => set("dreamFeedEnabled", v)}
-          help="Render-only label. The bottle cascade is unchanged; the first projected bottle past bedtime is just renamed."
+          help="When enabled, the engine emits a projected bottle at the dream-feed time below. It counts toward bottles per day and auto-records when the time arrives."
+        />
+        <TimeRow
+          id="dreamFeedTime"
+          label="Dream feed time"
+          value={value.dreamFeedTime}
+          onChange={(v) => set("dreamFeedTime", v)}
+          help="When the projected dream-feed bottle is anchored (e.g. 11:00pm)."
         />
       </Section>
 

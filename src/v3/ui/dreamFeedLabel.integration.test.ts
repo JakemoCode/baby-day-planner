@@ -1,22 +1,16 @@
 /**
  * Integration: full projectDay + applyDreamFeedLabel path.
  *
- * Context: Jake reported on 2026-05-13 that his click-test showed
- * a "Bottle 6" past bedtime instead of "Dream Feed". This test
- * exists to characterize what the engine actually emits in
- * configurations near his and to prove the labeler fires when the
- * preconditions are met.
+ * Original context (pre-PR-6): Jake reported on 2026-05-13 that his
+ * click-test showed a "Bottle 6" past bedtime instead of "Dream Feed".
+ * In the pre-PR-6 engine, the rhythm cascade always capped at bedtime,
+ * so dream-feed was render-only and had no projected bottle to relabel.
  *
- * Finding: in cold-start (no anchors), the bottle cascade CAPS at
- * bedtime.startTime — so projected bottles are NEVER past bedtime
- * in the post-PR-#138 engine. The label has nothing to fire on.
- *
- * The screenshot scenario therefore implies either:
- *   - stale persisted data (a previously-projected bottle written
- *     to Firestore by a now-removed code path), OR
- *   - a recorded bottle past bedtime (reality wins;
- *     these are intentionally NOT relabeled — see unit tests), OR
- *   - dreamFeedEnabled didn't actually persist.
+ * Post-PR-6 (§F66): the engine emits a projected dream-feed bottle at
+ * `settings.dreamFeedTime` via rule R5.5. The label-pass then either
+ * leaves it alone (R5.5 already labels it "Dream Feed") or relabels a
+ * separate post-bedtime bottle that happened to slip through, for
+ * resilience.
  */
 
 import { describe, expect, it } from "vitest";
@@ -26,7 +20,7 @@ import { ALL_RULES } from "../engine/rules";
 import { applyDreamFeedLabel } from "./dreamFeedLabel";
 
 describe("applyDreamFeedLabel — end-to-end with projectDay", () => {
-  it("cold-start with 6 bottles + bedtime at 21:30: cascade caps at bedtime, no relabel happens", () => {
+  it("cold-start with 6 bottles + bedtime at 21:30: rhythm cascade caps at bedtime; R5.5 emits dream-feed at 23:00 with the Dream Feed label", () => {
     // WW [120, 150, 180, 180, 30] + napLen 60 + threshold 22:30 →
     // nap_5 start 22:00, endTime=23:00 > 22:30 → ADR-0002: drop.
     // bedtime = max(earliestBedtime=18:00, wwStart=21:30) = 21:30.
@@ -34,6 +28,7 @@ describe("applyDreamFeedLabel — end-to-end with projectDay", () => {
       day: aDay({ wakeTime: 7 * 60 }),
       settings: aSettings({
         dreamFeedEnabled: true,
+        dreamFeedTime: 23 * 60,
         bedtimeThreshold: 22 * 60 + 30,
         wakeWindowsMinutes: [120, 150, 180, 180, 30],
         defaultNapLengthMinutes: 60,
@@ -58,17 +53,26 @@ describe("applyDreamFeedLabel — end-to-end with projectDay", () => {
     const bedtime = events.find((e) => e.type === "bedtime");
     expect(bedtime?.startTime).toBe(21 * 60 + 30);
 
-    // Engine output: all projected bottles are ≤ bedtime.startTime.
-    const projectedBottles = events.filter(
-      (e) => e.type === "bottle" && e.lifecycle.state === "projected",
+    // Rhythm cascade caps at bedtime (excluding dream-feed): all
+    // non-dream projected bottles are ≤ bedtime.startTime.
+    const rhythmProjected = events.filter(
+      (e) =>
+        e.type === "bottle" && e.lifecycle.state === "projected" && e.eventKey !== "bottle_dream",
     );
-    for (const b of projectedBottles) {
+    for (const b of rhythmProjected) {
       expect(b.startTime).toBeLessThanOrEqual(21 * 60 + 30);
     }
 
-    // Therefore the labeler has no past-bedtime bottle to relabel.
+    // Dream-feed slot is emitted at dreamFeedTime (post-bedtime) with
+    // the "Dream Feed" label baked in by R5.5. The label pass is a
+    // no-op on this output.
+    const dream = events.find((e) => e.type === "bottle" && e.eventKey === "bottle_dream");
+    expect(dream?.startTime).toBe(23 * 60);
+    expect(dream?.label).toBe("Dream Feed");
+    expect(dream?.lifecycle.state).toBe("projected");
+
     const labeled = applyDreamFeedLabel(events, ctx.settings);
-    expect(labeled.find((e) => e.label === "Dream Feed")).toBeUndefined();
+    expect(labeled.find((e) => e.eventKey === "bottle_dream")?.label).toBe("Dream Feed");
   });
 
   it("when a projected bottle DOES land past bedtime, the labeler fires end-to-end", () => {
