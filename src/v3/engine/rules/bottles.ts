@@ -130,6 +130,70 @@ function napRegions(events: Event[]): Region[] {
 }
 
 /**
+ * Putdown bottle-anchor rule (CONTEXT.md "putdown bottle-anchor rule"):
+ * if `proposed` lands in the range
+ * `[parent.startTime - putdownLeadMinutes, parent.startTime + napLen/2]`
+ * for an adjacent nap or bedtime, snap to
+ * `parent.startTime - putdownLeadMinutes` (the start of putdown). The
+ * bottle wind-down IS the start of putdown, and per Jake's framing
+ * "any projected bottle must snap to either the beginning of putdown
+ * or the end of the nap" — snapping to nap.startTime itself would
+ * misrepresent the bottle's start time (the bottle BEGINS at putdown
+ * start, not at the moment the baby falls asleep).
+ *
+ * Applies to BOTH projected and recorded naps:
+ * - Projected naps use `napLengthMinutes` (the default) for the
+ *   first-half computation.
+ * - Recorded naps use their actual `endTime - startTime`.
+ * In both cases, ADR-0006 Concern B prevents retroactive shifts: if
+ * the snap target is past `nowMinutes`, the snap is skipped. Past
+ * recorded naps therefore never trigger a snap; only future naps
+ * (projected or, rarely, future-recorded) attract bottles.
+ *
+ * For bedtime, "first half" doesn't apply — only the lead-in window
+ * `[parent.startTime - putdownLeadMinutes, parent.startTime]`.
+ *
+ * ADR-0006 Concern B (no retroactive shift): if the snap target would
+ * land at or before `nowMinutes`, the snap is SKIPPED and `proposed`
+ * is returned unchanged.
+ *
+ * If no nap/bedtime in the range, returns `proposed` unchanged.
+ */
+function snapToPutdown(
+  proposed: number,
+  events: Event[],
+  putdownLeadMinutes: number,
+  napLengthMinutes: number,
+  nowMinutes: number,
+): number {
+  for (const ev of events) {
+    if (ev.type !== "nap" && ev.type !== "bedtime") continue;
+    // For nap: snap window extends to the midpoint of the nap's actual
+    // duration (recorded) or the default. Bedtime has no midpoint (half=0).
+    const napLen =
+      ev.type !== "nap"
+        ? 0
+        : ev.endTime !== undefined
+          ? ev.endTime - ev.startTime
+          : napLengthMinutes;
+    const half = Math.floor(napLen / 2);
+    const lo = ev.startTime - putdownLeadMinutes;
+    const hi = ev.startTime + half;
+    if (proposed < lo || proposed > hi) continue;
+    const snapTarget = ev.startTime - putdownLeadMinutes;
+    // ADR-0006 Concern B: skip THIS nap's snap rather than
+    // retroactively pull the bottle into the past. Continue the loop
+    // — a later (future) nap may still legitimately attract proposed.
+    // (Bare narrow case: proposed lands in a recent past nap's range
+    // AND in a future nap's range; the past one would otherwise
+    // short-circuit and block the legitimate future snap.)
+    if (snapTarget <= nowMinutes) continue;
+    return snapTarget;
+  }
+  return proposed;
+}
+
+/**
  * If `proposed` lands STRICTLY inside any nap region, snap to whichever
  * edge is closer to `proposed`. Tie favors `region.start` (bottle
  * before nap is generally preferred — see DOMAIN.md §4: bottle CAN BE
@@ -288,7 +352,29 @@ function projectBottleChain(events: Event[], ctx: Context): Event[] {
   // consume a daytime slot (paired with canCascade's same fix).
   let chainCount = chainBottles.length;
 
-  const snap = (proposed: number) => snapOutOfNap(proposed, regions, ctx.nowMinutes);
+  const snap = (proposed: number) => {
+    // snapOutOfNap moves a bottle proposed strictly inside a nap to the
+    // nearer edge. snapToPutdown then applies the putdown-anchor rule
+    // (CONTEXT.md): bottles whose cascade-natural time lands in the
+    // putdown window or the first half of a projected nap snap to the
+    // start of putdown. ADR-0006 Concern B: putdown snap is skipped if
+    // the target would land in the past.
+    //
+    // Final snapOutOfNap pass: putdown-anchor moves the bottle to
+    // `nap.startTime - putdownLeadMinutes`. In pathological cases
+    // (e.g., the previous nap ends < putdownLead minutes before the
+    // next nap's start), that target can land strictly inside the
+    // previous nap. Re-applying snapOutOfNap moves it cleanly out.
+    const noNap = snapOutOfNap(proposed, regions, ctx.nowMinutes);
+    const withPutdown = snapToPutdown(
+      noNap,
+      trimmedEvents,
+      ctx.settings.putdownLeadMinutes,
+      ctx.settings.defaultNapLengthMinutes,
+      ctx.nowMinutes,
+    );
+    return snapOutOfNap(withPutdown, regions, ctx.nowMinutes);
+  };
 
   // The cold-start count cap (bottlesPerDay placeholders) ONLY applies
   // when there are no non-projected morning anchors. Once a real

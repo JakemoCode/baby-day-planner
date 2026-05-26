@@ -106,9 +106,19 @@ Established 2026-05-26 (§F66 button-design grill).
 
 If a projected bottle's cascade-computed time falls anywhere in the
 range `[parent.startTime - putdownLeadMinutes, parent.startTime + napLen/2]`
-for an adjacent projected nap or bedtime, the bottle's projected time
-snaps to `parent.startTime - putdownLeadMinutes` (the start of
-putdown).
+for an adjacent nap or bedtime (projected OR recorded), the bottle's
+projected time snaps to `parent.startTime - putdownLeadMinutes` (the
+start of putdown).
+
+For recorded naps, `napLen` is the nap's actual duration
+(`endTime - startTime`); for projected naps it's the default. Per
+Jake's framing (2026-05-26): "any projected bottle must snap to
+either the beginning of putdown or the end of the nap" — snapping
+to nap.startTime itself would misrepresent the bottle's start time
+(the bottle BEGINS at putdown.start, not at the moment baby falls
+asleep). The "back half" case (proposed in `(start + napLen/2, end]`)
+is handled by `snapOutOfNap`, which snaps to the nearer edge — which
+will be `nap.endTime` for this region.
 
 Mid-wake-window bottles outside this range still use plain interval
 cascade.
