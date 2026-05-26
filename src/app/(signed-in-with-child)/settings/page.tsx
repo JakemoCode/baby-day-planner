@@ -237,6 +237,7 @@ export default function SettingsPage() {
           label="Dream feed time"
           value={value.dreamFeedTime}
           onChange={(v) => set("dreamFeedTime", v)}
+          disabled={!value.dreamFeedEnabled}
           help="When the projected dream-feed bottle is anchored (e.g. 11:00pm)."
         />
       </Section>
@@ -327,12 +328,14 @@ function TimeRow({
   value,
   onChange,
   help,
+  disabled,
 }: {
   id: string;
   label: string;
   value: TimeMin;
   onChange: (next: TimeMin) => void;
   help?: string;
+  disabled?: boolean;
 }) {
   return (
     <div className={styles.field}>
@@ -344,6 +347,7 @@ function TimeRow({
         type="time"
         value={formatHM24(value)}
         onChange={(e) => onChange(parseTime(e.target.value))}
+        disabled={disabled === true}
         className={styles.input}
       />
       {help && <span className={styles.fieldHelp}>{help}</span>}

@@ -1751,6 +1751,42 @@ describe("R5.5 — dream-feed emission (§F66)", () => {
     expect(dream?.lifecycle.state).toBe("recorded");
   });
 
+  it("misconfig: dreamFeedTime < bedtime — dream-feed does NOT pollute the rhythm chain's cold-start count", () => {
+    // User sets dreamFeedTime = 18:00 which falls inside the rhythm
+    // chain window. Without isDreamFeed exclusion in chainBottles, the
+    // slot would consume a cold-start placeholder slot and the rhythm
+    // chain would emit one fewer regular bottle.
+    const ctx = aContext({
+      day: aDay({ wakeTime: 7 * 60 }),
+      settings: aSettings({
+        dreamFeedEnabled: true,
+        dreamFeedTime: 18 * 60,
+        bedtimeThreshold: 22 * 60 + 30,
+        wakeWindowsMinutes: [120, 150, 180, 180, 30],
+        defaultNapLengthMinutes: 60,
+        defaultBottleIntervalMinutes: 180,
+        bottleChain: { bottlesPerDay: 4, bufferAfterWakeMinutes: 10 },
+      }),
+      actuals: [],
+    });
+    const out = projectDay(
+      {
+        day: ctx.day,
+        settings: ctx.settings,
+        actuals: ctx.actuals,
+        nowMinutes: ctx.nowMinutes,
+      },
+      { rules: ALL_WITH_NAPS },
+    );
+    // Rhythm bottles (non-dream) should still be 4 — the cold-start
+    // target — independent of the dream-feed slot's position.
+    const rhythmBottles = out.filter((e) => e.type === "bottle" && e.eventKey !== "bottle_dream");
+    expect(rhythmBottles).toHaveLength(4);
+    // And the dream-feed at 18:00 still exists with its own slot.
+    const dream = out.find((e) => e.type === "bottle" && e.eventKey === "bottle_dream");
+    expect(dream?.startTime).toBe(18 * 60);
+  });
+
   it("rhythm cascade does not renumber the dream-feed slot via R5.4", () => {
     const ctx = aContext({
       day: aDay({ wakeTime: 7 * 60 }),
