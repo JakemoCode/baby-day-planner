@@ -112,8 +112,8 @@ describe("EditableWakeTime", () => {
   it("variant='card' applies the displayCard class", () => {
     const { rerender } = render(<EditableWakeTime wakeTime={SEVEN_AM} onChange={() => {}} />);
     const btn = () => screen.getByRole("button", { name: /change today's start time/i });
-    expect(btn()).not.toHaveClass(styles.displayCard);
+    expect(btn()).not.toHaveClass(styles.displayCard!);
     rerender(<EditableWakeTime wakeTime={SEVEN_AM} onChange={() => {}} variant="card" />);
-    expect(btn()).toHaveClass(styles.displayCard);
+    expect(btn()).toHaveClass(styles.displayCard!);
   });
 });
