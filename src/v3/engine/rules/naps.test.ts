@@ -1019,7 +1019,8 @@ describe("§F66 bedtime cascade — ADR-0002", () => {
     );
 
     const projectedNapsPastThreshold = out.filter(
-      (e) => e.type === "nap" && e.lifecycle.state === "projected" && (e.endTime ?? 0) > 17 * 60 + 30,
+      (e) =>
+        e.type === "nap" && e.lifecycle.state === "projected" && (e.endTime ?? 0) > 17 * 60 + 30,
     );
     expect(projectedNapsPastThreshold).toHaveLength(0);
 
@@ -1111,7 +1112,8 @@ describe("§F66 bedtime cascade — ADR-0002", () => {
     expect(bedtime!.startTime).toBeGreaterThanOrEqual(18 * 60);
 
     const projectedNapsPastThreshold = out.filter(
-      (e) => e.type === "nap" && e.lifecycle.state === "projected" && (e.endTime ?? 0) > 17 * 60 + 30,
+      (e) =>
+        e.type === "nap" && e.lifecycle.state === "projected" && (e.endTime ?? 0) > 17 * 60 + 30,
     );
     expect(projectedNapsPastThreshold).toHaveLength(0);
   });
