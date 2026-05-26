@@ -12,6 +12,8 @@
 
 **Updated 2026-05-26** with ADR-0003 (dashboard contextual button is multi-modal — adds Log Bottle Time mode) and ADR-0004 (no-past-projections invariant). Affects PR 3 (putdown-anchor precedence) and PR 4 (button mode logic).
 
+**Updated 2026-05-26 (architecture-deepening grill, ADR-0005)** — two new PRs slotted ahead of the original PR 3 from the §F66 architecture-deepening candidates C1 + C2: a `terminateCascade` extraction refactor (no behavior change) and the F4 seam (per-rule resolvers + seam dispatch) implementing ADR-0004's invariant. PRs renumbered 3a/3b/3c.
+
 ---
 
 ## PR sequence
@@ -20,11 +22,18 @@
 |---|---|---|---|
 | 1 | Settings: add `earliestBedtime`, change `bedtimeThreshold` default | `feat/f66-earliest-bedtime-setting` | — |
 | 2 | Engine: new bedtime cascade rule (drop nap past threshold; floor) | `feat/f66-bedtime-cascade-rule` | PR1 |
-| 3 | Engine: putdown bottle-anchor rule | `feat/f66-putdown-bottle-anchor` | — (parallel) |
+| **3a** | **Refactor: extract `terminateCascade` in naps.ts (C2)** | `refactor/f66-terminate-cascade` | PR2 |
+| **3b** | **Engine: F4 no-past-projections seam + per-rule resolvers (C1, ADR-0005)** | `feat/f66-no-past-projections-seam` | PR2 |
+| **3c** | **Engine: putdown bottle-anchor rule (consumes 3b's seam)** | `feat/f66-putdown-bottle-anchor` | PR3b |
 | 4 | Now-cross auto-promote + multi-modal dashboard button (End Nap / Log Bottle Time) | `feat/f66-now-cross-promote-buttons` | PR2 |
 | 5 | Drawer: future-event = owner-only edit | `feat/f66-drawer-future-owner-only` | PR4 |
-| 6 | Settings: `dreamFeedTime` + special bottle anchor | `feat/f66-dream-feed-setting` | PR1 |
+| 6 | Settings: `dreamFeedTime` + special bottle anchor | `feat/f66-dream-feed-setting` | PR1, PR3b |
 | 7 | Docs: DATA_MODEL / ENGINE_SPEC / DOMAIN updates + close fast-follows | `docs/f66-cascade-doc-sweep` | PR1-6 |
+
+**Other architecture cleanups deferred** to separate PRs after §F66 lands:
+- C3: `helpers.ts` predicate cleanup (delete shallow wrappers, promote `projectedEvent` to event-builders module).
+- C4: `SleepCascadeSettings` type slice for `projectSleepCascade`'s input contract.
+- C5: extract `checkRealityWins` as testable; add evaluator-unit tests.
 
 ---
 
@@ -241,13 +250,89 @@ git commit -m "feat(engine): F66 bedtime cascade — drop nap past threshold, fl
 
 ---
 
-## PR 3 — Engine: putdown bottle-anchor + no-past-projections invariant (parallel with PR 2)
+## PR 3a — Refactor: extract `terminateCascade` in naps.ts (C2)
 
-**ADR refs:** CONTEXT.md "putdown bottle-anchor rule" + ADR-0004 "no-past-projections invariant."
+**Files:** `src/v3/engine/rules/naps.ts` (the two cascade-termination sites)
 
-**Precedence:** the past-projections invariant trumps putdown-anchor. If the putdown-snap target time `parent.startTime - putdownLeadMinutes` is `≤ Now`, skip the snap and fall through to the next-valid-future-slot calculation.
+**Scope:** pure refactor, no behavior change. Extract the wake-window + (optional) bedtime emit pair into one named function:
 
-Add at least one test case for the precedence: a recorded nap whose start was edited later (e.g., 12:20 instead of 12:00) producing a cascade bottle whose snap-target is past Now — must end up at `nap.endTime`, not `nap.startTime - 15min`.
+```ts
+function terminateCascade(
+  ctx: Context,
+  n: number,
+  wwStart: number,
+  manualBedtime?: Event,
+): Event[] {
+  const anchor = manualBedtime
+    ? manualBedtime.startTime
+    : Math.max(ctx.settings.earliestBedtime, wwStart);
+  const out: Event[] = [buildWakeWindow(ctx, n, wwStart, anchor)];
+  if (!manualBedtime) {
+    out.push(buildProjectedBedtime(ctx, anchor, ctx.settings));
+  }
+  return out;
+}
+```
+
+Then the two existing call sites (`naps.ts:122-129` ADR-0002 drop branch; `naps.ts:135-138` manual-bedtime branch) collapse to `projected.push(...terminateCascade(...))`.
+
+**TDD:** existing engine tests stay green (they assert behavioral output, not internal call shape). Add no new tests; the refactor is dimensionless from the engine's external interface.
+
+**Commit:** `refactor(engine): extract terminateCascade in naps.ts (§F66 C2)`.
+
+---
+
+## PR 3b — Engine: no-past-projections seam + per-rule resolvers (C1, ADR-0005)
+
+**Files:**
+- Modify: `src/v3/engine/evaluator.ts` (add post-process seam parallel to `checkRealityWins`)
+- Modify: `src/v3/engine/rules/index.ts` (extend `Rule` type with optional `resolveNoPast`)
+- Modify: `src/v3/engine/rules/naps.ts`, `bottles.ts`, `dailyRecurring.ts`, `wakeWindowOverrides.ts` (register resolvers for each producing rule)
+- Test: `src/v3/engine/evaluator.test.ts` (new — seam-level tests with toy rules)
+
+**Scope:** add the cross-cutting invariant per ADR-0005. No user-facing behavior change in the common case (most projections are already future); the seam guarantees the invariant holds when the cascade would otherwise emit a past-now projection.
+
+**TDD outline:**
+
+### Task 3b.1 — Failing evaluator-level test
+
+Add toy-rule test in `evaluator.test.ts` (new file): a rule that deliberately emits a past-now projection. Expect: seam catches it; resolver runs; emitted event is shifted to a future time. Fails because the seam doesn't exist yet.
+
+### Task 3b.2 — Add seam to evaluator
+
+In `src/v3/engine/evaluator.ts`, after the fixed-point loop's last pass and after `checkRealityWins`:
+
+```ts
+events = applyNoPastProjections(events, ctx);
+```
+
+`applyNoPastProjections(events, ctx)` iterates projected events; for each with `startTime <= ctx.nowMinutes`, looks up the rule that owns that event type, calls its `resolveNoPast`. If no resolver registered, throws `EvaluationError`. If resolver returns `null`, drops the event.
+
+### Task 3b.3 — Register resolvers in producing rules
+
+For each producing rule, add a `resolveNoPast` field exposing existing placement logic:
+
+- `bottles.ts`: compute `Math.max(now + 1, snapOutOfNapTime, ...)`; shift to next valid future per existing cascade rules; return null if past bedtime cap.
+- `naps.ts`: similar — shift to next valid future respecting cascade cursor and threshold.
+- `dailyRecurring.ts`, `wakeWindowOverrides.ts`: only register if these can emit past-now projections in practice; else leave unset.
+
+### Task 3b.4 — Make the failing test pass
+
+Run `pnpm test src/v3/engine/evaluator.test.ts` → green. Full suite → green. Typecheck → green.
+
+### Task 3b.5 — Open PR
+
+PR body references ADR-0005, lists registered resolvers, includes click-test: simulate the §F66 §F66 #4 scenario (nap edited later, cascade bottle would land past now) and verify the bottle now lands at `nap.endTime`, not in the past.
+
+---
+
+## PR 3c — Engine: putdown bottle-anchor rule (consumes 3b's seam)
+
+**ADR refs:** CONTEXT.md "putdown bottle-anchor rule" + ADR-0004 + ADR-0005.
+
+**Precedence:** the past-projections invariant trumps putdown-anchor. Implementation now relies on PR 3b's seam: the putdown-anchor snap inside `bottles.ts` operates on cascade-natural times; if the snapped target lands in the past, the bottle is emitted at that past time, and PR 3b's seam catches it via the bottles.ts resolver which shifts to `nap.endTime` (or next valid future).
+
+Test case for the precedence: a recorded nap whose start was edited later (e.g., 12:20 instead of 12:00) producing a cascade bottle whose snap-target is past Now — must end up at `nap.endTime`, not `nap.startTime - 15min`. The test exercises both the putdown-anchor rule (this PR) and the F4 resolver (PR 3b) end-to-end.
 
 
 
