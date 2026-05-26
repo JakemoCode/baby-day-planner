@@ -52,7 +52,6 @@ function projectSleepCascade(ctx: Context, existing: Event[]): Event[] {
   const wws = ctx.settings.wakeWindowsMinutes;
   const napLen = ctx.settings.defaultNapLengthMinutes;
   const threshold = ctx.settings.bedtimeThreshold;
-  const earliestBedtime = ctx.settings.earliestBedtime;
 
   if (wws.length === 0) return existing;
 
@@ -122,9 +121,7 @@ function projectSleepCascade(ctx: Context, existing: Event[]): Event[] {
     // dropped — it stays as a nap and the cascade continues.
     const projectedNapEnd = napStart + napLen;
     if (!manualBedtime && !existingNap && projectedNapEnd > threshold) {
-      const bedtimeStart = Math.max(earliestBedtime, wwStart);
-      projected.push(buildWakeWindow(ctx, n, wwStart, bedtimeStart));
-      projected.push(buildProjectedBedtime(ctx, bedtimeStart, ctx.settings));
+      projected.push(...terminateCascade(ctx, n, wwStart, undefined));
       break;
     }
 
@@ -136,7 +133,7 @@ function projectSleepCascade(ctx: Context, existing: Event[]): Event[] {
     const projectedExtendsIntoBedtime =
       manualBedtime && !existingNap && napStart + napLen > manualBedtime.startTime;
     if (manualBedtime && (napStart >= manualBedtime.startTime || projectedExtendsIntoBedtime)) {
-      projected.push(buildWakeWindow(ctx, n, wwStart, manualBedtime.startTime));
+      projected.push(...terminateCascade(ctx, n, wwStart, manualBedtime));
       break;
     }
 
@@ -167,6 +164,29 @@ function projectSleepCascade(ctx: Context, existing: Event[]): Event[] {
   }
 
   return [...existing, ...projected];
+}
+
+/**
+ * Terminates the cascade with a closing wake-window + (optional) projected
+ * bedtime. The anchor is `manualBedtime.startTime` if one exists, else the
+ * ADR-0002 floor `max(earliestBedtime, wwStart)`. The wake-window always
+ * emits; the projected bedtime emits only when no manualBedtime is present
+ * (otherwise the manual one is the day's authoritative terminator).
+ */
+function terminateCascade(
+  ctx: Context,
+  n: number,
+  wwStart: number,
+  manualBedtime: Event | undefined,
+): Event[] {
+  const anchor = manualBedtime
+    ? manualBedtime.startTime
+    : Math.max(ctx.settings.earliestBedtime, wwStart);
+  const out: Event[] = [buildWakeWindow(ctx, n, wwStart, anchor)];
+  if (!manualBedtime) {
+    out.push(buildProjectedBedtime(ctx, anchor, ctx.settings));
+  }
+  return out;
 }
 
 function buildWakeWindow(ctx: Context, n: number, start: number, end: number): Event {
