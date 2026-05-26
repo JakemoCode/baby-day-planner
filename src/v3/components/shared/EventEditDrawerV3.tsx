@@ -251,10 +251,16 @@ export function EventEditDrawerV3({
     // back to the source's values when editing a future-projected event.
     // Guarantees the resulting save is owner-only and routes through
     // setOwnerOverride in useDrawer.onSave, keeping the event projected.
+    // Sanitize: startTime, endTime, amountOz, and label all reset to
+    // source values. Label matters because useDrawer's isOwnerOnlyEdit
+    // includes it in the diff — without resetting, a label edit on a
+    // future-projected extra would route to saveEvent and silently
+    // promote the slot to recorded.
     const next: Event = futureProjected
       ? {
           ...built,
           startTime: sourceEvent.startTime,
+          label: sourceEvent.label,
           ...(sourceEvent.endTime !== undefined && { endTime: sourceEvent.endTime }),
           ...(sourceEvent.amountOz !== undefined && { amountOz: sourceEvent.amountOz }),
         }
@@ -363,6 +369,7 @@ export function EventEditDrawerV3({
               type="text"
               className={styles.input}
               value={form.label}
+              disabled={futureProjected}
               onChange={(e) => setForm((prev) => ({ ...prev, label: e.target.value }))}
               placeholder="Pediatrician, library trip…"
             />

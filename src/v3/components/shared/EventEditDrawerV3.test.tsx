@@ -6,12 +6,13 @@
  * onSave payload assembles, validation surfaces overlap errors.
  */
 
-import type React from "react";
+import React, { useEffect } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { Event, OwnersConfig, TimeMin } from "../../schemas";
 import { NO_OWNER } from "../../schemas";
+import { useDrawer } from "../../hooks/useDrawer";
 import { EventEditDrawerV3 } from "./EventEditDrawerV3";
 
 const owners: OwnersConfig = {
@@ -854,6 +855,57 @@ describe("Past-threshold prompt when editing a nap (physiology cascade)", () => 
       expect(saved.endTime).toBe(source.endTime);
       // Owner did change.
       expect(saved.owner).toEqual({ slot: "parent1" });
+    });
+
+    // Seam test: full chain drawer → useDrawer → setOwnerOverride.
+    // Verifies that an owner edit on a future-projected event routes
+    // through ownerOverrides (keeping the slot projected) and NOT
+    // through saveEvent (which would promote to recorded and pin the
+    // time — the §F64 bug class).
+    it("seam: drawer + useDrawer routes future-projected owner edit through setOwnerOverride, not saveEvent", async () => {
+      const source = futureNap();
+      const saveEvent = vi.fn().mockResolvedValue(undefined);
+      const setOwnerOverride = vi.fn().mockResolvedValue(undefined);
+      const deleteOptimistic = vi.fn().mockResolvedValue(undefined);
+
+      function Harness() {
+        const { drawer, openEdit, onSave } = useDrawer(
+          [], // empty actuals → source is projected
+          saveEvent,
+          deleteOptimistic,
+          setOwnerOverride,
+        );
+        useEffect(() => {
+          openEdit(source);
+          // openEdit is stable across renders; safe to call once on mount.
+          // eslint-disable-next-line react-hooks/exhaustive-deps
+        }, []);
+        if (!drawer.open || drawer.mode !== "edit") return null;
+        return (
+          <EventEditDrawerV3
+            open
+            mode="edit"
+            event={drawer.event}
+            owners={owners}
+            nowMinutes={NOW}
+            bedtimeThreshold={THRESHOLD}
+            defaultWakeTime={DEFAULT_WAKE_TIME}
+            onSave={onSave}
+            onCancel={() => {}}
+          />
+        );
+      }
+
+      render(<Harness />);
+      // Wait for the openEdit effect to flush.
+      await screen.findByRole("dialog");
+      const jakeBtn = screen.getAllByRole("button").find((b) => /jake/i.test(b.textContent ?? ""));
+      await userEvent.click(jakeBtn!);
+      await userEvent.click(screen.getByRole("button", { name: /save/i }));
+
+      expect(setOwnerOverride).toHaveBeenCalledTimes(1);
+      expect(setOwnerOverride).toHaveBeenCalledWith(source.eventKey, { slot: "parent1" });
+      expect(saveEvent).not.toHaveBeenCalled();
     });
   });
 });
