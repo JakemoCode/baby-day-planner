@@ -6,6 +6,7 @@
  * onSave payload assembles, validation surfaces overlap errors.
  */
 
+import type React from "react";
 import { describe, expect, it, vi } from "vitest";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -766,7 +767,8 @@ describe("Past-threshold prompt when editing a nap (physiology cascade)", () => 
         label: "Bottle 4",
       });
 
-    it("disables start time, end time, and amount inputs on a future projected event", () => {
+    type DrawerProps = React.ComponentProps<typeof EventEditDrawerV3>;
+    const renderDrawer = (overrides: Partial<DrawerProps> = {}) =>
       render(
         <EventEditDrawerV3
           open
@@ -778,26 +780,18 @@ describe("Past-threshold prompt when editing a nap (physiology cascade)", () => 
           defaultWakeTime={DEFAULT_WAKE_TIME}
           onSave={() => {}}
           onCancel={() => {}}
+          {...overrides}
         />,
       );
+
+    it("disables start time, end time, and amount inputs on a future projected event", () => {
+      renderDrawer();
       expect(screen.getByLabelText(/start time/i)).toBeDisabled();
       expect(screen.getByLabelText(/end time/i)).toBeDisabled();
     });
 
     it("disables amount input on a future projected bottle but keeps owner editable", () => {
-      render(
-        <EventEditDrawerV3
-          open
-          mode="edit"
-          event={futureBottle()}
-          owners={owners}
-          nowMinutes={NOW}
-          bedtimeThreshold={THRESHOLD}
-          defaultWakeTime={DEFAULT_WAKE_TIME}
-          onSave={() => {}}
-          onCancel={() => {}}
-        />,
-      );
+      renderDrawer({ event: futureBottle() });
       expect(screen.getByLabelText(/amount/i)).toBeDisabled();
       // OwnerPickerV3 renders interactive owner buttons (not a labeled input).
       // It's enough to confirm at least one owner button is in the DOM and
@@ -810,19 +804,7 @@ describe("Past-threshold prompt when editing a nap (physiology cascade)", () => 
     });
 
     it("renders an explanatory hint for future-projected events", () => {
-      render(
-        <EventEditDrawerV3
-          open
-          mode="edit"
-          event={futureNap()}
-          owners={owners}
-          nowMinutes={NOW}
-          bedtimeThreshold={THRESHOLD}
-          defaultWakeTime={DEFAULT_WAKE_TIME}
-          onSave={() => {}}
-          onCancel={() => {}}
-        />,
-      );
+      renderDrawer();
       expect(screen.getByRole("note")).toHaveTextContent(/only the owner is editable/i);
     });
 
@@ -833,19 +815,7 @@ describe("Past-threshold prompt when editing a nap (physiology cascade)", () => 
         startTime: NOW - 60, // 1hr before Now
         endTime: NOW - 15,
       });
-      render(
-        <EventEditDrawerV3
-          open
-          mode="edit"
-          event={pastProjected}
-          owners={owners}
-          nowMinutes={NOW}
-          bedtimeThreshold={THRESHOLD}
-          defaultWakeTime={DEFAULT_WAKE_TIME}
-          onSave={() => {}}
-          onCancel={() => {}}
-        />,
-      );
+      renderDrawer({ event: pastProjected });
       expect(screen.getByLabelText(/start time/i)).not.toBeDisabled();
     });
 
@@ -856,37 +826,13 @@ describe("Past-threshold prompt when editing a nap (physiology cascade)", () => 
         endTime: 14 * 60 + 45,
         lifecycle: { state: "recorded", annotatedAt: 14 * 60 },
       });
-      render(
-        <EventEditDrawerV3
-          open
-          mode="edit"
-          event={recordedFuture}
-          owners={owners}
-          nowMinutes={NOW}
-          bedtimeThreshold={THRESHOLD}
-          defaultWakeTime={DEFAULT_WAKE_TIME}
-          onSave={() => {}}
-          onCancel={() => {}}
-        />,
-      );
+      renderDrawer({ event: recordedFuture });
       expect(screen.getByLabelText(/start time/i)).not.toBeDisabled();
       expect(screen.queryByRole("note")).toBeNull();
     });
 
     it("does NOT disable inputs in create mode (form fields are the source of truth)", () => {
-      render(
-        <EventEditDrawerV3
-          open
-          mode="create"
-          event={futureNap()}
-          owners={owners}
-          nowMinutes={NOW}
-          bedtimeThreshold={THRESHOLD}
-          defaultWakeTime={DEFAULT_WAKE_TIME}
-          onSave={() => {}}
-          onCancel={() => {}}
-        />,
-      );
+      renderDrawer({ mode: "create" });
       expect(screen.getByLabelText(/start time/i)).not.toBeDisabled();
     });
 
@@ -897,19 +843,7 @@ describe("Past-threshold prompt when editing a nap (physiology cascade)", () => 
       // sanitize step is the defense-in-depth guard).
       const onSave = vi.fn();
       const source = futureNap();
-      render(
-        <EventEditDrawerV3
-          open
-          mode="edit"
-          event={source}
-          owners={owners}
-          nowMinutes={NOW}
-          bedtimeThreshold={THRESHOLD}
-          defaultWakeTime={DEFAULT_WAKE_TIME}
-          onSave={onSave}
-          onCancel={() => {}}
-        />,
-      );
+      renderDrawer({ event: source, onSave });
       const jakeBtn = screen.getAllByRole("button").find((b) => /jake/i.test(b.textContent ?? ""));
       expect(jakeBtn).toBeDefined();
       await userEvent.click(jakeBtn!);

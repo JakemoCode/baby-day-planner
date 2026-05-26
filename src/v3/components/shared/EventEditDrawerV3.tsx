@@ -251,14 +251,14 @@ export function EventEditDrawerV3({
     // back to the source's values when editing a future-projected event.
     // Guarantees the resulting save is owner-only and routes through
     // setOwnerOverride in useDrawer.onSave, keeping the event projected.
-    let next: Event = built;
-    if (futureProjected) {
-      next = { ...built, startTime: sourceEvent.startTime };
-      if (sourceEvent.endTime !== undefined) next.endTime = sourceEvent.endTime;
-      else delete (next as { endTime?: TimeMin }).endTime;
-      if (sourceEvent.amountOz !== undefined) next.amountOz = sourceEvent.amountOz;
-      else delete (next as { amountOz?: number }).amountOz;
-    }
+    const next: Event = futureProjected
+      ? {
+          ...built,
+          startTime: sourceEvent.startTime,
+          ...(sourceEvent.endTime !== undefined && { endTime: sourceEvent.endTime }),
+          ...(sourceEvent.amountOz !== undefined && { amountOz: sourceEvent.amountOz }),
+        }
+      : built;
 
     // Prompt trigger: a nap whose startTime crossed from below
     // threshold to at/after threshold during this edit (spec R2 / Q6).
