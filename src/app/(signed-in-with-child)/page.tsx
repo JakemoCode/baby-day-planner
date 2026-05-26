@@ -31,11 +31,10 @@ import type { CreatableType } from "@/v3/components/shared/createEventTemplate";
 import { buildCreateTemplate } from "@/v3/components/shared/createEventTemplate";
 import { EventEditDrawerV3 } from "@/v3/components/shared/EventEditDrawerV3";
 import { NowBanner } from "@/v3/components/Dashboard/NowBanner";
-import { NapActionButton } from "@/v3/components/Dashboard/NapActionButton";
+import { ContextualActionButton } from "@/v3/components/Dashboard/ContextualActionButton";
 import { NextBottlePanel } from "@/v3/components/Dashboard/NextBottlePanel";
 import { NextEventCard } from "@/v3/components/Dashboard/NextEventCard";
 import { NextSleepPanel } from "@/v3/components/Dashboard/NextSleepPanel";
-import { StartBottleButton } from "@/v3/components/Dashboard/StartBottleButton";
 import { StartDayButton } from "@/v3/components/Dashboard/StartDayButton";
 import { WakeConfirmSheet } from "@/v3/components/Dashboard/WakeConfirmSheet";
 import styles from "./page.module.css";
@@ -169,12 +168,6 @@ export default function DashboardPage() {
     }
     await saveEvent(bottle);
   };
-  const handleStartNap = async (nap: Event) => {
-    await saveEvent(nap);
-  };
-  const handleStartBedtime = async (bedtime: Event) => {
-    await saveEvent(bedtime);
-  };
   // TIME_EDIT on a recorded nap → completed.
   const handleEndNap = async (event: Event, endTime: number) => {
     if (!day || day.id === "") return;
@@ -244,34 +237,23 @@ export default function DashboardPage() {
       />
 
       <div className={styles.actions}>
-        <StartBottleButton
-          defaultAmountOz={settings.defaultBottleAmountOz}
+        <ContextualActionButton
+          inProgressNap={inProgressNap}
+          inProgressBedtime={inProgressBedtime}
+          nextProjectedBottle={nb}
           dayId={day.id}
-          nextNumber={nextBottleNumber}
-          {...(nb ? { nextProjectedBottle: nb } : {})}
-          onLog={handleLogBottle}
-          minIntervalMinutes={settings.minBottleIntervalMinutes ?? 20}
-          {...(lastBottleTime !== undefined ? { lastBottleTime } : {})}
+          defaultBottleAmountOz={settings.defaultBottleAmountOz}
+          nowMinutes={nowMinutes}
+          fallbackBottleNumber={nextBottleNumber}
+          onEndNap={handleEndNap}
+          onWakeRequest={() => setWakeSheetOpen(true)}
+          onLogBottle={handleLogBottle}
         />
-        <div className={styles.actionsRow}>
-          <NapActionButton
-            inProgressNap={inProgressNap}
-            inProgressBedtime={inProgressBedtime}
-            dayId={day.id}
-            nowMinutes={nowMinutes}
-            bedtimeThreshold={settings.bedtimeThreshold}
-            defaultNapLengthMinutes={settings.defaultNapLengthMinutes}
-            defaultWakeTime={settings.defaultWakeTime}
-            {...(nn ? { nextProjectedNap: nn } : {})}
-            onStart={handleStartNap}
-            onEnd={handleEndNap}
-            onStartBedtime={handleStartBedtime}
-            onEndBedtime={async () => setWakeSheetOpen(true)}
-          />
-          {process.env.NODE_ENV === "development" && (
+        {process.env.NODE_ENV === "development" && (
+          <div className={styles.actionsRow}>
             <StartDayButton hasTomorrowPlan={hasTomorrowPlan} onStart={handleStartDay} />
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
       <FAB label="Add an event" onClick={() => setPickerOpen(true)} />
