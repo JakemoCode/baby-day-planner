@@ -258,6 +258,9 @@ describe("formToEvent — putdown survives a drawer time-edit (integration)", ()
   it("nap time edit → engine still emits the nap with hasPutdown=true", () => {
     // Seed: user records yesterday's bedtime end (= today's wake at 7:00).
     // The cascade emits a projected nap_1 around 9:00 with hasPutdown=true.
+    // ADR-0006: pin nowMinutes BEFORE the projected nap_1 (9:00) so the
+    // engine's Now-cross auto-promote doesn't flip it to recorded — the
+    // test specifically validates the projected-nap drawer-edit path.
     const ctx = aContext({
       day: aDay({ wakeTime: 7 * 60 }),
       settings: aSettings({
@@ -265,6 +268,7 @@ describe("formToEvent — putdown survives a drawer time-edit (integration)", ()
         defaultNapLengthMinutes: 60,
       }),
       actuals: [],
+      nowMinutes: 8 * 60,
     });
     const initial = projectDay({
       day: ctx.day,

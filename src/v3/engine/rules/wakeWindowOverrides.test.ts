@@ -66,7 +66,15 @@ describe("R4.2 — wake_window owner overrides survive recompute", () => {
     // Exactly one wake_window_2 in output (override doc dropped, projection kept).
     expect(ww2).toHaveLength(1);
     expect(ww2[0]!.owner).toEqual(PARENT1);
-    expect(ww2[0]!.lifecycle.state).toBe("projected");
+    // ADR-0006: wake_window_2 starts in the morning (before default
+    // nowMinutes=12:00), so engine auto-promotes to recorded. The test's
+    // intent — "override-derived projection survives recompute and
+    // carries the override's owner" — is unchanged.
+    expect(
+      ww2[0]!.startTime <= ctx.nowMinutes
+        ? ww2[0]!.lifecycle.state === "recorded"
+        : ww2[0]!.lifecycle.state === "projected",
+    ).toBe(true);
   });
 
   it("override beats template — final owner is the override, not the template", () => {

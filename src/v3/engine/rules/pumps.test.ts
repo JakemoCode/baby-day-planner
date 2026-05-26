@@ -61,7 +61,17 @@ describe("R9.1 / R9.3 — pumps from settings.pumpTimes, first anchored to wakeT
     const dur = ctx.settings.defaultPumpDurationMinutes;
     expect(pumps[0]!.endTime).toBe(7 * 60 + dur);
     expect(pumps[1]!.endTime).toBe(14 * 60 + 30 + dur);
-    expect(pumps.every((p) => p.lifecycle.state === "projected")).toBe(true);
+    // ADR-0006: 7:00 pump is past default nowMinutes (12:00) → recorded;
+    // 14:30 pump is future → projected. Test intent: pump rule emits at
+    // the configured times with the right owner; lifecycle follows the
+    // universal time-vs-now rule.
+    expect(
+      pumps.every((p) =>
+        p.startTime <= ctx.nowMinutes
+          ? p.lifecycle.state === "recorded"
+          : p.lifecycle.state === "projected",
+      ),
+    ).toBe(true);
     expect(pumps.every((p) => p.owner !== undefined && p.owner.slot === "parent2")).toBe(true);
   });
 });

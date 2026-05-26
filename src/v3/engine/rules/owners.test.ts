@@ -485,6 +485,7 @@ describe("R12.10 — Day.ownerOverrides applies to projected events", () => {
       .filter((e) => e.type === "nap")
       .sort((a, b) => a.startTime - b.startTime);
     const baselineNap1Start = baselineNaps[0]!.startTime;
+    const baselineNap1Lifecycle = baselineNaps[0]!.lifecycle.state;
 
     // With override: same setup + nap_1 owner override.
     const withOverride = run(
@@ -501,10 +502,15 @@ describe("R12.10 — Day.ownerOverrides applies to projected events", () => {
       .filter((e) => e.type === "nap")
       .sort((a, b) => a.startTime - b.startTime);
 
-    // Owner applied AND time identical to baseline AND lifecycle still projected.
+    // Owner applied AND time identical to baseline AND lifecycle matches
+    // baseline's lifecycle (ownerOverride must not change lifecycle —
+    // whatever the baseline produced, override should match).
+    // ADR-0006 Now-cross auto-promote sets baseline's lifecycle based on
+    // time vs nowMinutes, not based on overrides; this test verifies the
+    // override path produces the same lifecycle outcome.
     expect(naps[0]!.owner).toEqual(PARENT2);
     expect(naps[0]!.startTime).toBe(baselineNap1Start);
-    expect(naps[0]!.lifecycle.state).toBe("projected");
+    expect(naps[0]!.lifecycle.state).toBe(baselineNap1Lifecycle);
   });
 
   it("null in the map = explicit NO_OWNER (beats template default)", () => {

@@ -56,8 +56,17 @@ describe("R5.11 — placeholder projection when no bottle has been recorded", ()
       16 * 60 + 10, // 16:10
     ]);
 
-    // All projected (none recorded yet).
-    expect(bottles.every((b) => b.lifecycle.state === "projected")).toBe(true);
+    // ADR-0006 Now-cross auto-promote: aContext nowMinutes=12:00.
+    // Bottles at 7:10 and 10:10 are past now → recorded; 13:10 and 16:10
+    // are future → still projected. Test verifies the lifecycle mapping
+    // matches the time partition.
+    expect(
+      bottles.every((b) =>
+        b.startTime <= ctx.nowMinutes
+          ? b.lifecycle.state === "recorded"
+          : b.lifecycle.state === "projected",
+      ),
+    ).toBe(true);
     // All instant.
     expect(bottles.every((b) => b.kind === "instant")).toBe(true);
   });
@@ -213,9 +222,16 @@ describe("R5.1 — cascade resumes from the latest recorded bottle", () => {
     expect(first.id).toBe(recorded.id);
     expect(first.lifecycle.state).toBe("completed");
 
-    // The projections are projected and instant.
+    // The projections are instant and follow the ADR-0006 Now-cross
+    // auto-promote: past-now → recorded, future-now → projected.
     const projections = bottles.slice(1);
-    expect(projections.every((b) => b.lifecycle.state === "projected")).toBe(true);
+    expect(
+      projections.every((b) =>
+        b.startTime <= ctx.nowMinutes
+          ? b.lifecycle.state === "recorded"
+          : b.lifecycle.state === "projected",
+      ),
+    ).toBe(true);
     expect(projections.every((b) => b.kind === "instant")).toBe(true);
   });
 });
@@ -716,7 +732,16 @@ describe("R5.1 — recorded bottles anchor the cascade", () => {
     // Recorded anchor preserved (§0 reality-wins: user committed to this slot).
     expect(bottles[0]?.id).toBe(overridden.id);
     expect(bottles[0]?.lifecycle.state).toBe("recorded");
-    expect(bottles.slice(1).every((b) => b.lifecycle.state === "projected")).toBe(true);
+    // ADR-0006: past-now projections auto-promote to recorded.
+    expect(
+      bottles
+        .slice(1)
+        .every((b) =>
+          b.startTime <= ctx.nowMinutes
+            ? b.lifecycle.state === "recorded"
+            : b.lifecycle.state === "projected",
+        ),
+    ).toBe(true);
   });
 
   it("late-day recorded anchor: forward-only cascade to midnight (no backfill per DOMAIN §2)", () => {
