@@ -92,10 +92,17 @@ export default function SettingsPage() {
         />
         <TimeRow
           id="bedtimeThreshold"
-          label="Bedtime threshold"
+          label="Latest nap end (bedtime threshold)"
           value={value.bedtimeThreshold}
           onChange={(v) => set("bedtimeThreshold", v)}
-          help="The first projected nap landing at or after this time becomes bedtime."
+          help="If a projected nap would end past this, drop it — bedtime takes over at earliest bedtime."
+        />
+        <TimeRow
+          id="earliestBedtime"
+          label="Earliest bedtime"
+          value={value.earliestBedtime}
+          onChange={(v) => set("earliestBedtime", v)}
+          help="Floor for projected bedtime — engine never projects bedtime before this."
         />
       </Section>
 

@@ -2,10 +2,15 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { Event, OwnershipTemplate, TimeMin } from "@/v3/schemas";
-import { isRecorded } from "@/v3/schemas";
 import { reduceLifecycle } from "@/v3/lifecycle";
 import { isInProgress } from "@/v3/lib/effectiveEnd";
-import { currentWakeWindow, nextBottle, nextNap, projectedBedtime } from "@/v3/selectors";
+import {
+  currentWakeWindow,
+  nearestBottleInWindow,
+  nextNap,
+  projectedBedtime,
+} from "@/v3/selectors";
+import { LOG_BOTTLE_WINDOW_MIN } from "@/v3/components/Dashboard/decideMode";
 import { nextDashboardEvent } from "@/v3/components/Dashboard/dashboardStats";
 import { useNowMinutes } from "@/hooks/useNowMinutes";
 import { useV3Day } from "@/v3/hooks/useV3Day";
@@ -31,11 +36,10 @@ import type { CreatableType } from "@/v3/components/shared/createEventTemplate";
 import { buildCreateTemplate } from "@/v3/components/shared/createEventTemplate";
 import { EventEditDrawerV3 } from "@/v3/components/shared/EventEditDrawerV3";
 import { NowBanner } from "@/v3/components/Dashboard/NowBanner";
-import { NapActionButton } from "@/v3/components/Dashboard/NapActionButton";
+import { ContextualActionButton } from "@/v3/components/Dashboard/ContextualActionButton";
 import { NextBottlePanel } from "@/v3/components/Dashboard/NextBottlePanel";
 import { NextEventCard } from "@/v3/components/Dashboard/NextEventCard";
 import { NextSleepPanel } from "@/v3/components/Dashboard/NextSleepPanel";
-import { StartBottleButton } from "@/v3/components/Dashboard/StartBottleButton";
 import { StartDayButton } from "@/v3/components/Dashboard/StartDayButton";
 import { WakeConfirmSheet } from "@/v3/components/Dashboard/WakeConfirmSheet";
 import styles from "./page.module.css";
@@ -115,7 +119,12 @@ export default function DashboardPage() {
 
   const next = nextDashboardEvent(projected, nowMinutes);
 
-  const nb = nextBottle(projected, nowMinutes);
+  // Symmetric ±15min window around the nearest projected bottle slot —
+  // the contextual button's Log Bottle Time mode shows BOTH before and
+  // after the projected time (engine auto-promote flips lifecycle when
+  // Now crosses startTime, but the user can still confirm with a real
+  // log up to LOG_BOTTLE_WINDOW_MIN after).
+  const nb = nearestBottleInWindow(projected, nowMinutes, LOG_BOTTLE_WINDOW_MIN);
   const nn = nextNap(projected, nowMinutes);
   const cww = currentWakeWindow(projected, nowMinutes);
   const inProgressNap = actuals.find(
@@ -132,22 +141,6 @@ export default function DashboardPage() {
   const inProgressBedtime = actuals.find(
     (e) => e.type === "bedtime" && e.lifecycle.state === "recorded",
   );
-  // "Next" ordinals = unique nap/bottle slots that are RECORDED (the
-  // user committed a specific time). Owner-only annotations have a
-  // non-recorded lifecycle and don't bump the ordinal. Dedupe by
-  // eventKey so the Start/End pair (same doc updated) doesn't double-count.
-  const uniqueRecordedKeys = (type: Event["type"]) => {
-    const seen = new Set<string>();
-    for (const e of actuals) {
-      if (e.type !== type) continue;
-      if (!isRecorded(e.lifecycle)) continue;
-      seen.add(e.eventKey);
-    }
-    return seen.size;
-  };
-  const nextBottleNumber = uniqueRecordedKeys("bottle") + 1;
-  const lastBottle = lastEventOfType(actuals, "bottle");
-  const lastBottleTime = lastBottle?.startTime;
   const bedtime = projectedBedtime(projected);
 
   const handleLogBottle = async (bottle: Event) => {
@@ -168,12 +161,6 @@ export default function DashboardPage() {
       return;
     }
     await saveEvent(bottle);
-  };
-  const handleStartNap = async (nap: Event) => {
-    await saveEvent(nap);
-  };
-  const handleStartBedtime = async (bedtime: Event) => {
-    await saveEvent(bedtime);
   };
   // TIME_EDIT on a recorded nap → completed.
   const handleEndNap = async (event: Event, endTime: number) => {
@@ -244,34 +231,22 @@ export default function DashboardPage() {
       />
 
       <div className={styles.actions}>
-        <StartBottleButton
-          defaultAmountOz={settings.defaultBottleAmountOz}
+        <ContextualActionButton
+          inProgressNap={inProgressNap}
+          inProgressBedtime={inProgressBedtime}
+          nextProjectedBottle={nb}
           dayId={day.id}
-          nextNumber={nextBottleNumber}
-          {...(nb ? { nextProjectedBottle: nb } : {})}
-          onLog={handleLogBottle}
-          minIntervalMinutes={settings.minBottleIntervalMinutes ?? 20}
-          {...(lastBottleTime !== undefined ? { lastBottleTime } : {})}
+          defaultBottleAmountOz={settings.defaultBottleAmountOz}
+          nowMinutes={nowMinutes}
+          onEndNap={handleEndNap}
+          onWakeRequest={() => setWakeSheetOpen(true)}
+          onLogBottle={handleLogBottle}
         />
-        <div className={styles.actionsRow}>
-          <NapActionButton
-            inProgressNap={inProgressNap}
-            inProgressBedtime={inProgressBedtime}
-            dayId={day.id}
-            nowMinutes={nowMinutes}
-            bedtimeThreshold={settings.bedtimeThreshold}
-            defaultNapLengthMinutes={settings.defaultNapLengthMinutes}
-            defaultWakeTime={settings.defaultWakeTime}
-            {...(nn ? { nextProjectedNap: nn } : {})}
-            onStart={handleStartNap}
-            onEnd={handleEndNap}
-            onStartBedtime={handleStartBedtime}
-            onEndBedtime={async () => setWakeSheetOpen(true)}
-          />
-          {process.env.NODE_ENV === "development" && (
+        {process.env.NODE_ENV === "development" && (
+          <div className={styles.actionsRow}>
             <StartDayButton hasTomorrowPlan={hasTomorrowPlan} onStart={handleStartDay} />
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
       <FAB label="Add an event" onClick={() => setPickerOpen(true)} />
@@ -327,10 +302,4 @@ export default function DashboardPage() {
       )}
     </div>
   );
-}
-
-function lastEventOfType(events: Event[], type: Event["type"]): Event | undefined {
-  return events
-    .filter((e) => e.type === type && isRecorded(e.lifecycle))
-    .sort((a, b) => b.startTime - a.startTime)[0];
 }
