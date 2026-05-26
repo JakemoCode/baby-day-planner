@@ -5,6 +5,7 @@ import styles from "./EventEditDrawer.module.css";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import type { Event, EventType, OwnerRef, OwnersConfig, TimeMin } from "../../schemas";
 import { isRecorded, NO_OWNER } from "../../schemas";
+import { isFutureProjected } from "../../lifecycle";
 import { formatHM24, formatTimeForDisplay, nextDayAt, parseHM24 } from "../../ui/time";
 import { OwnerPickerV3 } from "./OwnerPickerV3";
 import { formToEvent, type FormState } from "./formToEvent";
@@ -205,6 +206,13 @@ export function EventEditDrawerV3({
   const showOwner = OWNER_TYPES.has(type);
   const showLabel = type === "extra";
 
+  // §F66 future-event drawer rule: when editing a future-projected event,
+  // only the owner is meaningful (planning intent). Time + amount edits
+  // would create a pinned override before the event has actually happened,
+  // breaking the cascade. Lock those inputs read-only. Edit mode only —
+  // create mode always treats the form fields as the source of truth.
+  const futureProjected = mode === "edit" && isFutureProjected(sourceEvent, nowMinutes);
+
   const errors = validateForm(type, form.startTime, form.endTime, sourceEvent.id, existingEvents);
 
   const handleStartTimeChange = (raw: string) => {
@@ -238,7 +246,19 @@ export function EventEditDrawerV3({
       owner: form.owner,
       label: form.label,
     };
-    const next = formToEvent(formForTransform, sourceEvent, nowMinutes);
+    const built = formToEvent(formForTransform, sourceEvent, nowMinutes);
+    // Defensive: even with inputs disabled, force time/endTime/amount
+    // back to the source's values when editing a future-projected event.
+    // Guarantees the resulting save is owner-only and routes through
+    // setOwnerOverride in useDrawer.onSave, keeping the event projected.
+    let next: Event = built;
+    if (futureProjected) {
+      next = { ...built, startTime: sourceEvent.startTime };
+      if (sourceEvent.endTime !== undefined) next.endTime = sourceEvent.endTime;
+      else delete (next as { endTime?: TimeMin }).endTime;
+      if (sourceEvent.amountOz !== undefined) next.amountOz = sourceEvent.amountOz;
+      else delete (next as { amountOz?: number }).amountOz;
+    }
 
     // Prompt trigger: a nap whose startTime crossed from below
     // threshold to at/after threshold during this edit (spec R2 / Q6).
@@ -329,6 +349,13 @@ export function EventEditDrawerV3({
           {title}
         </h2>
 
+        {futureProjected && (
+          <p className={styles.futureNotice} role="note">
+            This hasn&apos;t happened yet — only the owner is editable. Open the drawer again after
+            it occurs to record an actual time.
+          </p>
+        )}
+
         {showLabel && (
           <label className={styles.field}>
             <span className={styles.label}>Label</span>
@@ -351,6 +378,7 @@ export function EventEditDrawerV3({
               value={timeInputValue(form.startTime)}
               onChange={(e) => handleStartTimeChange(e.target.value)}
               required
+              disabled={futureProjected}
               {...(errors.startTime ? { "aria-invalid": true } : {})}
             />
             {errors.startTime && (
@@ -369,6 +397,7 @@ export function EventEditDrawerV3({
               className={styles.input}
               value={timeInputValue(form.endTime)}
               onChange={(e) => setForm((prev) => ({ ...prev, endTime: parseHM24(e.target.value) }))}
+              disabled={futureProjected}
               {...(errors.endTime ? { "aria-invalid": true } : {})}
             />
             {errors.endTime && (
@@ -388,6 +417,7 @@ export function EventEditDrawerV3({
               min="0"
               className={styles.input}
               value={form.amountOz ?? ""}
+              disabled={futureProjected}
               onChange={(e) => {
                 const raw = e.target.value;
                 setForm((prev) => ({

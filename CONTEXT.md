@@ -213,7 +213,8 @@ Established 2026-05-25 (§F66 grill).
 When the user opens the drawer on a *future projected* event:
 
 - **Owner** is editable (planning intent).
-- **Time** and **amount** fields are read-only or hidden.
+- **Time** and **amount** fields are read-only (disabled inputs +
+  explanatory hint at the top of the drawer).
 
 Reason: future events can't have happened yet, so claiming a time or
 amount for them would create the same "pinned" override that produced
@@ -221,7 +222,19 @@ amount for them would create the same "pinned" override that produced
 settings (bedtimeThreshold, earliestBedtime, wake-window durations,
 bottle interval, etc.) and via reality (recording actuals).
 
-Established 2026-05-25 (§F66 grill).
+Predicate: `isFutureProjected(event, now)` in `src/v3/lifecycle.ts` —
+true iff `lifecycle.state === "projected"` AND `startTime > now`.
+Boundary excluded (the moment of crossing belongs to the auto-promote
+flow).
+
+Defense-in-depth: even if the disabled inputs are bypassed, the
+drawer's `handleSave` sanitizes the payload back to source values for
+time/endTime/amount before dispatching. The resulting payload is
+owner-only by construction, so `useDrawer.onSave` routes it through
+`setOwnerOverride` (keeping the event projected) rather than
+`saveEvent` (which would promote to recorded).
+
+Established 2026-05-25 (§F66 grill). Implemented in §F66 PR 5.
 
 ## dream feed
 

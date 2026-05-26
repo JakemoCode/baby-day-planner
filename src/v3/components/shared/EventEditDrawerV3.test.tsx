@@ -161,11 +161,16 @@ describe("EventEditDrawerV3", () => {
 
   it("saves nap time edit as overridden lifecycle (predict-don't-prescribe: drawer is scheduling intent, not reality)", async () => {
     const onSave = vi.fn();
+    // §F66: time-edit path requires the inputs to be enabled, which
+    // means the event is NOT future-projected. Use a recorded nap.
+    const source = projectedNap({
+      lifecycle: { state: "recorded", annotatedAt: 9 * 60 },
+    });
     render(
       <EventEditDrawerV3
         open
         mode="edit"
-        event={projectedNap()}
+        event={source}
         owners={owners}
         nowMinutes={NOW}
         bedtimeThreshold={THRESHOLD}
@@ -180,16 +185,24 @@ describe("EventEditDrawerV3", () => {
     await userEvent.click(screen.getByRole("button", { name: "Save" }));
     const next: Event = onSave.mock.calls[0]![0];
     expect(next.startTime).toBe(9 * 60 + 5);
+    // Recorded + scheduling-type time edit → stays recorded with new annotation.
     expect(next.lifecycle).toEqual({ state: "recorded", annotatedAt: NOW });
   });
 
   it("blocks save when end time is not after start time", async () => {
     const onSave = vi.fn();
+    // §F66: editing a projected event whose startTime is in the future
+    // is owner-only (inputs disabled). To exercise the end-time validation
+    // path, use a recorded event — that's the post-§F66 shape any
+    // editable-time nap takes after engine auto-promote.
+    const recorded = projectedNap({
+      lifecycle: { state: "recorded", annotatedAt: 9 * 60 },
+    });
     render(
       <EventEditDrawerV3
         open
         mode="edit"
-        event={projectedNap()}
+        event={recorded}
         owners={owners}
         nowMinutes={NOW}
         bedtimeThreshold={THRESHOLD}
@@ -221,8 +234,13 @@ describe("EventEditDrawerV3", () => {
       lifecycle: { state: "completed", committedAt: 11 * 60 },
     };
     // Source nap at 11:30–12:00 — clear of recordedNap (9:30–11:00).
-    // Editing end to 10:30 then introduces overlap.
-    const source = projectedNap({ startTime: 11 * 60 + 30, endTime: 12 * 60 });
+    // Editing start to 9:00 then introduces overlap. Use a recorded
+    // lifecycle so the time inputs are enabled (§F66 future-event rule).
+    const source = projectedNap({
+      startTime: 11 * 60 + 30,
+      endTime: 12 * 60,
+      lifecycle: { state: "recorded", annotatedAt: 11 * 60 + 30 },
+    });
     render(
       <EventEditDrawerV3
         open
@@ -245,11 +263,15 @@ describe("EventEditDrawerV3", () => {
 
   it("does not flag overlap against still-projected events", async () => {
     const projectedOther = projectedNap({ id: "other", startTime: 9 * 60 + 30, label: "Nap 2" });
+    // Source is recorded so its time inputs are editable (§F66).
+    const source = projectedNap({
+      lifecycle: { state: "recorded", annotatedAt: 9 * 60 },
+    });
     render(
       <EventEditDrawerV3
         open
         mode="edit"
-        event={projectedNap()}
+        event={source}
         owners={owners}
         nowMinutes={NOW}
         bedtimeThreshold={THRESHOLD}
@@ -723,5 +745,181 @@ describe("Past-threshold prompt when editing a nap (physiology cascade)", () => 
     await userEvent.click(screen.getByRole("button", { name: /save/i }));
     expect(screen.queryByText(/change to bedtime\?/i)).toBeNull();
     expect(onSave).toHaveBeenCalled();
+  });
+
+  describe("§F66 future-event drawer rule (ADR-0001)", () => {
+    const futureNap = () =>
+      projectedNap({
+        id: "nap-future",
+        eventKey: "nap_3",
+        startTime: 14 * 60,
+        endTime: 14 * 60 + 45,
+        label: "Nap 3",
+      });
+
+    const futureBottle = () =>
+      projectedBottle({
+        id: "bot-future",
+        eventKey: "bottle_4",
+        startTime: 13 * 60,
+        amountOz: 6,
+        label: "Bottle 4",
+      });
+
+    it("disables start time, end time, and amount inputs on a future projected event", () => {
+      render(
+        <EventEditDrawerV3
+          open
+          mode="edit"
+          event={futureNap()}
+          owners={owners}
+          nowMinutes={NOW}
+          bedtimeThreshold={THRESHOLD}
+          defaultWakeTime={DEFAULT_WAKE_TIME}
+          onSave={() => {}}
+          onCancel={() => {}}
+        />,
+      );
+      expect(screen.getByLabelText(/start time/i)).toBeDisabled();
+      expect(screen.getByLabelText(/end time/i)).toBeDisabled();
+    });
+
+    it("disables amount input on a future projected bottle but keeps owner editable", () => {
+      render(
+        <EventEditDrawerV3
+          open
+          mode="edit"
+          event={futureBottle()}
+          owners={owners}
+          nowMinutes={NOW}
+          bedtimeThreshold={THRESHOLD}
+          defaultWakeTime={DEFAULT_WAKE_TIME}
+          onSave={() => {}}
+          onCancel={() => {}}
+        />,
+      );
+      expect(screen.getByLabelText(/amount/i)).toBeDisabled();
+      // OwnerPickerV3 renders interactive owner buttons (not a labeled input).
+      // It's enough to confirm at least one owner button is in the DOM and
+      // clickable — the picker itself has its own coverage.
+      const ownerButtons = screen
+        .getAllByRole("button")
+        .filter((btn) => /jake|sam|no owner/i.test(btn.textContent ?? ""));
+      expect(ownerButtons.length).toBeGreaterThan(0);
+      expect(ownerButtons[0]).not.toBeDisabled();
+    });
+
+    it("renders an explanatory hint for future-projected events", () => {
+      render(
+        <EventEditDrawerV3
+          open
+          mode="edit"
+          event={futureNap()}
+          owners={owners}
+          nowMinutes={NOW}
+          bedtimeThreshold={THRESHOLD}
+          defaultWakeTime={DEFAULT_WAKE_TIME}
+          onSave={() => {}}
+          onCancel={() => {}}
+        />,
+      );
+      expect(screen.getByRole("note")).toHaveTextContent(/only the owner is editable/i);
+    });
+
+    it("does NOT disable inputs when the projected event's startTime has passed (drawer reverts to normal recorded-edit flow)", () => {
+      const pastProjected = projectedNap({
+        id: "nap-past",
+        eventKey: "nap_2",
+        startTime: NOW - 60, // 1hr before Now
+        endTime: NOW - 15,
+      });
+      render(
+        <EventEditDrawerV3
+          open
+          mode="edit"
+          event={pastProjected}
+          owners={owners}
+          nowMinutes={NOW}
+          bedtimeThreshold={THRESHOLD}
+          defaultWakeTime={DEFAULT_WAKE_TIME}
+          onSave={() => {}}
+          onCancel={() => {}}
+        />,
+      );
+      expect(screen.getByLabelText(/start time/i)).not.toBeDisabled();
+    });
+
+    it("does NOT disable inputs when editing a recorded event whose startTime is in the future (planning-intent edits stay open)", () => {
+      const recordedFuture = projectedNap({
+        id: "nap-recorded",
+        startTime: 14 * 60,
+        endTime: 14 * 60 + 45,
+        lifecycle: { state: "recorded", annotatedAt: 14 * 60 },
+      });
+      render(
+        <EventEditDrawerV3
+          open
+          mode="edit"
+          event={recordedFuture}
+          owners={owners}
+          nowMinutes={NOW}
+          bedtimeThreshold={THRESHOLD}
+          defaultWakeTime={DEFAULT_WAKE_TIME}
+          onSave={() => {}}
+          onCancel={() => {}}
+        />,
+      );
+      expect(screen.getByLabelText(/start time/i)).not.toBeDisabled();
+      expect(screen.queryByRole("note")).toBeNull();
+    });
+
+    it("does NOT disable inputs in create mode (form fields are the source of truth)", () => {
+      render(
+        <EventEditDrawerV3
+          open
+          mode="create"
+          event={futureNap()}
+          owners={owners}
+          nowMinutes={NOW}
+          bedtimeThreshold={THRESHOLD}
+          defaultWakeTime={DEFAULT_WAKE_TIME}
+          onSave={() => {}}
+          onCancel={() => {}}
+        />,
+      );
+      expect(screen.getByLabelText(/start time/i)).not.toBeDisabled();
+    });
+
+    it("sanitizes the save payload back to source values even if the form somehow holds different time/amount", async () => {
+      // Owner-only edit on a future projected nap: change owner, save.
+      // The save payload's startTime/endTime must equal source values
+      // (the disabled inputs make this trivially true today, but the
+      // sanitize step is the defense-in-depth guard).
+      const onSave = vi.fn();
+      const source = futureNap();
+      render(
+        <EventEditDrawerV3
+          open
+          mode="edit"
+          event={source}
+          owners={owners}
+          nowMinutes={NOW}
+          bedtimeThreshold={THRESHOLD}
+          defaultWakeTime={DEFAULT_WAKE_TIME}
+          onSave={onSave}
+          onCancel={() => {}}
+        />,
+      );
+      const jakeBtn = screen.getAllByRole("button").find((b) => /jake/i.test(b.textContent ?? ""));
+      expect(jakeBtn).toBeDefined();
+      await userEvent.click(jakeBtn!);
+      await userEvent.click(screen.getByRole("button", { name: /save/i }));
+      expect(onSave).toHaveBeenCalledTimes(1);
+      const saved: Event = onSave.mock.calls[0]![0];
+      expect(saved.startTime).toBe(source.startTime);
+      expect(saved.endTime).toBe(source.endTime);
+      // Owner did change.
+      expect(saved.owner).toEqual({ slot: "parent1" });
+    });
   });
 });
