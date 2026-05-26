@@ -144,6 +144,7 @@ export function aSettings(overrides: Partial<Settings> = {}): Settings {
     childId: "child_test",
     defaultWakeTime: 7 * 60,
     bedtimeThreshold: 19 * 60,
+    earliestBedtime: 18 * 60,
     defaultNapLengthMinutes: 60,
     shortNapThresholdMinutes: 35,
     shortNapAdjustmentMinutes: 10,

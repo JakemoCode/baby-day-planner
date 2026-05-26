@@ -307,8 +307,15 @@ export type Settings = {
   defaultWakeTime: TimeMin;
 
   // Bedtime & nap
-  /** Probability shaper (R7.6). */
+  /** Probability shaper (R7.6). See ADR-0002: in the §F66 model this becomes
+   * the latest end-time allowed for a projected nap (engine drops any
+   * cascade nap whose endTime exceeds this). Engine wiring lands in PR2. */
   bedtimeThreshold: TimeMin;
+  /** Floor for projected bedtime startTime (ADR-0002, §F66). Engine never
+   * projects bedtime before this time; cascade-natural bedtime is
+   * `max(earliestBedtime, lastNapEnd + WW)`. Recorded bedtime ignores it.
+   * Engine wiring lands in PR2. */
+  earliestBedtime: TimeMin;
   /** Drives R7.6.1 convert-prompt window. */
   defaultNapLengthMinutes: number;
   shortNapThresholdMinutes: number;
