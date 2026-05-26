@@ -236,24 +236,23 @@ describe("R5.1 — cascade resumes from the latest recorded bottle", () => {
   });
 });
 
-describe("Sequential cascade — bottle landing in nap snaps to nap.start (wind-down allowed)", () => {
-  it("a projected bottle landing inside nap_1 snaps to nap.start, NOT to nap.start - putdownLead", () => {
-    // Per DOMAIN.md §4 / SIMPLIFICATION_SCOPE.md §2.1, the no-feed
-    // region is `[nap.start, nap.end]` only. Wind-down (putdown) is
-    // render-only synthetic; a bottle CAN land during it (often IS
-    // the wind-down: baby drinks → drowsy → sleep).
+describe("Sequential cascade — bottle landing in nap snaps to putdown.startTime (§F66 PR 3c)", () => {
+  it("a projected bottle landing inside nap_1 snaps to nap.start - putdownLead (the start of putdown)", () => {
+    // §F66 PR 3c / ADR-0006 reverses the pre-§F66 "wind-down not
+    // extended" decision: per Jake's framing, "any projected bottle
+    // must snap to either the beginning of putdown or the end of the
+    // nap." The bottle's startTime represents the moment the bottle
+    // BEGINS, not the moment baby is asleep — so the wind-down
+    // bottle's startTime IS at putdown.startTime (= nap.start - lead).
     //
     // Setup: wake 7:05, buffer 10 → bottle_1 at 7:15. Interval 180 →
-    // bottle_2 proposed at 10:15. Recorded nap_1 at [10:00, 11:00].
-    //   - 10:15 is strictly inside (10:00, 11:00). Snap.
-    //   - distBefore (10:15 → 10:00) = 15
-    //   - distAfter (11:00 → 10:15) = 45
-    //   - closer = 10:00. nowMinutes 8:00 < 10:00, so no past-fallback.
-    //   - bottle_2 = 10:00 (= nap.start; wind-down allowed).
-    //
-    // Old rule snapped to 9:45 (= nap.start - putdownLead). The
-    // current behavior intentionally drops that — bottle right into
-    // naptime is a real, common pattern.
+    // bottle_2 proposed at 10:15. Recorded nap_1 at [10:00, 11:00]
+    // (napLen=60, half=30, putdown range [9:45, 10:30]).
+    //   - snapOutOfNap: 10:15 strictly inside, distBefore=15,
+    //     distAfter=45 → snap to 10:00.
+    //   - snapToPutdown: 10:00 ∈ [9:45, 10:30] → snap to 9:45.
+    //   - nowMinutes 8:00 < 9:45, so Concern B does not skip.
+    //   - bottle_2 = 9:45.
     const recordedNap1 = aRecordedNap({
       id: "actual_nap_putdown",
       eventKey: "nap_1",
@@ -286,8 +285,8 @@ describe("Sequential cascade — bottle landing in nap snaps to nap.start (wind-
     const bottles = out
       .filter((e) => e.type === "bottle" && e.lifecycle.state === "projected")
       .sort((a, b) => a.startTime - b.startTime);
-    // Snap to nap.start (10:00), not nap.start - putdownLead (9:45).
-    expect(bottles[bottles.length - 1]!.startTime).toBe(10 * 60);
+    // §F66 PR 3c: snap to nap.start - putdownLead (9:45), not nap.start (10:00).
+    expect(bottles[bottles.length - 1]!.startTime).toBe(9 * 60 + 45);
   });
 });
 
@@ -386,8 +385,8 @@ describe("R5.6 — convergence regression (mirrors property-test failure)", () =
   });
 });
 
-describe("Sequential cascade — bottle inside nap snaps to closer edge (no putdown extension)", () => {
-  it("placeholder bottle landing in nap_1 snaps to whichever nap edge is closer; chain follows", () => {
+describe("Sequential cascade — snap-out-of-nap + putdown-anchor (§F66 PR 3c)", () => {
+  it("placeholder bottle landing in nap_1 snaps to nearer edge then putdown-anchor pulls subsequent bottles to putdown.startTime", () => {
     // Setup:
     //   wake 7:00, buffer 10, interval 180, bottlesPerDay 4, now 8:00
     //   recorded nap_1 from 9:30-11:00.
@@ -395,19 +394,28 @@ describe("Sequential cascade — bottle inside nap snaps to closer edge (no putd
     // The no-feed region is `[nap.start, nap.end]` ONLY — putdownLead
     // does NOT extend it (DOMAIN.md §4). Region = [9:30, 11:00].
     //
+    // PR 3c puts down ATTRACTION (separate from extension): if proposed
+    // lands in [parent.startTime - 15, parent.startTime + napLen/2],
+    // snap to parent.startTime - 15 (putdown start). Applies to both
+    // projected AND recorded naps (Concern B naturally filters past).
+    //
     // Sequential cascade:
     //   bottle_1 = 7:10 (wake+buffer anchor)
     //   bottle_2 proposed = 7:10 + 180 = 10:10. Inside (9:30, 11:00).
-    //     distBefore (10:10 → 9:30) = 40
-    //     distAfter (11:00 → 10:10) = 50
-    //     → snap to 9:30. nowMinutes 8:00 < 9:30, no past-fallback.
-    //   bottle_3 proposed = 9:30 + 180 = 12:30. Projected nap_2 at
-    //     [12:30, 13:30] (wakeWindowsMinutes[1]=90 after nap_1.end 11:00,
-    //     default napLen 60). 12:30 == nap.start, NOT strictly inside.
-    //     bottle_3 stays at 12:30.
-    //   bottle_4 proposed = 12:30 + 180 = 15:30. Projected nap_3 at
-    //     [15:00, 16:00]. 15:30 strictly inside. dist tie (30/30) →
-    //     snap to start (15:00). nowMinutes 8:00 < 15:00, no fallback.
+    //     snapOutOfNap: distBefore=40, distAfter=50 → 9:30.
+    //     snapToPutdown: nap_1 is recorded 9:30-11:00 (napLen=90,
+    //       half=45). 9:30 ∈ [9:15, 10:15] → snap to 9:15.
+    //   bottle_3 proposed = 9:15 + 180 = 12:15. Projected nap_2 at
+    //     [12:30, 13:30] (ww=90 after nap_1.end 11:00, napLen=60,
+    //     half=30).
+    //     snapOutOfNap: 12:15 not inside any nap.
+    //     snapToPutdown: 12:15 ∈ [12:15, 13:00] → snap target = 12:15
+    //       (already there).
+    //   bottle_4 proposed = 12:15 + 180 = 15:15. Projected nap_3 at
+    //     [15:00, 16:00].
+    //     snapOutOfNap: 15:15 strictly inside, distBefore=15,
+    //     distAfter=45 → snap to 15:00.
+    //     snapToPutdown: 15:00 ∈ [14:45, 15:30] → snap to 14:45.
     const recordedNap1 = aRecordedNap({
       id: "actual_nap_1",
       eventKey: "nap_1",
@@ -442,9 +450,9 @@ describe("Sequential cascade — bottle inside nap snaps to closer edge (no putd
 
     expect(bottles.map((b) => b.startTime)).toEqual([
       7 * 60 + 10, // 7:10 (anchor)
-      9 * 60 + 30, // 9:30 (snapped to nap_1.start)
-      12 * 60 + 30, // 12:30 (== nap_2.start, NOT strictly inside)
-      15 * 60, // 15:00 (snapped to nap_3.start)
+      9 * 60 + 15, // 9:15 (snapOutOfNap → 9:30, putdown-anchor on recorded nap_1 → 9:15)
+      12 * 60 + 15, // 12:15 (putdown-anchor: nap_2.startTime 12:30 − 15)
+      14 * 60 + 45, // 14:45 (snapOutOfNap → 15:00, then putdown-anchor: nap_3.startTime 15:00 − 15)
     ]);
 
     // No bottle's startTime falls strictly inside any nap.
@@ -877,15 +885,16 @@ describe("Sequential bottle cascade — chain coherence", () => {
     //     region). bottle_3 at 13:10 is outside any region → stays.
     //   Result: [7:10, 11:00, 13:10, 16:10, 19:10]
     //
-    // NEW behavior (sequential cascade, snap region = [nap.start, nap.end]):
+    // §F66 PR 3c behavior (sequential cascade with putdown-anchor):
     //   bottle_1 = 7:10 (anchor at wake+buffer)
     //   bottle_2 proposed = 7:10 + 180 = 10:10. Inside [9:30, 11:00].
-    //     |10:10 - 9:30| = 40, |11:00 - 10:10| = 50 → snap to 9:30.
-    //     (Wind-down at 9:15-9:30 is allowed; only the nap proper blocks.)
-    //   bottle_3 proposed = 9:30 + 180 = 12:30  ← CHAIN COHERENCE
-    //   bottle_4 proposed = 12:30 + 180 = 15:30
-    //   bottle_5 proposed = 15:30 + 180 = 18:30
-    //   Result: [7:10, 9:30, 12:30, 15:30, 18:30]
+    //     snapOutOfNap: |10:10 - 9:30| = 40, |11:00 - 10:10| = 50 → 9:30.
+    //     snapToPutdown: nap_1 actual len=90, half=45, range [9:15, 10:15].
+    //       9:30 ∈ range → snap to 9:15 (putdown.start = nap.start - 15).
+    //   bottle_3 proposed = 9:15 + 180 = 12:15  ← CHAIN COHERENCE
+    //   bottle_4 proposed = 12:15 + 180 = 15:15
+    //   bottle_5 proposed = 15:15 + 180 = 18:15
+    //   Result: [7:10, 9:15, 12:15, 15:15, 18:15]
     const recordedNap1 = aRecordedNap({
       id: "actual_nap_1",
       eventKey: "nap_1",
@@ -923,10 +932,10 @@ describe("Sequential bottle cascade — chain coherence", () => {
 
     expect(bottles.map((b) => b.startTime)).toEqual([
       7 * 60 + 10, // 7:10 (anchor)
-      9 * 60 + 30, // 9:30 (snapped to nap.start — wind-down allowed)
-      12 * 60 + 30, // 12:30 (cascade from 9:30, NOT 10:10)
-      15 * 60 + 30, // 15:30
-      18 * 60 + 30, // 18:30
+      9 * 60 + 15, // 9:15 (snapOutOfNap → 9:30, putdown-anchor → 9:15)
+      12 * 60 + 15, // 12:15 (cascade from 9:15, NOT 9:30)
+      15 * 60 + 15, // 15:15
+      18 * 60 + 15, // 18:15
     ]);
   });
 
@@ -1505,5 +1514,155 @@ describe("Overnight bottle does NOT interrupt the bedtime block (DOMAIN.md §3)"
     expect(preserved?.type).toBe("bottle");
     expect(preserved?.startTime).toBe(3 * 60);
     expect(preserved?.lifecycle.state).toBe("completed");
+  });
+});
+
+describe("§F66 PR 3c — putdown bottle-anchor rule (CONTEXT.md + ADR-0006 Concern B)", () => {
+  // CONTEXT.md "putdown bottle-anchor rule": if a projected bottle's
+  // cascade-computed time falls in
+  // `[parent.startTime - putdownLeadMinutes, parent.startTime + napLen/2]`
+  // for an adjacent projected nap or bedtime, snap to
+  // `parent.startTime - putdownLeadMinutes` (the start of putdown).
+  //
+  // ADR-0006 Concern B: the snap may not move a bottle from `time > Now`
+  // to `time ≤ Now`. If the snap target is past Now, the snap is SKIPPED
+  // and the bottle stays at its cascade-natural emit time.
+
+  it("snaps a projected bottle to putdown.startTime when proposed lands in the putdown-anchor range", () => {
+    // Setup: wake 7:00, ww=[120, 135], napLen=45, putdownLead=15.
+    //   nap_1: 9:00-9:45
+    //   ww_2: 9:45-12:00 (135 min)
+    //   nap_2: 12:00-12:45
+    // Recorded bottle at 9:00. interval=180 → cascade proposes 12:00.
+    //   12:00 is exactly nap_2.startTime; falls in
+    //   [12:00 - 15, 12:00 + 22] = [11:45, 12:22].
+    //   Snap target = 12:00 - 15 = 11:45. nowMinutes=8:00 < 11:45 → safe.
+    // Expected: cascade bottle at 11:45 (not 12:00).
+    const recorded = aRecordedBottle({
+      id: "actual_bottle_morning",
+      eventKey: "bottle_1",
+      start: 9 * 60,
+    });
+    const ctx = aContext({
+      day: aDay({ wakeTime: 7 * 60 }),
+      settings: aSettings({
+        wakeWindowsMinutes: [120, 135],
+        defaultNapLengthMinutes: 45,
+        putdownLeadMinutes: 15,
+        defaultBottleIntervalMinutes: 180,
+        bottleChain: { bottlesPerDay: 6, bufferAfterWakeMinutes: 10 },
+        bedtimeThreshold: 20 * 60,
+        earliestBedtime: 20 * 60,
+      }),
+      actuals: [recorded],
+      nowMinutes: 8 * 60,
+    });
+
+    const out = projectDay(
+      {
+        day: ctx.day,
+        settings: ctx.settings,
+        actuals: ctx.actuals,
+        nowMinutes: ctx.nowMinutes,
+      },
+      { rules: ALL_WITH_NAPS },
+    );
+
+    const bottles = out
+      .filter((e) => e.type === "bottle")
+      .sort((a, b) => a.startTime - b.startTime);
+
+    const snappedBottle = bottles.find((b) => b.startTime === 11 * 60 + 45);
+    expect(snappedBottle).toBeDefined();
+    // The would-be cascade-natural time (12:00, nap start) must NOT
+    // appear — it was snapped earlier to the putdown start.
+    expect(bottles.find((b) => b.startTime === 12 * 60)).toBeUndefined();
+  });
+
+  it("leaves a mid-wake-window bottle untouched when no nap is in the putdown range", () => {
+    // Setup: same as above, but recorded bottle at 8:00 → cascade
+    // proposes 11:00. nap_2 at 12:00 → putdown range [11:45, 12:22].
+    // 11:00 < 11:45 → not in range. Bottle stays at 11:00.
+    const recorded = aRecordedBottle({
+      id: "actual_bottle_morning",
+      eventKey: "bottle_1",
+      start: 8 * 60,
+    });
+    const ctx = aContext({
+      day: aDay({ wakeTime: 7 * 60 }),
+      settings: aSettings({
+        wakeWindowsMinutes: [120, 135],
+        defaultNapLengthMinutes: 45,
+        putdownLeadMinutes: 15,
+        defaultBottleIntervalMinutes: 180,
+        bottleChain: { bottlesPerDay: 6, bufferAfterWakeMinutes: 10 },
+        bedtimeThreshold: 20 * 60,
+        earliestBedtime: 20 * 60,
+      }),
+      actuals: [recorded],
+      nowMinutes: 7 * 60 + 30,
+    });
+
+    const out = projectDay(
+      {
+        day: ctx.day,
+        settings: ctx.settings,
+        actuals: ctx.actuals,
+        nowMinutes: ctx.nowMinutes,
+      },
+      { rules: ALL_WITH_NAPS },
+    );
+
+    const bottles = out
+      .filter((e) => e.type === "bottle")
+      .sort((a, b) => a.startTime - b.startTime);
+
+    expect(bottles.find((b) => b.startTime === 11 * 60)).toBeDefined();
+  });
+
+  it("ADR-0006 Concern B: skips the putdown snap when the snap target would land ≤ Now (no retroactive shift)", () => {
+    // Same as test 1, but nowMinutes is pushed past the would-be snap
+    // target (11:45). The putdown snap is forbidden — the engine cannot
+    // pull a future bottle (12:00) backward into the past (11:45 ≤ Now).
+    // Bottle stays at its cascade-natural emit time (12:00).
+    const recorded = aRecordedBottle({
+      id: "actual_bottle_morning",
+      eventKey: "bottle_1",
+      start: 9 * 60,
+    });
+    const ctx = aContext({
+      day: aDay({ wakeTime: 7 * 60 }),
+      settings: aSettings({
+        wakeWindowsMinutes: [120, 135],
+        defaultNapLengthMinutes: 45,
+        putdownLeadMinutes: 15,
+        defaultBottleIntervalMinutes: 180,
+        bottleChain: { bottlesPerDay: 6, bufferAfterWakeMinutes: 10 },
+        bedtimeThreshold: 20 * 60,
+        earliestBedtime: 20 * 60,
+      }),
+      actuals: [recorded],
+      nowMinutes: 11 * 60 + 50, // past the would-be snap target (11:45)
+    });
+
+    const out = projectDay(
+      {
+        day: ctx.day,
+        settings: ctx.settings,
+        actuals: ctx.actuals,
+        nowMinutes: ctx.nowMinutes,
+      },
+      { rules: ALL_WITH_NAPS },
+    );
+
+    const bottles = out
+      .filter((e) => e.type === "bottle")
+      .sort((a, b) => a.startTime - b.startTime);
+
+    // Bottle stays at cascade-natural 12:00.
+    expect(bottles.find((b) => b.startTime === 12 * 60)).toBeDefined();
+    // The snap to 11:45 must NOT have fired — that would be a
+    // retroactive shift into the past per Concern B.
+    expect(bottles.find((b) => b.startTime === 11 * 60 + 45)).toBeUndefined();
   });
 });
