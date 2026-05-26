@@ -134,6 +134,22 @@ describe("buildCreateTemplate (V3)", () => {
     expect(tpl.eventKey).toBe("bottle_4");
   });
 
+  it("with a gap in recorded ordinals, picks max + 1 — NOT first-free", () => {
+    // bottle_1 + bottle_4 (no _2 or _3) must yield bottle_5, not bottle_2.
+    // The cascade depends on monotonic eventKey ordinals, so filling a
+    // gap would collide with any future engine projection that re-uses
+    // the missing slot.
+    const tpl = buildCreateTemplate({
+      type: "bottle",
+      dayId: "d-1",
+      actuals: [recordedBottle(1, 7 * 60), recordedBottle(4, 14 * 60)],
+      projected: [],
+      settings: settings(),
+      nowMinutes: NOW,
+    });
+    expect(tpl.eventKey).toBe("bottle_5");
+  });
+
   // Per spec PR #146: parents adjust by editing existing projected
   // nap chips, never by adding new naps via FAB. The "nap" branch in
   // buildCreateTemplate is removed; the picker no longer offers it.

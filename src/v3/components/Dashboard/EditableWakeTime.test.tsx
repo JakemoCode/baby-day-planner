@@ -12,6 +12,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { TimeMin } from "@/v3/schemas";
 import { EditableWakeTime } from "./EditableWakeTime";
+import styles from "./EditableWakeTime.module.css";
 
 const SEVEN_AM = (7 * 60) as TimeMin;
 const SEVEN_THIRTY_AM = (7 * 60 + 30) as TimeMin;
@@ -40,7 +41,6 @@ describe("EditableWakeTime", () => {
     render(<EditableWakeTime wakeTime={SEVEN_AM} onChange={onChange} />);
     await user.click(screen.getByRole("button", { name: /change today's start time/i }));
     const input = screen.getByLabelText(/woke at/i) as HTMLInputElement;
-    // Use fireEvent-style change via userEvent
     await user.clear(input);
     await user.type(input, "07:30");
     await user.click(screen.getByRole("button", { name: /^save$/i }));
@@ -92,12 +92,28 @@ describe("EditableWakeTime", () => {
     expect(screen.queryByLabelText(/woke at/i)).toBeNull();
   });
 
-  it("variant='card' applies the card class to the display button", () => {
+  it("Save with invalid (unparseable) input does NOT call onChange and exits edit mode", async () => {
+    // Covers the parsed === undefined branch in handleSave (the
+    // "silent revert" the file docstring claims to test). Without this
+    // case, a regression that swapped `setEditing(false); return;` for
+    // `onChange(NaN as TimeMin)` would pass.
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    render(<EditableWakeTime wakeTime={SEVEN_AM} onChange={onChange} />);
+    await user.click(screen.getByRole("button", { name: /change today's start time/i }));
+    const input = screen.getByLabelText(/woke at/i) as HTMLInputElement;
+    await user.clear(input);
+    // input is now "" → parseHM24 returns undefined
+    await user.click(screen.getByRole("button", { name: /^save$/i }));
+    expect(onChange).not.toHaveBeenCalled();
+    expect(screen.queryByLabelText(/woke at/i)).toBeNull();
+  });
+
+  it("variant='card' applies the displayCard class", () => {
     const { rerender } = render(<EditableWakeTime wakeTime={SEVEN_AM} onChange={() => {}} />);
-    const plainClass = screen.getByRole("button", { name: /change today's start time/i }).className;
+    const btn = () => screen.getByRole("button", { name: /change today's start time/i });
+    expect(btn()).not.toHaveClass(styles.displayCard);
     rerender(<EditableWakeTime wakeTime={SEVEN_AM} onChange={() => {}} variant="card" />);
-    const cardClass = screen.getByRole("button", { name: /change today's start time/i }).className;
-    // Card variant adds an extra class token; plain variant does not.
-    expect(cardClass.split(/\s+/).length).toBeGreaterThan(plainClass.split(/\s+/).length);
+    expect(btn()).toHaveClass(styles.displayCard);
   });
 });
