@@ -13,13 +13,13 @@
 
 Items move between folders via `git mv` as priorities shift.
 
-Shipped items move to [`FAST_FOLLOW_COMPLETED.md`](./FAST_FOLLOW_COMPLETED.md) (compressed).
+Shipped items move to [`FAST_FOLLOW_COMPLETED.md`](./FAST_FOLLOW_COMPLETED.md) — a thin index of per-file entries under `fast-follow/completed/`.
 
 ## Status legend
 
 - `pending` — not yet started
 - `in-progress` — actively being worked on
-- `done` — landed; entry moves to COMPLETED, file deleted
+- `done` — landed; entry file `git mv`-ed into `fast-follow/completed/`, line moved between indices
 
 ---
 
@@ -109,8 +109,11 @@ When adding: pick the right folder (now/grill/backlog), write
 this index. Per-file structure avoids merge conflicts when
 multiple PRs add entries in parallel.
 
-When done: move file to `FAST_FOLLOW_COMPLETED.md` (compressed)
-and delete the per-entry file. Remove its line from this index.
+When done: `git mv` the per-file entry from `fast-follow/<status>/`
+into `fast-follow/completed/` (compress the entry body to title +
+1-sentence + shipping PR), remove its line from this index, and
+append a line to `FAST_FOLLOW_COMPLETED.md`. Parallel shipping PRs
+no longer conflict on a monolithic completed file.
 
 ---
 
