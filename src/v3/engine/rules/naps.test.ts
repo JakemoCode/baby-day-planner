@@ -48,13 +48,16 @@ describe("R3.1 — projected nap chain from wakeWindowsMinutes", () => {
     //   nap_1: 9:00 → 10:00  (60 min)
     //   ww_2 : 10:00 → 11:30 (90 min)
     //   nap_2: 11:30 → 12:30 (60 min)
+    // ADR-0006: aContext() defaults nowMinutes=12:00; all four events
+    // here have startTime ≤ 12:00, so the engine auto-promotes them
+    // from "projected" to "recorded" before returning.
     const ww1 = out.find((e) => e.eventKey === "wake_window_1");
     expect(ww1).toMatchObject({
       type: "wake_window",
       kind: "block",
       startTime: 7 * 60,
       endTime: 9 * 60,
-      lifecycle: { state: "projected" },
+      lifecycle: { state: "recorded" },
     });
 
     const nap1 = out.find((e) => e.eventKey === "nap_1");
@@ -63,7 +66,7 @@ describe("R3.1 — projected nap chain from wakeWindowsMinutes", () => {
       kind: "block",
       startTime: 9 * 60,
       endTime: 10 * 60,
-      lifecycle: { state: "projected" },
+      lifecycle: { state: "recorded" },
     });
 
     const ww2 = out.find((e) => e.eventKey === "wake_window_2");
@@ -72,7 +75,7 @@ describe("R3.1 — projected nap chain from wakeWindowsMinutes", () => {
       kind: "block",
       startTime: 10 * 60,
       endTime: 11 * 60 + 30,
-      lifecycle: { state: "projected" },
+      lifecycle: { state: "recorded" },
     });
 
     const nap2 = out.find((e) => e.eventKey === "nap_2");
@@ -81,7 +84,7 @@ describe("R3.1 — projected nap chain from wakeWindowsMinutes", () => {
       kind: "block",
       startTime: 11 * 60 + 30,
       endTime: 12 * 60 + 30,
-      lifecycle: { state: "projected" },
+      lifecycle: { state: "recorded" },
     });
   });
 });

@@ -74,7 +74,11 @@ describe("R21.1 — daycare projection (owner-less)", () => {
     expect(pickup!.kind).toBe("instant");
     expect(dropoff!.startTime).toBe(8 * 60 + 30);
     expect(pickup!.startTime).toBe(17 * 60 + 30);
-    expect(dropoff!.lifecycle.state).toBe("projected");
+    // ADR-0006: 8:30 is before default nowMinutes (12:00) → auto-promoted
+    // to recorded by the engine's Now-cross pass. The test's intent is
+    // that daycare emits the events at the configured times; lifecycle
+    // follows the universal time-vs-now rule, not daycare-specific logic.
+    expect(dropoff!.lifecycle.state).toBe("recorded");
     // 2026-05-20: events project owner-less so the timeline drawer can assign per-day.
     expect(dropoff!.owner).toEqual(NO_OWNER);
     expect(pickup!.owner).toEqual(NO_OWNER);

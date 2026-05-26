@@ -265,5 +265,19 @@ export function evaluate(rules: Rule[], ctx: Context, options: EvaluateOptions =
     );
   }
 
+  // Now-cross auto-promote (ADR-0006 Concern A): any projected event
+  // whose startTime is at or before nowMinutes flips to recorded. The
+  // user lives in reality and may not have logged the event yet —
+  // promotion claims the engine's best guess; if it didn't actually
+  // happen, the user reconciles by deleting via the drawer.
+  // Downstream consumers (render layer, cascade rules in subsequent
+  // engine runs) see past events as recorded and use them to inform
+  // remaining projections rather than re-projecting them.
+  events = events.map((e) =>
+    e.lifecycle.state === "projected" && e.startTime <= ctx.nowMinutes
+      ? { ...e, lifecycle: { state: "recorded", annotatedAt: e.startTime } }
+      : e,
+  );
+
   return [...events].sort((a, b) => a.startTime - b.startTime);
 }

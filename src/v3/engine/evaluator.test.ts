@@ -162,6 +162,56 @@ describe("evaluate — basics", () => {
   });
 });
 
+describe("evaluate — Now-cross auto-promote (ADR-0006 Concern A)", () => {
+  it("flips a projected event to recorded when startTime ≤ nowMinutes", () => {
+    const now = 12 * 60;
+    const pastEmitter: Rule = {
+      id: "R.test.emit-past",
+      description: "emits a projected bottle at 11:00 (before now=12:00)",
+      matches: (events) => !events.some((e) => e.type === "bottle"),
+      produces: (events) => [...events, aProjectedBottle({ start: 11 * 60 })],
+    };
+    const out = evaluate([pastEmitter], aContext({ nowMinutes: now }));
+    const bottle = out.find((e) => e.type === "bottle");
+    expect(bottle?.lifecycle.state).toBe("recorded");
+    expect(bottle?.startTime).toBe(11 * 60);
+  });
+
+  it("leaves projections with startTime > nowMinutes as projected", () => {
+    const now = 12 * 60;
+    const futureEmitter: Rule = {
+      id: "R.test.emit-future",
+      description: "emits a projected bottle at 13:00 (after now=12:00)",
+      matches: (events) => !events.some((e) => e.type === "bottle"),
+      produces: (events) => [...events, aProjectedBottle({ start: 13 * 60 })],
+    };
+    const out = evaluate([futureEmitter], aContext({ nowMinutes: now }));
+    const bottle = out.find((e) => e.type === "bottle");
+    expect(bottle?.lifecycle.state).toBe("projected");
+  });
+
+  it("flips a projection whose startTime exactly equals nowMinutes (≤ is inclusive)", () => {
+    const now = 12 * 60;
+    const boundaryEmitter: Rule = {
+      id: "R.test.emit-boundary",
+      description: "emits a projected bottle exactly at now",
+      matches: (events) => !events.some((e) => e.type === "bottle"),
+      produces: (events) => [...events, aProjectedBottle({ start: now })],
+    };
+    const out = evaluate([boundaryEmitter], aContext({ nowMinutes: now }));
+    const bottle = out.find((e) => e.type === "bottle");
+    expect(bottle?.lifecycle.state).toBe("recorded");
+  });
+
+  it("does not touch already non-projected events (recorded/completed)", () => {
+    const now = 14 * 60;
+    const recorded = aRecordedNap({ start: 13 * 60, end: 13 * 60 + 45 });
+    const out = evaluate([], aContext({ nowMinutes: now, actuals: [recorded] }));
+    expect(out[0]?.lifecycle.state).toBe(recorded.lifecycle.state);
+    expect(out[0]?.startTime).toBe(13 * 60);
+  });
+});
+
 describe("evaluate — reality-wins guard", () => {
   it("throws if a rule removes a recorded event", () => {
     const recorded = aRecordedNap({ start: 13 * 60, end: 14 * 60 });
