@@ -29,6 +29,7 @@ export const DEFAULT_WAKE_TIME = 7 * 60;
 const DEFAULTS: Omit<Settings, "childId"> = {
   defaultWakeTime: DEFAULT_WAKE_TIME,
   bedtimeThreshold: 17 * 60 + 30,
+  earliestBedtime: 18 * 60,
   defaultNapLengthMinutes: 45,
   shortNapThresholdMinutes: 25,
   shortNapAdjustmentMinutes: 10,

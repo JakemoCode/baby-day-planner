@@ -41,6 +41,39 @@ describe("makeDefaultSettings", () => {
 });
 
 // ---------------------------------------------------------------------------
+// §F66 — ADR-0002 bedtime model defaults
+// ---------------------------------------------------------------------------
+
+describe("§F66 bedtime defaults (ADR-0002)", () => {
+  it("bedtimeThreshold default is 17:30 (latest projected nap end)", () => {
+    const s = makeDefaultSettings("child-1");
+    expect(s.bedtimeThreshold).toBe(17 * 60 + 30);
+  });
+
+  it("earliestBedtime default is 18:00 (floor for projected bedtime)", () => {
+    const s = makeDefaultSettings("child-1");
+    expect(s.earliestBedtime).toBe(18 * 60);
+  });
+
+  it("earliestBedtime > bedtimeThreshold (floor strictly after the nap-end cap)", () => {
+    const s = makeDefaultSettings("child-1");
+    expect(s.earliestBedtime).toBeGreaterThan(s.bedtimeThreshold);
+  });
+
+  it("normalizeSettingsDoc default-fills earliestBedtime on legacy docs that lack it", () => {
+    const raw = { childId: "child-1" };
+    const s = normalizeSettingsDoc(raw);
+    expect(s.earliestBedtime).toBe(18 * 60);
+  });
+
+  it("normalizeSettingsDoc preserves a caller-supplied earliestBedtime", () => {
+    const raw = { childId: "child-1", earliestBedtime: 18 * 60 + 30 };
+    const s = normalizeSettingsDoc(raw);
+    expect(s.earliestBedtime).toBe(18 * 60 + 30);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // normalizeSettingsDoc
 // ---------------------------------------------------------------------------
 
