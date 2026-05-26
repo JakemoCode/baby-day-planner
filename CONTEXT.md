@@ -47,9 +47,10 @@ event's relevant time, the event auto-promotes to `recorded`.
 - **Interval event (nap, bedtime)**: Now ≥ startTime → start
   auto-records at projected startTime (in-progress).
   Now ≥ endTime → end auto-records at projected endTime (completed).
-- **In-progress carve-out**: while start ≤ Now < end, an "End Nap Now"
-  button (the only surviving dashboard action) closes the nap by
-  setting endTime = Now. Visible only during an in-progress nap.
+- **In-progress carve-out**: while start ≤ Now < end of a nap, the
+  dashboard's single contextual button shows "End Nap" and closes
+  the nap by setting endTime = Now. See [[dashboard contextual button]]
+  for the full mode logic.
 - **Honesty mechanic**: if an event didn't actually happen, user
   deletes it via the drawer. If it ran longer than projected, user
   edits the relevant time forward (which, per the edit-into-future
@@ -60,6 +61,39 @@ Replaces: NapActionButton "Start Nap Now," "Start Bedtime Now,"
 "Start Bottle Now," dashboard CTAs of the action-button kind.
 
 Established 2026-05-25 (§F66 grill).
+
+## dashboard contextual button
+
+A single multi-modal button slot on the dashboard. Hidden by default;
+shows a mode-specific label when a contextual action is available.
+
+**Mode priority (highest first):**
+
+| Condition | Mode label | Action on tap |
+|---|---|---|
+| In-progress nap (start ≤ Now < end) | **End Nap** | Set nap.endTime = Now |
+| In ±15min of a projected bottle's startTime, no in-progress nap | **Log Bottle Time** | Write recorded bottle: startTime = Now, amount = default (overwrites any auto-promoted projection at that slot) |
+| Neither | (hidden) | — |
+
+**Window** is symmetric ±15min around the projected bottle's
+startTime. Outside the window, manual edit via drawer is the path.
+
+**Overlap precedence:**
+- *Bottle window straddles in-progress nap*: End Nap wins until the
+  nap auto-promotes to completed (Now-cross of nap.endTime). Then if
+  still in the bottle window, button switches to Log Bottle.
+- *Bottle projected at putdown.startTime* (immediately before a nap
+  start, via [[putdown bottle-anchor rule]]): nap hasn't started yet
+  during the bottle window, so Log Bottle is the active mode. After
+  Now passes bottle.startTime + 15min, button switches to End Nap
+  (which by then coincides with putdown ending and the actual nap
+  starting).
+
+Replaces every "Start X Now" dashboard button removed under
+[[Now-cross promotion]]. Drawer remains the manual path for any
+bottle outside the ±15min window.
+
+Established 2026-05-26 (§F66 button-design grill).
 
 ## putdown bottle-anchor rule
 
@@ -78,7 +112,42 @@ so they don't collide.
 
 Resolves §F66 dogfood issue #6f.
 
-Established 2026-05-25 (§F66 grill).
+This rule is subject to the [[no-past-projections invariant]]: if
+snapping the bottle to `parent.startTime - putdownLeadMinutes` would
+land in the past (i.e., already ≤ Now), the putdown-anchor is
+skipped and the bottle falls through to the next-valid-future-slot
+calculation.
+
+Established 2026-05-25 (§F66 grill). Past-projection precedence added
+2026-05-26.
+
+## no-past-projections invariant
+
+A cascade-computed projection's time must always be `> Now`. Reality
+wins: if the natural calculation (including [[putdown bottle-anchor
+rule]] snap-out-of-nap, cascade interval, etc.) would place a
+projection at a time already in the past, the engine instead moves
+the projection to the **nearest future time that obeys all other
+projection rules** (not inside an active nap, not before another
+recorded event, respecting min-interval, etc.).
+
+**Why**: A "projection" is by definition a forecast. A forecast at a
+time already past would (a) auto-promote to recorded via Now-cross,
+which falsely claims a happened-fact that the engine just invented,
+and (b) destabilize the cascade — a recomputation could retroactively
+"create" past events that never existed.
+
+**Scope**: all projected event types — bottles, naps, bedtime,
+putdown render.
+
+**Concrete example**: nap projected 12:00–12:45 with a post-nap
+bottle projected at 12:45. User logs nap start as 12:20 (20-min
+putdown delay). Cascade re-runs: nap is now 12:20–1:05; the bottle
+would snap to first-half-of-nap → putdown.startTime = 12:05; but
+Now = 12:30. The 12:05 placement violates the invariant; the engine
+moves the bottle to nap.endTime (1:05) — the next valid future slot.
+
+Established 2026-05-26 (§F66 button-design grill).
 
 ## bedtimeThreshold
 

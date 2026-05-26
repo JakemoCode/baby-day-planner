@@ -10,6 +10,8 @@
 
 **Out of scope (separate paths):** #5 (2h14m formatter), #6e (disappearing bottle write-path bug), #6g (cascade ceiling triage), #7 (validation flash). Each gets its own small PR.
 
+**Updated 2026-05-26** with ADR-0003 (dashboard contextual button is multi-modal — adds Log Bottle Time mode) and ADR-0004 (no-past-projections invariant). Affects PR 3 (putdown-anchor precedence) and PR 4 (button mode logic).
+
 ---
 
 ## PR sequence
@@ -19,7 +21,7 @@
 | 1 | Settings: add `earliestBedtime`, change `bedtimeThreshold` default | `feat/f66-earliest-bedtime-setting` | — |
 | 2 | Engine: new bedtime cascade rule (drop nap past threshold; floor) | `feat/f66-bedtime-cascade-rule` | PR1 |
 | 3 | Engine: putdown bottle-anchor rule | `feat/f66-putdown-bottle-anchor` | — (parallel) |
-| 4 | Now-cross auto-promote + remove dashboard action buttons | `feat/f66-now-cross-promote-buttons` | PR2 |
+| 4 | Now-cross auto-promote + multi-modal dashboard button (End Nap / Log Bottle Time) | `feat/f66-now-cross-promote-buttons` | PR2 |
 | 5 | Drawer: future-event = owner-only edit | `feat/f66-drawer-future-owner-only` | PR4 |
 | 6 | Settings: `dreamFeedTime` + special bottle anchor | `feat/f66-dream-feed-setting` | PR1 |
 | 7 | Docs: DATA_MODEL / ENGINE_SPEC / DOMAIN updates + close fast-follows | `docs/f66-cascade-doc-sweep` | PR1-6 |
@@ -239,7 +241,15 @@ git commit -m "feat(engine): F66 bedtime cascade — drop nap past threshold, fl
 
 ---
 
-## PR 3 — Engine: putdown bottle-anchor rule (parallel with PR 2)
+## PR 3 — Engine: putdown bottle-anchor + no-past-projections invariant (parallel with PR 2)
+
+**ADR refs:** CONTEXT.md "putdown bottle-anchor rule" + ADR-0004 "no-past-projections invariant."
+
+**Precedence:** the past-projections invariant trumps putdown-anchor. If the putdown-snap target time `parent.startTime - putdownLeadMinutes` is `≤ Now`, skip the snap and fall through to the next-valid-future-slot calculation.
+
+Add at least one test case for the precedence: a recorded nap whose start was edited later (e.g., 12:20 instead of 12:00) producing a cascade bottle whose snap-target is past Now — must end up at `nap.endTime`, not `nap.startTime - 15min`.
+
+
 
 **Files:**
 - Modify: `src/v3/engine/rules/bottles.ts` (cascade-time computation)
@@ -353,7 +363,19 @@ git commit -m "feat(engine): F66 putdown bottle-anchor rule (issue #6f)"
 
 ---
 
-## PR 4 — Now-cross auto-promote + remove dashboard action buttons (LARGE)
+## PR 4 — Now-cross auto-promote + multi-modal dashboard button (LARGE)
+
+**ADR refs:** ADR-0001 (Now-cross + button removal) extended by ADR-0003 (dashboard contextual button is multi-modal).
+
+**Scope expansion vs original plan:** the surviving dashboard button is no longer "End Nap Now only" — it's a single contextual slot with two modes (End Nap / Log Bottle Time) and a hidden default. See CONTEXT.md "dashboard contextual button" for the mode-selection table and overlap rules. Add a new component (e.g. `DashboardContextualButton.tsx`) that owns the mode-selection logic, plus integration tests covering:
+
+1. In-progress nap → End Nap → sets endTime = Now.
+2. In ±15min of projected bottle (no nap) → Log Bottle Time → writes recorded bottle {startTime: Now, amount: default}.
+3. Overlap (in-progress nap straddles bottle window) → End Nap wins until nap auto-completes, then Log Bottle appears if still in window.
+4. Putdown bottle (bottle anchored to putdown.startTime) within ±15min → Log Bottle is active mode (nap hasn't started yet).
+5. Neither condition → button is hidden (not just disabled).
+
+
 
 **Files:**
 - Create: `src/v3/lifecycle/applyNowCrossPromotion.ts`
