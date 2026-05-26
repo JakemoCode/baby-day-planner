@@ -42,6 +42,13 @@ Established 2026-05-25 (§F66 grill).
 The primitive lifecycle rule: when wall-clock Now crosses a projected
 event's relevant time, the event auto-promotes to `recorded`.
 
+**Layer placement** (per [ADR-0006](docs/adr/0006-now-cross-and-no-retroactive-shift.md)):
+runs at the engine layer, after cascade convergence, before sort and
+return. Downstream cascade rules see past-now events as `recorded` and
+use them only to inform remaining projections — never re-project them.
+(Originally `F66_PLAN.md` placed this in `renderProjection`; ADR-0006
+moves it to the engine.)
+
 - **Instant event (bottle)**: Now ≥ time → recorded at projected time
   + default amount.
 - **Interval event (nap, bedtime)**: Now ≥ startTime → start
@@ -112,42 +119,54 @@ so they don't collide.
 
 Resolves §F66 dogfood issue #6f.
 
-This rule is subject to the [[no-past-projections invariant]]: if
-snapping the bottle to `parent.startTime - putdownLeadMinutes` would
-land in the past (i.e., already ≤ Now), the putdown-anchor is
-skipped and the bottle falls through to the next-valid-future-slot
-calculation.
+This rule is subject to the [[no-retroactive-shift rule]] (ADR-0006):
+if snapping the bottle to `parent.startTime - putdownLeadMinutes`
+would land at `time ≤ Now`, the putdown-anchor snap is **skipped**
+and the bottle falls through to its cascade-natural emit time. The
+engine cannot "predict that something will have happened in the past"
+as a side effect of recalculation.
 
-Established 2026-05-25 (§F66 grill). Past-projection precedence added
-2026-05-26.
+Established 2026-05-25 (§F66 grill). Past-time skip rule established
+2026-05-26 via ADR-0006 (replacing the briefly-considered
+"next-valid-future-slot" framing from the superseded ADR-0004).
 
-## no-past-projections invariant
+## no-retroactive-shift rule
 
-A cascade-computed projection's time must always be `> Now`. Reality
-wins: if the natural calculation (including [[putdown bottle-anchor
-rule]] snap-out-of-nap, cascade interval, etc.) would place a
-projection at a time already in the past, the engine instead moves
-the projection to the **nearest future time that obeys all other
-projection rules** (not inside an active nap, not before another
-recorded event, respecting min-interval, etc.).
+(Replaces the superseded "no-past-projections invariant" entry from
+2026-05-26.) See [ADR-0006](docs/adr/0006-now-cross-and-no-retroactive-shift.md).
 
-**Why**: A "projection" is by definition a forecast. A forecast at a
-time already past would (a) auto-promote to recorded via Now-cross,
-which falsely claims a happened-fact that the engine just invented,
-and (b) destabilize the cascade — a recomputation could retroactively
-"create" past events that never existed.
+**The engine may not move an event from `time > Now` to `time ≤ Now`
+as a result of recalculation.** "You can't predict that something
+will have happened in the past."
 
-**Scope**: all projected event types — bottles, naps, bedtime,
-putdown render.
+Enforced inline by each *shifting* rule (a rule whose `produces` step
+transforms an event's `startTime` based on other events or constraints,
+rather than emitting at a freshly-computed natural time). The rule
+checks before applying the shift: if the proposed shifted time is
+`≤ Now`, the rule skips the shift and falls back to a rule-specific
+default (typically: emit at cascade-natural time).
+
+**Currently only one shifting rule exists**: the
+[[putdown bottle-anchor rule]] in `bottles.ts`.
+
+**This is distinct from [[Now-cross promotion]]**, which handles the
+*other* mechanism by which an event can be at `time ≤ Now`: time
+moving forward past a projection. That case auto-promotes to
+`recorded`. The user accepts the "lie risk" (engine claims happened-
+fact for events at past times) and reconciles by deleting via the
+drawer if not actually given.
 
 **Concrete example**: nap projected 12:00–12:45 with a post-nap
 bottle projected at 12:45. User logs nap start as 12:20 (20-min
-putdown delay). Cascade re-runs: nap is now 12:20–1:05; the bottle
-would snap to first-half-of-nap → putdown.startTime = 12:05; but
-Now = 12:30. The 12:05 placement violates the invariant; the engine
-moves the bottle to nap.endTime (1:05) — the next valid future slot.
+putdown delay). Cascade re-runs: nap is now 12:20–1:05. The bottle's
+cascade-natural emit time is 1:05 (future, fine). Putdown-anchor
+would *try* to snap it to `1:00 − 15min = 12:45`... wait, that's
+future too. OK the actual problematic case: cascade emits a different
+future bottle whose snap target lands at `12:05` (past Now=12:30).
+The putdown-anchor's snap is skipped — bottle stays at its
+cascade-natural future time. No phantom past event.
 
-Established 2026-05-26 (§F66 button-design grill).
+Established 2026-05-26 (ADR-0006 course-correction).
 
 ## bedtimeThreshold
 

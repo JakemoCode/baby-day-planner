@@ -14,6 +14,8 @@
 
 **Updated 2026-05-26 (architecture-deepening grill, ADR-0005)** — two new PRs slotted ahead of the original PR 3 from the §F66 architecture-deepening candidates C1 + C2: a `terminateCascade` extraction refactor (no behavior change) and the F4 seam (per-rule resolvers + seam dispatch) implementing ADR-0004's invariant. PRs renumbered 3a/3b/3c.
 
+**Updated 2026-05-26 (course-correction, ADR-0006)** — ADRs 0004 and 0005 superseded. The "no-past-projections" universal invariant was over-scoped; the actual concerns are two separate mechanisms (Concern A: time moves forward → engine auto-promote; Concern B: rule recalculation must not retroactively shift). PR 3b rescoped from "F4 seam + resolvers" to "engine-side Now-cross auto-promote" — a single one-pass transform. PR 3c absorbs Concern B as an inline check in the putdown-anchor rule. PR 4 Task 4.2 (render-side auto-promote) is retired — engine-side covers it.
+
 ---
 
 ## PR sequence
@@ -22,9 +24,9 @@
 |---|---|---|---|
 | 1 | Settings: add `earliestBedtime`, change `bedtimeThreshold` default | `feat/f66-earliest-bedtime-setting` | — |
 | 2 | Engine: new bedtime cascade rule (drop nap past threshold; floor) | `feat/f66-bedtime-cascade-rule` | PR1 |
-| **3a** | **Refactor: extract `terminateCascade` in naps.ts (C2)** | `refactor/f66-terminate-cascade` | PR2 |
-| **3b** | **Engine: F4 no-past-projections seam + per-rule resolvers (C1, ADR-0005)** | `feat/f66-no-past-projections-seam` | PR2 |
-| **3c** | **Engine: putdown bottle-anchor rule (consumes 3b's seam)** | `feat/f66-putdown-bottle-anchor` | PR3b |
+| **3a** | **Refactor: extract `terminateCascade` in naps.ts (C2)** ✅ merged #253 | `refactor/f66-terminate-cascade` | PR2 |
+| **3b** | **Engine: Now-cross auto-promote at engine layer (ADR-0006 Concern A)** | `feat/f66-engine-now-cross-promote` | PR2 |
+| **3c** | **Engine: putdown bottle-anchor rule + inline no-retroactive-shift check (ADR-0006 Concern B)** | `feat/f66-putdown-bottle-anchor` | — (parallel with 3b) |
 | 4 | Now-cross auto-promote + multi-modal dashboard button (End Nap / Log Bottle Time) | `feat/f66-now-cross-promote-buttons` | PR2 |
 | 5 | Drawer: future-event = owner-only edit | `feat/f66-drawer-future-owner-only` | PR4 |
 | 6 | Settings: `dreamFeedTime` + special bottle anchor | `feat/f66-dream-feed-setting` | PR1, PR3b |
@@ -282,57 +284,59 @@ Then the two existing call sites (`naps.ts:122-129` ADR-0002 drop branch; `naps.
 
 ---
 
-## PR 3b — Engine: no-past-projections seam + per-rule resolvers (C1, ADR-0005)
+## PR 3b — Engine: Now-cross auto-promote at engine layer (ADR-0006 Concern A)
 
 **Files:**
-- Modify: `src/v3/engine/evaluator.ts` (add post-process seam parallel to `checkRealityWins`)
-- Modify: `src/v3/engine/rules/index.ts` (extend `Rule` type with optional `resolveNoPast`)
-- Modify: `src/v3/engine/rules/naps.ts`, `bottles.ts`, `dailyRecurring.ts`, `wakeWindowOverrides.ts` (register resolvers for each producing rule)
-- Test: `src/v3/engine/evaluator.test.ts` (new — seam-level tests with toy rules)
+- Modify: `src/v3/engine/evaluator.ts` (add a single post-convergence pass)
+- Test: `src/v3/engine/evaluator.test.ts` (add focused test)
+- Test: update existing tests across the suite to assert `lifecycle.state === "recorded"` (not `"projected"`) for past-now events — mechanical rename
 
-**Scope:** add the cross-cutting invariant per ADR-0005. No user-facing behavior change in the common case (most projections are already future); the seam guarantees the invariant holds when the cascade would otherwise emit a past-now projection.
+**Scope:** ADR-0006 moves Now-cross auto-promote from the render layer (where the original `F66_PLAN.md` PR 4 Task 4.2 placed it) into the engine. After the fixed-point loop converges, a single one-pass transform flips any `lifecycle.state === "projected"` event with `startTime ≤ ctx.nowMinutes` to `{ state: "recorded", annotatedAt: event.startTime }`. No rule registration, no resolver dispatch, no `Rule` type changes. The previously-proposed F4 seam (ADR-0005) is retired.
 
 **TDD outline:**
 
-### Task 3b.1 — Failing evaluator-level test
+### Task 3b.1 — Failing test for engine-side auto-promote
 
-Add toy-rule test in `evaluator.test.ts` (new file): a rule that deliberately emits a past-now projection. Expect: seam catches it; resolver runs; emitted event is shifted to a future time. Fails because the seam doesn't exist yet.
+Add a test in `evaluator.test.ts` under a new `describe("evaluate — Now-cross auto-promote (ADR-0006 Concern A)")`. A toy rule emits a projected bottle at past-now time. Engine output should show it with `lifecycle.state === "recorded"`. Fails before implementation.
 
-### Task 3b.2 — Add seam to evaluator
+### Task 3b.2 — Implement the post-process step
 
-In `src/v3/engine/evaluator.ts`, after the fixed-point loop's last pass and after `checkRealityWins`:
+In `src/v3/engine/evaluator.ts`, after the convergence loop's MAX_PASSES guard and before the `sort` return:
 
 ```ts
-events = applyNoPastProjections(events, ctx);
+events = events.map((e) =>
+  e.lifecycle.state === "projected" && e.startTime <= ctx.nowMinutes
+    ? { ...e, lifecycle: { state: "recorded", annotatedAt: e.startTime } }
+    : e,
+);
 ```
 
-`applyNoPastProjections(events, ctx)` iterates projected events; for each with `startTime <= ctx.nowMinutes`, looks up the rule that owns that event type, calls its `resolveNoPast`. If no resolver registered, throws `EvaluationError`. If resolver returns `null`, drops the event.
+That's it — no helper module, no Rule type changes, no dispatch.
 
-### Task 3b.3 — Register resolvers in producing rules
+### Task 3b.3 — Mechanically update existing tests
 
-For each producing rule, add a `resolveNoPast` field exposing existing placement logic:
+The transform changes lifecycle for past-now events in many existing test outputs (~144 tests by the failed earlier attempt's count). Each is a value swap, not an investigation:
+- Assertions about a past-now event's `lifecycle.state` change from `"projected"` to `"recorded"`.
+- Assertions about `e.lifecycle.annotatedAt` may newly exist; tests that previously didn't read it can ignore. Tests that DID need to read `annotatedAt` of a recorded event continue to work.
+- No assertion about a past-now event should remain at `"projected"` — if one does, it's locking the OLD behavior and needs updating.
 
-- `bottles.ts`: compute `Math.max(now + 1, snapOutOfNapTime, ...)`; shift to next valid future per existing cascade rules; return null if past bedtime cap.
-- `naps.ts`: similar — shift to next valid future respecting cascade cursor and threshold.
-- `dailyRecurring.ts`, `wakeWindowOverrides.ts`: only register if these can emit past-now projections in practice; else leave unset.
+Strategy: run `pnpm test`, list every failing assertion, batch-update by file. Verify the full suite green at each step.
 
-### Task 3b.4 — Make the failing test pass
+### Task 3b.4 — Open PR
 
-Run `pnpm test src/v3/engine/evaluator.test.ts` → green. Full suite → green. Typecheck → green.
+PR body references ADR-0006. Click-test: open `/timeline` at, say, noon; confirm any bottle whose projected time was before noon now renders as `recorded` (not projected styling). Confirm cascade rules downstream of past events anchor off them as `recorded`.
 
-### Task 3b.5 — Open PR
-
-PR body references ADR-0005, lists registered resolvers, includes click-test: simulate the §F66 §F66 #4 scenario (nap edited later, cascade bottle would land past now) and verify the bottle now lands at `nap.endTime`, not in the past.
+**Out of scope for this PR:** Concern B (no-retroactive-shift) — that ships inline with PR 3c's putdown-anchor rule. Render-side `applyNowCrossPromotion` (originally PR 4 Task 4.2) — that task is retired; this PR's engine-side transform subsumes it.
 
 ---
 
-## PR 3c — Engine: putdown bottle-anchor rule (consumes 3b's seam)
+## PR 3c — Engine: putdown bottle-anchor rule (with inline no-retroactive-shift check)
 
-**ADR refs:** CONTEXT.md "putdown bottle-anchor rule" + ADR-0004 + ADR-0005.
+**ADR refs:** CONTEXT.md "putdown bottle-anchor rule" + ADR-0006 (Concern B).
 
-**Precedence:** the past-projections invariant trumps putdown-anchor. Implementation now relies on PR 3b's seam: the putdown-anchor snap inside `bottles.ts` operates on cascade-natural times; if the snapped target lands in the past, the bottle is emitted at that past time, and PR 3b's seam catches it via the bottles.ts resolver which shifts to `nap.endTime` (or next valid future).
+**No-retroactive-shift check (Concern B):** inside the putdown-anchor's snap logic, the rule checks its proposed snapped time against `ctx.nowMinutes`. If the snap target is `≤ Now`, the snap is **skipped** and the bottle stays at its cascade-natural emit time. This is an inline guard — no seam, no resolver — per ADR-0006's "shifting rules self-police" design.
 
-Test case for the precedence: a recorded nap whose start was edited later (e.g., 12:20 instead of 12:00) producing a cascade bottle whose snap-target is past Now — must end up at `nap.endTime`, not `nap.startTime - 15min`. The test exercises both the putdown-anchor rule (this PR) and the F4 resolver (PR 3b) end-to-end.
+Test case for the structural check: a recorded nap whose start was edited later (e.g., 12:20 instead of 12:00) produces a cascade bottle whose would-be snap target is past Now. The bottle must stay at its cascade-natural time (future), NOT get snapped to `nap.startTime - 15min` (past). This test asserts the no-retroactive-shift discipline; runs alongside the standard putdown-anchor happy-path test.
 
 
 
@@ -589,7 +593,13 @@ git add src/v3/lifecycle/applyNowCrossPromotion.ts src/v3/lifecycle/applyNowCros
 git commit -m "feat(lifecycle): applyNowCrossPromotion helper (ADR-0001)"
 ```
 
-### Task 4.2: Wire into projection output
+### Task 4.1 + 4.2 RETIRED per ADR-0006
+
+The Now-cross auto-promote work originally planned here moves to **PR 3b** (engine-side). The render layer no longer needs `applyNowCrossPromotion`; engine output already has the right lifecycle. The `src/v3/lifecycle/applyNowCrossPromotion.ts` helper and its render-layer wiring are not created.
+
+PR 4's remaining scope: **multi-modal dashboard button** (End Nap / Log Bottle Time) per ADR-0003 + remove dashboard action buttons per ADR-0001's button-removal decision. Skip directly to **Task 4.3** below.
+
+### Task 4.2 (RETIRED original): Wire into projection output
 
 - [ ] **Step 1: Find where engine output is consumed by the UI. Likely `src/v3/renderProjection.ts` or a hook like `useProjection`. Read it.**
 

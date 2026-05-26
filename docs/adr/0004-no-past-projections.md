@@ -1,5 +1,11 @@
 # No-past-projections invariant
 
+**Status:** **superseded by [ADR-0006](./0006-now-cross-and-no-retroactive-shift.md)** (2026-05-26 course-correction). Kept for history.
+
+> **Why superseded:** this ADR conflated two separable concerns — (A) what happens when the wall clock moves forward past a projection's time, and (B) what happens when a rule's recalculation would move a future event into the past. The original "engine moves projection to next valid future" framing was correct for (B) but wrong for (A) — under [ADR-0001](./0001-now-cross-auto-promote.md)'s Now-cross auto-promote, a past-time projection is recorded reality (with a "lie risk" the user reconciles by deleting), not a forecast that needs shifting. ADR-0006 splits the concerns and assigns each its correct layer. PR 3b's F4-seam implementation (per ADR-0005) was the failed consequence of this conflation; reverting the implementation surfaced the design flaw.
+
+**Original (pre-supersede) text follows.**
+
 **Status:** accepted (2026-05-26, §F66 button-design grill).
 
 A cascade-computed projection's time must always be strictly greater
