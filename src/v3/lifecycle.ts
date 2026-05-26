@@ -19,7 +19,23 @@
  * - Instants jump projected → completed directly.
  */
 
-import type { EventKind, EventType, Lifecycle, TimeMin } from "./schemas";
+import type { Event, EventKind, EventType, Lifecycle, TimeMin } from "./schemas";
+
+// ---------------------------------------------------------------------------
+// Predicates
+// ---------------------------------------------------------------------------
+
+/**
+ * §F66 future-event drawer rule (ADR-0001 + CONTEXT.md "future-event
+ * drawer rule"): an event is "future-projected" when its lifecycle is
+ * `projected` AND its startTime is strictly after Now. Future-projected
+ * events can only be edited via owner (planning intent); time and
+ * amount edits would create a pinned override before the event has
+ * actually happened.
+ */
+export function isFutureProjected(event: Event, nowMinutes: TimeMin): boolean {
+  return event.lifecycle.state === "projected" && event.startTime > nowMinutes;
+}
 
 // ---------------------------------------------------------------------------
 // Legacy lifecycle migration

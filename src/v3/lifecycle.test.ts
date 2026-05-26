@@ -1,8 +1,60 @@
 import { describe, expect, it } from "vitest";
-import { isSchedulingType, migrateLegacyLifecycle, reduceLifecycle } from "./lifecycle";
-import type { Lifecycle } from "./schemas";
+import {
+  isFutureProjected,
+  isSchedulingType,
+  migrateLegacyLifecycle,
+  reduceLifecycle,
+} from "./lifecycle";
+import { NO_OWNER, type Event, type Lifecycle } from "./schemas";
 
 const projected: Lifecycle = { state: "projected" };
+
+function projectedNap(startTime: number): Event {
+  return {
+    id: "nap_1",
+    dayId: "d1",
+    eventKey: "nap_1",
+    type: "nap",
+    kind: "block",
+    label: "Nap 1",
+    startTime,
+    hasPutdown: false,
+    owner: NO_OWNER,
+    lifecycle: { state: "projected" },
+  };
+}
+
+describe("isFutureProjected", () => {
+  it("returns true when projected AND startTime is strictly after Now", () => {
+    expect(isFutureProjected(projectedNap(14 * 60), 12 * 60)).toBe(true);
+  });
+
+  it("returns false at startTime === Now (boundary excluded — the moment of crossing)", () => {
+    expect(isFutureProjected(projectedNap(12 * 60), 12 * 60)).toBe(false);
+  });
+
+  it("returns false when startTime is in the past", () => {
+    expect(isFutureProjected(projectedNap(10 * 60), 12 * 60)).toBe(false);
+  });
+
+  it("returns false for a recorded event even if startTime is in the future", () => {
+    const nap = projectedNap(14 * 60);
+    const recorded: Event = {
+      ...nap,
+      lifecycle: { state: "recorded", annotatedAt: 14 * 60 },
+    };
+    expect(isFutureProjected(recorded, 12 * 60)).toBe(false);
+  });
+
+  it("returns false for a completed event", () => {
+    const nap = projectedNap(14 * 60);
+    const completed: Event = {
+      ...nap,
+      lifecycle: { state: "completed", committedAt: 14 * 60 },
+    };
+    expect(isFutureProjected(completed, 12 * 60)).toBe(false);
+  });
+});
 
 describe("reduceLifecycle — valid transitions", () => {
   it("projected → completed via RECORD_INSTANT for instant events", () => {
