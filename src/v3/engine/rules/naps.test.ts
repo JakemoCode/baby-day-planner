@@ -532,9 +532,10 @@ describe("Cascade invariant — wake_window/nap boundaries (Jake 2026-05-12)", (
 // ---------------------------------------------------------------------------
 
 describe("R7.6 — bedtimeThreshold triggers bedtime substitution in the cascade", () => {
-  it("the first projected nap whose start ≥ threshold is replaced by bedtime", () => {
+  it("the first projected nap whose endTime > threshold is dropped; bedtime at max(earliestBedtime, wwStart)", () => {
     // Cascade: WW [120, 135, 135, 150], napLen 60, wake 7:00 →
-    //   nap_4 would start at 19:00 (= threshold). It becomes bedtime.
+    //   ww4: 16:30-19:00 (150 min), nap_4 would start at 19:00, endTime=20:00 > threshold=19:00.
+    //   ADR-0002: drop nap_4. bedtimeStart = max(earliestBedtime=18:00, wwStart=16:30) = 18:00.
     const ctx = aContext({
       day: aDay({ wakeTime: 7 * 60 }),
       settings: aSettings({
@@ -562,7 +563,7 @@ describe("R7.6 — bedtimeThreshold triggers bedtime substitution in the cascade
     expect(bedtime).toBeDefined();
     expect(bedtime!.type).toBe("bedtime");
     expect(bedtime!.kind).toBe("block");
-    expect(bedtime!.startTime).toBe(19 * 60);
+    expect(bedtime!.startTime).toBe(18 * 60);
     expect(bedtime!.lifecycle.state).toBe("projected");
   });
 });
@@ -602,7 +603,8 @@ describe("R7.4 / R7.4b — no projected naps or wake_windows past bedtime", () =
     //   ww1: 7-9,   nap1: 9-10
     //   ww2: 10-12, nap2: 12-13
     //   ww3: 13-17, nap3: 17-18
-    //   ww4: 18-19, nap4: 19-20    ← becomes bedtime at 19:00
+    //   ww4: 18-19 (60 min), nap4 would start 19:00, endTime=20:00 > threshold=19:00
+    //     → ADR-0002: drop. bedtime = max(earliestBedtime=18:00, wwStart=18:00) = 18:00
     //   ww5/nap5 are never emitted (cascade stops at bedtime).
     const ctx = aContext({
       day: aDay({ wakeTime: 7 * 60 }),
@@ -627,7 +629,7 @@ describe("R7.4 / R7.4b — no projected naps or wake_windows past bedtime", () =
 
     expect(out.find((e) => e.eventKey === "nap_5")).toBeUndefined();
     expect(out.find((e) => e.eventKey === "wake_window_5")).toBeUndefined();
-    expect(out.find((e) => e.eventKey === "bedtime")?.startTime).toBe(19 * 60);
+    expect(out.find((e) => e.eventKey === "bedtime")?.startTime).toBe(18 * 60);
     expect(out.find((e) => e.eventKey === "nap_1")).toBeDefined();
     expect(out.find((e) => e.eventKey === "nap_3")).toBeDefined();
   });
@@ -662,9 +664,10 @@ describe("R7.4 / R7.4b — no projected naps or wake_windows past bedtime", () =
 });
 
 describe("R7.5 — projected nap CROSSING the threshold becomes bedtime", () => {
-  it("nap_4 projected 18:30-19:30 crosses threshold 19:00 → bedtime at 18:30", () => {
+  it("nap_4 projected 18:30-19:30 crosses threshold 19:00 → bedtime at max(earliestBedtime=18:00, wwStart=18:00)=18:00", () => {
     // WW [120, 120, 240, 30], napLen 60, wake 7:00 →
-    //   ww4: 18-18:30, nap4: 18:30-19:30  ← crosses threshold
+    //   ww4: 18-18:30 (30 min), nap4: 18:30-19:30 → endTime=19:30 > threshold=19:00
+    //   ADR-0002: drop. bedtimeStart = max(earliestBedtime=18:00, wwStart=18:00) = 18:00
     const ctx = aContext({
       day: aDay({ wakeTime: 7 * 60 }),
       settings: aSettings({
@@ -689,7 +692,7 @@ describe("R7.5 — projected nap CROSSING the threshold becomes bedtime", () => 
     expect(out.find((e) => e.eventKey === "nap_4")).toBeUndefined();
     const bedtime = out.find((e) => e.type === "bedtime");
     expect(bedtime).toBeDefined();
-    expect(bedtime!.startTime).toBe(18 * 60 + 30);
+    expect(bedtime!.startTime).toBe(18 * 60);
   });
 });
 
@@ -883,7 +886,8 @@ describe("Cascade extends past wakeWindowsMinutes.length (physiology cascade)", 
     //   ww_2 10-11:30, nap_2 11:30-12:30 (WW=90)
     //   ww_3 12:30-14, nap_3 14-15 (WW=90, repeated)
     //   ww_4 15-16:30, nap_4 16:30-17:30 (WW=90)
-    //   ww_5 17:30-19, projected nap would start at 19:00 → bedtime.
+    //   ww_5 17:30-19, proj nap_5 19:00-20:00 → endTime=20:00 > threshold=19:00
+    //     ADR-0002: drop. bedtimeStart = max(earliestBedtime=18:00, wwStart=17:30) = 18:00.
     const ctx = aContext({
       day: aDay({ wakeTime: 7 * 60 }),
       settings: aSettings({
@@ -916,7 +920,7 @@ describe("Cascade extends past wakeWindowsMinutes.length (physiology cascade)", 
 
     const bedtime = out.find((e) => e.type === "bedtime");
     expect(bedtime).toBeDefined();
-    expect(bedtime!.startTime).toBe(19 * 60);
+    expect(bedtime!.startTime).toBe(18 * 60);
   });
 
   it("slot-keyed recorded nap_5 anchors slot 5 even when wws.length=1", () => {
@@ -961,6 +965,157 @@ describe("Cascade extends past wakeWindowsMinutes.length (physiology cascade)", 
     const ww5 = out.find((e) => e.eventKey === "wake_window_5");
     expect(ww5).toBeDefined();
     expect(ww5!.endTime).toBe(16 * 60);
+  });
+});
+
+describe("§F66 bedtime cascade — ADR-0002", () => {
+  // ADR-0002 redefines the bedtime cascade rule:
+  //
+  //   NEW: bedtimeThreshold = latest endTime a PROJECTED nap may have.
+  //        Drop any projected nap with nap.endTime > bedtimeThreshold.
+  //        bedtime.startTime = max(earliestBedtime, lastNapEnd + WW)
+  //
+  //   OLD (naps.ts:121): napStart >= threshold || napStart + napLen > threshold
+  //        → substitute the nap with bedtime at napStart.
+  //        This caused §F64: a nap projecting to e.g. 16:46-17:31 with
+  //        threshold=17:30 produced "bedtime at 16:46", before
+  //        earliestBedtime=18:00.
+  //
+  // All three tests FAIL against the current naps.ts:121 rule.
+  // They pass once Task 2.2 ships the new implementation.
+
+  it("drop projected nap whose endTime > bedtimeThreshold; bedtime lands at earliestBedtime floor", () => {
+    // Settings: bedtimeThreshold=17:30, earliestBedtime=18:00, WW=120, napLen=45.
+    // No actuals. Wake at 7:00. Cascade walks:
+    //   ww_1 7-9, nap_1 9-9:45
+    //   ww_2 9:45-11:45, nap_2 11:45-12:30
+    //   ww_3 12:30-14:30, nap_3 14:30-15:15
+    //   ww_4 15:15-17:15, proj nap_4 17:15-18:00
+    //     nap_4.endTime=18:00 > 17:30 → NEW: drop, bedtime=max(18:00,17:15)=18:00
+    //     OLD: 17:15+45=18:00>17:30 → bedtime at napStart=17:15 < 18:00 ← BUG
+    //
+    // Assert: no projected nap has endTime > 17:30.
+    // Assert: bedtime.startTime === 18:00 (floor applies).
+    const ctx = aContext({
+      day: aDay({ wakeTime: 7 * 60 }),
+      settings: aSettings({
+        wakeWindowsMinutes: [120],
+        defaultNapLengthMinutes: 45,
+        bedtimeThreshold: 17 * 60 + 30,
+        earliestBedtime: 18 * 60,
+        defaultWakeTime: 7 * 60,
+      }),
+      actuals: [],
+    });
+
+    const out = projectDay(
+      {
+        day: ctx.day,
+        settings: ctx.settings,
+        actuals: ctx.actuals,
+        nowMinutes: ctx.nowMinutes,
+      },
+      { rules: ALL_RULES },
+    );
+
+    const projectedNapsPastThreshold = out.filter(
+      (e) =>
+        e.type === "nap" && e.lifecycle.state === "projected" && (e.endTime ?? 0) > 17 * 60 + 30,
+    );
+    expect(projectedNapsPastThreshold).toHaveLength(0);
+
+    const bedtime = out.find((e) => e.type === "bedtime");
+    expect(bedtime).toBeDefined();
+    expect(bedtime!.startTime).toBe(18 * 60);
+  });
+
+  it("bedtime floor: startTime = max(earliestBedtime, lastNapEnd + WW) when cascade-natural time < floor", () => {
+    // Settings: bedtimeThreshold=17:30, earliestBedtime=18:00, WW=120, napLen=60.
+    // Recorded nap_1: 13:30-15:00. After nap_1:
+    //   ww_2: 15:00-17:00 (120 min)
+    //   proj nap_2: 17:00-18:00 → endTime=18:00 > 17:30
+    //     NEW: drop. Bedtime = max(18:00, 15:00+120) = max(18:00, 17:00) = 18:00
+    //     OLD: 17:00+60=18:00>17:30 → bedtime at napStart=17:00 < 18:00 ← BUG
+    const recordedNap1 = aRecordedNap({
+      eventKey: "nap_1",
+      start: 13 * 60 + 30,
+      end: 15 * 60,
+    });
+
+    const ctx = aContext({
+      day: aDay({ wakeTime: 7 * 60 }),
+      settings: aSettings({
+        wakeWindowsMinutes: [120],
+        defaultNapLengthMinutes: 60,
+        bedtimeThreshold: 17 * 60 + 30,
+        earliestBedtime: 18 * 60,
+        defaultWakeTime: 7 * 60,
+      }),
+      actuals: [recordedNap1],
+    });
+
+    const out = projectDay(
+      {
+        day: ctx.day,
+        settings: ctx.settings,
+        actuals: ctx.actuals,
+        nowMinutes: ctx.nowMinutes,
+      },
+      { rules: ALL_RULES },
+    );
+
+    const bedtime = out.find((e) => e.type === "bedtime");
+    expect(bedtime).toBeDefined();
+    expect(bedtime!.startTime).toBe(18 * 60);
+  });
+
+  it("§F64 regression: bedtime.startTime >= earliestBedtime; no projected nap past threshold", () => {
+    // Settings: bedtimeThreshold=17:30, earliestBedtime=18:00, WW=120, napLen=45.
+    // Recorded nap ending at 13:14. Cascade after that:
+    //   ww 13:14-15:14, proj nap_? 15:14-15:59 (endTime 15:59 ≤ 17:30 → keep)
+    //   ww 15:59-17:59, proj nap 17:59-18:44 (endTime 18:44 > 17:30 → drop)
+    //     NEW: bedtime = max(18:00, 17:59) = 18:00
+    //     OLD: napStart=17:59>=17:30 → bedtime at 17:59 < 18:00 ← §F64 bug
+    //
+    // Assert: bedtime.startTime >= 18:00.
+    // Assert: no projected nap has endTime > 17:30.
+    const recordedNap1 = aRecordedNap({
+      eventKey: "nap_1",
+      start: 12 * 60 + 30,
+      end: 13 * 60 + 14,
+    });
+
+    const ctx = aContext({
+      day: aDay({ wakeTime: 7 * 60 }),
+      settings: aSettings({
+        wakeWindowsMinutes: [120],
+        defaultNapLengthMinutes: 45,
+        bedtimeThreshold: 17 * 60 + 30,
+        earliestBedtime: 18 * 60,
+        defaultWakeTime: 7 * 60,
+      }),
+      actuals: [recordedNap1],
+    });
+
+    const out = projectDay(
+      {
+        day: ctx.day,
+        settings: ctx.settings,
+        actuals: ctx.actuals,
+        nowMinutes: ctx.nowMinutes,
+      },
+      { rules: ALL_RULES },
+    );
+
+    const bedtime = out.find((e) => e.type === "bedtime");
+    expect(bedtime).toBeDefined();
+    expect(bedtime!.startTime).toBeGreaterThanOrEqual(18 * 60);
+
+    const projectedNapsPastThreshold = out.filter(
+      (e) =>
+        e.type === "nap" && e.lifecycle.state === "projected" && (e.endTime ?? 0) > 17 * 60 + 30,
+    );
+    expect(projectedNapsPastThreshold).toHaveLength(0);
   });
 });
 

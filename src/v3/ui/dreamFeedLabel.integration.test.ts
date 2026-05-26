@@ -26,9 +26,10 @@ import { ALL_RULES } from "../engine/rules";
 import { applyDreamFeedLabel } from "./dreamFeedLabel";
 
 describe("applyDreamFeedLabel — end-to-end with projectDay", () => {
-  it("cold-start with 6 bottles + bedtime at 22:00: cascade caps at bedtime, no relabel happens", () => {
+  it("cold-start with 6 bottles + bedtime at 21:30: cascade caps at bedtime, no relabel happens", () => {
     // WW [120, 150, 180, 180, 30] + napLen 60 + threshold 22:30 →
-    // bedtime substituted at 22:00 (nap_5 start 22:00, 22:00+60 > 22:30).
+    // nap_5 start 22:00, endTime=23:00 > 22:30 → ADR-0002: drop.
+    // bedtime = max(earliestBedtime=18:00, wwStart=21:30) = 21:30.
     const ctx = aContext({
       day: aDay({ wakeTime: 7 * 60 }),
       settings: aSettings({
@@ -55,14 +56,14 @@ describe("applyDreamFeedLabel — end-to-end with projectDay", () => {
     );
 
     const bedtime = events.find((e) => e.type === "bedtime");
-    expect(bedtime?.startTime).toBe(22 * 60);
+    expect(bedtime?.startTime).toBe(21 * 60 + 30);
 
     // Engine output: all projected bottles are ≤ bedtime.startTime.
     const projectedBottles = events.filter(
       (e) => e.type === "bottle" && e.lifecycle.state === "projected",
     );
     for (const b of projectedBottles) {
-      expect(b.startTime).toBeLessThanOrEqual(22 * 60);
+      expect(b.startTime).toBeLessThanOrEqual(21 * 60 + 30);
     }
 
     // Therefore the labeler has no past-bedtime bottle to relabel.

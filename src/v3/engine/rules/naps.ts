@@ -5,8 +5,8 @@
  * `Day.wakeTime`, alternating wake_window → nap. Subsumes:
  *   - R3.5 / R3.6  (WW geometry follows whichever nap occupies the slot)
  *   - R3.7 / R3.8  (short-recorded-nap shortens the FOLLOWING WW)
- *   - R7.5 / R7.6 / R7.11  (a projected nap at/crossing `bedtimeThreshold`
- *                            becomes bedtime, taking that nap's start)
+ *   - ADR-0002: drop projected nap whose endTime > bedtimeThreshold;
+ *               project bedtime at max(earliestBedtime, lastNapEnd + WW)
  *   - R7.4 / R7.4b (no naps or wake_windows past bedtime — we simply stop
  *                   emitting once bedtime lands)
  *
@@ -52,6 +52,7 @@ function projectSleepCascade(ctx: Context, existing: Event[]): Event[] {
   const wws = ctx.settings.wakeWindowsMinutes;
   const napLen = ctx.settings.defaultNapLengthMinutes;
   const threshold = ctx.settings.bedtimeThreshold;
+  const earliestBedtime = ctx.settings.earliestBedtime;
 
   if (wws.length === 0) return existing;
 
@@ -113,15 +114,17 @@ function projectSleepCascade(ctx: Context, existing: Event[]): Event[] {
     // wwStart so the WW renders zero-length rather than negative.
     const napStart = existingNap ? Math.max(wwStart, existingNap.startTime) : wwStart + wwMinutes;
 
-    // Bedtime substitution (R7.5 / R7.6 / R7.11): if no manual bedtime
-    // exists AND this slot's PROJECTED nap would reach the threshold
-    // (start ≥ threshold OR its interval crosses it), emit bedtime at
-    // napStart and stop the cascade. Reality wins: a recorded
-    // nap at this slot is NOT substituted — it stays as a nap.
-    const wouldCrossThreshold = napStart >= threshold || napStart + napLen > threshold;
-    if (!manualBedtime && !existingNap && wouldCrossThreshold) {
-      projected.push(buildWakeWindow(ctx, n, wwStart, napStart));
-      projected.push(buildProjectedBedtime(ctx, napStart, ctx.settings));
+    // Bedtime substitution (ADR-0002): if no manual bedtime exists AND
+    // this slot's PROJECTED nap would have endTime > bedtimeThreshold,
+    // drop the nap. Emit a wake-window from wwStart to bedtimeStart
+    // (bedtimeStart = max(earliestBedtime, wwStart)) and project bedtime
+    // at bedtimeStart. Reality wins: a recorded nap at this slot is NOT
+    // dropped — it stays as a nap and the cascade continues.
+    const projectedNapEnd = napStart + napLen;
+    if (!manualBedtime && !existingNap && projectedNapEnd > threshold) {
+      const bedtimeStart = Math.max(earliestBedtime, wwStart);
+      projected.push(buildWakeWindow(ctx, n, wwStart, bedtimeStart));
+      projected.push(buildProjectedBedtime(ctx, bedtimeStart, ctx.settings));
       break;
     }
 
