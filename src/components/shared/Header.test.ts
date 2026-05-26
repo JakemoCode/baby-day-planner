@@ -33,8 +33,14 @@ describe("formatAge", () => {
     // calendar-day-diff doesn't slip through unnoticed.
     ["2026-03-03", "11 weeks"], // 83 elapsed-days
     ["2026-03-02", "2 months"], // 84 elapsed-days → 12 weeks → months path
-    // Calendar-month math: now=May 26, birth=Feb 27 → months = 3 then -1 (now.date 26 < birth.date 27) → 2 months
+    // Calendar-month math, branch A — adjustment fires:
+    //   now=May 26, birth=Feb 27 → months=3 then -1 (now.date 26 < birth.date 27) → 2 months
     ["2026-02-27", "2 months"],
+    // Calendar-month math, branch B — anniversary day, NO adjustment:
+    //   now=May 26, birth=May 26 → months=12, now.date 26 NOT < birth.date 26 → 12 months
+    // Pins the equality side of `now.getDate() < birth.getDate()`; without
+    // this, flipping `<` to `<=` would render "11 months" undetected.
+    ["2025-05-26", "12 months"],
     // Year boundary at 24 months
     ["2024-05-26", "2 years"],
     ["2024-05-27", "23 months"],

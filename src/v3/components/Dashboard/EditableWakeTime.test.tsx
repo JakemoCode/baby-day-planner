@@ -8,7 +8,7 @@
  */
 
 import { describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { TimeMin } from "@/v3/schemas";
 import { EditableWakeTime } from "./EditableWakeTime";
@@ -26,13 +26,17 @@ describe("EditableWakeTime", () => {
     expect(btn).toHaveTextContent(/7:00\s*AM/);
   });
 
-  it("enters edit mode on click with the input pre-populated to current wakeTime", async () => {
+  it("enters edit mode on click with the input pre-populated and auto-focused", async () => {
     const user = userEvent.setup();
     render(<EditableWakeTime wakeTime={SEVEN_AM} onChange={() => {}} />);
     await user.click(screen.getByRole("button", { name: /change today's start time/i }));
     const input = screen.getByLabelText(/woke at/i) as HTMLInputElement;
     expect(input).toBeVisible();
     expect(input.value).toBe("07:00");
+    // Focus is deferred to next frame via requestAnimationFrame so the
+    // time picker opens immediately. Without this assertion, dropping
+    // the rAF focus call would silently regress keyboard-flow ergonomics.
+    await waitFor(() => expect(input).toHaveFocus());
   });
 
   it("Save with a new time commits via onChange exactly once and exits edit mode", async () => {
