@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { currentWakeWindow, nextBottle, nextEvent, nextNap, projectedBedtime } from "./selectors";
+import {
+  currentWakeWindow,
+  nearestBottleInWindow,
+  nextBottle,
+  nextEvent,
+  nextNap,
+  projectedBedtime,
+} from "./selectors";
 import type { Event, EventKind, EventType, Lifecycle, TimeMin } from "./schemas";
 import { NO_OWNER } from "./schemas";
 import { PUTDOWN_KIND_TAG } from "./components/Timeline/expandPutdown";
@@ -220,5 +227,72 @@ describe("selectors ignore render-synthetic putdown events (regression)", () => 
 
   it("nextEvent (un-type-filtered) also ignores synthetics", () => {
     expect(nextEvent([syntheticNapPutdown, realNap], 8 * 60)).toBe(realNap);
+  });
+});
+
+describe("nearestBottleInWindow — symmetric ±window around Now (ADR-0003)", () => {
+  const now = 11 * 60;
+
+  it("returns undefined when no bottles are in window", () => {
+    const b = makeEvent({ id: "b", type: "bottle", startTime: 14 * 60 });
+    expect(nearestBottleInWindow([b], now, 15)).toBeUndefined();
+  });
+
+  it("returns undefined for an empty array", () => {
+    expect(nearestBottleInWindow([], now, 15)).toBeUndefined();
+  });
+
+  it("returns a future bottle within +window", () => {
+    const b = makeEvent({ id: "b", type: "bottle", startTime: 11 * 60 + 10 });
+    expect(nearestBottleInWindow([b], now, 15)).toBe(b);
+  });
+
+  it("returns a past bottle within −window (Jake's +15-after intent)", () => {
+    const b = makeEvent({ id: "b", type: "bottle", startTime: 11 * 60 - 10 });
+    expect(nearestBottleInWindow([b], now, 15)).toBe(b);
+  });
+
+  it("returns the closer bottle when two are in window", () => {
+    const closer = makeEvent({ id: "closer", type: "bottle", startTime: 11 * 60 + 5 });
+    const further = makeEvent({ id: "further", type: "bottle", startTime: 11 * 60 - 12 });
+    expect(nearestBottleInWindow([further, closer], now, 15)).toBe(closer);
+  });
+
+  it("includes bottles at the exact ±window boundary", () => {
+    const atMinus = makeEvent({ id: "atMinus", type: "bottle", startTime: 11 * 60 - 15 });
+    const atPlus = makeEvent({ id: "atPlus", type: "bottle", startTime: 11 * 60 + 15 });
+    expect(nearestBottleInWindow([atMinus], now, 15)).toBe(atMinus);
+    expect(nearestBottleInWindow([atPlus], now, 15)).toBe(atPlus);
+  });
+
+  it("ignores non-bottle types in window", () => {
+    const nap = makeEvent({ id: "nap", type: "nap", startTime: 11 * 60 + 5 });
+    const bottle = makeEvent({ id: "b", type: "bottle", startTime: 11 * 60 + 12 });
+    expect(nearestBottleInWindow([nap, bottle], now, 15)).toBe(bottle);
+  });
+
+  it("returns recorded (auto-promoted) bottles too — by design", () => {
+    // After ADR-0001 / PR #255 engine auto-promote, a past-Now projected
+    // bottle flips lifecycle to recorded but keeps its startTime. Jake's
+    // intent: keep the Log Bottle Time button visible for the +window
+    // window so the user can still confirm the actual time.
+    const recorded = makeEvent({
+      id: "b",
+      type: "bottle",
+      startTime: 11 * 60 - 5,
+      lifecycle: { state: "recorded", annotatedAt: 11 * 60 - 5 },
+    });
+    expect(nearestBottleInWindow([recorded], now, 15)).toBe(recorded);
+  });
+
+  it("ignores render-synthetic events (PUTDOWN_KIND_TAG)", () => {
+    const syntheticBottle = makeEvent({
+      id: "syn",
+      type: "bottle",
+      eventKey: PUTDOWN_KIND_TAG,
+      startTime: 11 * 60 + 5,
+    });
+    const realBottle = makeEvent({ id: "real", type: "bottle", startTime: 11 * 60 + 12 });
+    expect(nearestBottleInWindow([syntheticBottle, realBottle], now, 15)).toBe(realBottle);
   });
 });
