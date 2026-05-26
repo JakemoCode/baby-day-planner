@@ -145,8 +145,6 @@ export default function DashboardPage() {
     return seen.size;
   };
   const nextBottleNumber = uniqueRecordedKeys("bottle") + 1;
-  const lastBottle = lastEventOfType(actuals, "bottle");
-  const lastBottleTime = lastBottle?.startTime;
   const bedtime = projectedBedtime(projected);
 
   const handleLogBottle = async (bottle: Event) => {
@@ -309,10 +307,4 @@ export default function DashboardPage() {
       )}
     </div>
   );
-}
-
-function lastEventOfType(events: Event[], type: Event["type"]): Event | undefined {
-  return events
-    .filter((e) => e.type === type && isRecorded(e.lifecycle))
-    .sort((a, b) => b.startTime - a.startTime)[0];
 }

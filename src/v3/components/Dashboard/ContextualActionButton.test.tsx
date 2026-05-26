@@ -2,10 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { NO_OWNER, type Event, type TimeMin } from "@/v3/schemas";
-import {
-  ContextualActionButton,
-  type ContextualActionButtonProps,
-} from "./ContextualActionButton";
+import { ContextualActionButton, type ContextualActionButtonProps } from "./ContextualActionButton";
 import * as timeModule from "@/v3/ui/time";
 
 const hm = (h: number, m = 0): TimeMin => h * 60 + m;
@@ -82,9 +79,7 @@ describe("ContextualActionButton", () => {
   });
 
   it("renders 'End Nap' when an in-progress nap exists", () => {
-    render(
-      <ContextualActionButton {...makeProps({ inProgressNap: inProgressNap() })} />,
-    );
+    render(<ContextualActionButton {...makeProps({ inProgressNap: inProgressNap() })} />);
     expect(screen.getByRole("button", { name: /end nap/i })).toBeVisible();
   });
 
@@ -112,9 +107,7 @@ describe("ContextualActionButton", () => {
   it("End Nap click fires onEndNap with the nap and current local minutes", async () => {
     const nap = inProgressNap();
     const onEndNap = vi.fn().mockResolvedValue(undefined);
-    render(
-      <ContextualActionButton {...makeProps({ inProgressNap: nap, onEndNap })} />,
-    );
+    render(<ContextualActionButton {...makeProps({ inProgressNap: nap, onEndNap })} />);
     await userEvent.click(screen.getByRole("button", { name: /end nap/i }));
     expect(onEndNap).toHaveBeenCalledWith(nap, hm(13, 30));
   });
