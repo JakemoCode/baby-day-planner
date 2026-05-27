@@ -33,6 +33,17 @@ export type EventEditDrawerV3Props = {
    * wake (defaultWakeTime + 24h), NOT the source nap's endTime.
    */
   defaultWakeTime: TimeMin;
+  /**
+   * §F66 fast-follow: today's actual wakeTime (from `Day.wakeTime`),
+   * used to validate that an edited startTime isn't accidentally
+   * AM/PM-confused below the day's wake (e.g. user types 12:30 meaning
+   * 12:30pm but the picker reads it as 0:30am, which silently wrecks
+   * the cascade by anchoring a pre-wake nap).
+   *
+   * Optional for backwards compatibility with the few call sites
+   * (Tomorrow page) that don't have a live wakeTime.
+   */
+  dayWakeTime?: TimeMin;
   onSave: (event: Event) => void | Promise<void>;
   onCancel: () => void;
   onDelete?: (event: Event) => void | Promise<void>;
@@ -52,9 +63,18 @@ function validateForm(
   endTime: TimeMin | undefined,
   editingId: string | undefined,
   existingEvents: Event[] | undefined,
+  dayWakeTime: TimeMin | undefined,
 ): FormErrors {
   const errors: FormErrors = {};
-  if (endTime !== undefined && startTime !== undefined && endTime <= startTime) {
+  // §F66 fast-follow B7: pre-wake guard. AM/PM picker mistakes (12:30
+  // intending pm but stored as 0:30am) anchor a nap or bottle before
+  // wakeTime and wreck the cascade. Catch it at validation time so the
+  // user gets an explainable error instead of a chaotic timeline.
+  if (dayWakeTime !== undefined && startTime !== undefined && startTime < dayWakeTime) {
+    const wakeStr = formatTimeForDisplay(dayWakeTime);
+    errors.startTime = `Before today's wake time (${wakeStr}).`;
+  }
+  if (!errors.endTime && endTime !== undefined && startTime !== undefined && endTime <= startTime) {
     errors.endTime = "Must be after start time.";
   }
   if (
@@ -148,6 +168,7 @@ export function EventEditDrawerV3({
   nowMinutes,
   bedtimeThreshold,
   defaultWakeTime,
+  dayWakeTime,
   onSave,
   onCancel,
   onDelete,
@@ -230,7 +251,14 @@ export function EventEditDrawerV3({
   const futureProjected =
     mode === "edit" && isFutureProjected(sourceEvent, nowMinutes) && !isNextOfType;
 
-  const errors = validateForm(type, form.startTime, form.endTime, sourceEvent.id, existingEvents);
+  const errors = validateForm(
+    type,
+    form.startTime,
+    form.endTime,
+    sourceEvent.id,
+    existingEvents,
+    dayWakeTime,
+  );
 
   const handleStartTimeChange = (raw: string) => {
     const next = parseHM24(raw);

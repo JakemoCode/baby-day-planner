@@ -263,6 +263,39 @@ describe("EventEditDrawerV3", () => {
     expect(screen.getByRole("alert")).toHaveTextContent(/Overlaps Nap 2/);
   });
 
+  it("§F66 fast-follow B7: flags startTime < dayWakeTime as a pre-wake error (AM/PM safeguard)", async () => {
+    // User had a nap at 11:30am, intended to push to 12:30pm but the
+    // time picker stored it as 0:30 (am). Validator must catch this
+    // before save — anchoring a nap or bottle before wakeTime wrecks
+    // the cascade silently.
+    const recorded = projectedNap({
+      lifecycle: { state: "recorded", annotatedAt: 11 * 60 + 30 },
+      startTime: 11 * 60 + 30,
+      endTime: 12 * 60 + 30,
+    });
+    const onSave = vi.fn();
+    render(
+      <EventEditDrawerV3
+        open
+        mode="edit"
+        event={recorded}
+        owners={owners}
+        nowMinutes={NOW}
+        bedtimeThreshold={THRESHOLD}
+        defaultWakeTime={DEFAULT_WAKE_TIME}
+        dayWakeTime={7 * 60}
+        onSave={onSave}
+        onCancel={() => {}}
+      />,
+    );
+    const start = screen.getByLabelText("Start time");
+    await userEvent.clear(start);
+    await userEvent.type(start, "00:30"); // 0:30 am — the AM/PM mistake
+    expect(screen.getByRole("alert")).toHaveTextContent(/before today's wake time/i);
+    expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
+    expect(onSave).not.toHaveBeenCalled();
+  });
+
   it("§F66 fast-follow B1: does not flag overlap against a render-synthetic putdown chip", async () => {
     // §F66 dogfood: tapping a nap's end-time edit would surface
     // "Overlaps Putdown" because the synthetic putdown chip carries

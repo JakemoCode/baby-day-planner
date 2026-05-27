@@ -156,6 +156,7 @@ export default function TimelinePage() {
         nowMinutes={nowMinutes}
         bedtimeThreshold={settings.bedtimeThreshold}
         defaultWakeTime={settings.defaultWakeTime}
+        {...(day?.wakeTime !== undefined ? { dayWakeTime: day.wakeTime } : {})}
         existingEvents={projected}
         open={drawer.open}
         event={drawer.open ? (drawer.mode === "edit" ? drawer.event : drawer.template) : null}
