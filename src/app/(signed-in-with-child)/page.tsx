@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { Event, OwnershipTemplate, TimeMin } from "@/v3/schemas";
 import { reduceLifecycle } from "@/v3/lifecycle";
 import { isInProgress } from "@/v3/lib/effectiveEnd";
+import { isRenderSynthetic } from "@/v3/lib/syntheticEvents";
 import {
   currentWakeWindow,
   nearestBottleInWindow,
@@ -20,11 +21,14 @@ import { useV3Templates } from "@/v3/hooks/useV3Templates";
 import { useV3Projection } from "@/v3/hooks/useV3Projection";
 import { useV3TomorrowPlan } from "@/v3/hooks/useV3TomorrowPlan";
 import { useReconcileActiveDay } from "@/v3/hooks/useReconcileActiveDay";
-import { useDrawer } from "@/v3/hooks/useDrawer";
+import { useDrawer, type DrawerSuppression } from "@/v3/hooks/useDrawer";
 import {
   getOrCreatePlannedDay,
   promoteFromPlan,
   startNewDay,
+  suppressDaycareForDay,
+  suppressDreamFeedForDay,
+  suppressRecurringForDay,
   updateDayOwnerOverride,
 } from "@/v3/repositories/days";
 import {
@@ -82,6 +86,27 @@ export default function DashboardPage() {
   // re-promote from the plan vs defaults during dogfood iteration.
   const { plan: todaysPlan } = useV3TomorrowPlan(CHILD_ID, todayDate());
   const hasTomorrowPlan = todaysPlan?.status === "confirmed";
+  const drawerSuppressions: DrawerSuppression[] = day?.id
+    ? [
+        {
+          matches: (e) => e.type === "daily_recurring",
+          apply: (e) => {
+            const id = e.eventKey.startsWith("recurring:")
+              ? e.eventKey.slice("recurring:".length)
+              : e.eventKey;
+            return suppressRecurringForDay(db, CHILD_ID, day.id, id);
+          },
+        },
+        {
+          matches: (e) => e.type === "daycare_dropoff" || e.type === "daycare_pickup",
+          apply: () => suppressDaycareForDay(db, CHILD_ID, day.id),
+        },
+        {
+          matches: (e) => e.type === "bottle" && e.eventKey === "bottle_dream",
+          apply: () => suppressDreamFeedForDay(db, CHILD_ID, day.id),
+        },
+      ]
+    : [];
   const { drawer, openCreate, close, onSave, onDelete } = useDrawer(
     actuals,
     saveEvent,
@@ -89,6 +114,7 @@ export default function DashboardPage() {
     day?.id
       ? (eventKey, owner) => updateDayOwnerOverride(db, CHILD_ID, day.id, eventKey, owner)
       : undefined,
+    drawerSuppressions,
   );
   const [pickerOpen, setPickerOpen] = useState(false);
   const [wakeSheetOpen, setWakeSheetOpen] = useState(false);
@@ -139,8 +165,14 @@ export default function DashboardPage() {
   // recording lives in `projected` only, not `actuals`. Without this,
   // tapping a chip mid-nap wouldn't surface End Nap because the
   // dashboard only saw Firestore-persisted events.
+  // Skip render-synthetic putdown chips. They carry `type: "nap"` for
+  // timeline geometry and inherit the parent's lifecycle — so a
+  // recorded nap with startTime > Now produces a synthetic putdown
+  // that passes isInProgress (its window contains Now). Without this
+  // filter, the dashboard fires "End nap" during putdown, before the
+  // real nap has started.
   const inProgressNap = projected.find(
-    (e) => e.type === "nap" && isInProgress(e, settings, nowMinutes),
+    (e) => e.type === "nap" && !isRenderSynthetic(e) && isInProgress(e, settings, nowMinutes),
   );
   // Bedtime in-progress detection is intentionally NOT time-windowed.
   // `isInProgress` requires `startTime <= now`, but a bedtime that began

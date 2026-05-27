@@ -12,6 +12,8 @@ import { useDrawer } from "@/v3/hooks/useDrawer";
 import { db } from "@/lib/firebase/client";
 import {
   editWakeTime,
+  suppressDaycareForDay,
+  suppressDreamFeedForDay,
   suppressRecurringForDay,
   updateDayOwnerOverride,
 } from "@/v3/repositories/days";
@@ -41,10 +43,28 @@ export default function TimelinePage() {
     day?.id
       ? (eventKey, owner) => updateDayOwnerOverride(db, CHILD_ID, day.id, eventKey, owner)
       : undefined,
-    // §F65 — recurring delete = skip for today via Day.suppressedRecurringIds.
+    // §F65/§F66 — per-day suppressions when "delete" means "skip today".
     day?.id
-      ? (recurringId) => suppressRecurringForDay(db, CHILD_ID, day.id, recurringId)
-      : undefined,
+      ? [
+          {
+            matches: (e) => e.type === "daily_recurring",
+            apply: (e) => {
+              const id = e.eventKey.startsWith("recurring:")
+                ? e.eventKey.slice("recurring:".length)
+                : e.eventKey;
+              return suppressRecurringForDay(db, CHILD_ID, day.id, id);
+            },
+          },
+          {
+            matches: (e) => e.type === "daycare_dropoff" || e.type === "daycare_pickup",
+            apply: () => suppressDaycareForDay(db, CHILD_ID, day.id),
+          },
+          {
+            matches: (e) => e.type === "bottle" && e.eventKey === "bottle_dream",
+            apply: () => suppressDreamFeedForDay(db, CHILD_ID, day.id),
+          },
+        ]
+      : [],
   );
   const [pickerOpen, setPickerOpen] = useState(false);
 

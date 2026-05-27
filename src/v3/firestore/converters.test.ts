@@ -27,6 +27,7 @@ describe("v3DayConverter", () => {
       wakeTime: 7 * 60 + 30,
       suppressedRecurringIds: ["dinner"],
       suppressedDaycareDay: false,
+      suppressedDreamFeed: false,
       templateId: "tpl-saturday",
     };
     const wired = v3DayConverter.toFirestore(day) as Record<string, unknown>;

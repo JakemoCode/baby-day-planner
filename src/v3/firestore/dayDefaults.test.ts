@@ -19,6 +19,7 @@ describe("withV3DayDefaults", () => {
       wakeTime: 7 * 60 + 30,
       suppressedRecurringIds: ["recurring-1"],
       suppressedDaycareDay: true,
+      suppressedDreamFeed: false,
       templateId: "tpl-saturday",
     };
     expect(withV3DayDefaults(v3)).toEqual(v3);

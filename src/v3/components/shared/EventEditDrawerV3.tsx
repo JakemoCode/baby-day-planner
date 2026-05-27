@@ -184,14 +184,21 @@ export function EventEditDrawerV3({
       ? `${baseTitle}: ${sourceEvent.label}`
       : baseTitle;
 
-  // Delete is meaningful for events that exist in Firestore (already-
-  // recorded) OR for daily_recurring events — for recurring, "delete"
-  // means "skip today" via Day.suppressedRecurringIds (§F65), not a
-  // Firestore doc delete. useDrawer routes both cases.
+  // Delete is meaningful for:
+  //   - events that exist in Firestore (already-recorded)
+  //   - daily_recurring (→ Day.suppressedRecurringIds, §F65)
+  //   - daycare_dropoff/pickup (→ Day.suppressedDaycareDay, §F66 fast-follow)
+  //   - dream-feed slot (→ Day.suppressedDreamFeed, §F66 fast-follow)
+  // useDrawer routes each path.
+  const isDreamFeedSlot = type === "bottle" && sourceEvent.eventKey === "bottle_dream";
   const canDelete =
     mode === "edit" &&
     onDelete !== undefined &&
-    (isRecorded(sourceEvent.lifecycle) || type === "daily_recurring");
+    (isRecorded(sourceEvent.lifecycle) ||
+      type === "daily_recurring" ||
+      type === "daycare_dropoff" ||
+      type === "daycare_pickup" ||
+      isDreamFeedSlot);
 
   const confirmCopy =
     type === "daily_recurring"

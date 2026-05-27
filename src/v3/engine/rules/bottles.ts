@@ -589,6 +589,9 @@ const RuleDreamFeedEmit: Rule = {
   dependsOn: ["R5"],
   matches: (events, ctx) => {
     if (!ctx.settings.dreamFeedEnabled) return false;
+    // §F66 fast-follow: per-day skip via Day.suppressedDreamFeed
+    // (drawer "delete" on the dream-feed slot writes this field).
+    if (ctx.day.suppressedDreamFeed) return false;
     if (events.some((e) => isBottle(e) && isDreamFeed(e))) return false;
     if (hasRecordedPostBedtimeBottle(events)) return false;
     return true;
