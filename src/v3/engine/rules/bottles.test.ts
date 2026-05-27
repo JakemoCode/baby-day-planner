@@ -121,19 +121,24 @@ describe("R5.8 — cascade stops at midnight (the 'midnight rule', DOMAIN.md §2
   });
 });
 
-describe("R5.4 — bottles renumbered chronologically for display", () => {
-  it("two recorded bottles with non-chronological eventKeys end up renumbered in time order", () => {
-    // The user logged bottle_1 at 9:00, then later remembered an earlier
-    // bottle and FAB-inserted it at 7:30 with eventKey 'bottle_2'.
-    // Engine output should renumber so the 7:30 one is 'bottle_1'.
+describe("R5.4 — recorded bottle identity frozen; projected fill after max recorded", () => {
+  it("two recorded bottles with non-chronological eventKeys KEEP their pinned numbers", () => {
+    // §F66 fast-follow B5 grill 2026-05-27: recorded bottle identity
+    // (eventKey/label) is FROZEN at the moment of recording. The user
+    // logged bottle_1 at 9:00, then FAB-inserted an earlier bottle at
+    // 7:30 with eventKey 'bottle_2'. The 7:30 one stays 'bottle_2'
+    // even though it's chronologically first — past events are never
+    // re-projected, including their identity.
     const lateInserted = aRecordedBottle({
       id: "b_late_insert",
       eventKey: "bottle_2",
+      label: "Bottle 2",
       start: 7 * 60 + 30,
     });
     const firstLogged = aRecordedBottle({
       id: "b_first_logged",
       eventKey: "bottle_1",
+      label: "Bottle 1",
       start: 9 * 60,
     });
 
@@ -144,6 +149,9 @@ describe("R5.4 — bottles renumbered chronologically for display", () => {
         defaultBottleIntervalMinutes: 180,
       }),
       actuals: [lateInserted, firstLogged],
+      // Keep Now before the first cascade-natural emit (12:00) so
+      // auto-promote doesn't claim it as "recorded" mid-test.
+      nowMinutes: 10 * 60,
     });
 
     const out = projectDay(
@@ -160,16 +168,61 @@ describe("R5.4 — bottles renumbered chronologically for display", () => {
       .filter((e) => e.type === "bottle")
       .sort((a, b) => a.startTime - b.startTime);
 
-    // The cascade extends past bottlesPerDay (cold-start target only;
-    // see "bottlesPerDay is a cold-start target" describe block below).
-    // This test only cares about chronological renumbering of the two
-    // recorded bottles.
+    // Recorded identity is frozen — the 7:30 one stays bottle_2, the
+    // 9:00 one stays bottle_1, even though that's non-chronological.
     expect(bottles[0]!.id).toBe("b_late_insert"); // 7:30 one
-    expect(bottles[0]!.eventKey).toBe("bottle_1");
-    expect(bottles[0]!.label).toBe("Bottle 1");
+    expect(bottles[0]!.eventKey).toBe("bottle_2");
+    expect(bottles[0]!.label).toBe("Bottle 2");
     expect(bottles[1]!.id).toBe("b_first_logged"); // 9:00 one
-    expect(bottles[1]!.eventKey).toBe("bottle_2");
-    expect(bottles[1]!.label).toBe("Bottle 2");
+    expect(bottles[1]!.eventKey).toBe("bottle_1");
+    expect(bottles[1]!.label).toBe("Bottle 1");
+    // Projected bottles fill starting from max(recorded) + 1 = 3.
+    const projected = bottles.filter((b) => b.lifecycle.state === "projected");
+    if (projected.length > 0) {
+      expect(projected[0]!.eventKey).toBe("bottle_3");
+    }
+  });
+
+  it("recorded bottle keeps its number when time-edited into a new chronological position", () => {
+    // Jake's 2026-05-27 dogfood: a sole recorded bottle with eventKey
+    // 'bottle_3' (e.g. earlier bottle_1 + bottle_2 were deleted) is
+    // time-edited from 1:10pm to 12:30pm. It stays bottle_3 — past
+    // events are never re-projected, identity included.
+    const recorded = aRecordedBottle({
+      id: "b_recorded",
+      eventKey: "bottle_3",
+      label: "Bottle 3",
+      start: 12 * 60 + 30, // moved from 13:10 → 12:30
+    });
+    const ctx = aContext({
+      day: aDay({ wakeTime: 7 * 60 }),
+      settings: aSettings({
+        bottleChain: { bottlesPerDay: 4, bufferAfterWakeMinutes: 10 },
+        defaultBottleIntervalMinutes: 180,
+      }),
+      actuals: [recorded],
+      nowMinutes: 13 * 60,
+    });
+    const out = projectDay(
+      {
+        day: ctx.day,
+        settings: ctx.settings,
+        actuals: ctx.actuals,
+        nowMinutes: ctx.nowMinutes,
+      },
+      { rules: ALL },
+    );
+    const bottles = out
+      .filter((e) => e.type === "bottle")
+      .sort((a, b) => a.startTime - b.startTime);
+    const rec = bottles.find((b) => b.id === "b_recorded")!;
+    expect(rec.eventKey).toBe("bottle_3");
+    expect(rec.label).toBe("Bottle 3");
+    // Subsequent projected bottles start at 4 (max recorded + 1).
+    const projected = bottles.filter((b) => b.lifecycle.state === "projected");
+    if (projected.length > 0) {
+      expect(projected[0]!.eventKey).toBe("bottle_4");
+    }
   });
 });
 

@@ -557,28 +557,40 @@ function projectBottleChain(events: Event[], ctx: Context): Event[] {
 // ---------------------------------------------------------------------------
 
 /**
- * R5.4 — Bottles are renumbered chronologically for display.
+ * R5.4 — Renumber PROJECTED bottles for display; recorded bottles keep
+ * their pinned number.
  *
- * After cascade produces a complete chain, sort bottles by startTime
- * and rewrite eventKey/label as `bottle_1`, `bottle_2`, etc. for
- * display. This is engine-side only; Firestore docs keep their
- * original eventKey (the persistence layer reads `id`, never
- * eventKey).
+ * Recorded bottle eventKey/label is identity (set at the moment of
+ * recording — auto-promote, manual log, or drawer save) and stays
+ * frozen even when the user edits the time, deletes neighbors, or
+ * reshuffles the chronological order. Per §F66 fast-follow B5 grill
+ * 2026-05-27: "the bottle that was Bottle 3 should still be Bottle 3
+ * after I edit its time."
+ *
+ * Projected bottles fill numbers AFTER the largest recorded number
+ * (skipping any used recorded numbers below it). Cold-start days
+ * (no recorded bottles) renumber projected from 1, preserving the
+ * original chronological numbering.
+ *
+ * Engine-side only; Firestore docs keep their original eventKey
+ * (persistence reads `id`, never eventKey).
  */
 const RuleRenumberBottlesChronologically: Rule = {
   id: "R5.4",
-  description: "Renumber bottle eventKey/label chronologically for display",
+  description:
+    "Renumber projected bottle eventKey/label; recorded bottles keep their pinned number",
   dependsOn: ["R5"],
   matches: (events) => {
-    const ordered = bottlesByStartTime(events);
-    return ordered.some((b, i) => b.eventKey !== `bottle_${i + 1}`);
+    const target = computeProjectedRenumber(events);
+    for (const b of bottlesByStartTime(events)) {
+      if (b.lifecycle.state !== "projected") continue;
+      const next = target.get(b.id);
+      if (next && b.eventKey !== next.eventKey) return true;
+    }
+    return false;
   },
   produces: (events) => {
-    const renamed = new Map<string, { eventKey: string; label: string }>();
-    bottlesByStartTime(events).forEach((b, i) => {
-      const n = i + 1;
-      renamed.set(b.id, { eventKey: `bottle_${n}`, label: `Bottle ${n}` });
-    });
+    const renamed = computeProjectedRenumber(events);
     return events.map((e) => {
       if (!isBottle(e)) return e;
       // Dream-feed slot has its own stable eventKey + label; renumber
@@ -586,6 +598,7 @@ const RuleRenumberBottlesChronologically: Rule = {
       // breaking the dream-feed identity AND looping the cascade
       // (R5.5's identity check keys on eventKey).
       if (isDreamFeed(e)) return e;
+      if (e.lifecycle.state !== "projected") return e; // recorded bottles are frozen
       const next = renamed.get(e.id);
       if (!next) return e;
       if (e.eventKey === next.eventKey && e.label === next.label) return e;
@@ -593,6 +606,37 @@ const RuleRenumberBottlesChronologically: Rule = {
     });
   },
 };
+
+/**
+ * Returns a map from projected-bottle id → { eventKey, label } using
+ * the smallest unused number starting from `max(recordedNumbers) + 1`,
+ * skipping any numbers already used by recorded bottles. Projected
+ * bottles are assigned in chronological order.
+ */
+function computeProjectedRenumber(
+  events: Event[],
+): Map<string, { eventKey: string; label: string }> {
+  const all = bottlesByStartTime(events);
+  const recordedNums = new Set<number>();
+  for (const b of all) {
+    if (b.lifecycle.state === "projected") continue;
+    const m = /^bottle_(\d+)$/.exec(b.eventKey);
+    if (m) recordedNums.add(parseInt(m[1]!, 10));
+  }
+  const maxRecorded = recordedNums.size > 0 ? Math.max(...recordedNums) : 0;
+  let n = maxRecorded + 1;
+  const skipUsed = () => {
+    while (recordedNums.has(n)) n++;
+  };
+  const renamed = new Map<string, { eventKey: string; label: string }>();
+  for (const b of all) {
+    if (b.lifecycle.state !== "projected") continue;
+    skipUsed();
+    renamed.set(b.id, { eventKey: `bottle_${n}`, label: `Bottle ${n}` });
+    n++;
+  }
+  return renamed;
+}
 
 function bottlesByStartTime(events: Event[]): Event[] {
   // Exclude dream-feed from the chronological order — it's a sentinel
