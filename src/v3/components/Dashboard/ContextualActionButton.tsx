@@ -21,7 +21,7 @@ export type ContextualActionButtonProps = {
 
 const MODE_LABEL: Record<Exclude<ContextMode["kind"], "hidden">, string> = {
   "end-bedtime": "End overnight sleep",
-  "end-nap": "End Nap",
+  "end-nap": "End nap",
   "log-bottle": "Log bottle now",
 };
 

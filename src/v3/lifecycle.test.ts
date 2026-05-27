@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   isFutureProjected,
+  isNextProjectedOfType,
   isSchedulingType,
   migrateLegacyLifecycle,
   reduceLifecycle,
@@ -53,6 +54,128 @@ describe("isFutureProjected", () => {
       lifecycle: { state: "completed", committedAt: 14 * 60 },
     };
     expect(isFutureProjected(completed, 12 * 60)).toBe(false);
+  });
+
+  it("returns true for a future projected bottle (rhythm-cascade type)", () => {
+    const bottle: Event = {
+      id: "b",
+      dayId: "d1",
+      eventKey: "bottle_2",
+      type: "bottle",
+      kind: "instant",
+      label: "Bottle 2",
+      startTime: 14 * 60,
+      amountOz: 6,
+      hasPutdown: false,
+      owner: NO_OWNER,
+      lifecycle: { state: "projected" },
+    };
+    expect(isFutureProjected(bottle, 12 * 60)).toBe(true);
+  });
+
+  it("returns false for the dream-feed slot (eventKey === 'bottle_dream') — explicit-schedule, not rhythm-cascade", () => {
+    const dream: Event = {
+      id: "dream",
+      dayId: "d1",
+      eventKey: "bottle_dream",
+      type: "bottle",
+      kind: "instant",
+      label: "Dream Feed",
+      startTime: 23 * 60,
+      amountOz: 6,
+      hasPutdown: false,
+      owner: NO_OWNER,
+      lifecycle: { state: "projected" },
+    };
+    expect(isFutureProjected(dream, 12 * 60)).toBe(false);
+  });
+
+  it("returns false for daycare / daily_recurring / extra / bedtime — fixed-time or explicit-schedule types", () => {
+    const types: ReadonlyArray<Event["type"]> = [
+      "daycare_dropoff",
+      "daycare_pickup",
+      "daily_recurring",
+      "extra",
+      "bedtime",
+      "pump",
+    ];
+    for (const type of types) {
+      const e: Event = {
+        id: `e-${type}`,
+        dayId: "d1",
+        eventKey: `${type}_1`,
+        type,
+        kind: "instant",
+        label: type,
+        startTime: 14 * 60,
+        hasPutdown: false,
+        owner: NO_OWNER,
+        lifecycle: { state: "projected" },
+      };
+      expect(isFutureProjected(e, 12 * 60)).toBe(false);
+    }
+  });
+});
+
+describe("isNextProjectedOfType (sick-day carve-out)", () => {
+  const proj = (id: string, type: Event["type"], startTime: number, eventKey = id): Event => ({
+    id,
+    dayId: "d1",
+    eventKey,
+    type,
+    kind: type === "bottle" ? "instant" : "block",
+    label: id,
+    startTime,
+    hasPutdown: false,
+    owner: NO_OWNER,
+    lifecycle: { state: "projected" },
+  });
+
+  it("returns true for the earliest future projected nap (next in chain)", () => {
+    const nap2 = proj("nap2", "nap", 14 * 60);
+    const nap3 = proj("nap3", "nap", 16 * 60);
+    expect(isNextProjectedOfType(nap2, [nap2, nap3], 12 * 60)).toBe(true);
+  });
+
+  it("returns false for a later projected nap (locked by the rule)", () => {
+    const nap2 = proj("nap2", "nap", 14 * 60);
+    const nap3 = proj("nap3", "nap", 16 * 60);
+    expect(isNextProjectedOfType(nap3, [nap2, nap3], 12 * 60)).toBe(false);
+  });
+
+  it("returns true for the earliest future projected bottle (next in chain)", () => {
+    const b2 = proj("b2", "bottle", 13 * 60, "bottle_2");
+    const b3 = proj("b3", "bottle", 16 * 60, "bottle_3");
+    expect(isNextProjectedOfType(b2, [b2, b3], 12 * 60)).toBe(true);
+  });
+
+  it("ignores the dream-feed slot when picking the next bottle", () => {
+    const b2 = proj("b2", "bottle", 13 * 60, "bottle_2");
+    const dream = proj("dream", "bottle", 11 * 60, "bottle_dream");
+    // dream's startTime (11:00) is BEFORE b2 (13:00), but dream is
+    // excluded from the next-of-type calculation. b2 still wins.
+    expect(isNextProjectedOfType(b2, [b2, dream], 12 * 60)).toBe(true);
+    expect(isNextProjectedOfType(dream, [b2, dream], 12 * 60)).toBe(false);
+  });
+
+  it("returns false when there's a recorded sibling — recorded events are not in the projected chain", () => {
+    const recordedNap1: Event = {
+      ...proj("nap1", "nap", 10 * 60),
+      lifecycle: { state: "recorded", annotatedAt: 10 * 60 },
+    };
+    const nap2 = proj("nap2", "nap", 14 * 60);
+    // nap2 is the next projected nap even though nap1 (recorded) is earlier.
+    expect(isNextProjectedOfType(nap2, [recordedNap1, nap2], 12 * 60)).toBe(true);
+  });
+
+  it("returns false when the event is past Now (not future)", () => {
+    const past = proj("past", "nap", 8 * 60);
+    expect(isNextProjectedOfType(past, [past], 12 * 60)).toBe(false);
+  });
+
+  it("returns false for non-nap, non-bottle types (daycare, recurring, etc.)", () => {
+    const daycare = proj("dc", "daycare_dropoff", 14 * 60);
+    expect(isNextProjectedOfType(daycare, [daycare], 12 * 60)).toBe(false);
   });
 });
 

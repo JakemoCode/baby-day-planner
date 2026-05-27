@@ -27,7 +27,12 @@ import {
   startNewDay,
   updateDayOwnerOverride,
 } from "@/v3/repositories/days";
-import { createEvent, reconcileDuplicateEventDocs } from "@/v3/repositories/events";
+import {
+  createEvent,
+  deleteEvent,
+  listEvents,
+  reconcileDuplicateEventDocs,
+} from "@/v3/repositories/events";
 import { db } from "@/lib/firebase/client";
 import { DashboardSkeleton } from "@/v3/components/Dashboard/DashboardSkeleton";
 import { FAB } from "@/components/shared/FAB";
@@ -127,7 +132,14 @@ export default function DashboardPage() {
   const nb = nearestBottleInWindow(projected, nowMinutes, LOG_BOTTLE_WINDOW_MIN);
   const nn = nextNap(projected, nowMinutes);
   const cww = currentWakeWindow(projected, nowMinutes);
-  const inProgressNap = actuals.find(
+  // Source from `projected` (not `actuals`) so engine-side Now-cross
+  // auto-promote (ADR-0001) surfaces in-progress naps even when the
+  // user hasn't written a Firestore record yet. A projected nap whose
+  // startTime <= Now is flipped to `recorded` by the evaluator; that
+  // recording lives in `projected` only, not `actuals`. Without this,
+  // tapping a chip mid-nap wouldn't surface End Nap because the
+  // dashboard only saw Firestore-persisted events.
+  const inProgressNap = projected.find(
     (e) => e.type === "nap" && isInProgress(e, settings, nowMinutes),
   );
   // Bedtime in-progress detection is intentionally NOT time-windowed.
@@ -162,11 +174,17 @@ export default function DashboardPage() {
     }
     await saveEvent(bottle);
   };
-  // TIME_EDIT on a recorded nap → completed.
+  // TIME_EDIT on a recorded nap → completed. The event may be either
+  // a Firestore-persisted actual (id stable) or an engine projection
+  // that auto-promoted to recorded (id synthetic, e.g. proj_nap_t540).
+  // §F59 deterministic id: rewrite to `recorded_${eventKey}` so the
+  // first commit and any subsequent drawer edits overwrite the same
+  // doc rather than leaving an orphan with a `proj_*` id.
   const handleEndNap = async (event: Event, endTime: number) => {
     if (!day || day.id === "") return;
     await saveEvent({
       ...event,
+      id: `recorded_${event.eventKey}`,
       endTime,
       lifecycle: reduceLifecycle(event.lifecycle, { type: "TIME_EDIT", at: endTime }),
     });
@@ -190,6 +208,18 @@ export default function DashboardPage() {
     // from the confirmed plan (matches the auto-rollover path) or from
     // settings defaults. Both paths use the deterministic id so the
     // re-write replaces today's existing doc idempotently.
+    //
+    // §F66 fast-follow: same-date Start New Day collides on the
+    // deterministic dayId (`day-${childId}-${date}`), so the events
+    // subcollection under that id keeps yesterday's writes. For the
+    // dev rollover we explicitly delete all events under the active
+    // day's id BEFORE the day-doc replace — gives the user a true
+    // blank canvas. Production auto-rollover (different date) doesn't
+    // hit this path; this is dev-only.
+    if (day?.id) {
+      const existing = await listEvents(db, CHILD_ID, day.id);
+      await Promise.all(existing.map((e) => deleteEvent(db, CHILD_ID, day.id, e.id)));
+    }
     if (useTomorrowPlan && todaysPlan?.status === "confirmed") {
       await promoteFromPlan(db, CHILD_ID, todaysPlan, settings.defaultWakeTime);
       return;

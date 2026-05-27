@@ -5,7 +5,8 @@ import styles from "./EventEditDrawer.module.css";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import type { Event, EventType, OwnerRef, OwnersConfig, TimeMin } from "../../schemas";
 import { isRecorded, NO_OWNER } from "../../schemas";
-import { isFutureProjected } from "../../lifecycle";
+import { isFutureProjected, isNextProjectedOfType } from "../../lifecycle";
+import { isRenderSynthetic } from "../../lib/syntheticEvents";
 import { formatHM24, formatTimeForDisplay, nextDayAt, parseHM24 } from "../../ui/time";
 import { OwnerPickerV3 } from "./OwnerPickerV3";
 import { formToEvent, type FormState } from "./formToEvent";
@@ -66,6 +67,11 @@ function validateForm(
     const overlap = existingEvents.find((e) => {
       if (e.id === editingId) return false;
       if (e.type !== "nap") return false;
+      // Putdown synthetics carry `type: "nap"` for timeline geometry
+      // but represent the wind-down lane, not a real nap. The user
+      // intentionally schedules naps adjacent to their putdown chip;
+      // flagging that as an overlap blocks legitimate saves.
+      if (isRenderSynthetic(e)) return false;
       if (e.endTime === undefined) return false;
       if (!isRecorded(e.lifecycle)) return false;
       return e.startTime < endTime && startTime < e.endTime;
@@ -206,12 +212,16 @@ export function EventEditDrawerV3({
   const showOwner = OWNER_TYPES.has(type);
   const showLabel = type === "extra";
 
-  // §F66 future-event drawer rule: when editing a future-projected event,
-  // only the owner is meaningful (planning intent). Time + amount edits
-  // would create a pinned override before the event has actually happened,
-  // breaking the cascade. Lock those inputs read-only. Edit mode only —
-  // create mode always treats the form fields as the source of truth.
-  const futureProjected = mode === "edit" && isFutureProjected(sourceEvent, nowMinutes);
+  // §F66 future-event drawer rule: lock time + amount on future-
+  // projected rhythm events (nap, rhythm bottle). Carve-out (§F66
+  // fast-follow C2 sick-day flex): the chronologically-NEXT projected
+  // nap and bottle are editable so the user can anchor them to baby's
+  // actual rhythm. Once anchored, cascade re-projects everything past
+  // the new anchor — farther-out events stay locked because their
+  // times will reflow from the pin.
+  const isNextOfType = isNextProjectedOfType(sourceEvent, existingEvents ?? [], nowMinutes);
+  const futureProjected =
+    mode === "edit" && isFutureProjected(sourceEvent, nowMinutes) && !isNextOfType;
 
   const errors = validateForm(type, form.startTime, form.endTime, sourceEvent.id, existingEvents);
 

@@ -238,6 +238,11 @@ describe("DashboardPage (V3)", () => {
     };
     const { saveEvent } = setupHooks({
       actuals: [inProgressNap],
+      // §F66 fast-follow: dashboard now sources inProgressNap from the
+      // engine projection (so auto-promoted naps fire End Nap too). In
+      // production, projectDay includes actuals via reality-wins; the
+      // test mock has to mirror that.
+      projected: [inProgressNap],
       nowMinutes: 9 * 60 + 30, // 30 min into the nap (within [startTime, endTime])
     });
     renderWithAuth(<DashboardPage />);
@@ -251,10 +256,12 @@ describe("DashboardPage (V3)", () => {
     expect(saveEvent).toHaveBeenCalledTimes(1);
     // saveEvent receives the full updated nap. endTime is whatever wall
     // clock the button captured. committedAt is the end time (TIME_EDIT
-    // action: the moment the user confirmed "nap is over").
+    // action: the moment the user confirmed "nap is over"). The id is
+    // §F59-deterministic `recorded_${eventKey}` so subsequent edits
+    // overwrite the same doc.
     expect(saveEvent).toHaveBeenCalledWith(
       expect.objectContaining({
-        id: "n-started",
+        id: "recorded_nap_1",
         endTime: expect.any(Number),
         lifecycle: expect.objectContaining({ state: "completed" }),
       }),

@@ -263,6 +263,51 @@ describe("EventEditDrawerV3", () => {
     expect(screen.getByRole("alert")).toHaveTextContent(/Overlaps Nap 2/);
   });
 
+  it("§F66 fast-follow B1: does not flag overlap against a render-synthetic putdown chip", async () => {
+    // §F66 dogfood: tapping a nap's end-time edit would surface
+    // "Overlaps Putdown" because the synthetic putdown chip carries
+    // `type: "nap"` for timeline geometry. Validator now skips
+    // render-synthetic events (eventKey === PUTDOWN_KIND_TAG).
+    const putdownSynthetic: Event = {
+      id: "putdown:nap-2",
+      dayId: "d-1",
+      eventKey: "__putdown__", // PUTDOWN_KIND_TAG sentinel
+      type: "nap",
+      kind: "block",
+      label: "Putdown",
+      startTime: 11 * 60,
+      endTime: 11 * 60 + 15,
+      hasPutdown: false,
+      owner: NO_OWNER,
+      lifecycle: { state: "recorded", annotatedAt: 11 * 60 },
+    };
+    // Source is a recorded nap right after the putdown — editing
+    // its end-time should NOT flag the synthetic putdown as overlap.
+    const source = projectedNap({
+      lifecycle: { state: "recorded", annotatedAt: 11 * 60 + 15 },
+      startTime: 11 * 60 + 15,
+      endTime: 12 * 60,
+    });
+    render(
+      <EventEditDrawerV3
+        open
+        mode="edit"
+        event={source}
+        owners={owners}
+        nowMinutes={NOW}
+        bedtimeThreshold={THRESHOLD}
+        defaultWakeTime={DEFAULT_WAKE_TIME}
+        existingEvents={[putdownSynthetic]}
+        onSave={() => {}}
+        onCancel={() => {}}
+      />,
+    );
+    const end = screen.getByLabelText("End time");
+    await userEvent.clear(end);
+    await userEvent.type(end, "12:30");
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
   it("does not flag overlap against still-projected events", async () => {
     const projectedOther = projectedNap({ id: "other", startTime: 9 * 60 + 30, label: "Nap 2" });
     // Source is recorded so its time inputs are editable (§F66).
@@ -835,6 +880,46 @@ describe("Past-threshold prompt when editing a nap (physiology cascade)", () => 
     it("does NOT disable inputs in create mode (form fields are the source of truth)", () => {
       renderDrawer({ mode: "create" });
       expect(screen.getByLabelText(/start time/i)).not.toBeDisabled();
+    });
+
+    it("§F66 fast-follow C2: chronologically-NEXT projected nap is editable (sick-day flex)", () => {
+      // Two projected naps in the future. The earlier one (nap_2) is
+      // the "next" — user should be able to anchor it to baby's actual
+      // rhythm. The later one (nap_3) stays locked because cascade
+      // will re-project it from the pin.
+      const nap2 = projectedNap({
+        id: "nap-2",
+        eventKey: "nap_2",
+        startTime: 14 * 60,
+        endTime: 14 * 60 + 45,
+      });
+      const nap3 = projectedNap({
+        id: "nap-3",
+        eventKey: "nap_3",
+        startTime: 16 * 60,
+        endTime: 16 * 60 + 45,
+      });
+      renderDrawer({ event: nap2, existingEvents: [nap2, nap3] });
+      expect(screen.getByLabelText("Start time")).not.toBeDisabled();
+      expect(screen.queryByRole("note")).toBeNull();
+    });
+
+    it("§F66 fast-follow C2: farther-out projected nap stays locked (cascade re-projects from the pin)", () => {
+      const nap2 = projectedNap({
+        id: "nap-2",
+        eventKey: "nap_2",
+        startTime: 14 * 60,
+        endTime: 14 * 60 + 45,
+      });
+      const nap3 = projectedNap({
+        id: "nap-3",
+        eventKey: "nap_3",
+        startTime: 16 * 60,
+        endTime: 16 * 60 + 45,
+      });
+      renderDrawer({ event: nap3, existingEvents: [nap2, nap3] });
+      expect(screen.getByLabelText("Start time")).toBeDisabled();
+      expect(screen.getByRole("note")).toBeVisible();
     });
 
     it("sanitizes the save payload back to source values even if the form somehow holds different time/amount", async () => {

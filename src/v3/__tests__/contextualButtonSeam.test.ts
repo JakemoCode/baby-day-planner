@@ -129,4 +129,19 @@ describe("Contextual button — seam (engine + render + decideMode)", () => {
     });
     expect(mode.kind).toBe("end-nap");
   });
+
+  it("§F66 fast-follow B2: with recorded Bottle 1 @ 8am and projected Bottle 2 in window, the selector targets Bottle 2 (not Bottle 1)", () => {
+    // Jake's pre-merge dogfood: bottle 1 recorded @ 8am, projected
+    // bottle 2 in window, Now near bottle 2. Click Log Bottle Now
+    // should promote the bottle_2 slot, NOT move bottle 1 to Now.
+    // Engine cascades bottle 2 at 8:00 + 180min = 11:00. Now = 10:54
+    // puts bottle 2 in window (delta = 6min).
+    const now = hm(10, 54);
+    const events = project(now, [recordedBottle("bottle_1", hm(8))]);
+    const nb = nearestBottleInWindow(events, now, LOG_BOTTLE_WINDOW_MIN);
+    expect(nb).toBeDefined();
+    expect(nb?.eventKey).not.toBe("bottle_1");
+    expect(nb?.startTime).toBe(hm(11, 0));
+    expect(Math.abs((nb?.startTime ?? 0) - now)).toBeLessThanOrEqual(LOG_BOTTLE_WINDOW_MIN);
+  });
 });
