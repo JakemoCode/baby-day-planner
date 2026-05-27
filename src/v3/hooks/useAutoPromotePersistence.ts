@@ -67,7 +67,6 @@ export function useAutoPromotePersistence(input: UseAutoPromotePersistenceInput)
         // Write failed (offline, permissions, race). Remove from
         // session cache so the next render retries.
         writtenIds.current.delete(recordedId);
-        // eslint-disable-next-line no-console
         console.warn("[auto-promote] persist failed", recordedId, err);
       });
     }

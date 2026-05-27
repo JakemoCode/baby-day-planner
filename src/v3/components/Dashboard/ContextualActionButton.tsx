@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { NO_OWNER, type Event, type TimeMin } from "@/v3/schemas";
 import { currentLocalMinutes } from "@/v3/ui/time";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
@@ -26,6 +26,26 @@ const MODE_LABEL: Record<Exclude<ContextMode["kind"], "hidden">, string> = {
 };
 
 const LOGGED_LABEL = "✓ Bottle logged";
+/**
+ * How long the "✓ Bottle logged" affordance stays visible after a
+ * successful log before the button auto-hides. Without a timeout the
+ * label sticks for the full ±15min log-bottle window — masking any
+ * subsequent end-nap mode that would have shown up when the projected
+ * nap auto-promotes a moment later. (Jake 2026-05-27 dogfood.)
+ */
+const LOGGED_AFFORDANCE_MS = 4000;
+
+/**
+ * Renders nothing; fires `onExpire` after `ms`. Mount with a unique
+ * key for each affordance instance — unmounting clears the timer.
+ */
+function AffordanceTimer({ ms, onExpire }: { ms: number; onExpire: () => void }) {
+  useEffect(() => {
+    const t = setTimeout(onExpire, ms);
+    return () => clearTimeout(t);
+  }, [ms, onExpire]);
+  return null;
+}
 
 function buildLoggedBottle(
   projected: Event,
@@ -72,8 +92,19 @@ export function ContextualActionButton({
   });
 
   const [confirmOpen, setConfirmOpen] = useState(false);
+  // Track when the "✓ Bottle logged" affordance entered, by the
+  // recorded bottle's id. A new id (or no affordance) means "not
+  // currently showing the logged affordance" — see <AffordanceTimer/>.
+  const isLoggedAffordance = mode.kind === "log-bottle" && mode.alreadyLogged;
+  const loggedKey = isLoggedAffordance ? mode.projected.id : null;
+  const [expiredKey, setExpiredKey] = useState<string | null>(null);
 
   if (mode.kind === "hidden") return null;
+  // After the affordance window, hide so end-nap (or whatever fires
+  // next) can take over. decideMode is bedtime > nap > bottle, so if
+  // an in-progress event existed the button would already have switched
+  // away — only the "between log and next event" gap reaches here.
+  if (isLoggedAffordance && expiredKey === loggedKey) return null;
 
   const performLog = (projected: Event) => {
     const nowMin = currentLocalMinutes();
@@ -119,6 +150,13 @@ export function ContextualActionButton({
       <ActionButton variant="primary" onClick={handleClick} aria-live="polite">
         {label}
       </ActionButton>
+      {loggedKey !== null && expiredKey !== loggedKey && (
+        <AffordanceTimer
+          key={loggedKey}
+          ms={LOGGED_AFFORDANCE_MS}
+          onExpire={() => setExpiredKey(loggedKey)}
+        />
+      )}
       <ConfirmDialog
         open={confirmOpen}
         title="Change the recorded time?"
