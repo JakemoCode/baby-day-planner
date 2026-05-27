@@ -227,10 +227,18 @@ export default function SettingsPage() {
       <Section title="Dream feed" isOpen={openSlug === "dream-feed"} onToggle={handleToggle}>
         <CheckboxRow
           id="dreamFeedEnabled"
-          label="Label first post-bedtime bottle as Dream Feed"
+          label="Project a dream-feed bottle"
           value={value.dreamFeedEnabled}
           onChange={(v) => set("dreamFeedEnabled", v)}
-          help="Render-only label. The bottle cascade is unchanged; the first projected bottle past bedtime is just renamed."
+          help="When enabled, the engine emits a projected bottle at the dream-feed time below. It counts toward bottles per day and auto-records when the time arrives."
+        />
+        <TimeRow
+          id="dreamFeedTime"
+          label="Dream feed time"
+          value={value.dreamFeedTime}
+          onChange={(v) => set("dreamFeedTime", v)}
+          disabled={!value.dreamFeedEnabled}
+          help="When the projected dream-feed bottle is anchored (e.g. 11:00pm)."
         />
       </Section>
 
@@ -320,12 +328,14 @@ function TimeRow({
   value,
   onChange,
   help,
+  disabled,
 }: {
   id: string;
   label: string;
   value: TimeMin;
   onChange: (next: TimeMin) => void;
   help?: string;
+  disabled?: boolean;
 }) {
   return (
     <div className={styles.field}>
@@ -337,6 +347,7 @@ function TimeRow({
         type="time"
         value={formatHM24(value)}
         onChange={(e) => onChange(parseTime(e.target.value))}
+        disabled={disabled === true}
         className={styles.input}
       />
       {help && <span className={styles.fieldHelp}>{help}</span>}

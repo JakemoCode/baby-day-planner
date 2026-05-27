@@ -100,6 +100,37 @@ function buildProjectedBottle(ctx: Context, n: number, startTime: number): Event
   });
 }
 
+const DREAM_FEED_EVENT_KEY = "bottle_dream";
+
+/**
+ * The dream-feed slot is a sentinel — it has the type "bottle" but
+ * lives outside the rhythm chain by design (R5.5). All rhythm-cascade
+ * sites that walk over bottles (trim, renumber, chronological index)
+ * must skip it to avoid corrupting cascade math or looping the engine.
+ */
+function isDreamFeed(e: Event): boolean {
+  return e.eventKey === DREAM_FEED_EVENT_KEY;
+}
+
+/**
+ * The dream-feed slot — a special projected bottle anchored to
+ * `settings.dreamFeedTime` (post-bedtime). Distinct `eventKey` so the
+ * cascade and dedup paths can identify it without time-window heuristics.
+ * Subject to Now-cross auto-promote like any projected bottle (ADR-0001).
+ */
+function buildProjectedDreamFeed(ctx: Context, startTime: number): Event {
+  return projectedEvent({
+    ctx,
+    id: `proj_${DREAM_FEED_EVENT_KEY}`,
+    eventKey: DREAM_FEED_EVENT_KEY,
+    type: "bottle",
+    kind: "instant",
+    startTime,
+    label: "Dream Feed",
+    amountOz: ctx.settings.defaultBottleAmountOz,
+  });
+}
+
 type Region = { start: number; end: number };
 
 /**
@@ -269,15 +300,19 @@ function canCascade(events: Event[], ctx: Context): boolean {
   // Trimming check: any PROJECTED bottle outside the rhythm chain
   // [wakeTime, cap) needs to be removed. Fires when bedtime appears
   // mid-flight and pass-1's midnight-capped projections are now
-  // past-bedtime stragglers.
+  // past-bedtime stragglers. Dream-feed slot lives outside the cap
+  // by design (see R5.5) and is preserved.
   const needsTrim = bottles.some(
-    (b) => isProjected(b) && (b.startTime < wakeTime || b.startTime >= cap),
+    (b) => isProjected(b) && !isDreamFeed(b) && (b.startTime < wakeTime || b.startTime >= cap),
   );
   if (needsTrim) return true;
 
-  // Chain bottles: in-window for the day's rhythm chain.
+  // Chain bottles: in-window for the day's rhythm chain. Dream-feed
+  // is sentinel, never a rhythm-chain member — even if dreamFeedTime
+  // falls inside [wakeTime, cap) by user misconfiguration, it must
+  // not anchor cascade or inflate the cold-start count.
   const chainBottles = bottles
-    .filter((b) => b.startTime >= wakeTime && b.startTime < cap)
+    .filter((b) => !isDreamFeed(b) && b.startTime >= wakeTime && b.startTime < cap)
     .sort((a, b) => a.startTime - b.startTime);
   const anchors = chainBottles.filter((b) => !isProjected(b));
   const target = ctx.settings.bottleChain.bottlesPerDay;
@@ -321,6 +356,8 @@ function projectBottleChain(events: Event[], ctx: Context): Event[] {
   const trimmedEvents = events.filter((e) => {
     if (!isBottle(e)) return true;
     if (!isProjected(e)) return true;
+    // Dream-feed slot (R5.5) lives outside [wakeTime, cap) by design.
+    if (isDreamFeed(e)) return true;
     return e.startTime >= wakeTime && e.startTime < cap;
   });
 
@@ -330,9 +367,10 @@ function projectBottleChain(events: Event[], ctx: Context): Event[] {
   // Chain bottles: in-window for the day's rhythm chain. Outside-window
   // bottles (overnight, post-bedtime recordings) tally toward
   // bottlesPerDay but do NOT anchor cascade or backfill (DOMAIN.md §1
-  // + §3: cascade follows the wake-to-bedtime rhythm).
+  // + §3: cascade follows the wake-to-bedtime rhythm). Dream-feed is
+  // also excluded — sentinel slot, not a rhythm-chain member.
   const chainBottles = bottles
-    .filter((b) => b.startTime >= wakeTime && b.startTime < cap)
+    .filter((b) => !isDreamFeed(b) && b.startTime >= wakeTime && b.startTime < cap)
     .sort((a, b) => a.startTime - b.startTime);
   const anchors = chainBottles.filter((b) => !isProjected(b));
   const isAnchored = anchors.length > 0;
@@ -493,6 +531,11 @@ const RuleRenumberBottlesChronologically: Rule = {
     });
     return events.map((e) => {
       if (!isBottle(e)) return e;
+      // Dream-feed slot has its own stable eventKey + label; renumber
+      // would rename it to `bottle_N` and reset the label to `Bottle N`,
+      // breaking the dream-feed identity AND looping the cascade
+      // (R5.5's identity check keys on eventKey).
+      if (isDreamFeed(e)) return e;
       const next = renamed.get(e.id);
       if (!next) return e;
       if (e.eventKey === next.eventKey && e.label === next.label) return e;
@@ -502,7 +545,59 @@ const RuleRenumberBottlesChronologically: Rule = {
 };
 
 function bottlesByStartTime(events: Event[]): Event[] {
-  return events.filter(isBottle).sort((a, b) => a.startTime - b.startTime);
+  // Exclude dream-feed from the chronological order — it's a sentinel
+  // slot, not a rhythm-chain bottle. Including it would shift its index
+  // when its position relative to rhythm bottles changes.
+  return events
+    .filter(isBottle)
+    .filter((b) => !isDreamFeed(b))
+    .sort((a, b) => a.startTime - b.startTime);
 }
 
-export const RULES: Rule[] = [RuleSequentialBottleCascade, RuleRenumberBottlesChronologically];
+// ---------------------------------------------------------------------------
+// R5.5 — Dream-feed emission
+// ---------------------------------------------------------------------------
+
+/**
+ * Whether any non-projected bottle exists strictly after bedtime.
+ * Per Jake's §F66 framing: if the user records a feed after bedtime
+ * (e.g. 22:00 wake-feed), THAT recording IS the dream feed for the
+ * night — the projected slot at `dreamFeedTime` should be suppressed
+ * rather than rendered as a second post-bedtime bottle. The legacy
+ * `applyDreamFeedLabel` render pass then relabels that recorded
+ * bottle as "Dream Feed", so exactly one dream-feed chip appears.
+ */
+function hasRecordedPostBedtimeBottle(events: Event[]): boolean {
+  const bedtime = events.find(isBedtime);
+  if (!bedtime) return false;
+  return events.some((e) => isBottle(e) && !isProjected(e) && e.startTime > bedtime.startTime);
+}
+
+/**
+ * Emits the projected dream-feed bottle at `settings.dreamFeedTime`
+ * when enabled, idempotently. Runs after the rhythm cascade so it
+ * doesn't interact with R5's trim/saturation logic. Subject to
+ * Now-cross auto-promote like any projected bottle (ADR-0001).
+ *
+ * Suppression: when a recorded post-bedtime bottle already exists,
+ * that recording IS the dream feed for the night and the projection
+ * is skipped (avoids two "Dream Feed" chips on the timeline).
+ */
+const RuleDreamFeedEmit: Rule = {
+  id: "R5.5",
+  description: "Emit projected dream-feed bottle at settings.dreamFeedTime",
+  dependsOn: ["R5"],
+  matches: (events, ctx) => {
+    if (!ctx.settings.dreamFeedEnabled) return false;
+    if (events.some((e) => isBottle(e) && isDreamFeed(e))) return false;
+    if (hasRecordedPostBedtimeBottle(events)) return false;
+    return true;
+  },
+  produces: (events, ctx) => [...events, buildProjectedDreamFeed(ctx, ctx.settings.dreamFeedTime)],
+};
+
+export const RULES: Rule[] = [
+  RuleSequentialBottleCascade,
+  RuleRenumberBottlesChronologically,
+  RuleDreamFeedEmit,
+];

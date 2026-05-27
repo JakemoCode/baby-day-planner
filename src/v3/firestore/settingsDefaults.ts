@@ -47,6 +47,7 @@ const DEFAULTS: Omit<Settings, "childId"> = {
   pumpOwnerSlot: "parent2",
   defaultPumpDurationMinutes: 25,
   dreamFeedEnabled: false,
+  dreamFeedTime: 23 * 60,
   dailyRecurring: [],
   daycare: {
     enabled: false,

@@ -1666,3 +1666,192 @@ describe("§F66 PR 3c — putdown bottle-anchor rule (CONTEXT.md + ADR-0006 Conc
     expect(bottles.find((b) => b.startTime === 11 * 60 + 45)).toBeUndefined();
   });
 });
+
+describe("R5.5 — dream-feed emission (§F66)", () => {
+  it("emits a projected dream-feed bottle at settings.dreamFeedTime when enabled", () => {
+    const ctx = aContext({
+      day: aDay({ wakeTime: 7 * 60 }),
+      settings: aSettings({
+        dreamFeedEnabled: true,
+        dreamFeedTime: 23 * 60,
+      }),
+      actuals: [],
+    });
+    const out = projectDay(
+      {
+        day: ctx.day,
+        settings: ctx.settings,
+        actuals: ctx.actuals,
+        nowMinutes: ctx.nowMinutes,
+      },
+      { rules: ALL_WITH_NAPS },
+    );
+    const dream = out.find((e) => e.type === "bottle" && e.eventKey === "bottle_dream");
+    expect(dream).toBeDefined();
+    expect(dream?.startTime).toBe(23 * 60);
+    expect(dream?.label).toBe("Dream Feed");
+    expect(dream?.lifecycle.state).toBe("projected");
+  });
+
+  it("does NOT emit a dream-feed when disabled", () => {
+    const ctx = aContext({
+      day: aDay({ wakeTime: 7 * 60 }),
+      settings: aSettings({ dreamFeedEnabled: false }),
+      actuals: [],
+    });
+    const out = projectDay(
+      {
+        day: ctx.day,
+        settings: ctx.settings,
+        actuals: ctx.actuals,
+        nowMinutes: ctx.nowMinutes,
+      },
+      { rules: ALL_WITH_NAPS },
+    );
+    expect(out.find((e) => e.type === "bottle" && e.eventKey === "bottle_dream")).toBeUndefined();
+  });
+
+  it("is idempotent — re-running the engine on the same input yields the same dream-feed", () => {
+    const ctx = aContext({
+      day: aDay({ wakeTime: 7 * 60 }),
+      settings: aSettings({ dreamFeedEnabled: true, dreamFeedTime: 23 * 60 }),
+      actuals: [],
+    });
+    const input = {
+      day: ctx.day,
+      settings: ctx.settings,
+      actuals: ctx.actuals,
+      nowMinutes: ctx.nowMinutes,
+    };
+    const a = projectDay(input, { rules: ALL_WITH_NAPS });
+    const b = projectDay(input, { rules: ALL_WITH_NAPS });
+    expect(b).toEqual(a);
+    // Exactly one dream-feed event in the output.
+    const dreams = a.filter((e) => e.type === "bottle" && e.eventKey === "bottle_dream");
+    expect(dreams).toHaveLength(1);
+  });
+
+  it("auto-promotes to recorded when Now crosses dreamFeedTime (ADR-0001 / PR #255)", () => {
+    const ctx = aContext({
+      day: aDay({ wakeTime: 7 * 60 }),
+      settings: aSettings({ dreamFeedEnabled: true, dreamFeedTime: 23 * 60 }),
+      actuals: [],
+      nowMinutes: 23 * 60 + 30, // 30min past dream-feed time
+    });
+    const out = projectDay(
+      {
+        day: ctx.day,
+        settings: ctx.settings,
+        actuals: ctx.actuals,
+        nowMinutes: ctx.nowMinutes,
+      },
+      { rules: ALL_WITH_NAPS },
+    );
+    const dream = out.find((e) => e.type === "bottle" && e.eventKey === "bottle_dream");
+    expect(dream?.lifecycle.state).toBe("recorded");
+  });
+
+  it("suppresses the projection when a recorded post-bedtime bottle already exists (that recording IS the dream feed)", () => {
+    // User had a wake-feed at 22:00, post-bedtime. Per Jake's §F66
+    // framing, that recording IS the dream feed for the night — the
+    // engine should NOT project an additional dream-feed at 23:00.
+    const recordedWakeFeed: Event = {
+      id: "evt-night",
+      dayId: "day-1",
+      eventKey: "bottle_night",
+      type: "bottle",
+      kind: "instant",
+      label: "Bottle 6",
+      startTime: 22 * 60,
+      amountOz: 4,
+      hasPutdown: false,
+      owner: { slot: "parent1" },
+      lifecycle: { state: "completed", committedAt: 22 * 60 },
+    };
+    const ctx = aContext({
+      day: aDay({ wakeTime: 7 * 60 }),
+      settings: aSettings({ dreamFeedEnabled: true, dreamFeedTime: 23 * 60 }),
+      actuals: [recordedWakeFeed],
+    });
+    const out = projectDay(
+      {
+        day: ctx.day,
+        settings: ctx.settings,
+        actuals: ctx.actuals,
+        nowMinutes: ctx.nowMinutes,
+      },
+      { rules: ALL_WITH_NAPS },
+    );
+    // No bottle_dream slot in the output — the recorded wake-feed
+    // fulfills the dream-feed for the night.
+    expect(out.find((e) => e.type === "bottle" && e.eventKey === "bottle_dream")).toBeUndefined();
+    // The recorded post-bedtime bottle is still in the output.
+    expect(out.find((e) => e.id === "evt-night")).toBeDefined();
+  });
+
+  it("misconfig: dreamFeedTime < bedtime — dream-feed does NOT pollute the rhythm chain's cold-start count", () => {
+    // User sets dreamFeedTime = 18:00 which falls inside the rhythm
+    // chain window. Without isDreamFeed exclusion in chainBottles, the
+    // slot would consume a cold-start placeholder slot and the rhythm
+    // chain would emit one fewer regular bottle.
+    const ctx = aContext({
+      day: aDay({ wakeTime: 7 * 60 }),
+      settings: aSettings({
+        dreamFeedEnabled: true,
+        dreamFeedTime: 18 * 60,
+        bedtimeThreshold: 22 * 60 + 30,
+        wakeWindowsMinutes: [120, 150, 180, 180, 30],
+        defaultNapLengthMinutes: 60,
+        defaultBottleIntervalMinutes: 180,
+        bottleChain: { bottlesPerDay: 4, bufferAfterWakeMinutes: 10 },
+      }),
+      actuals: [],
+    });
+    const out = projectDay(
+      {
+        day: ctx.day,
+        settings: ctx.settings,
+        actuals: ctx.actuals,
+        nowMinutes: ctx.nowMinutes,
+      },
+      { rules: ALL_WITH_NAPS },
+    );
+    // Rhythm bottles (non-dream) should still be 4 — the cold-start
+    // target — independent of the dream-feed slot's position.
+    const rhythmBottles = out.filter((e) => e.type === "bottle" && e.eventKey !== "bottle_dream");
+    expect(rhythmBottles).toHaveLength(4);
+    // And the dream-feed at 18:00 still exists with its own slot.
+    const dream = out.find((e) => e.type === "bottle" && e.eventKey === "bottle_dream");
+    expect(dream?.startTime).toBe(18 * 60);
+  });
+
+  it("rhythm cascade does not renumber the dream-feed slot via R5.4", () => {
+    const ctx = aContext({
+      day: aDay({ wakeTime: 7 * 60 }),
+      settings: aSettings({ dreamFeedEnabled: true, dreamFeedTime: 23 * 60 }),
+      actuals: [],
+    });
+    const out = projectDay(
+      {
+        day: ctx.day,
+        settings: ctx.settings,
+        actuals: ctx.actuals,
+        nowMinutes: ctx.nowMinutes,
+      },
+      { rules: ALL_WITH_NAPS },
+    );
+    const dream = out.find((e) => e.type === "bottle" && e.eventKey === "bottle_dream");
+    // Dream-feed eventKey + label preserved even after R5.4 renumbers
+    // the rhythm bottles chronologically.
+    expect(dream?.eventKey).toBe("bottle_dream");
+    expect(dream?.label).toBe("Dream Feed");
+    // Rhythm bottles still numbered 1..N (dream-feed excluded from the
+    // chronological renumber). No bottle_N collision with the dream slot.
+    const rhythmKeys = out
+      .filter((e) => e.type === "bottle" && e.eventKey !== "bottle_dream")
+      .map((e) => e.eventKey);
+    for (const key of rhythmKeys) {
+      expect(key).toMatch(/^bottle_\d+$/);
+    }
+  });
+});

@@ -345,11 +345,13 @@ export type Settings = {
   /** Default duration of a pump session; pumps render as blocks of this length. */
   defaultPumpDurationMinutes: number;
 
-  // Dream feed — render-only label. When enabled, the first projected
-  // bottle whose startTime > bedtime.startTime is rendered with the label
-  // "Dream Feed" instead of "Bottle N". No engine logic; see
-  // docs/v3/SIMPLIFICATION_SCOPE.md §3.
+  // Dream feed — when enabled, the engine emits a special projected
+  // bottle at `dreamFeedTime` (counts toward bottlesPerDay) and the
+  // renderer labels it "Dream Feed". Subject to Now-cross auto-promote
+  // like any projected bottle (ADR-0001). See CONTEXT.md "dream feed".
   dreamFeedEnabled: boolean;
+  /** TimeMin for the projected dream-feed bottle (e.g. 23 * 60 = 11pm). */
+  dreamFeedTime: TimeMin;
 
   // Daily recurring
   dailyRecurring: DailyRecurring[];
