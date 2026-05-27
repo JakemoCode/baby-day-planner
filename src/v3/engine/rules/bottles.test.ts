@@ -1751,6 +1751,44 @@ describe("R5.5 — dream-feed emission (§F66)", () => {
     expect(dream?.lifecycle.state).toBe("recorded");
   });
 
+  it("suppresses the projection when a recorded post-bedtime bottle already exists (that recording IS the dream feed)", () => {
+    // User had a wake-feed at 22:00, post-bedtime. Per Jake's §F66
+    // framing, that recording IS the dream feed for the night — the
+    // engine should NOT project an additional dream-feed at 23:00.
+    const recordedWakeFeed: Event = {
+      id: "evt-night",
+      dayId: "day-1",
+      eventKey: "bottle_night",
+      type: "bottle",
+      kind: "instant",
+      label: "Bottle 6",
+      startTime: 22 * 60,
+      amountOz: 4,
+      hasPutdown: false,
+      owner: { slot: "parent1" },
+      lifecycle: { state: "completed", committedAt: 22 * 60 },
+    };
+    const ctx = aContext({
+      day: aDay({ wakeTime: 7 * 60 }),
+      settings: aSettings({ dreamFeedEnabled: true, dreamFeedTime: 23 * 60 }),
+      actuals: [recordedWakeFeed],
+    });
+    const out = projectDay(
+      {
+        day: ctx.day,
+        settings: ctx.settings,
+        actuals: ctx.actuals,
+        nowMinutes: ctx.nowMinutes,
+      },
+      { rules: ALL_WITH_NAPS },
+    );
+    // No bottle_dream slot in the output — the recorded wake-feed
+    // fulfills the dream-feed for the night.
+    expect(out.find((e) => e.type === "bottle" && e.eventKey === "bottle_dream")).toBeUndefined();
+    // The recorded post-bedtime bottle is still in the output.
+    expect(out.find((e) => e.id === "evt-night")).toBeDefined();
+  });
+
   it("misconfig: dreamFeedTime < bedtime — dream-feed does NOT pollute the rhythm chain's cold-start count", () => {
     // User sets dreamFeedTime = 18:00 which falls inside the rhythm
     // chain window. Without isDreamFeed exclusion in chainBottles, the

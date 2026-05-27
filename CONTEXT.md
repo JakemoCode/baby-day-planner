@@ -253,10 +253,12 @@ window heuristics.
 - Subject to the Now-cross auto-promote rule like any projected
   bottle (ADR-0001): when Now crosses `dreamFeedTime`, the engine
   flips it to recorded at the setting time + default amount.
-- If baby wakes and is fed before `dreamFeedTime`, the actual
-  recorded feed is a separate bottle (different eventKey) and the
-  dream-feed slot stays projected until Now crosses, then auto-records
-  in addition. User deletes via the drawer if not actually given.
+- If the user records any feed after bedtime (e.g. a 22:00 wake-feed
+  before the projected dream-feed at 23:00), THAT recording IS the
+  dream feed for the night. R5.5 suppresses its own projection in
+  that case, and the legacy render-pass `applyDreamFeedLabel`
+  relabels the recorded post-bedtime bottle as "Dream Feed". Exactly
+  one dream-feed chip ends up on the timeline.
 
 Resolves §F58 / §F66 dogfood issue #1.
 

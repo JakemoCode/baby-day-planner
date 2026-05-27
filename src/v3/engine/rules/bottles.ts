@@ -559,10 +559,29 @@ function bottlesByStartTime(events: Event[]): Event[] {
 // ---------------------------------------------------------------------------
 
 /**
+ * Whether any non-projected bottle exists strictly after bedtime.
+ * Per Jake's §F66 framing: if the user records a feed after bedtime
+ * (e.g. 22:00 wake-feed), THAT recording IS the dream feed for the
+ * night — the projected slot at `dreamFeedTime` should be suppressed
+ * rather than rendered as a second post-bedtime bottle. The legacy
+ * `applyDreamFeedLabel` render pass then relabels that recorded
+ * bottle as "Dream Feed", so exactly one dream-feed chip appears.
+ */
+function hasRecordedPostBedtimeBottle(events: Event[]): boolean {
+  const bedtime = events.find(isBedtime);
+  if (!bedtime) return false;
+  return events.some((e) => isBottle(e) && !isProjected(e) && e.startTime > bedtime.startTime);
+}
+
+/**
  * Emits the projected dream-feed bottle at `settings.dreamFeedTime`
  * when enabled, idempotently. Runs after the rhythm cascade so it
  * doesn't interact with R5's trim/saturation logic. Subject to
  * Now-cross auto-promote like any projected bottle (ADR-0001).
+ *
+ * Suppression: when a recorded post-bedtime bottle already exists,
+ * that recording IS the dream feed for the night and the projection
+ * is skipped (avoids two "Dream Feed" chips on the timeline).
  */
 const RuleDreamFeedEmit: Rule = {
   id: "R5.5",
@@ -570,7 +589,9 @@ const RuleDreamFeedEmit: Rule = {
   dependsOn: ["R5"],
   matches: (events, ctx) => {
     if (!ctx.settings.dreamFeedEnabled) return false;
-    return !events.some((e) => isBottle(e) && isDreamFeed(e));
+    if (events.some((e) => isBottle(e) && isDreamFeed(e))) return false;
+    if (hasRecordedPostBedtimeBottle(events)) return false;
+    return true;
   },
   produces: (events, ctx) => [...events, buildProjectedDreamFeed(ctx, ctx.settings.dreamFeedTime)],
 };
