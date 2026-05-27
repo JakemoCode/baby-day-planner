@@ -251,41 +251,44 @@ function snapOutOfNap(proposed: number, regions: Region[], nowMinutes: number): 
 }
 
 /**
- * §F66 fast-follow B4: when a cascade-natural emit lands at a past
- * time AND falls in some nap's putdown-or-body range
- * `[start - lead, end]`, snap forward to that nap's `endTime` — the
- * clearly-future side of the nap. Per Jake's framing:
+ * §F66 fast-follow B4: when a cascade-natural emit lands in some
+ * nap's putdown-or-body range `[start - lead, end]` AND the putdown
+ * era has already opened (`start - lead ≤ now`), snap forward to that
+ * nap's `endTime`. Per Jake's framing:
  *
- *   - Putdown is a contiguous part of the nap. If we missed the
- *     putdown window (Now is past putdown.start), don't pin the
- *     bottle to a past slot AND don't pin to the "end of putdown"
- *     (= nap.startTime) because that's effectively the same beat.
- *     The bottle has been deferred past this nap; show it on the
- *     other side.
- *   - Future putdowns are handled by snapToPutdown (Concern B
- *     refuses past targets there); this function only fires after
- *     that refusal, with proposed still in the past.
+ *   - Putdown is a contiguous part of the nap. If we've already
+ *     entered the putdown window (Now ≥ putdown.start), don't pin
+ *     the bottle anywhere in `[putdown.start, nap.end)`: the bottle
+ *     has been deferred past this nap; show it on the other side.
+ *   - This gate fires for any proposed in-range — past, present
+ *     (proposed === now), or barely-future — as long as the nap is
+ *     "in progress relative to Now." The discriminator is the
+ *     putdown era (`lo ≤ now`), not the proposed time's tense.
+ *   - Future putdowns (`lo > now`) are handled by snapToPutdown
+ *     (Concern B refuses past targets there; future targets pass).
+ *     This function preserves that hand-off by skipping when
+ *     `lo > now`.
  *
  * Self-gates by the proposed-in-range check — cold-start cascades
- * (bottle_1 at 7:10am with no nap in that vicinity) don't trigger
- * this. Auto-promote handles the genuine past-time cases that fall
- * outside any nap's range.
+ * (bottle_1 at 7:10am with no nap in that vicinity) don't trigger.
  */
 function snapForwardToNapEnd(
   proposed: number,
-  events: Event[],
+  regions: Region[],
   putdownLead: number,
-  napLen: number,
   nowMinutes: number,
 ): number {
-  if (proposed >= nowMinutes) return proposed;
-  for (const e of events) {
-    if (e.type !== "nap" && e.type !== "bedtime") continue;
-    const end = e.endTime ?? e.startTime + napLen;
-    const lo = e.startTime - putdownLead;
-    if (proposed < lo || proposed > end) continue;
-    if (end <= nowMinutes) continue;
-    return end;
+  for (const r of regions) {
+    const lo = r.start - putdownLead;
+    if (proposed < lo || proposed > r.end) continue;
+    // Don't snap across the Now line: if the block's end is already
+    // past, leave proposed alone (auto-promote claims it).
+    if (r.end <= nowMinutes) continue;
+    // Hand off to snapToPutdown for blocks whose putdown era hasn't
+    // opened yet (lo > now). Those want to anchor at lo, not skip
+    // ahead to end. Snap-forward only fires inside the active block.
+    if (lo > nowMinutes) continue;
+    return r.end;
   }
   return proposed;
 }
@@ -458,13 +461,7 @@ function projectBottleChain(events: Event[], ctx: Context): Event[] {
     // projected-nap case (snap to nap.startTime). Self-gates: a cold-
     // start emit at 7:10am with no nap in that vicinity returns
     // unchanged.
-    return snapForwardToNapEnd(
-      outOfNap,
-      trimmedEvents,
-      ctx.settings.putdownLeadMinutes,
-      ctx.settings.defaultNapLengthMinutes,
-      ctx.nowMinutes,
-    );
+    return snapForwardToNapEnd(outOfNap, regions, ctx.settings.putdownLeadMinutes, ctx.nowMinutes);
   };
 
   // The cold-start count cap (bottlesPerDay placeholders) ONLY applies

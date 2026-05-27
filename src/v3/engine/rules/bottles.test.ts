@@ -1620,11 +1620,16 @@ describe("§F66 PR 3c — putdown bottle-anchor rule (CONTEXT.md + ADR-0006 Conc
     expect(bottles.find((b) => b.startTime === 11 * 60)).toBeDefined();
   });
 
-  it("ADR-0006 Concern B: skips the putdown snap when the snap target would land ≤ Now (no retroactive shift)", () => {
-    // Same as test 1, but nowMinutes is pushed past the would-be snap
-    // target (11:45). The putdown snap is forbidden — the engine cannot
-    // pull a future bottle (12:00) backward into the past (11:45 ≤ Now).
-    // Bottle stays at its cascade-natural emit time (12:00).
+  it("ADR-0006 Concern B + putdown+nap one-block: forward-snaps to nap.end when putdown era has opened", () => {
+    // Same fixture as test 1, but nowMinutes is pushed past the
+    // would-be putdown anchor (11:45). Concern B forbids the backward
+    // snap to 11:45 (≤ Now = retroactive shift across Now line). But
+    // the bottle still lands at nap_2.startTime = 12:00, which is
+    // INSIDE the block [11:45, 12:45] — and "putdown + nap is one
+    // uninterruptible block as far as bottle projections go." With
+    // the putdown era already open (lo=11:45 ≤ Now=11:50), the
+    // forward-snap (§F66 fast-follow B4) pushes the bottle to
+    // nap_2.endTime = 12:45 — clearly future, no Now crossing.
     const recorded = aRecordedBottle({
       id: "actual_bottle_morning",
       eventKey: "bottle_1",
@@ -1659,11 +1664,14 @@ describe("§F66 PR 3c — putdown bottle-anchor rule (CONTEXT.md + ADR-0006 Conc
       .filter((e) => e.type === "bottle")
       .sort((a, b) => a.startTime - b.startTime);
 
-    // Bottle stays at cascade-natural 12:00.
-    expect(bottles.find((b) => b.startTime === 12 * 60)).toBeDefined();
-    // The snap to 11:45 must NOT have fired — that would be a
-    // retroactive shift into the past per Concern B.
+    // Forward-snapped to nap_2.endTime = 12:45.
+    expect(bottles.find((b) => b.startTime === 12 * 60 + 45)).toBeDefined();
+    // The backward snap to 11:45 must NOT have fired — retroactive
+    // shift into the past, forbidden by Concern B.
     expect(bottles.find((b) => b.startTime === 11 * 60 + 45)).toBeUndefined();
+    // The cascade-natural 12:00 inside the block must NOT remain —
+    // putdown+nap is one uninterruptible block.
+    expect(bottles.find((b) => b.startTime === 12 * 60)).toBeUndefined();
   });
 });
 
@@ -1962,6 +1970,50 @@ describe("§F66 fast-follow B4 — past-time emit during nap edit snaps to nap e
     const nextBottle = projectedBottles[0];
     expect(nextBottle?.startTime).not.toBe(15 * 60); // 3:00p
     expect(nextBottle?.startTime).toBe(15 * 60 + 45); // 3:45p
+  });
+
+  it("proposed === Now during in-progress putdown still snaps forward to nap.endTime", () => {
+    // Tighter version of Jake's 2026-05-27 screenshot: cascade-natural
+    // emit lands EXACTLY at Now (3:10p) while the putdown era is
+    // already open (putdown at 3:05p, nap at 3:20-4:05p). The original
+    // B4 implementation skipped snap-forward when `proposed >= now`,
+    // so the bottle rendered AT Now inside the putdown block. The fix
+    // gates on the putdown era opening (lo ≤ now), not on proposed's
+    // tense.
+    //
+    // Fixture: recorded bottle at 12:10pm + 180min interval → proposed
+    // 3:10pm = Now. nap_1 sits at 3:20-4:05p (7hr wake window from 8am).
+    const recordedBottle = aRecordedBottle({
+      id: "rec_b1",
+      eventKey: "bottle_1",
+      start: 12 * 60 + 10,
+    });
+    const ctx = aContext({
+      day: aDay({ wakeTime: 8 * 60 }),
+      settings: aSettings({
+        bottleChain: { bottlesPerDay: 2, bufferAfterWakeMinutes: 10 },
+        defaultBottleIntervalMinutes: 180,
+        wakeWindowsMinutes: [7 * 60 + 20], // 8am + 7h20m → nap_1 at 3:20p
+        defaultNapLengthMinutes: 45,
+        putdownLeadMinutes: 15,
+        bedtimeThreshold: 22 * 60,
+      }),
+      actuals: [recordedBottle],
+      nowMinutes: 15 * 60 + 10, // 3:10p — exactly the cascade emit time
+    });
+    const out = projectDay(
+      {
+        day: ctx.day,
+        settings: ctx.settings,
+        actuals: ctx.actuals,
+        nowMinutes: ctx.nowMinutes,
+      },
+      { rules: ALL_WITH_NAPS },
+    );
+    const projectedBottles = out
+      .filter((e) => e.type === "bottle" && e.lifecycle.state === "projected")
+      .sort((a, b) => a.startTime - b.startTime);
+    expect(projectedBottles[0]?.startTime).toBe(16 * 60 + 5); // 4:05p = nap_1.endTime
   });
 
   it("cold-start (no recorded events) is unaffected — past-time emits still happen and auto-promote claims them", () => {
