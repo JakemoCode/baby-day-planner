@@ -19,6 +19,7 @@ import { useV3Events } from "@/v3/hooks/useV3Events";
 import { useV3Settings } from "@/v3/hooks/useV3Settings";
 import { useV3Templates } from "@/v3/hooks/useV3Templates";
 import { useV3Projection } from "@/v3/hooks/useV3Projection";
+import { useAutoPromotePersistence } from "@/v3/hooks/useAutoPromotePersistence";
 import { useV3TomorrowPlan } from "@/v3/hooks/useV3TomorrowPlan";
 import { useReconcileActiveDay } from "@/v3/hooks/useReconcileActiveDay";
 import { useDrawer, type DrawerSuppression } from "@/v3/hooks/useDrawer";
@@ -129,6 +130,18 @@ export default function DashboardPage() {
     settings,
     actuals,
     ...(template ? { template } : {}),
+  });
+
+  // §F66 fast-follow B5: persist engine-auto-promoted bottles to
+  // Firestore so they survive the next cascade pass. Without this,
+  // the morning bottle predictions vanish the moment any real
+  // recording exists (R5's anchored branch suppresses cold-start
+  // emission). See useAutoPromotePersistence for the philosophy.
+  useAutoPromotePersistence({
+    db,
+    childId: CHILD_ID,
+    projected,
+    actuals,
   });
 
   // Loading + just-mounted + post-onboarding all collapse to the same
