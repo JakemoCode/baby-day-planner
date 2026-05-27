@@ -1855,3 +1855,90 @@ describe("R5.5 — dream-feed emission (§F66)", () => {
     }
   });
 });
+
+describe("§F66 fast-follow B4 — past-time emit during nap edit snaps to nap edge", () => {
+  it("with an in-progress recorded nap, a past-time cascade emit snaps forward to the nap's future endTime", () => {
+    // Recorded morning bottle at 8am. Recorded nap in progress that
+    // the user just pushed later — start 10:30, end 13:00. Now is 12:00
+    // (mid-nap). The cascade walks 8am + 180min = 11am, which is now
+    // INSIDE the nap (10:30-13:00). snapOutOfNap usually pushes to
+    // nearer edge (10:30, which is < Now=12:00). Past-edge fallback
+    // would prefer 13:00, but only when 10:30 is the "chosen" edge
+    // strictly inside. With the new B4 forward-snap, the post-snap
+    // result that's still < Now gets bumped to the nearest future
+    // nap edge — 13:00.
+    const recordedBottle = aRecordedBottle({
+      id: "rec_b1",
+      eventKey: "bottle_1",
+      start: 8 * 60,
+    });
+    const recordedNap = aRecordedNap({
+      id: "rec_n1",
+      eventKey: "nap_1",
+      start: 10 * 60 + 30,
+      end: 13 * 60,
+    });
+    const ctx = aContext({
+      day: aDay({ wakeTime: 7 * 60 }),
+      settings: aSettings({
+        bottleChain: { bottlesPerDay: 4, bufferAfterWakeMinutes: 10 },
+        defaultBottleIntervalMinutes: 180,
+        wakeWindowsMinutes: [],
+        bedtimeThreshold: 22 * 60,
+      }),
+      actuals: [recordedBottle, recordedNap],
+      nowMinutes: 12 * 60,
+    });
+    const out = projectDay(
+      {
+        day: ctx.day,
+        settings: ctx.settings,
+        actuals: ctx.actuals,
+        nowMinutes: ctx.nowMinutes,
+      },
+      { rules: ALL_WITH_NAPS },
+    );
+    const projectedBottles = out
+      .filter((e) => e.type === "bottle" && e.lifecycle.state === "projected")
+      .sort((a, b) => a.startTime - b.startTime);
+    // The next projected bottle should be at the nap's endTime (13:00)
+    // OR later — never inside the past portion of the nap.
+    expect(projectedBottles.length).toBeGreaterThan(0);
+    for (const b of projectedBottles) {
+      expect(b.startTime).toBeGreaterThanOrEqual(12 * 60);
+    }
+    expect(projectedBottles[0]?.startTime).toBe(13 * 60);
+  });
+
+  it("cold-start (no recorded events) is unaffected — past-time emits still happen and auto-promote claims them", () => {
+    // Without an in-progress recorded nap, B4 forward-snap is gated
+    // off. The cascade emits its natural cold-start chain even if
+    // some slots are past Now; auto-promote handles those upstream.
+    const ctx = aContext({
+      day: aDay({ wakeTime: 7 * 60 }),
+      settings: aSettings({
+        bottleChain: { bottlesPerDay: 3, bufferAfterWakeMinutes: 10 },
+        defaultBottleIntervalMinutes: 180,
+        wakeWindowsMinutes: [],
+        bedtimeThreshold: 22 * 60,
+      }),
+      actuals: [],
+      nowMinutes: 12 * 60,
+    });
+    const out = projectDay(
+      {
+        day: ctx.day,
+        settings: ctx.settings,
+        actuals: ctx.actuals,
+        nowMinutes: ctx.nowMinutes,
+      },
+      { rules: ALL_WITH_NAPS },
+    );
+    const bottles = out
+      .filter((e) => e.type === "bottle")
+      .sort((a, b) => a.startTime - b.startTime);
+    // First slot at wakeTime + buffer = 7:10 (past Now=12:00).
+    // Not snapped forward; auto-promoted to recorded.
+    expect(bottles[0]?.startTime).toBe(7 * 60 + 10);
+  });
+});

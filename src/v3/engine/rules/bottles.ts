@@ -251,6 +251,34 @@ function snapOutOfNap(proposed: number, regions: Region[], nowMinutes: number): 
   return chosen;
 }
 
+/**
+ * §F66 fast-follow B4: when a cascade-natural projection lands at a
+ * past time (most commonly because the user just edited a nap in
+ * progress, pushing the bottle's anchor back), snap FORWARD to the
+ * nearest nap edge whose time > Now. The "render at the closest edge
+ * of the nap, as long as that edge is in the future" rule.
+ *
+ * If no future nap edge exists in the day, leave the proposed time
+ * alone — the evaluator's Now-cross auto-promote (ADR-0001) will
+ * claim it as recorded, which is the existing fallback model.
+ */
+function snapForwardOutOfPast(proposed: number, regions: Region[], nowMinutes: number): number {
+  if (proposed >= nowMinutes) return proposed;
+  let best: number | undefined;
+  let bestDelta = Number.POSITIVE_INFINITY;
+  for (const r of regions) {
+    for (const edge of [r.start, r.end]) {
+      if (edge <= nowMinutes) continue;
+      const delta = Math.abs(edge - proposed);
+      if (delta < bestDelta) {
+        best = edge;
+        bestDelta = delta;
+      }
+    }
+  }
+  return best ?? proposed;
+}
+
 // ---------------------------------------------------------------------------
 // R5 — Sequential bottle cascade (unified)
 // ---------------------------------------------------------------------------
@@ -390,6 +418,15 @@ function projectBottleChain(events: Event[], ctx: Context): Event[] {
   // consume a daytime slot (paired with canCascade's same fix).
   let chainCount = chainBottles.length;
 
+  // Gate for the §F66 fast-follow B4 forward-snap (defined below).
+  const hasInProgressRecordedNap = trimmedEvents.some(
+    (e) =>
+      e.type === "nap" &&
+      e.lifecycle.state === "recorded" &&
+      e.startTime <= ctx.nowMinutes &&
+      (e.endTime ?? e.startTime + ctx.settings.defaultNapLengthMinutes) > ctx.nowMinutes,
+  );
+
   const snap = (proposed: number) => {
     // snapOutOfNap moves a bottle proposed strictly inside a nap to the
     // nearer edge. snapToPutdown then applies the putdown-anchor rule
@@ -411,7 +448,17 @@ function projectBottleChain(events: Event[], ctx: Context): Event[] {
       ctx.settings.defaultNapLengthMinutes,
       ctx.nowMinutes,
     );
-    return snapOutOfNap(withPutdown, regions, ctx.nowMinutes);
+    const outOfNap = snapOutOfNap(withPutdown, regions, ctx.nowMinutes);
+    // §F66 fast-follow B4: only fires when the cascade reaches a
+    // past-time emit AND an in-progress recorded nap exists. This is
+    // the user-just-edited-the-nap scenario where the cascade re-runs
+    // and a bottle would otherwise emit at a past time mid-nap. In
+    // cold-start cascades (no recorded events yet), past-time emits
+    // are legitimate — the engine's Now-cross auto-promote will claim
+    // them as recorded, matching what would have happened earlier in
+    // the day.
+    if (!hasInProgressRecordedNap) return outOfNap;
+    return snapForwardOutOfPast(outOfNap, regions, ctx.nowMinutes);
   };
 
   // The cold-start count cap (bottlesPerDay placeholders) ONLY applies
