@@ -83,7 +83,7 @@ export default function SettingsPage() {
         <InviteCoParentSection />
       </Section>
 
-      <Section title="Default times" isOpen={openSlug === "default-times"} onToggle={handleToggle}>
+      <Section title="Wake & bedtime" isOpen={openSlug === "default-times"} onToggle={handleToggle}>
         <TimeRow
           id="defaultWakeTime"
           label="Default wake time"

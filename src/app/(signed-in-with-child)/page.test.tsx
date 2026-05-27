@@ -337,7 +337,7 @@ describe("DashboardPage (V3)", () => {
     vi.setSystemTime(new Date("2026-05-10T09:00:00"));
     // Two recorded bottle docs with the SAME eventKey (Start/End pair),
     // plus one projected bottle (must be ignored). nextNumber should be 2,
-    // not 3 — verified via the ContextualActionButton's Log Bottle Time
+    // not 3 — verified via the ContextualActionButton's Log bottle now
     // mode promoting the next projected bottle's eventKey.
     const recordedBottle: Event = {
       id: "b1",
@@ -378,10 +378,10 @@ describe("DashboardPage (V3)", () => {
     });
     renderWithAuth(<DashboardPage />);
 
-    // Click Log Bottle Time → handler should produce a Bottle whose
+    // Click Log bottle now → handler should produce a Bottle whose
     // eventKey is bottle_2 (1 unique recorded + 1, matching the projected
     // slot promoted by the contextual button).
-    const btn = screen.getByRole("button", { name: /Log Bottle Time/i });
+    const btn = screen.getByRole("button", { name: /Log bottle now/i });
     btn.click();
 
     expect(saveEvent).toHaveBeenCalledTimes(1);
@@ -404,7 +404,7 @@ describe("DashboardPage (V3)", () => {
     getOrCreatePlannedDayMock.mockResolvedValue(plannedTomorrow);
     createEventMock.mockResolvedValue(undefined);
 
-    // Projected bottle at 2 AM next-day frame so the Log Bottle Time
+    // Projected bottle at 2 AM next-day frame so the Log bottle now
     // window is open at nowMinutes=2:00.
     const projectedBottle: Event = {
       id: "b-proj-2am",
@@ -424,7 +424,7 @@ describe("DashboardPage (V3)", () => {
     });
     renderWithAuth(<DashboardPage />);
 
-    const btn = screen.getByRole("button", { name: /Log Bottle Time/i });
+    const btn = screen.getByRole("button", { name: /Log bottle now/i });
     btn.click();
 
     // Wait for async handler.

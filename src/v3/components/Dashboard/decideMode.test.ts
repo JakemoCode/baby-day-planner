@@ -82,13 +82,13 @@ describe("decideMode — ADR-0003 multi-modal dashboard button", () => {
       nextProjectedBottle: bottle,
       nowMinutes: hm(6, 50),
     });
-    expect(out).toEqual({ kind: "log-bottle", projected: bottle });
+    expect(out).toEqual({ kind: "log-bottle", projected: bottle, alreadyLogged: false });
   });
 
   it("returns log-bottle when bottle is within ±15min and no nap or bedtime", () => {
     const bottle = projectedBottle(hm(12, 0));
     const out = decideMode({ nextProjectedBottle: bottle, nowMinutes: hm(11, 50) });
-    expect(out).toEqual({ kind: "log-bottle", projected: bottle });
+    expect(out).toEqual({ kind: "log-bottle", projected: bottle, alreadyLogged: false });
   });
 
   it("end-nap wins over log-bottle when nap is in progress during bottle window", () => {

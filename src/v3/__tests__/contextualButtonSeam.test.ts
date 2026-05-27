@@ -67,7 +67,7 @@ function project(now: TimeMin, actuals: Event[]): Event[] {
 }
 
 describe("Contextual button — seam (engine + render + decideMode)", () => {
-  it("lights up Log Bottle Time when Now is within ±15min of the next projected bottle", () => {
+  it("lights up Log bottle now when Now is within ±15min of the next projected bottle", () => {
     // 8:00 recorded bottle + 180min interval cascades next at 11:00.
     // At 10:50 (10min before), the Log Bottle window is open.
     const now = hm(10, 50);
@@ -96,7 +96,7 @@ describe("Contextual button — seam (engine + render + decideMode)", () => {
     expect(mode.kind).toBe("hidden");
   });
 
-  it("still lights up Log Bottle Time +10min after a projected bottle has passed", () => {
+  it("still lights up Log bottle now +10min after a projected bottle has passed", () => {
     // Engine projects bottle at 11:00. At 11:10 (after Now-cross + engine
     // auto-promote), Jake still wants the button visible so he can tap to
     // confirm an actual log at 11:10 — overwriting the auto-promoted slot.

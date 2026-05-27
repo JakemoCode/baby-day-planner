@@ -1,7 +1,9 @@
 "use client";
 
+import { useState } from "react";
 import { NO_OWNER, type Event, type TimeMin } from "@/v3/schemas";
 import { currentLocalMinutes } from "@/v3/ui/time";
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { ActionButton } from "./ActionButton";
 import { decideMode, type ContextMode } from "./decideMode";
 
@@ -20,8 +22,10 @@ export type ContextualActionButtonProps = {
 const MODE_LABEL: Record<Exclude<ContextMode["kind"], "hidden">, string> = {
   "end-bedtime": "End overnight sleep",
   "end-nap": "End Nap",
-  "log-bottle": "Log Bottle Time",
+  "log-bottle": "Log bottle now",
 };
+
+const LOGGED_LABEL = "✓ Bottle logged";
 
 function buildLoggedBottle(
   projected: Event,
@@ -67,7 +71,15 @@ export function ContextualActionButton({
     nowMinutes,
   });
 
+  const [confirmOpen, setConfirmOpen] = useState(false);
+
   if (mode.kind === "hidden") return null;
+
+  const performLog = (projected: Event) => {
+    const nowMin = currentLocalMinutes();
+    const bottle = buildLoggedBottle(projected, dayId, defaultBottleAmountOz, nowMin);
+    void onLogBottle(bottle);
+  };
 
   const handleClick = () => {
     const nowMin = currentLocalMinutes();
@@ -79,16 +91,46 @@ export function ContextualActionButton({
         void onEndNap(mode.nap, nowMin);
         return;
       case "log-bottle": {
-        const bottle = buildLoggedBottle(mode.projected, dayId, defaultBottleAmountOz, nowMin);
-        void onLogBottle(bottle);
+        // Re-tap on an already-logged slot surfaces a confirm dialog
+        // ("change the recorded time?") rather than a silent overwrite.
+        if (mode.alreadyLogged) {
+          setConfirmOpen(true);
+          return;
+        }
+        performLog(mode.projected);
         return;
       }
     }
   };
 
+  const label =
+    mode.kind === "log-bottle" && mode.alreadyLogged ? LOGGED_LABEL : MODE_LABEL[mode.kind];
+
+  // Wall-clock minutes since the recorded bottle's startTime — drives
+  // the "logged X minutes ago" text in the confirm dialog. Only used
+  // when mode is log-bottle + alreadyLogged.
+  const minutesAgo =
+    mode.kind === "log-bottle" && mode.alreadyLogged
+      ? Math.max(0, nowMinutes - mode.projected.startTime)
+      : 0;
+
   return (
-    <ActionButton variant="primary" onClick={handleClick}>
-      {MODE_LABEL[mode.kind]}
-    </ActionButton>
+    <>
+      <ActionButton variant="primary" onClick={handleClick} aria-live="polite">
+        {label}
+      </ActionButton>
+      <ConfirmDialog
+        open={confirmOpen}
+        title="Change the recorded time?"
+        body={`Last bottle logged ${minutesAgo} minute${minutesAgo === 1 ? "" : "s"} ago. Tap Confirm to update to now.`}
+        confirmLabel="Confirm"
+        cancelLabel="Cancel"
+        onCancel={() => setConfirmOpen(false)}
+        onConfirm={() => {
+          setConfirmOpen(false);
+          if (mode.kind === "log-bottle") performLog(mode.projected);
+        }}
+      />
+    </>
   );
 }
