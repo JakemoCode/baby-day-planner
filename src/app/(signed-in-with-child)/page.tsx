@@ -177,14 +177,16 @@ export default function DashboardPage() {
   // TIME_EDIT on a recorded nap → completed. The event may be either
   // a Firestore-persisted actual (id stable) or an engine projection
   // that auto-promoted to recorded (id synthetic, e.g. proj_nap_t540).
-  // §F59 deterministic id: rewrite to `recorded_${eventKey}` so the
-  // first commit and any subsequent drawer edits overwrite the same
-  // doc rather than leaving an orphan with a `proj_*` id.
+  // Only rewrite to the §F59 deterministic id when the source is a
+  // projection — never overwrite the original doc id of a real actual
+  // (would orphan an imported / legacy doc that doesn't already follow
+  // the `recorded_${eventKey}` convention).
   const handleEndNap = async (event: Event, endTime: number) => {
     if (!day || day.id === "") return;
+    const id = event.id.startsWith("proj_") ? `recorded_${event.eventKey}` : event.id;
     await saveEvent({
       ...event,
-      id: `recorded_${event.eventKey}`,
+      id,
       endTime,
       lifecycle: reduceLifecycle(event.lifecycle, { type: "TIME_EDIT", at: endTime }),
     });

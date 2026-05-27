@@ -305,7 +305,7 @@ describe("EventEditDrawerV3", () => {
     const end = screen.getByLabelText("End time");
     await userEvent.clear(end);
     await userEvent.type(end, "12:30");
-    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(screen.queryByRole("alert")).toBeNull();
   });
 
   it("does not flag overlap against still-projected events", async () => {

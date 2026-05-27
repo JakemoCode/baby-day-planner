@@ -224,7 +224,7 @@ describe("DashboardPage (V3)", () => {
   it("handleEndNap saves completed nap with endTime committed (TIME_EDIT action)", async () => {
     // Nap is in-progress: recorded lifecycle, startTime <= nowMinutes < effectiveEnd
     const inProgressNap: Event = {
-      id: "n-started",
+      id: "proj_nap_t540", // simulates an auto-promoted projection
       dayId: "day-1",
       eventKey: "nap_1",
       type: "nap",

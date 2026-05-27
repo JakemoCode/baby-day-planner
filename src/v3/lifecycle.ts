@@ -26,20 +26,33 @@ import type { Event, EventKind, EventType, Lifecycle, TimeMin } from "./schemas"
 // ---------------------------------------------------------------------------
 
 /**
+ * True iff `event` is a rhythm-cascade projected event that is strictly
+ * in the future:
+ *
+ *   - lifecycle is `projected`
+ *   - `startTime > nowMinutes`
+ *   - type is `nap` or `bottle` (the cascade-anchoring types)
+ *   - NOT the dream-feed slot (`bottle_dream`) — that's explicit-
+ *     schedule, not rhythm-cascade
+ *
+ * Used as the shared entry-point for both {@link isFutureProjected} and
+ * {@link isNextProjectedOfType}.
+ */
+function isRhythmCascadeProjected(event: Event, nowMinutes: TimeMin): boolean {
+  if (event.lifecycle.state !== "projected") return false;
+  if (event.startTime <= nowMinutes) return false;
+  if (event.type !== "nap" && event.type !== "bottle") return false;
+  if (event.type === "bottle" && event.eventKey === "bottle_dream") return false;
+  return true;
+}
+
+/**
  * §F66 future-event drawer rule (ADR-0001 + CONTEXT.md "future-event
  * drawer rule"): the time/amount inputs on the drawer are locked only
- * for **rhythm-cascade** events whose movement would feed back into the
- * cascade and pin a slot:
- *
- *   - `nap` (rhythm — cascade walks WW chains from these)
- *   - `bottle` EXCEPT the dream-feed slot (`eventKey === "bottle_dream"`)
- *
- * Daycare, daily-recurring events, the dream-feed slot, and `extra`
- * events are all fixed-time / explicit-slot in nature — they're
- * inserted at their default time but don't anchor the cascade, so the
- * user can move them around per-day without breaking the engine.
- *
- * Established 2026-05-27 in the §F66 fast-follow scope clarification.
+ * for rhythm-cascade events (`nap`, non-dream-feed `bottle`) that are
+ * strictly in the future. Daycare, daily-recurring, dream-feed, and
+ * `extra` events are fixed-time / explicit-slot — the user can move
+ * them per-day without breaking the cascade.
  *
  * **Pure-event predicate**: does NOT know whether this event is the
  * chronologically-next of its type. The drawer combines this with
@@ -48,26 +61,19 @@ import type { Event, EventKind, EventType, Lifecycle, TimeMin } from "./schemas"
  *   `lockTimeInputs = isFutureProjected(e, now) && !isNextProjectedOfType(e, allEvents, now)`
  */
 export function isFutureProjected(event: Event, nowMinutes: TimeMin): boolean {
-  if (event.lifecycle.state !== "projected") return false;
-  if (event.startTime <= nowMinutes) return false;
-  if (event.type !== "nap" && event.type !== "bottle") return false;
-  // Dream-feed slot is explicitly schedule-time, not rhythm-cascade.
-  if (event.type === "bottle" && event.eventKey === "bottle_dream") return false;
-  return true;
+  return isRhythmCascadeProjected(event, nowMinutes);
 }
 
 /**
  * True iff `event` is the chronologically-earliest projected event of
  * its type whose `startTime > nowMinutes`. The drawer exempts these
  * from the time-lock so the user can anchor the next-up nap or bottle
- * to baby's actual rhythm (sick day, off-schedule day, etc.). Farther-
- * out events in the same type chain stay locked — once the user pins
- * the next slot, the cascade re-anchors and reprojects everything
- * beyond it from that point.
+ * to baby's actual rhythm (sick day, off-schedule day). Farther-out
+ * events stay locked — once the user pins the next slot, the cascade
+ * re-anchors and reprojects everything beyond it from that point.
  *
- * Dream-feed slot (`eventKey === "bottle_dream"`) is NOT counted as
- * the next bottle — it's a separate schedule-time slot, not part of
- * the rhythm chain.
+ * Dream-feed (`bottle_dream`) is not counted as the next bottle — it's
+ * a separate schedule-time slot, not part of the rhythm chain.
  *
  * Established 2026-05-27 in §F66 fast-follow C2.
  */
@@ -76,16 +82,11 @@ export function isNextProjectedOfType(
   allEvents: Event[],
   nowMinutes: TimeMin,
 ): boolean {
-  if (event.lifecycle.state !== "projected") return false;
-  if (event.startTime <= nowMinutes) return false;
-  if (event.type !== "nap" && event.type !== "bottle") return false;
-  if (event.type === "bottle" && event.eventKey === "bottle_dream") return false;
+  if (!isRhythmCascadeProjected(event, nowMinutes)) return false;
   let earliest: Event | undefined;
   for (const e of allEvents) {
     if (e.type !== event.type) continue;
-    if (e.lifecycle.state !== "projected") continue;
-    if (e.startTime <= nowMinutes) continue;
-    if (e.type === "bottle" && e.eventKey === "bottle_dream") continue;
+    if (!isRhythmCascadeProjected(e, nowMinutes)) continue;
     if (earliest === undefined || e.startTime < earliest.startTime) earliest = e;
   }
   return earliest !== undefined && earliest.id === event.id;
