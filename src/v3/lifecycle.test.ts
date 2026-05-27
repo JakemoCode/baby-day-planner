@@ -177,6 +177,23 @@ describe("isNextProjectedOfType (sick-day carve-out)", () => {
     const daycare = proj("dc", "daycare_dropoff", 14 * 60);
     expect(isNextProjectedOfType(daycare, [daycare], 12 * 60)).toBe(false);
   });
+
+  it("§F66 fast-follow: ignores render-synthetic putdown chips when picking the next nap", () => {
+    // Synthetic putdown carries type="nap" + parent's "projected"
+    // lifecycle for timeline geometry. Without the synthetic filter,
+    // its earlier startTime (nap.startTime - putdownLead) wins the
+    // "earliest projected nap" lottery and the real nap is marked
+    // as NOT next → drawer locks the real nap's time input.
+    const realNap = proj("nap2", "nap", 14 * 60);
+    const putdownSynthetic: Event = {
+      ...proj("putdown:nap2", "nap", 14 * 60 - 15),
+      eventKey: "__putdown__", // PUTDOWN_KIND_TAG sentinel
+    };
+    expect(isNextProjectedOfType(realNap, [realNap, putdownSynthetic], 12 * 60)).toBe(true);
+    expect(isNextProjectedOfType(putdownSynthetic, [realNap, putdownSynthetic], 12 * 60)).toBe(
+      false,
+    );
+  });
 });
 
 describe("reduceLifecycle — valid transitions", () => {

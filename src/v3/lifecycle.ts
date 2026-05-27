@@ -20,6 +20,7 @@
  */
 
 import type { Event, EventKind, EventType, Lifecycle, TimeMin } from "./schemas";
+import { isRenderSynthetic } from "./lib/syntheticEvents";
 
 // ---------------------------------------------------------------------------
 // Predicates
@@ -43,6 +44,12 @@ function isRhythmCascadeProjected(event: Event, nowMinutes: TimeMin): boolean {
   if (event.startTime <= nowMinutes) return false;
   if (event.type !== "nap" && event.type !== "bottle") return false;
   if (event.type === "bottle" && event.eventKey === "bottle_dream") return false;
+  // Render-synthetic putdown chips inherit type="nap" + parent's
+  // lifecycle ("projected"), so without this filter they'd claim the
+  // chronologically-next nap slot in isNextProjectedOfType (their
+  // startTime = nap.startTime - putdownLead, earlier than the real
+  // nap) and lock the real nap's drawer inputs.
+  if (isRenderSynthetic(event)) return false;
   return true;
 }
 
