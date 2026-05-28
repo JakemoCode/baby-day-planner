@@ -2103,5 +2103,11 @@ describe("§F66 fast-follow B4 — past-time emit during nap edit snaps to nap e
     // First slot at wakeTime + buffer = 7:10 (past Now=12:00).
     // Not snapped forward; auto-promoted to recorded.
     expect(bottles[0]?.startTime).toBe(7 * 60 + 10);
+    // §F66 audit: the test name claims "auto-promote claims them" but
+    // previously only asserted startTime, so a regression that left the
+    // bottle in `projected` lifecycle would silently pass. Pin both
+    // halves of the claim — the cold-start chain emits at 7:10 AND
+    // Now-cross auto-promote upgrades that slot to `recorded`.
+    expect(bottles[0]?.lifecycle.state).toBe("recorded");
   });
 });

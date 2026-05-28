@@ -117,17 +117,74 @@ describe("Contextual button — seam (engine + render + decideMode)", () => {
     // At 10:55, both the bottle window (10:45–11:15) and the in-progress
     // nap (started at 10:45) coexist — End Nap wins per ADR-0003.
     const now = hm(10, 55);
-    const inProgressNap = recordedInProgressNap(hm(10, 45));
-    const events = project(now, [recordedBottle("bottle_1", hm(8)), inProgressNap]);
+    const events = project(now, [
+      recordedBottle("bottle_1", hm(8)),
+      recordedInProgressNap(hm(10, 45)),
+    ]);
+    // §F66 audit fix: derive inProgressNap from the engine OUTPUT, not the
+    // fixture. Otherwise the engine's actual handling of an in-progress
+    // recorded nap (lifecycle bookkeeping, annotation passes) isn't verified
+    // end-to-end — the test would pass even if the engine corrupted the nap.
+    const inProgressNap = events.find(
+      (e) =>
+        e.type === "nap" &&
+        e.lifecycle.state === "recorded" &&
+        e.kind === "block" &&
+        e.startTime <= now &&
+        (e.endTime ?? Infinity) > now,
+    );
+    expect(inProgressNap).toBeDefined();
     const nb = nearestBottleInWindow(events, now, LOG_BOTTLE_WINDOW_MIN);
     expect(nb?.startTime).toBe(hm(11));
 
     const mode = decideMode({
-      inProgressNap,
+      ...(inProgressNap ? { inProgressNap } : {}),
       ...(nb ? { nextProjectedBottle: nb } : {}),
       nowMinutes: now,
     });
     expect(mode.kind).toBe("end-nap");
+  });
+
+  it("§F66 audit: round-trip — clicking Log Bottle flips alreadyLogged to true", () => {
+    // Action-chain seam: the most consequential §F66 transition is "user
+    // taps Log Bottle Now → mode becomes 'logged' so re-taps don't silently
+    // overwrite." Component tests cover the click handler with mocks; this
+    // round-trip pins that the projected → completed lifecycle transition
+    // is what flips decideMode's `alreadyLogged` flag.
+    const now = hm(11, 0);
+    const initialEvents = project(now, [recordedBottle("bottle_1", hm(8))]);
+    const projectedBottle = nearestBottleInWindow(initialEvents, now, LOG_BOTTLE_WINDOW_MIN);
+    expect(projectedBottle?.startTime).toBe(hm(11));
+    // Engine auto-promotes the projected bottle to lifecycle.recorded
+    // (Now-cross, ADR-0006), NOT completed — alreadyLogged stays false.
+    const initialMode = decideMode({
+      ...(projectedBottle ? { nextProjectedBottle: projectedBottle } : {}),
+      nowMinutes: now,
+    });
+    expect(initialMode).toMatchObject({ kind: "log-bottle", alreadyLogged: false });
+
+    // Simulate ContextualActionButton's onLogBottle: a `completed` bottle
+    // overlaid at the projected slot's eventKey. Re-project + re-decide.
+    const loggedBottle: Event = {
+      id: "recorded_bottle_2",
+      dayId: "day_test",
+      eventKey: projectedBottle!.eventKey,
+      type: "bottle",
+      kind: "instant",
+      label: projectedBottle!.label,
+      startTime: now,
+      amountOz: 6,
+      hasPutdown: false,
+      owner: NO_OWNER,
+      lifecycle: { state: "completed", committedAt: now },
+    };
+    const afterEvents = project(now, [recordedBottle("bottle_1", hm(8)), loggedBottle]);
+    const afterBottle = nearestBottleInWindow(afterEvents, now, LOG_BOTTLE_WINDOW_MIN);
+    const afterMode = decideMode({
+      ...(afterBottle ? { nextProjectedBottle: afterBottle } : {}),
+      nowMinutes: now,
+    });
+    expect(afterMode).toMatchObject({ kind: "log-bottle", alreadyLogged: true });
   });
 
   it("§F66 fast-follow B2: with recorded Bottle 1 @ 8am and projected Bottle 2 in window, the selector targets Bottle 2 (not Bottle 1)", () => {
@@ -139,9 +196,7 @@ describe("Contextual button — seam (engine + render + decideMode)", () => {
     const now = hm(10, 54);
     const events = project(now, [recordedBottle("bottle_1", hm(8))]);
     const nb = nearestBottleInWindow(events, now, LOG_BOTTLE_WINDOW_MIN);
-    expect(nb).toBeDefined();
-    expect(nb?.eventKey).not.toBe("bottle_1");
+    expect(nb?.eventKey).toBe("bottle_2");
     expect(nb?.startTime).toBe(hm(11, 0));
-    expect(Math.abs((nb?.startTime ?? 0) - now)).toBeLessThanOrEqual(LOG_BOTTLE_WINDOW_MIN);
   });
 });
