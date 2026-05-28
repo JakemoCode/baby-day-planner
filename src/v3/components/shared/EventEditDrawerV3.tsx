@@ -212,19 +212,32 @@ export function EventEditDrawerV3({
   //   - dream-feed slot (→ Day.suppressedDreamFeed, §F66 fast-follow)
   // useDrawer routes each path.
   const isDreamFeedSlot = type === "bottle" && sourceEvent.eventKey === "bottle_dream";
-  // §F66 fast-follow B11: an auto-promoted nap/bedtime has lifecycle
-  // "recorded" but lives only in transient engine output — there's no
-  // Firestore doc to delete. The engine re-emits + re-auto-promotes
-  // on the very next pass, so Delete would visibly do nothing.
-  // Detection: engine-emitted id (starts with "proj_") + sleep-type.
-  // Bottles are exempt — useAutoPromotePersistence (B5) writes them
-  // and suppressedBottleEventKeys (B10) makes deletion stick.
+  // §F66 fast-follow B11: hide Delete when the cascade owns the slot.
+  //
+  // Auto-promoted nap/bedtime: lifecycle "recorded" but no Firestore
+  // doc — engine output only. Detection: id starts with "proj_".
+  //
+  // Auto-promoted bottle: useAutoPromotePersistence wrote a doc with
+  // id `recorded_bottle_N` and lifecycle {state:"recorded",
+  // annotatedAt:startTime}. Manual logs (ContextualActionButton) use
+  // "completed"; drawer saves bump annotatedAt to nowMinutes. So
+  // `recorded && annotatedAt === startTime` uniquely identifies the
+  // auto-promote ghost — for those, the cascade re-emits on the next
+  // pass and the hook re-writes the doc (loop). Delete would visibly
+  // do nothing. The dream-feed slot uses its own suppression and
+  // is exempt.
   const isAutoPromotedSleep =
     (type === "nap" || type === "bedtime") && sourceEvent.id.startsWith("proj_");
+  const isAutoPromotedBottle =
+    type === "bottle" &&
+    !isDreamFeedSlot &&
+    sourceEvent.lifecycle.state === "recorded" &&
+    sourceEvent.lifecycle.annotatedAt === sourceEvent.startTime;
   const canDelete =
     mode === "edit" &&
     onDelete !== undefined &&
     !isAutoPromotedSleep &&
+    !isAutoPromotedBottle &&
     (isRecorded(sourceEvent.lifecycle) ||
       type === "daily_recurring" ||
       type === "daycare_dropoff" ||

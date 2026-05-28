@@ -481,6 +481,57 @@ describe("EventEditDrawerV3", () => {
     expect(screen.getByRole("button", { name: "Delete" })).toBeInTheDocument();
   });
 
+  it("§F66 B11: delete button is HIDDEN for an auto-promoted bottle (recorded + annotatedAt===startTime)", () => {
+    // Auto-promote signature: lifecycle state "recorded" with
+    // annotatedAt === startTime. Manual logs use "completed" and
+    // drawer saves bump annotatedAt to nowMinutes, so neither
+    // matches.
+    render(
+      <EventEditDrawerV3
+        open
+        mode="edit"
+        event={projectedBottle({
+          id: "recorded_bottle_2",
+          startTime: 10 * 60,
+          lifecycle: { state: "recorded", annotatedAt: 10 * 60 },
+        })}
+        owners={owners}
+        nowMinutes={NOW}
+        bedtimeThreshold={THRESHOLD}
+        defaultWakeTime={DEFAULT_WAKE_TIME}
+        onSave={() => {}}
+        onCancel={() => {}}
+        onDelete={() => {}}
+      />,
+    );
+    expect(screen.queryByRole("button", { name: "Delete" })).toBeNull();
+  });
+
+  it("§F66 B11: delete button is SHOWN for a manually-logged bottle (lifecycle completed)", () => {
+    // ContextualActionButton.buildLoggedBottle writes lifecycle
+    // {state:"completed", committedAt}. User wants to delete the
+    // extra bottle they added — Delete must remain available.
+    render(
+      <EventEditDrawerV3
+        open
+        mode="edit"
+        event={projectedBottle({
+          id: "recorded_bottle_5",
+          startTime: 14 * 60,
+          lifecycle: { state: "completed", committedAt: 14 * 60 },
+        })}
+        owners={owners}
+        nowMinutes={NOW}
+        bedtimeThreshold={THRESHOLD}
+        defaultWakeTime={DEFAULT_WAKE_TIME}
+        onSave={() => {}}
+        onCancel={() => {}}
+        onDelete={() => {}}
+      />,
+    );
+    expect(screen.getByRole("button", { name: "Delete" })).toBeInTheDocument();
+  });
+
   it("§F66 B11: delete button is HIDDEN for an auto-promoted nap (proj_ id + recorded lifecycle)", () => {
     // An auto-promoted nap exists only in transient engine output —
     // there's no Firestore doc to delete. The engine re-emits and
