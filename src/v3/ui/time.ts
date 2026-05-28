@@ -95,6 +95,17 @@ export function formatHoursMinutes(min: number): string {
 }
 
 /**
+ * Format a countdown to an upcoming event: "now" once the delta hits
+ * zero, otherwise "in 1h 20m". `isNow` lets callers style the
+ * at-or-past-now state distinctly. Shared by the dashboard's Next-*
+ * panels.
+ */
+export function formatStartDelta(deltaMinutes: number): { text: string; isNow: boolean } {
+  if (deltaMinutes <= 0) return { text: "now", isNow: true };
+  return { text: `in ${formatHoursMinutes(deltaMinutes)}`, isNow: false };
+}
+
+/**
  * Read the wall clock and return the current local time as a TimeMin
  * (minutes since local midnight). Used by action buttons that log
  * "now" events.

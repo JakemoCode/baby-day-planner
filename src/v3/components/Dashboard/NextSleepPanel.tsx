@@ -1,5 +1,10 @@
 import type { Event, OwnersConfig, TimeMin } from "@/v3/schemas";
-import { formatHoursMinutes, formatTimeForDisplay, formatTimeShort } from "@/v3/ui/time";
+import {
+  formatHoursMinutes,
+  formatStartDelta,
+  formatTimeForDisplay,
+  formatTimeShort,
+} from "@/v3/ui/time";
 import { OwnerPill } from "./OwnerPill";
 import { lastCompletedNap, napTotals } from "./dashboardStats";
 import styles from "./NextSleepPanel.module.css";
@@ -15,11 +20,6 @@ export type NextSleepPanelProps = {
 
 function pluralNaps(n: number): string {
   return n === 1 ? "nap" : "naps";
-}
-
-function formatDelta(deltaMinutes: number): string {
-  if (deltaMinutes <= 0) return "now";
-  return `in ${formatHoursMinutes(deltaMinutes)}`;
 }
 
 export function NextSleepPanel({
@@ -41,7 +41,9 @@ export function NextSleepPanel({
         <>
           <div className={styles.timeRow}>
             <span className={styles.time}>{formatTimeForDisplay(nextNap.startTime)}</span>
-            <span className={styles.delta}>{formatDelta(nextNap.startTime - nowMinutes)}</span>
+            <span className={styles.delta}>
+              {formatStartDelta(nextNap.startTime - nowMinutes).text}
+            </span>
             {nextNap.owner && <OwnerPill owner={nextNap.owner} owners={owners} />}
           </div>
           {putdownTime !== undefined && (
