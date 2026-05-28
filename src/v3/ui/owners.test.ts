@@ -1,10 +1,4 @@
-/**
- * Owner display-name lookup at the UI boundary.
- *
- * The engine stores OwnerRef as a slot identity; the UI looks up the
- * configured displayName at render time. This keeps slot identity
- * stable across rename ("Mom" → "Mama") without rewriting any events.
- */
+/** Owner lookup at the UI boundary; slot identity stays stable across display renames. */
 
 import { describe, expect, it } from "vitest";
 import type { OwnerRef, OwnersConfig } from "../schemas";
@@ -40,7 +34,7 @@ describe("ownerDisplayName", () => {
   });
 });
 
-describe("ownerColor (§F4 — slot-keyed token references)", () => {
+describe("ownerColor (slot-keyed token references)", () => {
   it("resolves parent slots to their CSS variable references", () => {
     expect(ownerColor({ slot: "parent1" }, owners)).toBe("var(--color-owner-parent-1)");
     expect(ownerColor({ slot: "parent2" }, owners)).toBe("var(--color-owner-parent-2)");

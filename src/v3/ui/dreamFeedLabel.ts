@@ -1,17 +1,7 @@
 /**
- * Dream feed — render-only label.
- *
- * Per docs/v3/SIMPLIFICATION_SCOPE.md §3: dream feed has ZERO engine
- * logic. At render time, when `settings.dreamFeedEnabled` is true and
- * a bedtime exists in the projection, the FIRST bottle (in startTime
- * order) whose startTime is strictly after `bedtime.startTime` gets
- * relabeled "Dream Feed".
- *
- * Lifecycle-agnostic: recorded bottles are relabeled too. "Dream Feed"
- * is the name of the slot, not a forecast hint — if the user logged a
- * real 10 PM bottle, that IS the dream feed.
- *
- * Subsequent post-bedtime bottles are normal "Bottle N" labels.
+ * Render-only "Dream Feed" label (SIMPLIFICATION_SCOPE.md §3 — zero engine logic).
+ * Relabels the first bottle (by startTime) after bedtime when `dreamFeedEnabled`.
+ * Lifecycle-agnostic: a recorded post-bedtime bottle IS the dream feed.
  */
 
 import type { Event, Settings } from "../schemas";
@@ -25,8 +15,7 @@ export function applyDreamFeedLabel(events: Event[], settings: Settings): Event[
   const bedtime = events.find(isBedtime);
   if (!bedtime) return events;
 
-  // First-by-startTime selection. Iteration order of the events array
-  // is not guaranteed to be time-sorted, so we pick the winner up front.
+  // events array isn't time-sorted, so pick the earliest post-bedtime bottle explicitly.
   const target = events
     .filter((e) => isBottle(e) && e.startTime > bedtime.startTime)
     .reduce<

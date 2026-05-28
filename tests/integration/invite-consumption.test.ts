@@ -1,17 +1,8 @@
 // @vitest-environment node
 /**
- * §F3 PR #2 invite consumption end-to-end seam test.
- *
- * Specifically validates the *rule-tightening* gate: a second allowlisted
- * user cannot read another user's child UNTIL they've consumed an invite.
- * Without the PR #2 rule tightening, an allowlisted email was the sole
- * gate — anyone in the allowlist could read any /children/{id}. This test
- * makes that contract explicit and would fail loudly if the rule ever
- * regressed.
- *
- * The data-layer correctness of consumeInvite itself is covered by
- * src/v3/repositories/invites.test.ts. This adds the cross-user rule
- * dimension.
+ * Invite-consumption seam validating the cross-user rule gate: a user cannot read
+ * another's child UNTIL they consume an invite. Locks that contract so a rule
+ * regression fails loudly. consumeInvite's own correctness is in invites.test.ts.
  */
 
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
@@ -25,7 +16,7 @@ import { loadUser } from "../../src/v3/repositories/users";
 
 const KELLY = { uid: "kelly-uid", email: "kellyrbarber@gmail.com" };
 
-describe("§F3 PR #2 — invite consumption end-to-end", () => {
+describe("invite consumption end-to-end", () => {
   let env: RulesTestEnvironment;
   beforeAll(async () => {
     env = await startTestEnv();

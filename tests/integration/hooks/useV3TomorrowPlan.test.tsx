@@ -1,10 +1,5 @@
 // @vitest-environment jsdom
-/**
- * Integration test: useV3TomorrowPlan hook (§F12 PR 2)
- *
- * Subscribes to /children/{childId}/tomorrowPlans/{date}. Used by the
- * dashboard to surface `hasTomorrowPlan` to the dev StartDayButton.
- */
+/** Emulator-backed test for useV3TomorrowPlan — subscribes to one tomorrowPlans/{date} doc. */
 
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { renderHook, waitFor } from "@testing-library/react";

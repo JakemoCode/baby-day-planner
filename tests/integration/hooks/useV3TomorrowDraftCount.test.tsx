@@ -1,10 +1,5 @@
 // @vitest-environment jsdom
-/**
- * Integration test: useV3TomorrowDraftCount (§F12 PR 3).
- *
- * Real Firestore emulator → real subscription. Verifies that draft
- * plans are counted and confirmed plans are not.
- */
+/** Emulator-backed test for useV3TomorrowDraftCount: draft plans count, confirmed don't. */
 
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { renderHook, waitFor } from "@testing-library/react";

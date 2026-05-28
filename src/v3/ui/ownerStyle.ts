@@ -1,19 +1,6 @@
 /**
- * Owner-color CSS-variable helper.
- *
- * Components that visually identify an owner set the `--owner-color`
- * CSS custom property scoped to the element. This helper centralises
- * the conditional shape (omit the variable entirely when there is no
- * owner, so per-rule CSS fallbacks fire) and one canonical pattern.
- *
- * The `--*` augmentation in `src/types/react-css.d.ts` removes any
- * cast requirement; this helper exists to avoid repeating the literal
- * variable name `--owner-color` and the omit-when-null shape at every
- * call site.
- *
- * Companion attribute `data-owner` is set independently via
- * `ownerSlotKey()` — components conditionally spread it next to
- * `style={ownerStyleVar(...)}`.
+ * `--owner-color` CSS-variable helper. Omits the variable when there's no owner
+ * so per-rule CSS fallbacks fire. Companion `data-owner` attr comes from `ownerSlotKey()`.
  */
 
 import type { CSSProperties } from "react";
