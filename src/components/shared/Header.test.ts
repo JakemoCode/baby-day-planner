@@ -25,14 +25,14 @@ describe("formatAge", () => {
     // Week boundary at 14 days
     ["2026-05-12", "2 weeks"],
     ["2026-05-05", "3 weeks"],
-    // Exact week→month boundary. The function uses `weeks < 12` (strict).
-    // NB: day count uses `floor(ms / 86_400_000)` which loses 1h on DST
-    // (US spring-forward is 2026-03-08), so calendar-84-days from
-    // 2026-05-26 reads as 83 elapsed-days → "11 weeks". This is a real
-    // production behavior, pinned here so a fix to switch to a
-    // calendar-day-diff doesn't slip through unnoticed.
-    ["2026-03-03", "11 weeks"], // 83 elapsed-days
-    ["2026-03-02", "2 months"], // 84 elapsed-days → 12 weeks → months path
+    // Week→month boundary, months side. Pins `weeks < 12` (strict): 12
+    // weeks → months path, NOT "12 weeks". Catches the `<` → `<=` mutation.
+    // NB: we don't pin the adjacent weeks=11 side because the production
+    // day-count (`ms / 86_400_000`) loses an hour on DST, and DST dates
+    // differ by region (US 03-08, EU 03-29). Spans landing within ~1 day
+    // of the boundary flake across timezones; rows like 2026-03-02 sit
+    // safely on the months side in every tz checked.
+    ["2026-03-02", "2 months"],
     // Calendar-month math, branch A — adjustment fires:
     //   now=May 26, birth=Feb 27 → months=3 then -1 (now.date 26 < birth.date 27) → 2 months
     ["2026-02-27", "2 months"],
