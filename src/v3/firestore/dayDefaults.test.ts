@@ -20,6 +20,7 @@ describe("withV3DayDefaults", () => {
       suppressedRecurringIds: ["recurring-1"],
       suppressedDaycareDay: true,
       suppressedDreamFeed: false,
+      suppressedBottleEventKeys: [],
       templateId: "tpl-saturday",
     };
     expect(withV3DayDefaults(v3)).toEqual(v3);

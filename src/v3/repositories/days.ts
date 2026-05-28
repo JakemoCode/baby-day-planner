@@ -86,6 +86,7 @@ export async function getOrCreatePlannedDay(
     wakeTime: defaultWakeTime,
     suppressedRecurringIds: [],
     suppressedDaycareDay: false,
+    suppressedBottleEventKeys: [],
   };
   await setDoc(dayRef(db, childId, newDay.id), newDay);
   return newDay;
@@ -180,6 +181,27 @@ export async function suppressDaycareForDay(
  * "delete" handler on the dream-feed slot. Tomorrow's fresh Day doc
  * starts with `false`.
  */
+/**
+ * §F66 fast-follow B10: per-day bottle suppression. When the user
+ * deletes an auto-promote-persisted bottle (a "ghost" the engine
+ * filled in but baby didn't actually take), the drawer writes the
+ * bottle's eventKey here so R5 + R5.4 skip the slot. Without this
+ * the cascade re-emits, auto-promote re-claims, and the
+ * useAutoPromotePersistence hook re-writes the doc — ghost reappears.
+ *
+ * Uses `arrayUnion` so duplicate suppressions are a no-op.
+ */
+export async function suppressBottleForDay(
+  db: Firestore,
+  childId: string,
+  dayId: string,
+  eventKey: string,
+): Promise<void> {
+  await updateDoc(dayRef(db, childId, dayId), {
+    suppressedBottleEventKeys: arrayUnion(eventKey),
+  });
+}
+
 export async function suppressDreamFeedForDay(
   db: Firestore,
   childId: string,

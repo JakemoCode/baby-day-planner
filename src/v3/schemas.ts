@@ -174,6 +174,15 @@ export type Day = {
   suppressedDaycareDay: boolean;
   /** §F66 fast-follow: per-day dream-feed opt-out. R5.5 skips emission when true. */
   suppressedDreamFeed?: boolean;
+  /**
+   * §F66 fast-follow B10 — per-day bottle suppression keyed by
+   * eventKey (e.g. `"bottle_2"`). When the user deletes an
+   * auto-promote-persisted bottle (per "delete events that didn't
+   * actually happen"), the drawer writes the eventKey here so R5 +
+   * R5.4 skip the slot. Tomorrow's fresh Day doc starts empty and
+   * the cascade re-projects normally.
+   */
+  suppressedBottleEventKeys?: string[];
   /** Optional template id selected for this day. */
   templateId?: string;
   /**

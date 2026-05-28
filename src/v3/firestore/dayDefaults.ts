@@ -24,6 +24,7 @@ export function withV3DayDefaults(input: Partial<Day> | null): Day | null {
     suppressedRecurringIds: input.suppressedRecurringIds ?? [],
     suppressedDaycareDay: input.suppressedDaycareDay ?? false,
     suppressedDreamFeed: input.suppressedDreamFeed ?? false,
+    suppressedBottleEventKeys: input.suppressedBottleEventKeys ?? [],
   };
 
   if (input.wakeTime !== undefined) {
