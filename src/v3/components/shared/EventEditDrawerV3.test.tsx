@@ -529,7 +529,7 @@ describe("EventEditDrawerV3", () => {
         onDelete={() => {}}
       />,
     );
-    expect(screen.getByRole("button", { name: "Delete" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Delete" })).toBeVisible();
   });
 
   it("§F66 B11: delete button is HIDDEN for an auto-promoted nap (proj_ id + recorded lifecycle)", () => {

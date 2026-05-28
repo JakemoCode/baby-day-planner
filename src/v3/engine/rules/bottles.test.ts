@@ -177,10 +177,11 @@ describe("R5.4 — recorded bottle identity frozen; projected fill after max rec
     expect(bottles[1]!.eventKey).toBe("bottle_1");
     expect(bottles[1]!.label).toBe("Bottle 1");
     // Projected bottles fill starting from max(recorded) + 1 = 3.
+    // Anchored cascade extends forward; at least one projection should
+    // exist past the 9am anchor.
     const projected = bottles.filter((b) => b.lifecycle.state === "projected");
-    if (projected.length > 0) {
-      expect(projected[0]!.eventKey).toBe("bottle_3");
-    }
+    expect(projected.length).toBeGreaterThan(0);
+    expect(projected[0]!.eventKey).toBe("bottle_3");
   });
 
   it("recorded bottle keeps its number when time-edited into a new chronological position", () => {
@@ -219,10 +220,11 @@ describe("R5.4 — recorded bottle identity frozen; projected fill after max rec
     expect(rec.eventKey).toBe("bottle_3");
     expect(rec.label).toBe("Bottle 3");
     // Subsequent projected bottles start at 4 (max recorded + 1).
+    // Anchored cascade extends forward from 12:30; at least one
+    // projection should exist after the recorded anchor.
     const projected = bottles.filter((b) => b.lifecycle.state === "projected");
-    if (projected.length > 0) {
-      expect(projected[0]!.eventKey).toBe("bottle_4");
-    }
+    expect(projected.length).toBeGreaterThan(0);
+    expect(projected[0]!.eventKey).toBe("bottle_4");
   });
 });
 
