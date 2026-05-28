@@ -1,6 +1,10 @@
 /**
- * R11.2 — Projects one event per enabled, non-suppressed dailyRecurring entry.
- * Existing event at the same eventKey (R11.5) or suppressed id (R11.6) blocks projection.
+ * R11.x daily recurring event rules. Source: docs/v3/ENGINE_SPEC.md §11.
+ * Projects one event per enabled, non-suppressed dailyRecurring entry; an
+ * existing event at the same eventKey (R11.5) or a suppressed id (R11.6) blocks it.
+ *
+ * Known gap (deferred to R12 owners work): defaultOwnerSlot is `parent1 | parent2`;
+ * supporting "other" caregivers as default owners needs an `OwnerRef`, not an `OwnerSlot`.
  */
 
 import type { Context, DailyRecurring as RecurringConfig, Event } from "../../schemas";
