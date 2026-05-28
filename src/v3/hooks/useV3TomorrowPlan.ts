@@ -1,11 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { onSnapshot, type Firestore } from "firebase/firestore";
 import { db } from "@/lib/firebase/client";
-import { tomorrowPlanPath } from "@/lib/firestore/paths";
-import { doc } from "firebase/firestore";
-import { v3TomorrowPlanConverter } from "../firestore/converters";
+import { watchTomorrowPlan } from "../repositories/tomorrowPlans";
 import type { TomorrowPlan } from "../schemas";
 
 export type UseV3TomorrowPlanResult = {
@@ -25,12 +22,8 @@ export function useV3TomorrowPlan(childId: string, date: string): UseV3TomorrowP
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const database = db as Firestore;
-    const ref = doc(database, tomorrowPlanPath(childId, date)).withConverter(
-      v3TomorrowPlanConverter,
-    );
-    return onSnapshot(ref, (snap) => {
-      setPlan(snap.exists() ? snap.data() : null);
+    return watchTomorrowPlan(db, childId, date, (p) => {
+      setPlan(p);
       setLoading(false);
     });
   }, [childId, date]);

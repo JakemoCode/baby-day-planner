@@ -19,6 +19,8 @@ import {
   loadTomorrowPlan,
   markPlanDraft,
   saveTomorrowPlan,
+  watchTomorrowDraftCount,
+  watchTomorrowPlan,
 } from "./tomorrowPlans";
 
 const aPlan = (overrides: Partial<TomorrowPlan> = {}): TomorrowPlan => ({
@@ -158,5 +160,36 @@ describe("v3 tomorrowPlans repository", () => {
     const b = await loadTomorrowPlan(db(), "aden", "2026-05-20");
     expect(a?.startTemplateId).toBeUndefined();
     expect(b?.startTemplateId).toBe("tpl-sunday");
+  });
+
+  // watchTomorrowPlan / watchTomorrowDraftCount back the useV3TomorrowPlan
+  // and useV3TomorrowDraftCount hooks (which now just delegate). The
+  // subscription seam is exercised here against the real emulator.
+  it("watchTomorrowPlan delivers null then the plan when it's written", async () => {
+    const database = db();
+    const seen: (TomorrowPlan | null)[] = [];
+    const unsub = watchTomorrowPlan(database, "aden", "2026-05-19", (p) => seen.push(p));
+    await new Promise((r) => setTimeout(r, 100));
+    await saveTomorrowPlan(database, "aden", aPlan({ date: "2026-05-19", wakeTime: 7 * 60 }));
+    await new Promise((r) => setTimeout(r, 200));
+    unsub();
+    expect(seen[0]).toBeNull(); // no doc yet on first snapshot
+    const last = seen[seen.length - 1];
+    expect(last?.wakeTime).toBe(7 * 60);
+  });
+
+  it("watchTomorrowDraftCount counts only draft plans, live", async () => {
+    const database = db();
+    const counts: number[] = [];
+    const unsub = watchTomorrowDraftCount(database, "aden", (n) => counts.push(n));
+    await new Promise((r) => setTimeout(r, 100));
+    // Two drafts + one confirmed → count should settle at 2.
+    await saveTomorrowPlan(database, "aden", aPlan({ date: "2026-05-19", status: "draft" }));
+    await saveTomorrowPlan(database, "aden", aPlan({ date: "2026-05-20", status: "draft" }));
+    await saveTomorrowPlan(database, "aden", aPlan({ date: "2026-05-21", status: "confirmed" }));
+    await new Promise((r) => setTimeout(r, 200));
+    unsub();
+    expect(counts[0]).toBe(0); // empty collection on first snapshot
+    expect(counts[counts.length - 1]).toBe(2);
   });
 });
