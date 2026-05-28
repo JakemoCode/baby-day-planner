@@ -7,15 +7,10 @@ import { useV3Settings } from "@/v3/hooks/useV3Settings";
 import { useV3Templates } from "@/v3/hooks/useV3Templates";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { LoadingState } from "@/components/shared/LoadingState";
-import { FAB } from "@/components/shared/FAB";
-import { FABTypePicker } from "@/components/shared/FABTypePicker";
 import { BottomSheet } from "@/components/shared/BottomSheet";
 import { EventEditDrawerV3 } from "@/v3/components/shared/EventEditDrawerV3";
 import { OwnerPickerV3 } from "@/v3/components/shared/OwnerPickerV3";
-import {
-  buildCreateTemplate,
-  type CreatableType,
-} from "@/v3/components/shared/createEventTemplate";
+import { AddEventFAB } from "@/v3/components/shared/AddEventFAB";
 import { TomorrowForm } from "@/v3/components/Tomorrow/TomorrowForm";
 import { TomorrowPreview } from "@/v3/components/Tomorrow/TomorrowPreview";
 import { ActionButton } from "@/v3/components/Dashboard/ActionButton";
@@ -47,7 +42,6 @@ export default function TomorrowPage() {
   const { settings, loading: settingsLoading } = useV3Settings(CHILD_ID);
   const { templates, loading: templatesLoading } = useV3Templates(CHILD_ID);
 
-  const [pickerOpen, setPickerOpen] = useState(false);
   const [pickedEvent, setPickedEvent] = useState<Event | null>(null);
   const [clearConfirmOpen, setClearConfirmOpen] = useState(false);
 
@@ -69,8 +63,6 @@ export default function TomorrowPage() {
       tomorrowDate={TOMORROW}
       settings={settings}
       templates={templates}
-      pickerOpen={pickerOpen}
-      setPickerOpen={setPickerOpen}
       pickedEvent={pickedEvent}
       setPickedEvent={setPickedEvent}
       clearConfirmOpen={clearConfirmOpen}
@@ -84,8 +76,6 @@ type TomorrowPageInnerProps = {
   tomorrowDate: string;
   settings: NonNullable<ReturnType<typeof useV3Settings>["settings"]>;
   templates: ReturnType<typeof useV3Templates>["templates"];
-  pickerOpen: boolean;
-  setPickerOpen: (v: boolean) => void;
   pickedEvent: Event | null;
   setPickedEvent: (e: Event | null) => void;
   clearConfirmOpen: boolean;
@@ -97,8 +87,6 @@ function TomorrowPageInner({
   tomorrowDate,
   settings,
   templates,
-  pickerOpen,
-  setPickerOpen,
   pickedEvent,
   setPickedEvent,
   clearConfirmOpen,
@@ -165,17 +153,6 @@ function TomorrowPageInner({
     const override = planState.ownerOverrides[event.eventKey];
     if (override !== undefined) return override ?? NO_OWNER;
     return event.owner ?? NO_OWNER;
-  };
-
-  const handleAddEvent = (type: CreatableType) => {
-    const tpl = buildCreateTemplate({
-      type,
-      dayId: tomorrowDay.id,
-      actuals: planState.extras,
-      settings,
-      nowMinutes: TOMORROW_ANCHOR_MINUTES,
-    });
-    openCreate(tpl);
   };
 
   return (
@@ -266,15 +243,13 @@ function TomorrowPageInner({
         </BottomSheet>
       )}
 
-      <FAB label="Add an event" onClick={() => setPickerOpen(true)} />
-
-      <FABTypePicker
-        open={pickerOpen}
-        onSelect={(type: CreatableType) => {
-          setPickerOpen(false);
-          handleAddEvent(type);
-        }}
-        onCancel={() => setPickerOpen(false)}
+      <AddEventFAB
+        dayId={tomorrowDay.id}
+        actuals={planState.extras}
+        settings={settings}
+        nowMinutes={TOMORROW_ANCHOR_MINUTES}
+        types={["extra"]}
+        onCreate={openCreate}
       />
 
       <EventEditDrawerV3

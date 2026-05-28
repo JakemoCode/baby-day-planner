@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import type { TimeMin } from "@/v3/schemas";
 import { useNowMinutes } from "@/hooks/useNowMinutes";
 import { useDayPageState } from "@/v3/hooks/useDayPageState";
@@ -8,10 +7,7 @@ import { db } from "@/lib/firebase/client";
 import { editWakeTime } from "@/v3/repositories/days";
 import { LoadingState } from "@/components/shared/LoadingState";
 import { EmptyState } from "@/components/shared/EmptyState";
-import { FAB } from "@/components/shared/FAB";
-import { FABTypePicker } from "@/components/shared/FABTypePicker";
-import type { CreatableType } from "@/v3/components/shared/createEventTemplate";
-import { buildCreateTemplate } from "@/v3/components/shared/createEventTemplate";
+import { AddEventFAB } from "@/v3/components/shared/AddEventFAB";
 import { DrawerShell } from "@/v3/components/shared/DrawerShell";
 import { EditableWakeTime } from "@/v3/components/Dashboard/EditableWakeTime";
 import { TimelineV3 } from "@/v3/components/Timeline/TimelineV3";
@@ -35,7 +31,6 @@ export default function TimelinePage() {
     onSave,
     onDelete,
   } = useDayPageState(db, CHILD_ID);
-  const [pickerOpen, setPickerOpen] = useState(false);
 
   if (dayLoading || settingsLoading) {
     return (
@@ -82,23 +77,13 @@ export default function TimelinePage() {
         onEventTap={openEdit}
       />
 
-      <FAB label="Add an event" onClick={() => setPickerOpen(true)} />
-
-      <FABTypePicker
-        open={pickerOpen}
-        onSelect={(type: CreatableType) => {
-          setPickerOpen(false);
-          const tpl = buildCreateTemplate({
-            type,
-            dayId: day.id,
-            actuals,
-            settings,
-            nowMinutes,
-            projected,
-          });
-          openCreate(tpl);
-        }}
-        onCancel={() => setPickerOpen(false)}
+      <AddEventFAB
+        dayId={day.id}
+        actuals={actuals}
+        settings={settings}
+        nowMinutes={nowMinutes}
+        projected={projected}
+        onCreate={openCreate}
       />
 
       <DrawerShell
