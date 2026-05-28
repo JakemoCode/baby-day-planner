@@ -35,6 +35,27 @@ export function AddEventFAB({
 }: AddEventFABProps) {
   const [pickerOpen, setPickerOpen] = useState(false);
 
+  const create = (type: CreatableType) => {
+    onCreate(
+      buildCreateTemplate({
+        type,
+        dayId,
+        actuals,
+        settings,
+        nowMinutes,
+        ...(projected ? { projected } : {}),
+      }),
+    );
+  };
+
+  // With only one type on offer, the picker is a pointless extra tap —
+  // the FAB opens that type's create form directly (/tomorrow: Custom).
+  const soleType = types?.length === 1 ? types[0] : undefined;
+
+  if (soleType !== undefined) {
+    return <FAB label="Add an event" onClick={() => create(soleType)} />;
+  }
+
   return (
     <>
       <FAB label="Add an event" onClick={() => setPickerOpen(true)} />
@@ -43,16 +64,7 @@ export function AddEventFAB({
         {...(types ? { types } : {})}
         onSelect={(type: CreatableType) => {
           setPickerOpen(false);
-          onCreate(
-            buildCreateTemplate({
-              type,
-              dayId,
-              actuals,
-              settings,
-              nowMinutes,
-              ...(projected ? { projected } : {}),
-            }),
-          );
+          create(type);
         }}
         onCancel={() => setPickerOpen(false)}
       />
