@@ -17,18 +17,22 @@
  * bottles are best-guess recordings. The user can delete any that
  * didn't actually happen via the drawer.
  *
- * Idempotency:
- *   - Deterministic id (`recorded_${eventKey}`) collides across tabs/
- *     devices — last setDoc wins, content is deterministic so no
- *     observable difference.
- *   - Session-level `writtenIds` ref skips redundant writes between
- *     a successful write and the snapshot round-trip that puts the
- *     bottle into `actuals`.
+ * Idempotency + race safety:
+ *   - The write is wrapped in a Firestore transaction that bails if
+ *     the doc already exists. Critical: without this, a queued
+ *     setDoc could overwrite a user's drawer edit that landed
+ *     between the auto-promote pass and Firestore commit (Jake's
+ *     2026-05-27 dogfood: edits to auto-promoted bottles silently
+ *     reverted to the original cascade time).
+ *   - Session-level `writtenIds` ref skips redundant transactions
+ *     between a successful write and the snapshot round-trip back
+ *     through `actuals`.
  */
 
 import { useEffect, useRef } from "react";
-import type { Firestore } from "firebase/firestore";
-import { createEvent } from "../repositories/events";
+import { doc, runTransaction, type Firestore } from "firebase/firestore";
+import { v3EventConverter } from "../firestore/converters";
+import { eventPath } from "@/lib/firestore/paths";
 import type { Event } from "../schemas";
 
 export type UseAutoPromotePersistenceInput = {
@@ -63,9 +67,22 @@ export function useAutoPromotePersistence(input: UseAutoPromotePersistenceInput)
 
       writtenIds.current.add(recordedId);
       const toWrite: Event = { ...e, id: recordedId };
-      createEvent(db, childId, toWrite).catch((err) => {
-        // Write failed (offline, permissions, race). Remove from
-        // session cache so the next render retries.
+      const childIdForWrite = childId;
+      const dayIdForWrite = e.dayId;
+      void runTransaction(db, async (tx) => {
+        const ref = doc(db, eventPath(childIdForWrite, dayIdForWrite, recordedId)).withConverter(
+          v3EventConverter,
+        );
+        const snap = await tx.get(ref);
+        // Bail when the doc already exists — could be from a parallel
+        // tab's auto-promote, a manual Log Bottle Now, or (the bug
+        // this guards) a user drawer edit that just landed.
+        if (snap.exists()) return;
+        tx.set(ref, toWrite);
+      }).catch((err) => {
+        // Transaction failed (offline, permissions, races outside the
+        // transaction's view). Remove from session cache so the next
+        // render retries.
         writtenIds.current.delete(recordedId);
         console.warn("[auto-promote] persist failed", recordedId, err);
       });
