@@ -1,24 +1,18 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import type { OwnershipTemplate, TimeMin } from "@/v3/schemas";
+import { useState } from "react";
+import type { TimeMin } from "@/v3/schemas";
 import { useNowMinutes } from "@/hooks/useNowMinutes";
-import { useV3Day } from "@/v3/hooks/useV3Day";
-import { useV3Events } from "@/v3/hooks/useV3Events";
-import { useV3Projection } from "@/v3/hooks/useV3Projection";
-import { useV3Settings } from "@/v3/hooks/useV3Settings";
-import { useV3Templates } from "@/v3/hooks/useV3Templates";
-import { useDrawer } from "@/v3/hooks/useDrawer";
-import { useDayDrawerSuppressions } from "@/v3/hooks/useDayDrawerSuppressions";
+import { useDayPageState } from "@/v3/hooks/useDayPageState";
 import { db } from "@/lib/firebase/client";
-import { editWakeTime, updateDayOwnerOverride } from "@/v3/repositories/days";
+import { editWakeTime } from "@/v3/repositories/days";
 import { LoadingState } from "@/components/shared/LoadingState";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { FAB } from "@/components/shared/FAB";
 import { FABTypePicker } from "@/components/shared/FABTypePicker";
 import type { CreatableType } from "@/v3/components/shared/createEventTemplate";
 import { buildCreateTemplate } from "@/v3/components/shared/createEventTemplate";
-import { EventEditDrawerV3 } from "@/v3/components/shared/EventEditDrawerV3";
+import { DrawerShell } from "@/v3/components/shared/DrawerShell";
 import { EditableWakeTime } from "@/v3/components/Dashboard/EditableWakeTime";
 import { TimelineV3 } from "@/v3/components/Timeline/TimelineV3";
 import styles from "./page.module.css";
@@ -27,33 +21,21 @@ import { useCurrentChild } from "@/v3/context/ChildProvider";
 export default function TimelinePage() {
   const CHILD_ID = useCurrentChild().id;
   const nowMinutes = useNowMinutes();
-  const { day, loading: dayLoading } = useV3Day(CHILD_ID);
-  const { settings, loading: settingsLoading } = useV3Settings(CHILD_ID);
-  const { events: actuals, saveEvent, deleteOptimistic } = useV3Events(CHILD_ID, day?.id ?? "");
-  const { templates } = useV3Templates(CHILD_ID);
-  const drawerSuppressions = useDayDrawerSuppressions(db, CHILD_ID, day?.id);
-  const { drawer, openCreate, openEdit, close, onSave, onDelete } = useDrawer(
-    actuals,
-    saveEvent,
-    deleteOptimistic,
-    day?.id
-      ? (eventKey, owner) => updateDayOwnerOverride(db, CHILD_ID, day.id, eventKey, owner)
-      : undefined,
-    drawerSuppressions,
-  );
-  const [pickerOpen, setPickerOpen] = useState(false);
-
-  const template = useMemo<OwnershipTemplate | undefined>(() => {
-    if (!day?.templateId) return undefined;
-    return templates.find((t) => t.id === day.templateId);
-  }, [day, templates]);
-
-  const projected = useV3Projection({
+  const {
     day,
+    dayLoading,
     settings,
+    settingsLoading,
     actuals,
-    ...(template ? { template } : {}),
-  });
+    projected,
+    drawer,
+    openCreate,
+    openEdit,
+    close,
+    onSave,
+    onDelete,
+  } = useDayPageState(db, CHILD_ID);
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   if (dayLoading || settingsLoading) {
     return (
@@ -119,26 +101,15 @@ export default function TimelinePage() {
         onCancel={() => setPickerOpen(false)}
       />
 
-      <EventEditDrawerV3
-        key={
-          drawer.open && drawer.mode === "edit"
-            ? drawer.event.id
-            : drawer.open && drawer.mode === "create"
-              ? drawer.template.id
-              : "closed"
-        }
-        owners={settings.owners}
+      <DrawerShell
+        drawer={drawer}
+        settings={settings}
+        day={day}
         nowMinutes={nowMinutes}
-        bedtimeThreshold={settings.bedtimeThreshold}
-        defaultWakeTime={settings.defaultWakeTime}
-        {...(day?.wakeTime !== undefined ? { dayWakeTime: day.wakeTime } : {})}
-        existingEvents={projected}
-        open={drawer.open}
-        event={drawer.open ? (drawer.mode === "edit" ? drawer.event : drawer.template) : null}
-        mode={drawer.open && drawer.mode === "edit" ? "edit" : "create"}
+        projected={projected}
         onSave={onSave}
-        onCancel={close}
         onDelete={onDelete}
+        onCancel={close}
       />
     </div>
   );

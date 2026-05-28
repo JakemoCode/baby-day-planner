@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import type { Event, OwnershipTemplate, TimeMin } from "@/v3/schemas";
+import { useEffect, useState } from "react";
+import type { Event, TimeMin } from "@/v3/schemas";
 import { reduceLifecycle } from "@/v3/lifecycle";
 import { isInProgress } from "@/v3/lib/effectiveEnd";
 import { isRenderSynthetic } from "@/v3/lib/syntheticEvents";
@@ -14,23 +14,12 @@ import {
 import { LOG_BOTTLE_WINDOW_MIN } from "@/v3/components/Dashboard/decideMode";
 import { nextDashboardEvent } from "@/v3/components/Dashboard/dashboardStats";
 import { useNowMinutes } from "@/hooks/useNowMinutes";
-import { useV3Day } from "@/v3/hooks/useV3Day";
-import { useV3Events } from "@/v3/hooks/useV3Events";
-import { useV3Settings } from "@/v3/hooks/useV3Settings";
-import { useV3Templates } from "@/v3/hooks/useV3Templates";
-import { useV3Projection } from "@/v3/hooks/useV3Projection";
 import { useAutoPromotePersistence } from "@/v3/hooks/useAutoPromotePersistence";
 import { useV3TomorrowPlan } from "@/v3/hooks/useV3TomorrowPlan";
 import { useReconcileActiveDay } from "@/v3/hooks/useReconcileActiveDay";
-import { useDrawer } from "@/v3/hooks/useDrawer";
-import { useDayDrawerSuppressions } from "@/v3/hooks/useDayDrawerSuppressions";
+import { useDayPageState } from "@/v3/hooks/useDayPageState";
 import { isEngineEmittedId, recordedIdFor } from "@/v3/lib/eventConventions";
-import {
-  getOrCreatePlannedDay,
-  promoteFromPlan,
-  startNewDay,
-  updateDayOwnerOverride,
-} from "@/v3/repositories/days";
+import { getOrCreatePlannedDay, promoteFromPlan, startNewDay } from "@/v3/repositories/days";
 import {
   createEvent,
   deleteEvent,
@@ -43,7 +32,7 @@ import { FAB } from "@/components/shared/FAB";
 import { FABTypePicker } from "@/components/shared/FABTypePicker";
 import type { CreatableType } from "@/v3/components/shared/createEventTemplate";
 import { buildCreateTemplate } from "@/v3/components/shared/createEventTemplate";
-import { EventEditDrawerV3 } from "@/v3/components/shared/EventEditDrawerV3";
+import { DrawerShell } from "@/v3/components/shared/DrawerShell";
 import { NowBanner } from "@/v3/components/Dashboard/NowBanner";
 import { ContextualActionButton } from "@/v3/components/Dashboard/ContextualActionButton";
 import { NextBottlePanel } from "@/v3/components/Dashboard/NextBottlePanel";
@@ -65,10 +54,20 @@ function todayDate(): string {
 export default function DashboardPage() {
   const CHILD_ID = useCurrentChild().id;
   const nowMinutes = useNowMinutes();
-  const { day, loading: dayLoading } = useV3Day(CHILD_ID);
-  const { settings, loading: settingsLoading } = useV3Settings(CHILD_ID);
-  const { events: actuals, saveEvent, deleteOptimistic } = useV3Events(CHILD_ID, day?.id ?? "");
-  const { templates } = useV3Templates(CHILD_ID);
+  const {
+    day,
+    dayLoading,
+    settings,
+    settingsLoading,
+    actuals,
+    saveEvent,
+    projected,
+    drawer,
+    openCreate,
+    close,
+    onSave,
+    onDelete,
+  } = useDayPageState(db, CHILD_ID);
   // §F17 — auto-reconcile the active day on every dashboard mount.
   // Side-effect only; the new active day flows back through useV3Day's
   // subscription. Defaults to settings.defaultWakeTime if no confirmed
@@ -86,30 +85,8 @@ export default function DashboardPage() {
   // re-promote from the plan vs defaults during dogfood iteration.
   const { plan: todaysPlan } = useV3TomorrowPlan(CHILD_ID, todayDate());
   const hasTomorrowPlan = todaysPlan?.status === "confirmed";
-  const drawerSuppressions = useDayDrawerSuppressions(db, CHILD_ID, day?.id);
-  const { drawer, openCreate, close, onSave, onDelete } = useDrawer(
-    actuals,
-    saveEvent,
-    deleteOptimistic,
-    day?.id
-      ? (eventKey, owner) => updateDayOwnerOverride(db, CHILD_ID, day.id, eventKey, owner)
-      : undefined,
-    drawerSuppressions,
-  );
   const [pickerOpen, setPickerOpen] = useState(false);
   const [wakeSheetOpen, setWakeSheetOpen] = useState(false);
-
-  const template = useMemo<OwnershipTemplate | undefined>(() => {
-    if (!day?.templateId) return undefined;
-    return templates.find((t) => t.id === day.templateId);
-  }, [day, templates]);
-
-  const projected = useV3Projection({
-    day,
-    settings,
-    actuals,
-    ...(template ? { template } : {}),
-  });
 
   // §F66 fast-follow B5: persist engine-auto-promoted bottles to
   // Firestore so they survive the next cascade pass. Without this,
@@ -324,23 +301,12 @@ export default function DashboardPage() {
         onCancel={() => setPickerOpen(false)}
       />
 
-      <EventEditDrawerV3
-        key={
-          drawer.open && drawer.mode === "edit"
-            ? drawer.event.id
-            : drawer.open && drawer.mode === "create"
-              ? drawer.template.id
-              : "closed"
-        }
-        owners={settings.owners}
+      <DrawerShell
+        drawer={drawer}
+        settings={settings}
+        day={day}
         nowMinutes={nowMinutes}
-        bedtimeThreshold={settings.bedtimeThreshold}
-        defaultWakeTime={settings.defaultWakeTime}
-        {...(day.wakeTime !== undefined ? { dayWakeTime: day.wakeTime } : {})}
-        existingEvents={projected}
-        open={drawer.open}
-        event={drawer.open ? (drawer.mode === "edit" ? drawer.event : drawer.template) : null}
-        mode={drawer.open && drawer.mode === "edit" ? "edit" : "create"}
+        projected={projected}
         onSave={onSave}
         onDelete={onDelete}
         onCancel={close}
