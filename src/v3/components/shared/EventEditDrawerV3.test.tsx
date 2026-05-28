@@ -481,6 +481,32 @@ describe("EventEditDrawerV3", () => {
     expect(screen.getByRole("button", { name: "Delete" })).toBeInTheDocument();
   });
 
+  it("§F66 B11: delete button is HIDDEN for an auto-promoted nap (proj_ id + recorded lifecycle)", () => {
+    // An auto-promoted nap exists only in transient engine output —
+    // there's no Firestore doc to delete. The engine re-emits and
+    // re-auto-promotes on the next pass, so Delete would visibly
+    // accomplish nothing. Detection: id starts with "proj_" + sleep
+    // type.
+    render(
+      <EventEditDrawerV3
+        open
+        mode="edit"
+        event={projectedNap({
+          id: "proj_nap_1",
+          lifecycle: { state: "recorded", annotatedAt: 9 * 60 },
+        })}
+        owners={owners}
+        nowMinutes={NOW}
+        bedtimeThreshold={THRESHOLD}
+        defaultWakeTime={DEFAULT_WAKE_TIME}
+        onSave={() => {}}
+        onCancel={() => {}}
+        onDelete={() => {}}
+      />,
+    );
+    expect(screen.queryByRole("button", { name: "Delete" })).toBeNull();
+  });
+
   it("§F65: delete button is shown for a PROJECTED daily_recurring event", () => {
     const recurring: Event = {
       id: "proj_recurring:rec-tummy",

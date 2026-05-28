@@ -212,9 +212,19 @@ export function EventEditDrawerV3({
   //   - dream-feed slot (→ Day.suppressedDreamFeed, §F66 fast-follow)
   // useDrawer routes each path.
   const isDreamFeedSlot = type === "bottle" && sourceEvent.eventKey === "bottle_dream";
+  // §F66 fast-follow B11: an auto-promoted nap/bedtime has lifecycle
+  // "recorded" but lives only in transient engine output — there's no
+  // Firestore doc to delete. The engine re-emits + re-auto-promotes
+  // on the very next pass, so Delete would visibly do nothing.
+  // Detection: engine-emitted id (starts with "proj_") + sleep-type.
+  // Bottles are exempt — useAutoPromotePersistence (B5) writes them
+  // and suppressedBottleEventKeys (B10) makes deletion stick.
+  const isAutoPromotedSleep =
+    (type === "nap" || type === "bedtime") && sourceEvent.id.startsWith("proj_");
   const canDelete =
     mode === "edit" &&
     onDelete !== undefined &&
+    !isAutoPromotedSleep &&
     (isRecorded(sourceEvent.lifecycle) ||
       type === "daily_recurring" ||
       type === "daycare_dropoff" ||
