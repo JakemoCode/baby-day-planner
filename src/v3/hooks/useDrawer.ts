@@ -18,6 +18,7 @@
 
 import { useState } from "react";
 import type { Event } from "../schemas";
+import { recordedIdFor } from "../lib/eventConventions";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -27,6 +28,25 @@ export type DrawerState =
   | { open: false }
   | { open: true; mode: "create"; template: Event }
   | { open: true; mode: "edit"; event: Event };
+
+/**
+ * A "delete this event" rule that translates a drawer-delete on a
+ * projected event into a per-day suppression write on the Day doc.
+ * Each entry pairs a matcher with the side-effect.
+ *
+ * Examples (wired by callers):
+ *   - daily_recurring → Day.suppressedRecurringIds (R11.6)
+ *   - daycare_dropoff/pickup → Day.suppressedDaycareDay (R21.5)
+ *   - dream-feed slot → Day.suppressedDreamFeed (R5.5)
+ *
+ * Multiple matchers can fire on the same event (the for-of below runs
+ * them in array order). The recorded-doc delete path is independent
+ * and always runs when the event is in `actuals`.
+ */
+export type DrawerSuppression = {
+  matches: (event: Event) => boolean;
+  apply: (event: Event) => Promise<void> | void;
+};
 
 export type UseDrawerResult = {
   drawer: DrawerState;
@@ -66,13 +86,11 @@ export function useDrawer(
   deleteOptimistic: (eventId: string) => Promise<void> | void,
   setOwnerOverride?: (eventKey: string, owner: Event["owner"]) => Promise<void> | void,
   /**
-   * §F65 OPTIONAL — when provided AND the deleted event is a
-   * `daily_recurring`, route through `Day.suppressedRecurringIds`
-   * (R11.6) instead of (or in addition to, if the event is also
-   * recorded) the regular `deleteOptimistic` path. Caller closes
-   * over the dayId and forwards to {@link suppressRecurringForDay}.
+   * §F65 + §F66 fast-follow: per-day suppression rules for projected
+   * event types whose "delete" gesture means "skip for today" rather
+   * than removing a Firestore doc. See {@link DrawerSuppression}.
    */
-  suppressRecurring?: (recurringId: string) => Promise<void> | void,
+  suppressions: DrawerSuppression[] = [],
 ): UseDrawerResult {
   const [drawer, setDrawer] = useState<DrawerState>({ open: false });
 
@@ -113,7 +131,7 @@ export function useDrawer(
         // deterministically so subsequent edits route through update
         // (not create) — fixes the intermittent wake-window owner bug
         // from PR #186.
-        await saveEvent({ ...event, id: `recorded_${event.eventKey}` });
+        await saveEvent({ ...event, id: recordedIdFor(event.eventKey) });
       } else {
         await saveEvent(event);
       }
@@ -144,19 +162,14 @@ export function useDrawer(
       if (isActual) {
         await deleteOptimistic(event.id);
       }
-      // §F65: recurring events live in Settings.dailyRecurring; the
-      // engine projects them per-day via R11.2. "Delete from today"
-      // ≠ "remove from settings" — instead suppress the recurring id
-      // on this Day, which R11.6 honors. If the user had recorded the
-      // event (above branch ran), the suppression *also* runs so the
-      // freshly-deleted slot doesn't immediately re-project.
-      if (suppressRecurring && event.type === "daily_recurring") {
-        const recurringId = event.eventKey.startsWith("recurring:")
-          ? event.eventKey.slice("recurring:".length)
-          : event.eventKey;
-        await suppressRecurring(recurringId);
+      // Run any per-day suppressions matching this event type. The
+      // recorded-doc delete above and these suppression writes are
+      // independent — both fire when both apply (e.g. a recorded
+      // recurring event needs both deleted-from-Firestore AND
+      // suppressed-from-today so it doesn't re-project).
+      for (const s of suppressions) {
+        if (s.matches(event)) await s.apply(event);
       }
-      // projected non-recurring: close only, no persist
     }
     setDrawer({ open: false });
   };

@@ -78,9 +78,19 @@ shows a mode-specific label when a contextual action is available.
 
 | Condition | Mode label | Action on tap |
 |---|---|---|
+| In-progress bedtime AND no projected bottle's Log Bottle window has opened yet | **End overnight sleep** | Opens wake-confirm sheet → `startNewDay` |
 | In-progress nap (start ≤ Now < end) | **End Nap** | Set nap.endTime = Now |
-| In ±15min of a projected bottle's startTime, no in-progress nap | **Log Bottle Time** | Write recorded bottle: startTime = Now, amount = default (overwrites any auto-promoted projection at that slot) |
-| Neither | (hidden) | — |
+| Bottle within ±15min, already user-logged (lifecycle "completed") | **✓ Bottle logged** | Re-tap → confirm dialog "change recorded time?" |
+| Bottle within ±15min, no in-progress nap | **Log bottle now** | Write recorded bottle: startTime = Now, amount = default (overwrites the projection at that slot) |
+| Otherwise | (hidden) | — |
+
+**End overnight sleep mode** assumes yesterday's recorded bedtime is
+still alive (lifecycle "recorded" with startTime in yesterday's frame).
+A user that starts a new day via dev `StartDayButton` — or any path
+that archives the bedtime without leaving an in-progress one — won't
+see this mode. That's correct: the wake-time edit then happens via
+the "Woke at" card / `WakeConfirmSheet` directly, not through the
+contextual button.
 
 **Window** is symmetric ±15min around the projected bottle's
 startTime. Outside the window, manual edit via drawer is the path.

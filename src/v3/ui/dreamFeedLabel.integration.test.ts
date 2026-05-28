@@ -20,10 +20,11 @@ import { ALL_RULES } from "../engine/rules";
 import { applyDreamFeedLabel } from "./dreamFeedLabel";
 
 describe("applyDreamFeedLabel — end-to-end with projectDay", () => {
-  it("cold-start with 6 bottles + bedtime at 21:30: rhythm cascade caps at bedtime; R5.5 emits dream-feed at 23:00 with the Dream Feed label", () => {
+  it("cold-start with 6 bottles + bedtime at 22:00: rhythm cascade caps at bedtime; R5.5 emits dream-feed at 23:00 with the Dream Feed label", () => {
     // WW [120, 150, 180, 180, 30] + napLen 60 + threshold 22:30 →
     // nap_5 start 22:00, endTime=23:00 > 22:30 → ADR-0002: drop.
-    // bedtime = max(earliestBedtime=18:00, wwStart=21:30) = 21:30.
+    // §F66 fast-follow B8: bedtime = max(earliestBedtime=18:00,
+    // wwStart+WW=21:30+30=22:00) = 22:00. Full WW before bedtime.
     const ctx = aContext({
       day: aDay({ wakeTime: 7 * 60 }),
       settings: aSettings({
@@ -51,7 +52,7 @@ describe("applyDreamFeedLabel — end-to-end with projectDay", () => {
     );
 
     const bedtime = events.find((e) => e.type === "bedtime");
-    expect(bedtime?.startTime).toBe(21 * 60 + 30);
+    expect(bedtime?.startTime).toBe(22 * 60);
 
     // Rhythm cascade caps at bedtime (excluding dream-feed): all
     // non-dream projected bottles are ≤ bedtime.startTime.
@@ -60,7 +61,7 @@ describe("applyDreamFeedLabel — end-to-end with projectDay", () => {
         e.type === "bottle" && e.lifecycle.state === "projected" && e.eventKey !== "bottle_dream",
     );
     for (const b of rhythmProjected) {
-      expect(b.startTime).toBeLessThanOrEqual(21 * 60 + 30);
+      expect(b.startTime).toBeLessThanOrEqual(22 * 60);
     }
 
     // Dream-feed slot is emitted at dreamFeedTime (post-bedtime) with

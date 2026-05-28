@@ -44,6 +44,7 @@ import type { Rule } from "../evaluator";
 import { intervalForAmount } from "../bottleIntervalRules";
 import { hasType, isProjected, projectedEvent } from "../helpers";
 import { MINUTES_PER_DAY } from "../../ui/time";
+import { DREAM_FEED_EVENT_KEY, isDreamFeed } from "../../lib/eventConventions";
 
 // ---------------------------------------------------------------------------
 // Predicates / helpers
@@ -81,35 +82,39 @@ function forwardCapFor(events: Event[]): number {
   return Math.min(MIDNIGHT, bedtime.startTime);
 }
 
-function buildProjectedBottle(ctx: Context, n: number, startTime: number): Event {
-  // ID is keyed to startTime, NOT slot number. Slot number changes when
-  // R5.4 renumbers chronologically, so a slot-keyed id would be unstable
-  // across passes — the same projection could end up with two different
-  // ids on consecutive evaluator passes, which would defeat the
-  // fixed-point check and risk convergence loops. startTime is what the
-  // event IS; the eventKey/label are how we display it.
+// ID is keyed to startTime, NOT slot number. Slot number changes when
+// R5.4 renumbers chronologically, so a slot-keyed id would be unstable
+// across passes — the same projection could end up with two different
+// ids on consecutive evaluator passes, which would defeat the
+// fixed-point check and risk convergence loops. startTime is what the
+// event IS; the eventKey/label are how we display it.
+function buildBottleProjection(
+  ctx: Context,
+  id: string,
+  eventKey: string,
+  label: string,
+  startTime: number,
+): Event {
   return projectedEvent({
     ctx,
-    id: `proj_bottle_t${startTime}`,
-    eventKey: `bottle_${n}`,
+    id,
+    eventKey,
     type: "bottle",
     kind: "instant",
     startTime,
-    label: `Bottle ${n}`,
+    label,
     amountOz: ctx.settings.defaultBottleAmountOz,
   });
 }
 
-const DREAM_FEED_EVENT_KEY = "bottle_dream";
-
-/**
- * The dream-feed slot is a sentinel — it has the type "bottle" but
- * lives outside the rhythm chain by design (R5.5). All rhythm-cascade
- * sites that walk over bottles (trim, renumber, chronological index)
- * must skip it to avoid corrupting cascade math or looping the engine.
- */
-function isDreamFeed(e: Event): boolean {
-  return e.eventKey === DREAM_FEED_EVENT_KEY;
+function buildProjectedBottle(ctx: Context, n: number, startTime: number): Event {
+  return buildBottleProjection(
+    ctx,
+    `proj_bottle_t${startTime}`,
+    `bottle_${n}`,
+    `Bottle ${n}`,
+    startTime,
+  );
 }
 
 /**
@@ -119,16 +124,13 @@ function isDreamFeed(e: Event): boolean {
  * Subject to Now-cross auto-promote like any projected bottle (ADR-0001).
  */
 function buildProjectedDreamFeed(ctx: Context, startTime: number): Event {
-  return projectedEvent({
+  return buildBottleProjection(
     ctx,
-    id: `proj_${DREAM_FEED_EVENT_KEY}`,
-    eventKey: DREAM_FEED_EVENT_KEY,
-    type: "bottle",
-    kind: "instant",
+    `proj_${DREAM_FEED_EVENT_KEY}`,
+    DREAM_FEED_EVENT_KEY,
+    "Dream Feed",
     startTime,
-    label: "Dream Feed",
-    amountOz: ctx.settings.defaultBottleAmountOz,
-  });
+  );
 }
 
 type Region = { start: number; end: number };
@@ -212,12 +214,11 @@ function snapToPutdown(
     const hi = ev.startTime + half;
     if (proposed < lo || proposed > hi) continue;
     const snapTarget = ev.startTime - putdownLeadMinutes;
-    // ADR-0006 Concern B: skip THIS nap's snap rather than
-    // retroactively pull the bottle into the past. Continue the loop
-    // — a later (future) nap may still legitimately attract proposed.
-    // (Bare narrow case: proposed lands in a recent past nap's range
-    // AND in a future nap's range; the past one would otherwise
-    // short-circuit and block the legitimate future snap.)
+    // ADR-0006 Concern B: putdown anchor never snaps a bottle to a
+    // past time. If putdown.start is ≤ Now, the conceptual slot has
+    // passed — the bottle is no longer "about to happen at putdown."
+    // The forward-snap step (snapForwardToNapEnd) takes over and
+    // pushes the bottle to nap.endTime instead.
     if (snapTarget <= nowMinutes) continue;
     return snapTarget;
   }
@@ -249,6 +250,49 @@ function snapOutOfNap(proposed: number, regions: Region[], nowMinutes: number): 
     if (other >= nowMinutes) chosen = other;
   }
   return chosen;
+}
+
+/**
+ * §F66 fast-follow B4: when a cascade-natural emit lands in some
+ * nap's putdown-or-body range `[start - lead, end]` AND the putdown
+ * era has already opened (`start - lead ≤ now`), snap forward to that
+ * nap's `endTime`. Per Jake's framing:
+ *
+ *   - Putdown is a contiguous part of the nap. If we've already
+ *     entered the putdown window (Now ≥ putdown.start), don't pin
+ *     the bottle anywhere in `[putdown.start, nap.end)`: the bottle
+ *     has been deferred past this nap; show it on the other side.
+ *   - This gate fires for any proposed in-range — past, present
+ *     (proposed === now), or barely-future — as long as the nap is
+ *     "in progress relative to Now." The discriminator is the
+ *     putdown era (`lo ≤ now`), not the proposed time's tense.
+ *   - Future putdowns (`lo > now`) are handled by snapToPutdown
+ *     (Concern B refuses past targets there; future targets pass).
+ *     This function preserves that hand-off by skipping when
+ *     `lo > now`.
+ *
+ * Self-gates by the proposed-in-range check — cold-start cascades
+ * (bottle_1 at 7:10am with no nap in that vicinity) don't trigger.
+ */
+function snapForwardToNapEnd(
+  proposed: number,
+  regions: Region[],
+  putdownLead: number,
+  nowMinutes: number,
+): number {
+  for (const r of regions) {
+    const lo = r.start - putdownLead;
+    if (proposed < lo || proposed > r.end) continue;
+    // Don't snap across the Now line: if the block's end is already
+    // past, leave proposed alone (auto-promote claims it).
+    if (r.end <= nowMinutes) continue;
+    // Hand off to snapToPutdown for blocks whose putdown era hasn't
+    // opened yet (lo > now). Those want to anchor at lo, not skip
+    // ahead to end. Snap-forward only fires inside the active block.
+    if (lo > nowMinutes) continue;
+    return r.end;
+  }
+  return proposed;
 }
 
 // ---------------------------------------------------------------------------
@@ -411,7 +455,15 @@ function projectBottleChain(events: Event[], ctx: Context): Event[] {
       ctx.settings.defaultNapLengthMinutes,
       ctx.nowMinutes,
     );
-    return snapOutOfNap(withPutdown, regions, ctx.nowMinutes);
+    const outOfNap = snapOutOfNap(withPutdown, regions, ctx.nowMinutes);
+    // §F66 fast-follow B4: if the cascade-natural emit is past Now AND
+    // it's in a nap's putdown-or-body range, snap to the nearest
+    // future edge of that nap. Catches both the in-progress-recorded-
+    // nap-edit case (snap to nap.endTime) AND the about-to-start-
+    // projected-nap case (snap to nap.startTime). Self-gates: a cold-
+    // start emit at 7:10am with no nap in that vicinity returns
+    // unchanged.
+    return snapForwardToNapEnd(outOfNap, regions, ctx.settings.putdownLeadMinutes, ctx.nowMinutes);
   };
 
   // The cold-start count cap (bottlesPerDay placeholders) ONLY applies
@@ -507,28 +559,40 @@ function projectBottleChain(events: Event[], ctx: Context): Event[] {
 // ---------------------------------------------------------------------------
 
 /**
- * R5.4 — Bottles are renumbered chronologically for display.
+ * R5.4 — Renumber PROJECTED bottles for display; recorded bottles keep
+ * their pinned number.
  *
- * After cascade produces a complete chain, sort bottles by startTime
- * and rewrite eventKey/label as `bottle_1`, `bottle_2`, etc. for
- * display. This is engine-side only; Firestore docs keep their
- * original eventKey (the persistence layer reads `id`, never
- * eventKey).
+ * Recorded bottle eventKey/label is identity (set at the moment of
+ * recording — auto-promote, manual log, or drawer save) and stays
+ * frozen even when the user edits the time, deletes neighbors, or
+ * reshuffles the chronological order. Per §F66 fast-follow B5 grill
+ * 2026-05-27: "the bottle that was Bottle 3 should still be Bottle 3
+ * after I edit its time."
+ *
+ * Projected bottles fill numbers AFTER the largest recorded number
+ * (skipping any used recorded numbers below it). Cold-start days
+ * (no recorded bottles) renumber projected from 1, preserving the
+ * original chronological numbering.
+ *
+ * Engine-side only; Firestore docs keep their original eventKey
+ * (persistence reads `id`, never eventKey).
  */
 const RuleRenumberBottlesChronologically: Rule = {
   id: "R5.4",
-  description: "Renumber bottle eventKey/label chronologically for display",
+  description:
+    "Renumber projected bottle eventKey/label; recorded bottles keep their pinned number",
   dependsOn: ["R5"],
   matches: (events) => {
-    const ordered = bottlesByStartTime(events);
-    return ordered.some((b, i) => b.eventKey !== `bottle_${i + 1}`);
+    const target = computeProjectedRenumber(events);
+    for (const b of bottlesByStartTime(events)) {
+      if (b.lifecycle.state !== "projected") continue;
+      const next = target.get(b.id);
+      if (next && b.eventKey !== next.eventKey) return true;
+    }
+    return false;
   },
   produces: (events) => {
-    const renamed = new Map<string, { eventKey: string; label: string }>();
-    bottlesByStartTime(events).forEach((b, i) => {
-      const n = i + 1;
-      renamed.set(b.id, { eventKey: `bottle_${n}`, label: `Bottle ${n}` });
-    });
+    const renamed = computeProjectedRenumber(events);
     return events.map((e) => {
       if (!isBottle(e)) return e;
       // Dream-feed slot has its own stable eventKey + label; renumber
@@ -536,6 +600,7 @@ const RuleRenumberBottlesChronologically: Rule = {
       // breaking the dream-feed identity AND looping the cascade
       // (R5.5's identity check keys on eventKey).
       if (isDreamFeed(e)) return e;
+      if (e.lifecycle.state !== "projected") return e; // recorded bottles are frozen
       const next = renamed.get(e.id);
       if (!next) return e;
       if (e.eventKey === next.eventKey && e.label === next.label) return e;
@@ -543,6 +608,37 @@ const RuleRenumberBottlesChronologically: Rule = {
     });
   },
 };
+
+/**
+ * Returns a map from projected-bottle id → { eventKey, label } using
+ * the smallest unused number starting from `max(recordedNumbers) + 1`,
+ * skipping any numbers already used by recorded bottles. Projected
+ * bottles are assigned in chronological order.
+ */
+function computeProjectedRenumber(
+  events: Event[],
+): Map<string, { eventKey: string; label: string }> {
+  const all = bottlesByStartTime(events);
+  const recordedNums = new Set<number>();
+  for (const b of all) {
+    if (b.lifecycle.state === "projected") continue;
+    const m = /^bottle_(\d+)$/.exec(b.eventKey);
+    if (m) recordedNums.add(parseInt(m[1]!, 10));
+  }
+  const maxRecorded = recordedNums.size > 0 ? Math.max(...recordedNums) : 0;
+  let n = maxRecorded + 1;
+  const skipUsed = () => {
+    while (recordedNums.has(n)) n++;
+  };
+  const renamed = new Map<string, { eventKey: string; label: string }>();
+  for (const b of all) {
+    if (b.lifecycle.state !== "projected") continue;
+    skipUsed();
+    renamed.set(b.id, { eventKey: `bottle_${n}`, label: `Bottle ${n}` });
+    n++;
+  }
+  return renamed;
+}
 
 function bottlesByStartTime(events: Event[]): Event[] {
   // Exclude dream-feed from the chronological order — it's a sentinel
@@ -589,6 +685,9 @@ const RuleDreamFeedEmit: Rule = {
   dependsOn: ["R5"],
   matches: (events, ctx) => {
     if (!ctx.settings.dreamFeedEnabled) return false;
+    // §F66 fast-follow: per-day skip via Day.suppressedDreamFeed
+    // (drawer "delete" on the dream-feed slot writes this field).
+    if (ctx.day.suppressedDreamFeed) return false;
     if (events.some((e) => isBottle(e) && isDreamFeed(e))) return false;
     if (hasRecordedPostBedtimeBottle(events)) return false;
     return true;

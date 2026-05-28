@@ -26,7 +26,7 @@ import styles from "./page.module.css";
 import { useCurrentChild } from "@/v3/context/ChildProvider";
 
 const ACCORDION_STORAGE_KEY = "bdp.settings.accordion.openSlug";
-const DEFAULT_OPEN_SLUG = "default-times";
+const DEFAULT_OPEN_SLUG = "wake-bedtime";
 
 function slugify(title: string): string {
   return title
@@ -83,7 +83,7 @@ export default function SettingsPage() {
         <InviteCoParentSection />
       </Section>
 
-      <Section title="Default times" isOpen={openSlug === "default-times"} onToggle={handleToggle}>
+      <Section title="Wake & bedtime" isOpen={openSlug === "wake-bedtime"} onToggle={handleToggle}>
         <TimeRow
           id="defaultWakeTime"
           label="Default wake time"

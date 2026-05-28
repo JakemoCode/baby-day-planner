@@ -263,6 +263,119 @@ describe("EventEditDrawerV3", () => {
     expect(screen.getByRole("alert")).toHaveTextContent(/Overlaps Nap 2/);
   });
 
+  it("§F66 fast-follow B7: flags startTime < dayWakeTime as a pre-wake error (AM/PM safeguard)", async () => {
+    // User had a nap at 11:30am, intended to push to 12:30pm but the
+    // time picker stored it as 0:30 (am). Validator must catch this
+    // before save — anchoring a nap or bottle before wakeTime wrecks
+    // the cascade silently.
+    const recorded = projectedNap({
+      lifecycle: { state: "recorded", annotatedAt: 11 * 60 + 30 },
+      startTime: 11 * 60 + 30,
+      endTime: 12 * 60 + 30,
+    });
+    const onSave = vi.fn();
+    render(
+      <EventEditDrawerV3
+        open
+        mode="edit"
+        event={recorded}
+        owners={owners}
+        nowMinutes={NOW}
+        bedtimeThreshold={THRESHOLD}
+        defaultWakeTime={DEFAULT_WAKE_TIME}
+        dayWakeTime={7 * 60}
+        onSave={onSave}
+        onCancel={() => {}}
+      />,
+    );
+    const start = screen.getByLabelText("Start time");
+    await userEvent.clear(start);
+    await userEvent.type(start, "00:30"); // 0:30 am — the AM/PM mistake
+    expect(screen.getByRole("alert")).toHaveTextContent(/before today's wake time/i);
+    expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
+    expect(onSave).not.toHaveBeenCalled();
+  });
+
+  it("§F66 review: B7 pre-wake guard does NOT block a pre-wake daily_recurring (review-found false positive)", async () => {
+    // The B7 rationale (AM/PM mistake wrecks cascade) is
+    // cascade-specific. daily_recurring is fixed-time / explicit-slot
+    // and the user may legitimately schedule it pre-wake (e.g., 5am
+    // medication). Validator must NOT block.
+    const preWakeRecurring: Event = {
+      id: "proj_recurring:rec-medication",
+      dayId: "d-1",
+      eventKey: "recurring:rec-medication",
+      type: "daily_recurring",
+      kind: "instant",
+      startTime: 5 * 60 + 30, // 5:30am, before wakeTime 7:00
+      label: "Medication",
+      hasPutdown: false,
+      owner: NO_OWNER,
+      lifecycle: { state: "projected" },
+    };
+    render(
+      <EventEditDrawerV3
+        open
+        mode="edit"
+        event={preWakeRecurring}
+        owners={owners}
+        nowMinutes={NOW}
+        bedtimeThreshold={THRESHOLD}
+        defaultWakeTime={DEFAULT_WAKE_TIME}
+        dayWakeTime={7 * 60}
+        onSave={() => {}}
+        onCancel={() => {}}
+      />,
+    );
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(screen.getByRole("button", { name: "Save" })).toBeEnabled();
+  });
+
+  it("§F66 fast-follow B1: does not flag overlap against a render-synthetic putdown chip", async () => {
+    // §F66 dogfood: tapping a nap's end-time edit would surface
+    // "Overlaps Putdown" because the synthetic putdown chip carries
+    // `type: "nap"` for timeline geometry. Validator now skips
+    // render-synthetic events (eventKey === PUTDOWN_KIND_TAG).
+    const putdownSynthetic: Event = {
+      id: "putdown:nap-2",
+      dayId: "d-1",
+      eventKey: "__putdown__", // PUTDOWN_KIND_TAG sentinel
+      type: "nap",
+      kind: "block",
+      label: "Putdown",
+      startTime: 11 * 60,
+      endTime: 11 * 60 + 15,
+      hasPutdown: false,
+      owner: NO_OWNER,
+      lifecycle: { state: "recorded", annotatedAt: 11 * 60 },
+    };
+    // Source is a recorded nap right after the putdown — editing
+    // its end-time should NOT flag the synthetic putdown as overlap.
+    const source = projectedNap({
+      lifecycle: { state: "recorded", annotatedAt: 11 * 60 + 15 },
+      startTime: 11 * 60 + 15,
+      endTime: 12 * 60,
+    });
+    render(
+      <EventEditDrawerV3
+        open
+        mode="edit"
+        event={source}
+        owners={owners}
+        nowMinutes={NOW}
+        bedtimeThreshold={THRESHOLD}
+        defaultWakeTime={DEFAULT_WAKE_TIME}
+        existingEvents={[putdownSynthetic]}
+        onSave={() => {}}
+        onCancel={() => {}}
+      />,
+    );
+    const end = screen.getByLabelText("End time");
+    await userEvent.clear(end);
+    await userEvent.type(end, "12:30");
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
   it("does not flag overlap against still-projected events", async () => {
     const projectedOther = projectedNap({ id: "other", startTime: 9 * 60 + 30, label: "Nap 2" });
     // Source is recorded so its time inputs are editable (§F66).
@@ -401,6 +514,83 @@ describe("EventEditDrawerV3", () => {
       />,
     );
     expect(screen.getByRole("button", { name: "Delete" })).toBeInTheDocument();
+  });
+
+  it("§F66 B11: delete button is HIDDEN for an auto-promoted bottle (recorded + annotatedAt===startTime)", () => {
+    // Auto-promote signature: lifecycle state "recorded" with
+    // annotatedAt === startTime. Manual logs use "completed" and
+    // drawer saves bump annotatedAt to nowMinutes, so neither
+    // matches.
+    render(
+      <EventEditDrawerV3
+        open
+        mode="edit"
+        event={projectedBottle({
+          id: "recorded_bottle_2",
+          startTime: 10 * 60,
+          lifecycle: { state: "recorded", annotatedAt: 10 * 60 },
+        })}
+        owners={owners}
+        nowMinutes={NOW}
+        bedtimeThreshold={THRESHOLD}
+        defaultWakeTime={DEFAULT_WAKE_TIME}
+        onSave={() => {}}
+        onCancel={() => {}}
+        onDelete={() => {}}
+      />,
+    );
+    expect(screen.queryByRole("button", { name: "Delete" })).toBeNull();
+  });
+
+  it("§F66 B11: delete button is SHOWN for a manually-logged bottle (lifecycle completed)", () => {
+    // ContextualActionButton.buildLoggedBottle writes lifecycle
+    // {state:"completed", committedAt}. User wants to delete the
+    // extra bottle they added — Delete must remain available.
+    render(
+      <EventEditDrawerV3
+        open
+        mode="edit"
+        event={projectedBottle({
+          id: "recorded_bottle_5",
+          startTime: 14 * 60,
+          lifecycle: { state: "completed", committedAt: 14 * 60 },
+        })}
+        owners={owners}
+        nowMinutes={NOW}
+        bedtimeThreshold={THRESHOLD}
+        defaultWakeTime={DEFAULT_WAKE_TIME}
+        onSave={() => {}}
+        onCancel={() => {}}
+        onDelete={() => {}}
+      />,
+    );
+    expect(screen.getByRole("button", { name: "Delete" })).toBeVisible();
+  });
+
+  it("§F66 B11: delete button is HIDDEN for an auto-promoted nap (proj_ id + recorded lifecycle)", () => {
+    // An auto-promoted nap exists only in transient engine output —
+    // there's no Firestore doc to delete. The engine re-emits and
+    // re-auto-promotes on the next pass, so Delete would visibly
+    // accomplish nothing. Detection: id starts with "proj_" + sleep
+    // type.
+    render(
+      <EventEditDrawerV3
+        open
+        mode="edit"
+        event={projectedNap({
+          id: "proj_nap_1",
+          lifecycle: { state: "recorded", annotatedAt: 9 * 60 },
+        })}
+        owners={owners}
+        nowMinutes={NOW}
+        bedtimeThreshold={THRESHOLD}
+        defaultWakeTime={DEFAULT_WAKE_TIME}
+        onSave={() => {}}
+        onCancel={() => {}}
+        onDelete={() => {}}
+      />,
+    );
+    expect(screen.queryByRole("button", { name: "Delete" })).toBeNull();
   });
 
   it("§F65: delete button is shown for a PROJECTED daily_recurring event", () => {
@@ -835,6 +1025,46 @@ describe("Past-threshold prompt when editing a nap (physiology cascade)", () => 
     it("does NOT disable inputs in create mode (form fields are the source of truth)", () => {
       renderDrawer({ mode: "create" });
       expect(screen.getByLabelText(/start time/i)).not.toBeDisabled();
+    });
+
+    it("§F66 fast-follow C2: chronologically-NEXT projected nap is editable (sick-day flex)", () => {
+      // Two projected naps in the future. The earlier one (nap_2) is
+      // the "next" — user should be able to anchor it to baby's actual
+      // rhythm. The later one (nap_3) stays locked because cascade
+      // will re-project it from the pin.
+      const nap2 = projectedNap({
+        id: "nap-2",
+        eventKey: "nap_2",
+        startTime: 14 * 60,
+        endTime: 14 * 60 + 45,
+      });
+      const nap3 = projectedNap({
+        id: "nap-3",
+        eventKey: "nap_3",
+        startTime: 16 * 60,
+        endTime: 16 * 60 + 45,
+      });
+      renderDrawer({ event: nap2, existingEvents: [nap2, nap3] });
+      expect(screen.getByLabelText("Start time")).not.toBeDisabled();
+      expect(screen.queryByRole("note")).toBeNull();
+    });
+
+    it("§F66 fast-follow C2: farther-out projected nap stays locked (cascade re-projects from the pin)", () => {
+      const nap2 = projectedNap({
+        id: "nap-2",
+        eventKey: "nap_2",
+        startTime: 14 * 60,
+        endTime: 14 * 60 + 45,
+      });
+      const nap3 = projectedNap({
+        id: "nap-3",
+        eventKey: "nap_3",
+        startTime: 16 * 60,
+        endTime: 16 * 60 + 45,
+      });
+      renderDrawer({ event: nap3, existingEvents: [nap2, nap3] });
+      expect(screen.getByLabelText("Start time")).toBeDisabled();
+      expect(screen.getByRole("note")).toBeVisible();
     });
 
     it("sanitizes the save payload back to source values even if the form somehow holds different time/amount", async () => {

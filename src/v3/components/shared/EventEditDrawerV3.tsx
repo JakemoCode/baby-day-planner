@@ -5,7 +5,14 @@ import styles from "./EventEditDrawer.module.css";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import type { Event, EventType, OwnerRef, OwnersConfig, TimeMin } from "../../schemas";
 import { isRecorded, NO_OWNER } from "../../schemas";
-import { isFutureProjected } from "../../lifecycle";
+import { isFutureProjected, isNextProjectedOfType } from "../../lifecycle";
+import { isRenderSynthetic } from "../../lib/syntheticEvents";
+import {
+  DREAM_FEED_EVENT_KEY,
+  isDreamFeed,
+  isEngineEmittedId,
+  recordedIdFor,
+} from "../../lib/eventConventions";
 import { formatHM24, formatTimeForDisplay, nextDayAt, parseHM24 } from "../../ui/time";
 import { OwnerPickerV3 } from "./OwnerPickerV3";
 import { formToEvent, type FormState } from "./formToEvent";
@@ -32,6 +39,17 @@ export type EventEditDrawerV3Props = {
    * wake (defaultWakeTime + 24h), NOT the source nap's endTime.
    */
   defaultWakeTime: TimeMin;
+  /**
+   * §F66 fast-follow: today's actual wakeTime (from `Day.wakeTime`),
+   * used to validate that an edited startTime isn't accidentally
+   * AM/PM-confused below the day's wake (e.g. user types 12:30 meaning
+   * 12:30pm but the picker reads it as 0:30am, which silently wrecks
+   * the cascade by anchoring a pre-wake nap).
+   *
+   * Optional for backwards compatibility with the few call sites
+   * (Tomorrow page) that don't have a live wakeTime.
+   */
+  dayWakeTime?: TimeMin;
   onSave: (event: Event) => void | Promise<void>;
   onCancel: () => void;
   onDelete?: (event: Event) => void | Promise<void>;
@@ -47,13 +65,32 @@ type FormErrors = { startTime?: string; endTime?: string };
 
 function validateForm(
   type: EventType,
+  eventKey: string,
   startTime: TimeMin | undefined,
   endTime: TimeMin | undefined,
   editingId: string | undefined,
   existingEvents: Event[] | undefined,
+  dayWakeTime: TimeMin | undefined,
 ): FormErrors {
   const errors: FormErrors = {};
-  if (endTime !== undefined && startTime !== undefined && endTime <= startTime) {
+  // §F66 fast-follow B7: pre-wake guard. AM/PM picker mistakes (12:30
+  // intending pm but stored as 0:30am) anchor a nap or rhythm bottle
+  // before wakeTime and wreck the cascade. Catch it at validation
+  // time. Scope to cascade-anchoring types only — daily_recurring,
+  // daycare, dream-feed, pump, and extras are fixed-time / explicit-
+  // slot events that the user may legitimately schedule pre-wake.
+  const isCascadeAnchoring =
+    type === "nap" || (type === "bottle" && eventKey !== DREAM_FEED_EVENT_KEY);
+  if (
+    isCascadeAnchoring &&
+    dayWakeTime !== undefined &&
+    startTime !== undefined &&
+    startTime < dayWakeTime
+  ) {
+    const wakeStr = formatTimeForDisplay(dayWakeTime);
+    errors.startTime = `Before today's wake time (${wakeStr}).`;
+  }
+  if (!errors.endTime && endTime !== undefined && startTime !== undefined && endTime <= startTime) {
     errors.endTime = "Must be after start time.";
   }
   if (
@@ -66,6 +103,11 @@ function validateForm(
     const overlap = existingEvents.find((e) => {
       if (e.id === editingId) return false;
       if (e.type !== "nap") return false;
+      // Putdown synthetics carry `type: "nap"` for timeline geometry
+      // but represent the wind-down lane, not a real nap. The user
+      // intentionally schedules naps adjacent to their putdown chip;
+      // flagging that as an overlap blocks legitimate saves.
+      if (isRenderSynthetic(e)) return false;
       if (e.endTime === undefined) return false;
       if (!isRecorded(e.lifecycle)) return false;
       return e.startTime < endTime && startTime < e.endTime;
@@ -142,6 +184,7 @@ export function EventEditDrawerV3({
   nowMinutes,
   bedtimeThreshold,
   defaultWakeTime,
+  dayWakeTime,
   onSave,
   onCancel,
   onDelete,
@@ -178,14 +221,39 @@ export function EventEditDrawerV3({
       ? `${baseTitle}: ${sourceEvent.label}`
       : baseTitle;
 
-  // Delete is meaningful for events that exist in Firestore (already-
-  // recorded) OR for daily_recurring events — for recurring, "delete"
-  // means "skip today" via Day.suppressedRecurringIds (§F65), not a
-  // Firestore doc delete. useDrawer routes both cases.
+  // Delete is meaningful for:
+  //   - events that exist in Firestore (already-recorded)
+  //   - daily_recurring (→ Day.suppressedRecurringIds, §F65)
+  //   - daycare_dropoff/pickup (→ Day.suppressedDaycareDay, §F66 fast-follow)
+  //   - dream-feed slot (→ Day.suppressedDreamFeed, §F66 fast-follow)
+  // useDrawer routes each path.
+  const isDreamFeedSlot = type === "bottle" && isDreamFeed(sourceEvent);
+  const hasSuppressionPath =
+    type === "daily_recurring" ||
+    type === "daycare_dropoff" ||
+    type === "daycare_pickup" ||
+    isDreamFeedSlot;
+  // §F66 fast-follow B11: hide Delete when the cascade owns the slot.
+  // Auto-promoted nap/bedtime live only in engine output (no Firestore
+  // doc). Auto-promoted bottles are persisted by
+  // useAutoPromotePersistence but the cascade re-emits + the hook
+  // re-writes on the next pass — Delete would visibly do nothing.
+  // Signature for the bottle case: lifecycle "recorded" with
+  // annotatedAt === startTime. Manual logs use "completed" and drawer
+  // saves bump annotatedAt to nowMinutes, so neither collides.
+  const isAutoPromotedSleep =
+    (type === "nap" || type === "bedtime") && isEngineEmittedId(sourceEvent.id);
+  const isAutoPromotedBottle =
+    type === "bottle" &&
+    !isDreamFeedSlot &&
+    sourceEvent.lifecycle.state === "recorded" &&
+    sourceEvent.lifecycle.annotatedAt === sourceEvent.startTime;
   const canDelete =
     mode === "edit" &&
     onDelete !== undefined &&
-    (isRecorded(sourceEvent.lifecycle) || type === "daily_recurring");
+    !isAutoPromotedSleep &&
+    !isAutoPromotedBottle &&
+    (isRecorded(sourceEvent.lifecycle) || hasSuppressionPath);
 
   const confirmCopy =
     type === "daily_recurring"
@@ -206,14 +274,26 @@ export function EventEditDrawerV3({
   const showOwner = OWNER_TYPES.has(type);
   const showLabel = type === "extra";
 
-  // §F66 future-event drawer rule: when editing a future-projected event,
-  // only the owner is meaningful (planning intent). Time + amount edits
-  // would create a pinned override before the event has actually happened,
-  // breaking the cascade. Lock those inputs read-only. Edit mode only —
-  // create mode always treats the form fields as the source of truth.
-  const futureProjected = mode === "edit" && isFutureProjected(sourceEvent, nowMinutes);
+  // §F66 future-event drawer rule: lock time + amount on future-
+  // projected rhythm events (nap, rhythm bottle). Carve-out (§F66
+  // fast-follow C2 sick-day flex): the chronologically-NEXT projected
+  // nap and bottle are editable so the user can anchor them to baby's
+  // actual rhythm. Once anchored, cascade re-projects everything past
+  // the new anchor — farther-out events stay locked because their
+  // times will reflow from the pin.
+  const isNextOfType = isNextProjectedOfType(sourceEvent, existingEvents ?? [], nowMinutes);
+  const futureProjected =
+    mode === "edit" && isFutureProjected(sourceEvent, nowMinutes) && !isNextOfType;
 
-  const errors = validateForm(type, form.startTime, form.endTime, sourceEvent.id, existingEvents);
+  const errors = validateForm(
+    type,
+    sourceEvent.eventKey,
+    form.startTime,
+    form.endTime,
+    sourceEvent.id,
+    existingEvents,
+    dayWakeTime,
+  );
 
   const handleStartTimeChange = (raw: string) => {
     const next = parseHM24(raw);
@@ -297,7 +377,7 @@ export function EventEditDrawerV3({
       // §F59: align id convention with useDrawer (`recorded_${eventKey}`)
       // so this and any subsequent edit / Start-Bedtime tap write to the
       // same Firestore doc instead of orphaning a `bedtime`-id doc.
-      id: "recorded_bedtime",
+      id: recordedIdFor("bedtime"),
       dayId: napCandidate.dayId,
       eventKey: "bedtime",
       type: "bedtime",

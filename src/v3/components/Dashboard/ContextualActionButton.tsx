@@ -1,7 +1,10 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { NO_OWNER, type Event, type TimeMin } from "@/v3/schemas";
+import { recordedIdFor } from "@/v3/lib/eventConventions";
 import { currentLocalMinutes } from "@/v3/ui/time";
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { ActionButton } from "./ActionButton";
 import { decideMode, type ContextMode } from "./decideMode";
 
@@ -19,9 +22,31 @@ export type ContextualActionButtonProps = {
 
 const MODE_LABEL: Record<Exclude<ContextMode["kind"], "hidden">, string> = {
   "end-bedtime": "End overnight sleep",
-  "end-nap": "End Nap",
-  "log-bottle": "Log Bottle Time",
+  "end-nap": "End nap",
+  "log-bottle": "Log bottle now",
 };
+
+const LOGGED_LABEL = "✓ Bottle logged";
+/**
+ * How long the "✓ Bottle logged" affordance stays visible after a
+ * successful log before the button auto-hides. Without a timeout the
+ * label sticks for the full ±15min log-bottle window — masking any
+ * subsequent end-nap mode that would have shown up when the projected
+ * nap auto-promotes a moment later. (Jake 2026-05-27 dogfood.)
+ */
+const LOGGED_AFFORDANCE_MS = 4000;
+
+/**
+ * Renders nothing; fires `onExpire` after `ms`. Mount with a unique
+ * key for each affordance instance — unmounting clears the timer.
+ */
+function AffordanceTimer({ ms, onExpire }: { ms: number; onExpire: () => void }) {
+  useEffect(() => {
+    const t = setTimeout(onExpire, ms);
+    return () => clearTimeout(t);
+  }, [ms, onExpire]);
+  return null;
+}
 
 function buildLoggedBottle(
   projected: Event,
@@ -35,7 +60,7 @@ function buildLoggedBottle(
   // `recorded_${eventKey}` id makes subsequent drawer edits / re-taps
   // overwrite the same Firestore doc.
   return {
-    id: `recorded_${projected.eventKey}`,
+    id: recordedIdFor(projected.eventKey),
     dayId,
     eventKey: projected.eventKey,
     type: "bottle",
@@ -67,7 +92,26 @@ export function ContextualActionButton({
     nowMinutes,
   });
 
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  // Track when the "✓ Bottle logged" affordance entered, by the
+  // recorded bottle's id. A new id (or no affordance) means "not
+  // currently showing the logged affordance" — see <AffordanceTimer/>.
+  const isLoggedAffordance = mode.kind === "log-bottle" && mode.alreadyLogged;
+  const loggedKey = isLoggedAffordance ? mode.projected.id : null;
+  const [expiredKey, setExpiredKey] = useState<string | null>(null);
+
   if (mode.kind === "hidden") return null;
+  // After the affordance window, hide so end-nap (or whatever fires
+  // next) can take over. decideMode is bedtime > nap > bottle, so if
+  // an in-progress event existed the button would already have switched
+  // away — only the "between log and next event" gap reaches here.
+  if (isLoggedAffordance && expiredKey === loggedKey) return null;
+
+  const performLog = (projected: Event) => {
+    const nowMin = currentLocalMinutes();
+    const bottle = buildLoggedBottle(projected, dayId, defaultBottleAmountOz, nowMin);
+    void onLogBottle(bottle);
+  };
 
   const handleClick = () => {
     const nowMin = currentLocalMinutes();
@@ -79,16 +123,53 @@ export function ContextualActionButton({
         void onEndNap(mode.nap, nowMin);
         return;
       case "log-bottle": {
-        const bottle = buildLoggedBottle(mode.projected, dayId, defaultBottleAmountOz, nowMin);
-        void onLogBottle(bottle);
+        // Re-tap on an already-logged slot surfaces a confirm dialog
+        // ("change the recorded time?") rather than a silent overwrite.
+        if (mode.alreadyLogged) {
+          setConfirmOpen(true);
+          return;
+        }
+        performLog(mode.projected);
         return;
       }
     }
   };
 
+  const label =
+    mode.kind === "log-bottle" && mode.alreadyLogged ? LOGGED_LABEL : MODE_LABEL[mode.kind];
+
+  const confirmBody =
+    mode.kind === "log-bottle" && mode.alreadyLogged
+      ? (() => {
+          const m = Math.max(0, nowMinutes - mode.projected.startTime);
+          return `Last bottle logged ${m} minute${m === 1 ? "" : "s"} ago. Tap Confirm to update to now.`;
+        })()
+      : "";
+
   return (
-    <ActionButton variant="primary" onClick={handleClick}>
-      {MODE_LABEL[mode.kind]}
-    </ActionButton>
+    <>
+      <ActionButton variant="primary" onClick={handleClick} aria-live="polite">
+        {label}
+      </ActionButton>
+      {loggedKey !== null && expiredKey !== loggedKey && (
+        <AffordanceTimer
+          key={loggedKey}
+          ms={LOGGED_AFFORDANCE_MS}
+          onExpire={() => setExpiredKey(loggedKey)}
+        />
+      )}
+      <ConfirmDialog
+        open={confirmOpen}
+        title="Change the recorded time?"
+        body={confirmBody}
+        confirmLabel="Confirm"
+        cancelLabel="Cancel"
+        onCancel={() => setConfirmOpen(false)}
+        onConfirm={() => {
+          setConfirmOpen(false);
+          if (mode.kind === "log-bottle") performLog(mode.projected);
+        }}
+      />
+    </>
   );
 }

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { NO_OWNER, type Event, type TimeMin } from "@/v3/schemas";
 import { ContextualActionButton, type ContextualActionButtonProps } from "./ContextualActionButton";
@@ -91,7 +91,7 @@ describe("ContextualActionButton", () => {
     expect(screen.getByRole("button", { name: /end overnight sleep/i })).toBeVisible();
   });
 
-  it("renders 'Log Bottle Time' when projected bottle is within ±15min and no in-progress sleep", () => {
+  it("renders 'Log bottle now' when projected bottle is within ±15min and no in-progress sleep", () => {
     render(
       <ContextualActionButton
         {...makeProps({
@@ -100,7 +100,7 @@ describe("ContextualActionButton", () => {
         })}
       />,
     );
-    expect(screen.getByRole("button", { name: /log bottle time/i })).toBeVisible();
+    expect(screen.getByRole("button", { name: /log bottle now/i })).toBeVisible();
   });
 
   it("End Nap click fires onEndNap with the nap and current local minutes", async () => {
@@ -138,7 +138,7 @@ describe("ContextualActionButton", () => {
         })}
       />,
     );
-    await userEvent.click(screen.getByRole("button", { name: /log bottle time/i }));
+    await userEvent.click(screen.getByRole("button", { name: /log bottle now/i }));
     expect(onLogBottle).toHaveBeenCalledTimes(1);
     const bottle: Event = onLogBottle.mock.calls[0]![0];
     expect(bottle.type).toBe("bottle");
@@ -147,5 +147,107 @@ describe("ContextualActionButton", () => {
     expect(bottle.startTime).toBe(hm(13, 30));
     expect(bottle.amountOz).toBe(6);
     expect(bottle.lifecycle).toEqual({ state: "completed", committedAt: hm(13, 30) });
+  });
+
+  describe("logged-state UX (§F66 fast-follow A3)", () => {
+    const loggedBottle = (startTime: TimeMin): Event => ({
+      ...projectedBottle(startTime),
+      lifecycle: { state: "completed", committedAt: startTime },
+    });
+
+    it("renders '✓ Bottle logged' when the in-window bottle is already completed", () => {
+      render(
+        <ContextualActionButton
+          {...makeProps({
+            nextProjectedBottle: loggedBottle(hm(11, 50)),
+            nowMinutes: hm(11, 55),
+          })}
+        />,
+      );
+      expect(screen.getByRole("button", { name: /bottle logged/i })).toBeVisible();
+      expect(screen.queryByRole("button", { name: /log bottle now/i })).toBeNull();
+    });
+
+    it("re-tap on '✓ Bottle logged' opens the confirm dialog (does NOT silently overwrite)", async () => {
+      const onLogBottle = vi.fn().mockResolvedValue(undefined);
+      render(
+        <ContextualActionButton
+          {...makeProps({
+            nextProjectedBottle: loggedBottle(hm(11, 50)),
+            nowMinutes: hm(11, 55),
+            onLogBottle,
+          })}
+        />,
+      );
+      await userEvent.click(screen.getByRole("button", { name: /bottle logged/i }));
+      expect(onLogBottle).not.toHaveBeenCalled();
+      expect(screen.getByRole("heading", { name: /change the recorded time/i })).toBeVisible();
+    });
+
+    it("confirm dialog reports the elapsed minutes since the recorded bottle", () => {
+      render(
+        <ContextualActionButton
+          {...makeProps({
+            nextProjectedBottle: loggedBottle(hm(11, 50)),
+            nowMinutes: hm(11, 57),
+          })}
+        />,
+      );
+      // Re-tap surfaces the dialog with "logged 7 minutes ago" copy.
+      fireEvent.click(screen.getByRole("button", { name: /bottle logged/i }));
+      expect(screen.getByText(/logged 7 minutes ago/i)).toBeVisible();
+    });
+
+    it("confirm dialog Confirm fires a fresh onLogBottle with startTime = currentLocalMinutes", async () => {
+      const onLogBottle = vi.fn().mockResolvedValue(undefined);
+      const projected = loggedBottle(hm(11, 50));
+      render(
+        <ContextualActionButton
+          {...makeProps({
+            nextProjectedBottle: projected,
+            nowMinutes: hm(11, 55),
+            onLogBottle,
+          })}
+        />,
+      );
+      await userEvent.click(screen.getByRole("button", { name: /bottle logged/i }));
+      await userEvent.click(screen.getByRole("button", { name: /confirm/i }));
+      expect(onLogBottle).toHaveBeenCalledTimes(1);
+      const bottle: Event = onLogBottle.mock.calls[0]![0];
+      expect(bottle.eventKey).toBe(projected.eventKey);
+      expect(bottle.startTime).toBe(hm(13, 30)); // currentLocalMinutes spy
+    });
+
+    it("confirm dialog Cancel does NOT fire onLogBottle", async () => {
+      const onLogBottle = vi.fn().mockResolvedValue(undefined);
+      render(
+        <ContextualActionButton
+          {...makeProps({
+            nextProjectedBottle: loggedBottle(hm(11, 50)),
+            nowMinutes: hm(11, 55),
+            onLogBottle,
+          })}
+        />,
+      );
+      await userEvent.click(screen.getByRole("button", { name: /bottle logged/i }));
+      await userEvent.click(screen.getByRole("button", { name: /cancel/i }));
+      expect(onLogBottle).not.toHaveBeenCalled();
+    });
+
+    it("auto-promoted (lifecycle.state === 'recorded', not 'completed') still shows 'Log bottle now' — user hasn't committed yet", () => {
+      const autoPromoted: Event = {
+        ...projectedBottle(hm(11, 50)),
+        lifecycle: { state: "recorded", annotatedAt: hm(11, 50) },
+      };
+      render(
+        <ContextualActionButton
+          {...makeProps({
+            nextProjectedBottle: autoPromoted,
+            nowMinutes: hm(11, 55),
+          })}
+        />,
+      );
+      expect(screen.getByRole("button", { name: /log bottle now/i })).toBeVisible();
+    });
   });
 });

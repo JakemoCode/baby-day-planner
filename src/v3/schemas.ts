@@ -172,6 +172,8 @@ export type Day = {
   suppressedRecurringIds: string[];
   /** Per-day daycare opt-out (R21.5). */
   suppressedDaycareDay: boolean;
+  /** §F66 fast-follow: per-day dream-feed opt-out. R5.5 skips emission when true. */
+  suppressedDreamFeed?: boolean;
   /** Optional template id selected for this day. */
   templateId?: string;
   /**

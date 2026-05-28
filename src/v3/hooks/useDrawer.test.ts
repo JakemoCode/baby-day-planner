@@ -92,8 +92,24 @@ function setup({
     ReturnType<typeof vi.fn>;
   suppressRecurring?: ((recurringId: string) => Promise<void>) & ReturnType<typeof vi.fn>;
 } = {}) {
+  // §F66 fast-follow: useDrawer now takes a `DrawerSuppression[]` array
+  // instead of one optional callback per type. Tests build the array
+  // from the explicit `suppressRecurring` arg.
+  const suppressions = suppressRecurring
+    ? [
+        {
+          matches: (e: Event) => e.type === "daily_recurring",
+          apply: (e: Event) => {
+            const id = e.eventKey.startsWith("recurring:")
+              ? e.eventKey.slice("recurring:".length)
+              : e.eventKey;
+            return suppressRecurring(id);
+          },
+        },
+      ]
+    : [];
   const result = renderHook(() =>
-    useDrawer(actuals, saveEvent, deleteOptimistic, setOwnerOverride, suppressRecurring),
+    useDrawer(actuals, saveEvent, deleteOptimistic, setOwnerOverride, suppressions),
   );
   return { ...result, saveEvent, deleteOptimistic, setOwnerOverride, suppressRecurring };
 }

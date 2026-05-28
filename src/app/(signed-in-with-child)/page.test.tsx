@@ -224,7 +224,7 @@ describe("DashboardPage (V3)", () => {
   it("handleEndNap saves completed nap with endTime committed (TIME_EDIT action)", async () => {
     // Nap is in-progress: recorded lifecycle, startTime <= nowMinutes < effectiveEnd
     const inProgressNap: Event = {
-      id: "n-started",
+      id: "proj_nap_t540", // simulates an auto-promoted projection
       dayId: "day-1",
       eventKey: "nap_1",
       type: "nap",
@@ -238,6 +238,11 @@ describe("DashboardPage (V3)", () => {
     };
     const { saveEvent } = setupHooks({
       actuals: [inProgressNap],
+      // §F66 fast-follow: dashboard now sources inProgressNap from the
+      // engine projection (so auto-promoted naps fire End Nap too). In
+      // production, projectDay includes actuals via reality-wins; the
+      // test mock has to mirror that.
+      projected: [inProgressNap],
       nowMinutes: 9 * 60 + 30, // 30 min into the nap (within [startTime, endTime])
     });
     renderWithAuth(<DashboardPage />);
@@ -251,10 +256,12 @@ describe("DashboardPage (V3)", () => {
     expect(saveEvent).toHaveBeenCalledTimes(1);
     // saveEvent receives the full updated nap. endTime is whatever wall
     // clock the button captured. committedAt is the end time (TIME_EDIT
-    // action: the moment the user confirmed "nap is over").
+    // action: the moment the user confirmed "nap is over"). The id is
+    // §F59-deterministic `recorded_${eventKey}` so subsequent edits
+    // overwrite the same doc.
     expect(saveEvent).toHaveBeenCalledWith(
       expect.objectContaining({
-        id: "n-started",
+        id: "recorded_nap_1",
         endTime: expect.any(Number),
         lifecycle: expect.objectContaining({ state: "completed" }),
       }),
@@ -337,7 +344,7 @@ describe("DashboardPage (V3)", () => {
     vi.setSystemTime(new Date("2026-05-10T09:00:00"));
     // Two recorded bottle docs with the SAME eventKey (Start/End pair),
     // plus one projected bottle (must be ignored). nextNumber should be 2,
-    // not 3 — verified via the ContextualActionButton's Log Bottle Time
+    // not 3 — verified via the ContextualActionButton's Log bottle now
     // mode promoting the next projected bottle's eventKey.
     const recordedBottle: Event = {
       id: "b1",
@@ -378,10 +385,10 @@ describe("DashboardPage (V3)", () => {
     });
     renderWithAuth(<DashboardPage />);
 
-    // Click Log Bottle Time → handler should produce a Bottle whose
+    // Click Log bottle now → handler should produce a Bottle whose
     // eventKey is bottle_2 (1 unique recorded + 1, matching the projected
     // slot promoted by the contextual button).
-    const btn = screen.getByRole("button", { name: /Log Bottle Time/i });
+    const btn = screen.getByRole("button", { name: /Log bottle now/i });
     btn.click();
 
     expect(saveEvent).toHaveBeenCalledTimes(1);
@@ -404,7 +411,7 @@ describe("DashboardPage (V3)", () => {
     getOrCreatePlannedDayMock.mockResolvedValue(plannedTomorrow);
     createEventMock.mockResolvedValue(undefined);
 
-    // Projected bottle at 2 AM next-day frame so the Log Bottle Time
+    // Projected bottle at 2 AM next-day frame so the Log bottle now
     // window is open at nowMinutes=2:00.
     const projectedBottle: Event = {
       id: "b-proj-2am",
@@ -424,7 +431,7 @@ describe("DashboardPage (V3)", () => {
     });
     renderWithAuth(<DashboardPage />);
 
-    const btn = screen.getByRole("button", { name: /Log Bottle Time/i });
+    const btn = screen.getByRole("button", { name: /Log bottle now/i });
     btn.click();
 
     // Wait for async handler.

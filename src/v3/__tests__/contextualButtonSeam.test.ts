@@ -67,7 +67,7 @@ function project(now: TimeMin, actuals: Event[]): Event[] {
 }
 
 describe("Contextual button — seam (engine + render + decideMode)", () => {
-  it("lights up Log Bottle Time when Now is within ±15min of the next projected bottle", () => {
+  it("lights up Log bottle now when Now is within ±15min of the next projected bottle", () => {
     // 8:00 recorded bottle + 180min interval cascades next at 11:00.
     // At 10:50 (10min before), the Log Bottle window is open.
     const now = hm(10, 50);
@@ -96,7 +96,7 @@ describe("Contextual button — seam (engine + render + decideMode)", () => {
     expect(mode.kind).toBe("hidden");
   });
 
-  it("still lights up Log Bottle Time +10min after a projected bottle has passed", () => {
+  it("still lights up Log bottle now +10min after a projected bottle has passed", () => {
     // Engine projects bottle at 11:00. At 11:10 (after Now-cross + engine
     // auto-promote), Jake still wants the button visible so he can tap to
     // confirm an actual log at 11:10 — overwriting the auto-promoted slot.
@@ -128,5 +128,20 @@ describe("Contextual button — seam (engine + render + decideMode)", () => {
       nowMinutes: now,
     });
     expect(mode.kind).toBe("end-nap");
+  });
+
+  it("§F66 fast-follow B2: with recorded Bottle 1 @ 8am and projected Bottle 2 in window, the selector targets Bottle 2 (not Bottle 1)", () => {
+    // Jake's pre-merge dogfood: bottle 1 recorded @ 8am, projected
+    // bottle 2 in window, Now near bottle 2. Click Log Bottle Now
+    // should promote the bottle_2 slot, NOT move bottle 1 to Now.
+    // Engine cascades bottle 2 at 8:00 + 180min = 11:00. Now = 10:54
+    // puts bottle 2 in window (delta = 6min).
+    const now = hm(10, 54);
+    const events = project(now, [recordedBottle("bottle_1", hm(8))]);
+    const nb = nearestBottleInWindow(events, now, LOG_BOTTLE_WINDOW_MIN);
+    expect(nb).toBeDefined();
+    expect(nb?.eventKey).not.toBe("bottle_1");
+    expect(nb?.startTime).toBe(hm(11, 0));
+    expect(Math.abs((nb?.startTime ?? 0) - now)).toBeLessThanOrEqual(LOG_BOTTLE_WINDOW_MIN);
   });
 });

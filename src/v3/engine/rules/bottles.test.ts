@@ -121,19 +121,24 @@ describe("R5.8 — cascade stops at midnight (the 'midnight rule', DOMAIN.md §2
   });
 });
 
-describe("R5.4 — bottles renumbered chronologically for display", () => {
-  it("two recorded bottles with non-chronological eventKeys end up renumbered in time order", () => {
-    // The user logged bottle_1 at 9:00, then later remembered an earlier
-    // bottle and FAB-inserted it at 7:30 with eventKey 'bottle_2'.
-    // Engine output should renumber so the 7:30 one is 'bottle_1'.
+describe("R5.4 — recorded bottle identity frozen; projected fill after max recorded", () => {
+  it("two recorded bottles with non-chronological eventKeys KEEP their pinned numbers", () => {
+    // §F66 fast-follow B5 grill 2026-05-27: recorded bottle identity
+    // (eventKey/label) is FROZEN at the moment of recording. The user
+    // logged bottle_1 at 9:00, then FAB-inserted an earlier bottle at
+    // 7:30 with eventKey 'bottle_2'. The 7:30 one stays 'bottle_2'
+    // even though it's chronologically first — past events are never
+    // re-projected, including their identity.
     const lateInserted = aRecordedBottle({
       id: "b_late_insert",
       eventKey: "bottle_2",
+      label: "Bottle 2",
       start: 7 * 60 + 30,
     });
     const firstLogged = aRecordedBottle({
       id: "b_first_logged",
       eventKey: "bottle_1",
+      label: "Bottle 1",
       start: 9 * 60,
     });
 
@@ -144,6 +149,9 @@ describe("R5.4 — bottles renumbered chronologically for display", () => {
         defaultBottleIntervalMinutes: 180,
       }),
       actuals: [lateInserted, firstLogged],
+      // Keep Now before the first cascade-natural emit (12:00) so
+      // auto-promote doesn't claim it as "recorded" mid-test.
+      nowMinutes: 10 * 60,
     });
 
     const out = projectDay(
@@ -160,16 +168,63 @@ describe("R5.4 — bottles renumbered chronologically for display", () => {
       .filter((e) => e.type === "bottle")
       .sort((a, b) => a.startTime - b.startTime);
 
-    // The cascade extends past bottlesPerDay (cold-start target only;
-    // see "bottlesPerDay is a cold-start target" describe block below).
-    // This test only cares about chronological renumbering of the two
-    // recorded bottles.
+    // Recorded identity is frozen — the 7:30 one stays bottle_2, the
+    // 9:00 one stays bottle_1, even though that's non-chronological.
     expect(bottles[0]!.id).toBe("b_late_insert"); // 7:30 one
-    expect(bottles[0]!.eventKey).toBe("bottle_1");
-    expect(bottles[0]!.label).toBe("Bottle 1");
+    expect(bottles[0]!.eventKey).toBe("bottle_2");
+    expect(bottles[0]!.label).toBe("Bottle 2");
     expect(bottles[1]!.id).toBe("b_first_logged"); // 9:00 one
-    expect(bottles[1]!.eventKey).toBe("bottle_2");
-    expect(bottles[1]!.label).toBe("Bottle 2");
+    expect(bottles[1]!.eventKey).toBe("bottle_1");
+    expect(bottles[1]!.label).toBe("Bottle 1");
+    // Projected bottles fill starting from max(recorded) + 1 = 3.
+    // Anchored cascade extends forward; at least one projection should
+    // exist past the 9am anchor.
+    const projected = bottles.filter((b) => b.lifecycle.state === "projected");
+    expect(projected.length).toBeGreaterThan(0);
+    expect(projected[0]!.eventKey).toBe("bottle_3");
+  });
+
+  it("recorded bottle keeps its number when time-edited into a new chronological position", () => {
+    // Jake's 2026-05-27 dogfood: a sole recorded bottle with eventKey
+    // 'bottle_3' (e.g. earlier bottle_1 + bottle_2 were deleted) is
+    // time-edited from 1:10pm to 12:30pm. It stays bottle_3 — past
+    // events are never re-projected, identity included.
+    const recorded = aRecordedBottle({
+      id: "b_recorded",
+      eventKey: "bottle_3",
+      label: "Bottle 3",
+      start: 12 * 60 + 30, // moved from 13:10 → 12:30
+    });
+    const ctx = aContext({
+      day: aDay({ wakeTime: 7 * 60 }),
+      settings: aSettings({
+        bottleChain: { bottlesPerDay: 4, bufferAfterWakeMinutes: 10 },
+        defaultBottleIntervalMinutes: 180,
+      }),
+      actuals: [recorded],
+      nowMinutes: 13 * 60,
+    });
+    const out = projectDay(
+      {
+        day: ctx.day,
+        settings: ctx.settings,
+        actuals: ctx.actuals,
+        nowMinutes: ctx.nowMinutes,
+      },
+      { rules: ALL },
+    );
+    const bottles = out
+      .filter((e) => e.type === "bottle")
+      .sort((a, b) => a.startTime - b.startTime);
+    const rec = bottles.find((b) => b.id === "b_recorded")!;
+    expect(rec.eventKey).toBe("bottle_3");
+    expect(rec.label).toBe("Bottle 3");
+    // Subsequent projected bottles start at 4 (max recorded + 1).
+    // Anchored cascade extends forward from 12:30; at least one
+    // projection should exist after the recorded anchor.
+    const projected = bottles.filter((b) => b.lifecycle.state === "projected");
+    expect(projected.length).toBeGreaterThan(0);
+    expect(projected[0]!.eventKey).toBe("bottle_4");
   });
 });
 
@@ -1395,9 +1450,11 @@ describe("Sequential bottle cascade — caps forward at bedtime (DOMAIN.md §1 +
       expect(b.startTime).toBeLessThan(19 * 60);
     }
     // Bedtime event projected.
-    // ADR-0002: bedtimeStart = max(earliestBedtime=18:00, wwStart=16:30) = 18:00.
+    // §F66 fast-follow B8: bedtimeStart = max(earliestBedtime=18:00,
+    // wwStart+WW=16:30+150=19:00) = 19:00. Full wake window plays
+    // out before bedtime lands.
     const bedtime = out.find((e) => e.type === "bedtime");
-    expect(bedtime?.startTime).toBe(18 * 60);
+    expect(bedtime?.startTime).toBe(19 * 60);
   });
 
   it("recorded bottle past bedtime is preserved but does NOT cascade forward from there", () => {
@@ -1620,11 +1677,16 @@ describe("§F66 PR 3c — putdown bottle-anchor rule (CONTEXT.md + ADR-0006 Conc
     expect(bottles.find((b) => b.startTime === 11 * 60)).toBeDefined();
   });
 
-  it("ADR-0006 Concern B: skips the putdown snap when the snap target would land ≤ Now (no retroactive shift)", () => {
-    // Same as test 1, but nowMinutes is pushed past the would-be snap
-    // target (11:45). The putdown snap is forbidden — the engine cannot
-    // pull a future bottle (12:00) backward into the past (11:45 ≤ Now).
-    // Bottle stays at its cascade-natural emit time (12:00).
+  it("ADR-0006 Concern B + putdown+nap one-block: forward-snaps to nap.end when putdown era has opened", () => {
+    // Same fixture as test 1, but nowMinutes is pushed past the
+    // would-be putdown anchor (11:45). Concern B forbids the backward
+    // snap to 11:45 (≤ Now = retroactive shift across Now line). But
+    // the bottle still lands at nap_2.startTime = 12:00, which is
+    // INSIDE the block [11:45, 12:45] — and "putdown + nap is one
+    // uninterruptible block as far as bottle projections go." With
+    // the putdown era already open (lo=11:45 ≤ Now=11:50), the
+    // forward-snap (§F66 fast-follow B4) pushes the bottle to
+    // nap_2.endTime = 12:45 — clearly future, no Now crossing.
     const recorded = aRecordedBottle({
       id: "actual_bottle_morning",
       eventKey: "bottle_1",
@@ -1659,11 +1721,14 @@ describe("§F66 PR 3c — putdown bottle-anchor rule (CONTEXT.md + ADR-0006 Conc
       .filter((e) => e.type === "bottle")
       .sort((a, b) => a.startTime - b.startTime);
 
-    // Bottle stays at cascade-natural 12:00.
-    expect(bottles.find((b) => b.startTime === 12 * 60)).toBeDefined();
-    // The snap to 11:45 must NOT have fired — that would be a
-    // retroactive shift into the past per Concern B.
+    // Forward-snapped to nap_2.endTime = 12:45.
+    expect(bottles.find((b) => b.startTime === 12 * 60 + 45)).toBeDefined();
+    // The backward snap to 11:45 must NOT have fired — retroactive
+    // shift into the past, forbidden by Concern B.
     expect(bottles.find((b) => b.startTime === 11 * 60 + 45)).toBeUndefined();
+    // The cascade-natural 12:00 inside the block must NOT remain —
+    // putdown+nap is one uninterruptible block.
+    expect(bottles.find((b) => b.startTime === 12 * 60)).toBeUndefined();
   });
 });
 
@@ -1853,5 +1918,190 @@ describe("R5.5 — dream-feed emission (§F66)", () => {
     for (const key of rhythmKeys) {
       expect(key).toMatch(/^bottle_\d+$/);
     }
+  });
+});
+
+describe("§F66 fast-follow B4 — past-time emit during nap edit snaps to nap edge", () => {
+  it("with an in-progress recorded nap, a past-time cascade emit snaps forward to the nap's future endTime", () => {
+    // Recorded morning bottle at 8am. Recorded nap in progress that
+    // the user just pushed later — start 10:30, end 13:00. Now is 12:00
+    // (mid-nap). The cascade walks 8am + 180min = 11am, which is now
+    // INSIDE the nap (10:30-13:00). snapOutOfNap usually pushes to
+    // nearer edge (10:30, which is < Now=12:00). Past-edge fallback
+    // would prefer 13:00, but only when 10:30 is the "chosen" edge
+    // strictly inside. With the new B4 forward-snap, the post-snap
+    // result that's still < Now gets bumped to the nearest future
+    // nap edge — 13:00.
+    const recordedBottle = aRecordedBottle({
+      id: "rec_b1",
+      eventKey: "bottle_1",
+      start: 8 * 60,
+    });
+    const recordedNap = aRecordedNap({
+      id: "rec_n1",
+      eventKey: "nap_1",
+      start: 10 * 60 + 30,
+      end: 13 * 60,
+    });
+    const ctx = aContext({
+      day: aDay({ wakeTime: 7 * 60 }),
+      settings: aSettings({
+        bottleChain: { bottlesPerDay: 4, bufferAfterWakeMinutes: 10 },
+        defaultBottleIntervalMinutes: 180,
+        wakeWindowsMinutes: [],
+        bedtimeThreshold: 22 * 60,
+      }),
+      actuals: [recordedBottle, recordedNap],
+      nowMinutes: 12 * 60,
+    });
+    const out = projectDay(
+      {
+        day: ctx.day,
+        settings: ctx.settings,
+        actuals: ctx.actuals,
+        nowMinutes: ctx.nowMinutes,
+      },
+      { rules: ALL_WITH_NAPS },
+    );
+    const projectedBottles = out
+      .filter((e) => e.type === "bottle" && e.lifecycle.state === "projected")
+      .sort((a, b) => a.startTime - b.startTime);
+    // The next projected bottle should be at the nap's endTime (13:00)
+    // OR later — never inside the past portion of the nap.
+    expect(projectedBottles.length).toBeGreaterThan(0);
+    for (const b of projectedBottles) {
+      expect(b.startTime).toBeGreaterThanOrEqual(12 * 60);
+    }
+    expect(projectedBottles[0]?.startTime).toBe(13 * 60);
+  });
+
+  it("projected nap with putdown.start past Now — bottle skips the past putdown AND nap.start, lands at nap.endTime", () => {
+    // Jake's 2026-05-27 screenshot scenario: a projected nap whose
+    // putdown.start is past Now AND whose start is barely future.
+    // The cascade-natural bottle would land in the putdown window
+    // (past Now). Putdown-anchor refuses (Concern B — target ≤ Now),
+    // and the forward-snap pushes to nap.endTime (clearly future) —
+    // putdown + nap is treated as a single block; the bottle is
+    // deferred past it.
+    //
+    // Fixture: single 7-hour wake window puts nap_1 at 3:00-3:45p
+    // (deterministic). Recorded bottle at 11:50am triggers a
+    // cascade-natural emit at 2:50p (inside nap_1's putdown range).
+    const recordedBottle = aRecordedBottle({
+      id: "rec_b1",
+      eventKey: "bottle_1",
+      start: 11 * 60 + 50, // 11:50am → 11:50 + 180 = 14:50 (2:50p)
+    });
+    const ctx = aContext({
+      day: aDay({ wakeTime: 8 * 60 }),
+      settings: aSettings({
+        bottleChain: { bottlesPerDay: 2, bufferAfterWakeMinutes: 10 },
+        defaultBottleIntervalMinutes: 180,
+        // 7-hour wake window from 8am → nap_1 at 3:00-3:45p.
+        wakeWindowsMinutes: [7 * 60],
+        defaultNapLengthMinutes: 45,
+        putdownLeadMinutes: 15,
+        bedtimeThreshold: 22 * 60,
+      }),
+      actuals: [recordedBottle],
+      nowMinutes: 14 * 60 + 59, // 2:59p
+    });
+    const out = projectDay(
+      {
+        day: ctx.day,
+        settings: ctx.settings,
+        actuals: ctx.actuals,
+        nowMinutes: ctx.nowMinutes,
+      },
+      { rules: ALL_WITH_NAPS },
+    );
+    const projectedBottles = out
+      .filter((e) => e.type === "bottle" && e.lifecycle.state === "projected")
+      .sort((a, b) => a.startTime - b.startTime);
+    // Every projected bottle must be in the future.
+    for (const b of projectedBottles) {
+      expect(b.startTime).toBeGreaterThan(14 * 60 + 59);
+    }
+    // The next projected bottle is NOT at nap.startTime (3:00p, the
+    // end-of-putdown), but at nap.endTime (3:45p, past the nap).
+    const nextBottle = projectedBottles[0];
+    expect(nextBottle?.startTime).not.toBe(15 * 60); // 3:00p
+    expect(nextBottle?.startTime).toBe(15 * 60 + 45); // 3:45p
+  });
+
+  it("proposed === Now during in-progress putdown still snaps forward to nap.endTime", () => {
+    // Tighter version of Jake's 2026-05-27 screenshot: cascade-natural
+    // emit lands EXACTLY at Now (3:10p) while the putdown era is
+    // already open (putdown at 3:05p, nap at 3:20-4:05p). The original
+    // B4 implementation skipped snap-forward when `proposed >= now`,
+    // so the bottle rendered AT Now inside the putdown block. The fix
+    // gates on the putdown era opening (lo ≤ now), not on proposed's
+    // tense.
+    //
+    // Fixture: recorded bottle at 12:10pm + 180min interval → proposed
+    // 3:10pm = Now. nap_1 sits at 3:20-4:05p (7hr wake window from 8am).
+    const recordedBottle = aRecordedBottle({
+      id: "rec_b1",
+      eventKey: "bottle_1",
+      start: 12 * 60 + 10,
+    });
+    const ctx = aContext({
+      day: aDay({ wakeTime: 8 * 60 }),
+      settings: aSettings({
+        bottleChain: { bottlesPerDay: 2, bufferAfterWakeMinutes: 10 },
+        defaultBottleIntervalMinutes: 180,
+        wakeWindowsMinutes: [7 * 60 + 20], // 8am + 7h20m → nap_1 at 3:20p
+        defaultNapLengthMinutes: 45,
+        putdownLeadMinutes: 15,
+        bedtimeThreshold: 22 * 60,
+      }),
+      actuals: [recordedBottle],
+      nowMinutes: 15 * 60 + 10, // 3:10p — exactly the cascade emit time
+    });
+    const out = projectDay(
+      {
+        day: ctx.day,
+        settings: ctx.settings,
+        actuals: ctx.actuals,
+        nowMinutes: ctx.nowMinutes,
+      },
+      { rules: ALL_WITH_NAPS },
+    );
+    const projectedBottles = out
+      .filter((e) => e.type === "bottle" && e.lifecycle.state === "projected")
+      .sort((a, b) => a.startTime - b.startTime);
+    expect(projectedBottles[0]?.startTime).toBe(16 * 60 + 5); // 4:05p = nap_1.endTime
+  });
+
+  it("cold-start (no recorded events) is unaffected — past-time emits still happen and auto-promote claims them", () => {
+    // Without an in-progress recorded nap, B4 forward-snap is gated
+    // off. The cascade emits its natural cold-start chain even if
+    // some slots are past Now; auto-promote handles those upstream.
+    const ctx = aContext({
+      day: aDay({ wakeTime: 7 * 60 }),
+      settings: aSettings({
+        bottleChain: { bottlesPerDay: 3, bufferAfterWakeMinutes: 10 },
+        defaultBottleIntervalMinutes: 180,
+        wakeWindowsMinutes: [],
+        bedtimeThreshold: 22 * 60,
+      }),
+      actuals: [],
+      nowMinutes: 12 * 60,
+    });
+    const out = projectDay(
+      {
+        day: ctx.day,
+        settings: ctx.settings,
+        actuals: ctx.actuals,
+        nowMinutes: ctx.nowMinutes,
+      },
+      { rules: ALL_WITH_NAPS },
+    );
+    const bottles = out
+      .filter((e) => e.type === "bottle")
+      .sort((a, b) => a.startTime - b.startTime);
+    // First slot at wakeTime + buffer = 7:10 (past Now=12:00).
+    // Not snapped forward; auto-promoted to recorded.
+    expect(bottles[0]?.startTime).toBe(7 * 60 + 10);
   });
 });

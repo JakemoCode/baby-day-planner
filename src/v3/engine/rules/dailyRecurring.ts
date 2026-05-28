@@ -27,6 +27,7 @@ import type { Context, DailyRecurring as RecurringConfig, Event } from "../../sc
 import type { Rule } from "../evaluator";
 import { hasType, projectedEvent } from "../helpers";
 import { missingScheduledEvents } from "./missingScheduledEvents";
+import { recurringEventKeyFor } from "../../lib/eventConventions";
 
 const isRecurring = hasType("daily_recurring");
 
@@ -58,7 +59,7 @@ function missingRecurring(events: readonly Event[], ctx: Context): RecurringConf
     if (suppressed.has(entry.id)) continue;
     if (seenIds.has(entry.id)) continue;
     seenIds.add(entry.id);
-    candidates.push({ ...entry, eventKey: recurringKey(entry.id) });
+    candidates.push({ ...entry, eventKey: recurringEventKeyFor(entry.id) });
   }
   // R11.5: filter out entries whose eventKey already exists on a
   // daily_recurring event (recorded or projected). Includes recorded events
@@ -68,7 +69,7 @@ function missingRecurring(events: readonly Event[], ctx: Context): RecurringConf
 }
 
 function buildProjection(ctx: Context, entry: RecurringConfig): Event {
-  const eventKey = recurringKey(entry.id);
+  const eventKey = recurringEventKeyFor(entry.id);
   // R11.2: durationMinutes > 0 → block. Treat 0 (or undefined) as
   // instant; a zero-length block is nonsensical and would render
   // weirdly.
@@ -85,10 +86,6 @@ function buildProjection(ctx: Context, entry: RecurringConfig): Event {
     ...(isBlock ? { endTime: entry.time + entry.durationMinutes! } : {}),
     ...(ownerSlot !== undefined ? { owner: { slot: ownerSlot } } : {}),
   });
-}
-
-function recurringKey(id: string): string {
-  return `recurring:${id}`;
 }
 
 export const RULES: Rule[] = [RuleProjectDailyRecurring];

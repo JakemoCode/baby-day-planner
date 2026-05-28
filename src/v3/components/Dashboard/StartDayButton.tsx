@@ -26,9 +26,9 @@ export function StartDayButton({ hasTomorrowPlan, onStart }: StartDayButtonProps
     return () => document.removeEventListener("mousedown", handleClick);
   }, [overflowOpen]);
 
-  const primaryLabel = hasTomorrowPlan ? "Start Day from Plan" : "Start New Day";
+  const primaryLabel = hasTomorrowPlan ? "Start day from plan" : "Start new day";
   const dialogTitle =
-    pendingChoice === "plan" ? "Start day from Tomorrow Plan?" : "Archive today and start fresh?";
+    pendingChoice === "plan" ? "Start day from tomorrow plan?" : "Archive today and start fresh?";
   const dialogBody =
     pendingChoice === "plan"
       ? "Today's data will be archived and the planned day will become the new active day."

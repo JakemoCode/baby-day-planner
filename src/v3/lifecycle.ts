@@ -20,6 +20,8 @@
  */
 
 import type { Event, EventKind, EventType, Lifecycle, TimeMin } from "./schemas";
+import { isRenderSynthetic } from "./lib/syntheticEvents";
+import { isDreamFeed } from "./lib/eventConventions";
 
 // ---------------------------------------------------------------------------
 // Predicates
@@ -27,14 +29,65 @@ import type { Event, EventKind, EventType, Lifecycle, TimeMin } from "./schemas"
 
 /**
  * §F66 future-event drawer rule (ADR-0001 + CONTEXT.md "future-event
- * drawer rule"): an event is "future-projected" when its lifecycle is
- * `projected` AND its startTime is strictly after Now. Future-projected
- * events can only be edited via owner (planning intent); time and
- * amount edits would create a pinned override before the event has
- * actually happened.
+ * drawer rule"): the time/amount inputs on the drawer are locked only
+ * for rhythm-cascade events (`nap`, non-dream-feed `bottle`) that are
+ * strictly in the future. Daycare, daily-recurring, dream-feed, and
+ * `extra` events are fixed-time / explicit-slot — the user can move
+ * them per-day without breaking the cascade.
+ *
+ * Conditions:
+ *   - lifecycle is `projected`
+ *   - `startTime > nowMinutes`
+ *   - type is `nap` or `bottle` (the cascade-anchoring types)
+ *   - NOT the dream-feed slot (`bottle_dream`) — that's explicit-
+ *     schedule, not rhythm-cascade
+ *   - NOT a render-synthetic putdown chip (these inherit type="nap"
+ *     and the parent's projected lifecycle for timeline geometry;
+ *     without the filter they'd claim the next-nap slot in
+ *     {@link isNextProjectedOfType} via their earlier startTime and
+ *     lock the real nap's drawer inputs)
+ *
+ * **Pure-event predicate**: does NOT know whether this event is the
+ * chronologically-next of its type. The drawer combines this with
+ * {@link isNextProjectedOfType} to allow per-day anchoring of the next
+ * nap or bottle (sick-day flexibility, §F66 fast-follow C2):
+ *   `lockTimeInputs = isFutureProjected(e, now) && !isNextProjectedOfType(e, allEvents, now)`
  */
 export function isFutureProjected(event: Event, nowMinutes: TimeMin): boolean {
-  return event.lifecycle.state === "projected" && event.startTime > nowMinutes;
+  if (event.lifecycle.state !== "projected") return false;
+  if (event.startTime <= nowMinutes) return false;
+  if (event.type !== "nap" && event.type !== "bottle") return false;
+  if (event.type === "bottle" && isDreamFeed(event)) return false;
+  if (isRenderSynthetic(event)) return false;
+  return true;
+}
+
+/**
+ * True iff `event` is the chronologically-earliest projected event of
+ * its type whose `startTime > nowMinutes`. The drawer exempts these
+ * from the time-lock so the user can anchor the next-up nap or bottle
+ * to baby's actual rhythm (sick day, off-schedule day). Farther-out
+ * events stay locked — once the user pins the next slot, the cascade
+ * re-anchors and reprojects everything beyond it from that point.
+ *
+ * Dream-feed (`bottle_dream`) is not counted as the next bottle — it's
+ * a separate schedule-time slot, not part of the rhythm chain.
+ *
+ * Established 2026-05-27 in §F66 fast-follow C2.
+ */
+export function isNextProjectedOfType(
+  event: Event,
+  allEvents: Event[],
+  nowMinutes: TimeMin,
+): boolean {
+  if (!isFutureProjected(event, nowMinutes)) return false;
+  let earliest: Event | undefined;
+  for (const e of allEvents) {
+    if (e.type !== event.type) continue;
+    if (!isFutureProjected(e, nowMinutes)) continue;
+    if (earliest === undefined || e.startTime < earliest.startTime) earliest = e;
+  }
+  return earliest !== undefined && earliest.id === event.id;
 }
 
 // ---------------------------------------------------------------------------

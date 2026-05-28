@@ -159,6 +159,38 @@ export async function suppressRecurringForDay(
 }
 
 /**
+ * §F66 fast-follow: per-day daycare opt-out. The engine's daycare rule
+ * (R21.5) already honors `Day.suppressedDaycareDay`; this writes the
+ * field from the drawer's "delete" handler on a daycare event.
+ * Tomorrow's fresh Day doc starts with `false`.
+ */
+export async function suppressDaycareForDay(
+  db: Firestore,
+  childId: string,
+  dayId: string,
+): Promise<void> {
+  await updateDoc(dayRef(db, childId, dayId), {
+    suppressedDaycareDay: true,
+  });
+}
+
+/**
+ * §F66 fast-follow: per-day dream-feed opt-out. R5.5 honors
+ * `Day.suppressedDreamFeed`; this writes the field from the drawer's
+ * "delete" handler on the dream-feed slot. Tomorrow's fresh Day doc
+ * starts with `false`.
+ */
+export async function suppressDreamFeedForDay(
+  db: Firestore,
+  childId: string,
+  dayId: string,
+): Promise<void> {
+  await updateDoc(dayRef(db, childId, dayId), {
+    suppressedDreamFeed: true,
+  });
+}
+
+/**
  * Edit today's wakeTime AND close any in-progress overnight bedtime
  * event in the same transaction.
  *

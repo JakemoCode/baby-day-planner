@@ -9,12 +9,9 @@ import { useV3Projection } from "@/v3/hooks/useV3Projection";
 import { useV3Settings } from "@/v3/hooks/useV3Settings";
 import { useV3Templates } from "@/v3/hooks/useV3Templates";
 import { useDrawer } from "@/v3/hooks/useDrawer";
+import { useDayDrawerSuppressions } from "@/v3/hooks/useDayDrawerSuppressions";
 import { db } from "@/lib/firebase/client";
-import {
-  editWakeTime,
-  suppressRecurringForDay,
-  updateDayOwnerOverride,
-} from "@/v3/repositories/days";
+import { editWakeTime, updateDayOwnerOverride } from "@/v3/repositories/days";
 import { LoadingState } from "@/components/shared/LoadingState";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { FAB } from "@/components/shared/FAB";
@@ -34,6 +31,7 @@ export default function TimelinePage() {
   const { settings, loading: settingsLoading } = useV3Settings(CHILD_ID);
   const { events: actuals, saveEvent, deleteOptimistic } = useV3Events(CHILD_ID, day?.id ?? "");
   const { templates } = useV3Templates(CHILD_ID);
+  const drawerSuppressions = useDayDrawerSuppressions(db, CHILD_ID, day?.id);
   const { drawer, openCreate, openEdit, close, onSave, onDelete } = useDrawer(
     actuals,
     saveEvent,
@@ -41,10 +39,7 @@ export default function TimelinePage() {
     day?.id
       ? (eventKey, owner) => updateDayOwnerOverride(db, CHILD_ID, day.id, eventKey, owner)
       : undefined,
-    // §F65 — recurring delete = skip for today via Day.suppressedRecurringIds.
-    day?.id
-      ? (recurringId) => suppressRecurringForDay(db, CHILD_ID, day.id, recurringId)
-      : undefined,
+    drawerSuppressions,
   );
   const [pickerOpen, setPickerOpen] = useState(false);
 
@@ -136,6 +131,7 @@ export default function TimelinePage() {
         nowMinutes={nowMinutes}
         bedtimeThreshold={settings.bedtimeThreshold}
         defaultWakeTime={settings.defaultWakeTime}
+        {...(day?.wakeTime !== undefined ? { dayWakeTime: day.wakeTime } : {})}
         existingEvents={projected}
         open={drawer.open}
         event={drawer.open ? (drawer.mode === "edit" ? drawer.event : drawer.template) : null}

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { Event, OwnershipTemplate, TimeMin } from "@/v3/schemas";
 import { reduceLifecycle } from "@/v3/lifecycle";
 import { isInProgress } from "@/v3/lib/effectiveEnd";
+import { isRenderSynthetic } from "@/v3/lib/syntheticEvents";
 import {
   currentWakeWindow,
   nearestBottleInWindow,
@@ -18,16 +19,24 @@ import { useV3Events } from "@/v3/hooks/useV3Events";
 import { useV3Settings } from "@/v3/hooks/useV3Settings";
 import { useV3Templates } from "@/v3/hooks/useV3Templates";
 import { useV3Projection } from "@/v3/hooks/useV3Projection";
+import { useAutoPromotePersistence } from "@/v3/hooks/useAutoPromotePersistence";
 import { useV3TomorrowPlan } from "@/v3/hooks/useV3TomorrowPlan";
 import { useReconcileActiveDay } from "@/v3/hooks/useReconcileActiveDay";
 import { useDrawer } from "@/v3/hooks/useDrawer";
+import { useDayDrawerSuppressions } from "@/v3/hooks/useDayDrawerSuppressions";
+import { isEngineEmittedId, recordedIdFor } from "@/v3/lib/eventConventions";
 import {
   getOrCreatePlannedDay,
   promoteFromPlan,
   startNewDay,
   updateDayOwnerOverride,
 } from "@/v3/repositories/days";
-import { createEvent, reconcileDuplicateEventDocs } from "@/v3/repositories/events";
+import {
+  createEvent,
+  deleteEvent,
+  listEvents,
+  reconcileDuplicateEventDocs,
+} from "@/v3/repositories/events";
 import { db } from "@/lib/firebase/client";
 import { DashboardSkeleton } from "@/v3/components/Dashboard/DashboardSkeleton";
 import { FAB } from "@/components/shared/FAB";
@@ -77,6 +86,7 @@ export default function DashboardPage() {
   // re-promote from the plan vs defaults during dogfood iteration.
   const { plan: todaysPlan } = useV3TomorrowPlan(CHILD_ID, todayDate());
   const hasTomorrowPlan = todaysPlan?.status === "confirmed";
+  const drawerSuppressions = useDayDrawerSuppressions(db, CHILD_ID, day?.id);
   const { drawer, openCreate, close, onSave, onDelete } = useDrawer(
     actuals,
     saveEvent,
@@ -84,6 +94,7 @@ export default function DashboardPage() {
     day?.id
       ? (eventKey, owner) => updateDayOwnerOverride(db, CHILD_ID, day.id, eventKey, owner)
       : undefined,
+    drawerSuppressions,
   );
   const [pickerOpen, setPickerOpen] = useState(false);
   const [wakeSheetOpen, setWakeSheetOpen] = useState(false);
@@ -98,6 +109,18 @@ export default function DashboardPage() {
     settings,
     actuals,
     ...(template ? { template } : {}),
+  });
+
+  // §F66 fast-follow B5: persist engine-auto-promoted bottles to
+  // Firestore so they survive the next cascade pass. Without this,
+  // the morning bottle predictions vanish the moment any real
+  // recording exists (R5's anchored branch suppresses cold-start
+  // emission). See useAutoPromotePersistence for the philosophy.
+  useAutoPromotePersistence({
+    db,
+    childId: CHILD_ID,
+    projected,
+    actuals,
   });
 
   // Loading + just-mounted + post-onboarding all collapse to the same
@@ -127,8 +150,21 @@ export default function DashboardPage() {
   const nb = nearestBottleInWindow(projected, nowMinutes, LOG_BOTTLE_WINDOW_MIN);
   const nn = nextNap(projected, nowMinutes);
   const cww = currentWakeWindow(projected, nowMinutes);
-  const inProgressNap = actuals.find(
-    (e) => e.type === "nap" && isInProgress(e, settings, nowMinutes),
+  // Source from `projected` (not `actuals`) so engine-side Now-cross
+  // auto-promote (ADR-0001) surfaces in-progress naps even when the
+  // user hasn't written a Firestore record yet. A projected nap whose
+  // startTime <= Now is flipped to `recorded` by the evaluator; that
+  // recording lives in `projected` only, not `actuals`. Without this,
+  // tapping a chip mid-nap wouldn't surface End Nap because the
+  // dashboard only saw Firestore-persisted events.
+  // Skip render-synthetic putdown chips. They carry `type: "nap"` for
+  // timeline geometry and inherit the parent's lifecycle — so a
+  // recorded nap with startTime > Now produces a synthetic putdown
+  // that passes isInProgress (its window contains Now). Without this
+  // filter, the dashboard fires "End nap" during putdown, before the
+  // real nap has started.
+  const inProgressNap = projected.find(
+    (e) => e.type === "nap" && !isRenderSynthetic(e) && isInProgress(e, settings, nowMinutes),
   );
   // Bedtime in-progress detection is intentionally NOT time-windowed.
   // `isInProgress` requires `startTime <= now`, but a bedtime that began
@@ -162,11 +198,19 @@ export default function DashboardPage() {
     }
     await saveEvent(bottle);
   };
-  // TIME_EDIT on a recorded nap → completed.
+  // TIME_EDIT on a recorded nap → completed. The event may be either
+  // a Firestore-persisted actual (id stable) or an engine projection
+  // that auto-promoted to recorded (id synthetic, e.g. proj_nap_t540).
+  // Only rewrite to the §F59 deterministic id when the source is a
+  // projection — never overwrite the original doc id of a real actual
+  // (would orphan an imported / legacy doc that doesn't already follow
+  // the `recorded_${eventKey}` convention).
   const handleEndNap = async (event: Event, endTime: number) => {
     if (!day || day.id === "") return;
+    const id = isEngineEmittedId(event.id) ? recordedIdFor(event.eventKey) : event.id;
     await saveEvent({
       ...event,
+      id,
       endTime,
       lifecycle: reduceLifecycle(event.lifecycle, { type: "TIME_EDIT", at: endTime }),
     });
@@ -190,6 +234,18 @@ export default function DashboardPage() {
     // from the confirmed plan (matches the auto-rollover path) or from
     // settings defaults. Both paths use the deterministic id so the
     // re-write replaces today's existing doc idempotently.
+    //
+    // §F66 fast-follow: same-date Start New Day collides on the
+    // deterministic dayId (`day-${childId}-${date}`), so the events
+    // subcollection under that id keeps yesterday's writes. For the
+    // dev rollover we explicitly delete all events under the active
+    // day's id BEFORE the day-doc replace — gives the user a true
+    // blank canvas. Production auto-rollover (different date) doesn't
+    // hit this path; this is dev-only.
+    if (day?.id) {
+      const existing = await listEvents(db, CHILD_ID, day.id);
+      await Promise.all(existing.map((e) => deleteEvent(db, CHILD_ID, day.id, e.id)));
+    }
     if (useTomorrowPlan && todaysPlan?.status === "confirmed") {
       await promoteFromPlan(db, CHILD_ID, todaysPlan, settings.defaultWakeTime);
       return;
@@ -280,6 +336,7 @@ export default function DashboardPage() {
         nowMinutes={nowMinutes}
         bedtimeThreshold={settings.bedtimeThreshold}
         defaultWakeTime={settings.defaultWakeTime}
+        {...(day.wakeTime !== undefined ? { dayWakeTime: day.wakeTime } : {})}
         existingEvents={projected}
         open={drawer.open}
         event={drawer.open ? (drawer.mode === "edit" ? drawer.event : drawer.template) : null}

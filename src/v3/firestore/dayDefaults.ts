@@ -23,6 +23,7 @@ export function withV3DayDefaults(input: Partial<Day> | null): Day | null {
     status: input.status ?? "active",
     suppressedRecurringIds: input.suppressedRecurringIds ?? [],
     suppressedDaycareDay: input.suppressedDaycareDay ?? false,
+    suppressedDreamFeed: input.suppressedDreamFeed ?? false,
   };
 
   if (input.wakeTime !== undefined) {
