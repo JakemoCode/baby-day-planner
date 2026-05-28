@@ -7,15 +7,11 @@ import type { Event, EventType, OwnerRef, OwnersConfig, TimeMin } from "../../sc
 import { isRecorded, NO_OWNER } from "../../schemas";
 import { isFutureProjected, isNextProjectedOfType } from "../../lifecycle";
 import { isRenderSynthetic } from "../../lib/syntheticEvents";
-import {
-  DREAM_FEED_EVENT_KEY,
-  isDreamFeed,
-  isEngineEmittedId,
-  recordedIdFor,
-} from "../../lib/eventConventions";
+import { DREAM_FEED_EVENT_KEY, recordedIdFor } from "../../lib/eventConventions";
 import { formatHM24, formatTimeForDisplay, nextDayAt, parseHM24 } from "../../ui/time";
 import { OwnerPickerV3 } from "./OwnerPickerV3";
 import { formToEvent, type FormState } from "./formToEvent";
+import { canDeleteEvent } from "./drawerDeletePolicy";
 
 export type EventEditDrawerV3Mode = "edit" | "create";
 
@@ -221,39 +217,10 @@ export function EventEditDrawerV3({
       ? `${baseTitle}: ${sourceEvent.label}`
       : baseTitle;
 
-  // Delete is meaningful for:
-  //   - events that exist in Firestore (already-recorded)
-  //   - daily_recurring (→ Day.suppressedRecurringIds, §F65)
-  //   - daycare_dropoff/pickup (→ Day.suppressedDaycareDay, §F66 fast-follow)
-  //   - dream-feed slot (→ Day.suppressedDreamFeed, §F66 fast-follow)
-  // useDrawer routes each path.
-  const isDreamFeedSlot = type === "bottle" && isDreamFeed(sourceEvent);
-  const hasSuppressionPath =
-    type === "daily_recurring" ||
-    type === "daycare_dropoff" ||
-    type === "daycare_pickup" ||
-    isDreamFeedSlot;
-  // §F66 fast-follow B11: hide Delete when the cascade owns the slot.
-  // Auto-promoted nap/bedtime live only in engine output (no Firestore
-  // doc). Auto-promoted bottles are persisted by
-  // useAutoPromotePersistence but the cascade re-emits + the hook
-  // re-writes on the next pass — Delete would visibly do nothing.
-  // Signature for the bottle case: lifecycle "recorded" with
-  // annotatedAt === startTime. Manual logs use "completed" and drawer
-  // saves bump annotatedAt to nowMinutes, so neither collides.
-  const isAutoPromotedSleep =
-    (type === "nap" || type === "bedtime") && isEngineEmittedId(sourceEvent.id);
-  const isAutoPromotedBottle =
-    type === "bottle" &&
-    !isDreamFeedSlot &&
-    sourceEvent.lifecycle.state === "recorded" &&
-    sourceEvent.lifecycle.annotatedAt === sourceEvent.startTime;
-  const canDelete =
-    mode === "edit" &&
-    onDelete !== undefined &&
-    !isAutoPromotedSleep &&
-    !isAutoPromotedBottle &&
-    (isRecorded(sourceEvent.lifecycle) || hasSuppressionPath);
+  // Delete-button visibility (recorded-vs-suppression routing,
+  // auto-promote carve-outs) lives in drawerDeletePolicy as pure,
+  // unit-tested functions — see that module for the full rationale.
+  const canDelete = canDeleteEvent(sourceEvent, { mode, hasOnDelete: onDelete !== undefined });
 
   const confirmCopy =
     type === "daily_recurring"
