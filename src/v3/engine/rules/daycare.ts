@@ -33,11 +33,15 @@
 import { NO_OWNER } from "../../schemas";
 import { type Context, type Event, type OwnerRef, type TimeMin, type Weekday } from "../../schemas";
 import type { Rule } from "../evaluator";
-import { hasType, projectedEvent } from "../helpers";
+import { hasType, isNap, projectedEvent } from "../helpers";
+import {
+  DAYCARE_DROPOFF_EVENT_KEY,
+  DAYCARE_PICKUP_EVENT_KEY,
+  ENGINE_PROJECTED_ID_PREFIX,
+} from "../../lib/eventConventions";
 
 const isDaycareDropoff = hasType("daycare_dropoff");
 const isDaycarePickup = hasType("daycare_pickup");
-const isNap = hasType("nap");
 
 // ---------------------------------------------------------------------------
 // R21.1 — Project daycare_dropoff and daycare_pickup (owner-less)
@@ -57,9 +61,9 @@ const RuleProjectDaycareEvents: Rule = {
       ? []
       : [
           buildDaycareEvent(ctx, NO_OWNER, {
-            id: "proj_daycare_dropoff",
-            eventKey: "daycare_dropoff",
-            type: "daycare_dropoff",
+            id: `${ENGINE_PROJECTED_ID_PREFIX}${DAYCARE_DROPOFF_EVENT_KEY}`,
+            eventKey: DAYCARE_DROPOFF_EVENT_KEY,
+            type: DAYCARE_DROPOFF_EVENT_KEY,
             label: "Daycare Dropoff",
             startTime: ctx.settings.daycare.dropoffTime,
           }),
@@ -68,9 +72,9 @@ const RuleProjectDaycareEvents: Rule = {
       ? []
       : [
           buildDaycareEvent(ctx, NO_OWNER, {
-            id: "proj_daycare_pickup",
-            eventKey: "daycare_pickup",
-            type: "daycare_pickup",
+            id: `${ENGINE_PROJECTED_ID_PREFIX}${DAYCARE_PICKUP_EVENT_KEY}`,
+            eventKey: DAYCARE_PICKUP_EVENT_KEY,
+            type: DAYCARE_PICKUP_EVENT_KEY,
             label: "Daycare Pickup",
             startTime: ctx.settings.daycare.pickupTime,
           }),

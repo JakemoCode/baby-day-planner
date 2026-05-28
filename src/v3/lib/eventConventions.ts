@@ -42,6 +42,18 @@ export function isDreamFeed(e: { eventKey: string }): boolean {
 }
 
 /**
+ * Daycare singleton eventKeys. Unlike the dream-feed slot (whose type
+ * is "bottle"), these coincide with their own EventType discriminant —
+ * a daycare event's eventKey always equals its type. The constant
+ * exists to lock the raw-string eventKey the daycare rule produces and
+ * the drawer's delete-suppression matcher reads, so the two can't
+ * drift. Type-discriminant comparisons elsewhere stay as union-guarded
+ * literals (TS catches a typo there; it can't on a bare eventKey).
+ */
+export const DAYCARE_DROPOFF_EVENT_KEY = "daycare_dropoff";
+export const DAYCARE_PICKUP_EVENT_KEY = "daycare_pickup";
+
+/**
  * Daily-recurring eventKey wraps the Settings.dailyRecurring entry's
  * id with this prefix so the cascade can identify projections that
  * came from a recurring template vs. an ad-hoc event. The drawer's

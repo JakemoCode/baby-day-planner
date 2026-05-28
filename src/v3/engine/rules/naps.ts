@@ -25,12 +25,8 @@
 
 import type { Context, Event, Settings } from "../../schemas";
 import type { Rule } from "../evaluator";
-import { hasType, isProjected, projectedEvent } from "../helpers";
+import { isBedtime, isNap, isProjected, isWakeWindow, projectedEvent } from "../helpers";
 import { nextDayAt } from "../../ui/time";
-
-const isNap = hasType("nap");
-const isWakeWindow = hasType("wake_window");
-const isBedtime = hasType("bedtime");
 
 const RuleSleepCascade: Rule = {
   id: "R3.1",

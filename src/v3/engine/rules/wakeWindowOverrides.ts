@@ -30,9 +30,7 @@
 
 import type { Event } from "../../schemas";
 import type { Rule } from "../evaluator";
-import { hasType, isProjected } from "../helpers";
-
-const isWakeWindow = hasType("wake_window");
+import { isProjected, isWakeWindow } from "../helpers";
 
 function isWakeWindowOverride(e: Event): boolean {
   return isWakeWindow(e) && e.lifecycle.state === "recorded";
