@@ -122,7 +122,17 @@ export function useTomorrowPlanState(
     // by the effect above once plan goes null), so neither the stale
     // plan nor the blanked form can resurrect the doc.
     setClearing(true);
-    await deleteTomorrowPlan(db, childId, date);
+    try {
+      await deleteTomorrowPlan(db, childId, date);
+    } catch (err) {
+      // Delete failed → the doc still exists and `plan` never goes null,
+      // so the effect would never clear the flag and autosave would stay
+      // disabled for the rest of the session. Restore it here and
+      // re-throw for the caller's error handling. form.reset() stays
+      // below the try so the form only blanks on a real delete.
+      setClearing(false);
+      throw err;
+    }
     // Blank the form to defaults. reset() stays hydrated, so the stale
     // snapshot can't re-hydrate the values we just deleted.
     form.reset();

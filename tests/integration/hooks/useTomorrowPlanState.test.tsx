@@ -19,7 +19,12 @@ import { renderHook, act, waitFor } from "@testing-library/react";
 import type { RulesTestEnvironment } from "@firebase/rules-unit-testing";
 import type { Firestore } from "firebase/firestore";
 import { ALLOWED_USER, seedAllowedUser, startTestEnv } from "../firestore-test-utils";
-import { loadTomorrowPlan, saveTomorrowPlan } from "../../../src/v3/repositories/tomorrowPlans";
+import {
+  deleteTomorrowPlan,
+  loadTomorrowPlan,
+  saveTomorrowPlan,
+} from "../../../src/v3/repositories/tomorrowPlans";
+import type * as TomorrowPlansRepo from "../../../src/v3/repositories/tomorrowPlans";
 import { useTomorrowPlanState } from "../../../src/v3/hooks/useTomorrowPlanState";
 import { makeDefaultSettings } from "../../../src/v3/firestore/settingsDefaults";
 
@@ -30,6 +35,19 @@ vi.mock("@/lib/firebase/client", () => ({
     return testDb;
   },
 }));
+
+// Keep every repo fn real except deleteTomorrowPlan, which stays real by
+// default but can be made to reject once (to exercise clear()'s
+// failed-delete path).
+vi.mock("../../../src/v3/repositories/tomorrowPlans", async (importOriginal) => {
+  const actual = await importOriginal<typeof TomorrowPlansRepo>();
+  return {
+    ...actual,
+    deleteTomorrowPlan: vi.fn((...args: Parameters<typeof actual.deleteTomorrowPlan>) =>
+      actual.deleteTomorrowPlan(...args),
+    ),
+  };
+});
 
 let env: RulesTestEnvironment;
 
@@ -109,5 +127,46 @@ describe("useTomorrowPlanState — clear() seam (emulator-backed)", () => {
       await new Promise((r) => setTimeout(r, 400));
     });
     expect(await loadTomorrowPlan(testDb, "child-1", DATE)).toBeNull();
+  });
+
+  it("restores autosave when the delete fails (clearing flag not stuck)", async () => {
+    await saveTomorrowPlan(testDb, "child-1", {
+      childId: "child-1",
+      date: DATE,
+      status: "confirmed",
+      confirmedAt: 19 * 60,
+      wakeTime: DEFAULT_WAKE + 90,
+      ownerOverrides: {},
+      extras: [],
+    });
+
+    const { result } = renderHook(() => useTomorrowPlanState("child-1", DATE, settings));
+    await waitFor(
+      () => {
+        expect(result.current.loading).toBe(false);
+        expect(result.current.wakeTime).toBe(DEFAULT_WAKE + 90);
+      },
+      { timeout: 2000 },
+    );
+
+    // Force the delete to reject — clear() must restore the clearing flag
+    // and re-throw, not leave autosave disabled.
+    vi.mocked(deleteTomorrowPlan).mockRejectedValueOnce(new Error("offline"));
+    await act(async () => {
+      await expect(result.current.clear()).rejects.toThrow("offline");
+    });
+
+    // The doc still exists (delete failed). A subsequent edit must still
+    // autosave — proving `clearing` was restored, not stuck true. If the
+    // flag were stuck, autosaveInput would stay null and this never saves.
+    act(() => result.current.setWakeTime(DEFAULT_WAKE + 5));
+    await waitFor(
+      async () => {
+        const got = await loadTomorrowPlan(testDb, "child-1", DATE);
+        expect(got?.status).toBe("draft");
+        expect(got?.wakeTime).toBe(DEFAULT_WAKE + 5);
+      },
+      { timeout: 2000 },
+    );
   });
 });
