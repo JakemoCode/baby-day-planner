@@ -111,6 +111,7 @@ export default function WelcomePage() {
       wakeTime: previewSettings.defaultWakeTime,
       suppressedRecurringIds: [],
       suppressedDaycareDay: false,
+      suppressedDreamFeed: false,
       ownerOverrides,
     };
   }, [previewSettings, ownerOverrides]);
@@ -160,6 +161,7 @@ export default function WelcomePage() {
         wakeTime: wakeMin,
         suppressedRecurringIds: [],
         suppressedDaycareDay: false,
+        suppressedDreamFeed: false,
         ...(Object.keys(ownerOverrides).length > 0 ? { ownerOverrides } : {}),
       };
 

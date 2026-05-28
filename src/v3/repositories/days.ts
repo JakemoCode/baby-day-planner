@@ -79,13 +79,14 @@ export async function getOrCreatePlannedDay(
   const existing = await getDayByDate(db, childId, date);
   if (existing) return existing;
   const newDay: Day = {
-    id: `day-${date}-${Date.now()}`,
+    id: deterministicDayId(childId, date),
     childId,
     date,
     status: "planned",
     wakeTime: defaultWakeTime,
     suppressedRecurringIds: [],
     suppressedDaycareDay: false,
+    suppressedDreamFeed: false,
   };
   await setDoc(dayRef(db, childId, newDay.id), newDay);
   return newDay;
@@ -247,12 +248,15 @@ export async function editWakeTime(
 }
 
 export async function listArchivedDays(db: Firestore, childId: string, max = 7): Promise<Day[]> {
-  // Fetch extra so we have headroom to collapse same-date duplicates without
-  // shrinking the result below `max`. `startNewDay` mints
-  // `day-${date}-${Date.now()}` IDs so multiple calls on the same calendar
-  // date produce distinct docs with the same `date` — common in dev/dogfood.
-  // The /history page's invariant is "one row per calendar day," so dedupe
-  // here rather than at every consumer.
+  // Fetch extra so we have headroom to collapse same-date duplicates
+  // without shrinking the result below `max`. `startNewDay` is
+  // deterministic-id now (`day-${childId}-${date}`), so a same-date
+  // repeat call lands on the same doc — dedupe is a no-op for the
+  // common case. The dedup is still here for two reasons: (1) legacy
+  // docs minted before deterministic ids carry a `Date.now()`-suffixed
+  // id and won't collapse at the Firestore-id layer, and (2) the
+  // /history page's invariant ("one row per calendar day") is a repo
+  // concern rather than a consumer concern.
   const q = query(
     daysRef(db, childId),
     where("status", "==", "archived"),
@@ -264,8 +268,9 @@ export async function listArchivedDays(db: Firestore, childId: string, max = 7):
   for (const d of snap.docs) {
     const day = d.data();
     const existing = byDate.get(day.date);
-    // Keep the lexicographically-greatest ID per date — IDs end in
-    // Date.now() so the newest dup wins.
+    // Keep the lexicographically-greatest id per date — legacy
+    // `Date.now()`-suffixed ids sort newest-last, and deterministic
+    // ids collide outright so the comparison short-circuits.
     if (!existing || day.id > existing.id) {
       byDate.set(day.date, day);
     }
@@ -395,6 +400,7 @@ export async function startNewDay(
       wakeTime: input.newWakeTime,
       suppressedRecurringIds: [],
       suppressedDaycareDay: false,
+      suppressedDreamFeed: false,
       ...(input.templateId !== undefined ? { templateId: input.templateId } : {}),
       ...(input.ownerOverrides !== undefined ? { ownerOverrides: input.ownerOverrides } : {}),
     };
