@@ -296,6 +296,37 @@ describe("EventEditDrawerV3", () => {
     expect(onSave).not.toHaveBeenCalled();
   });
 
+  it("§F66 audit: B7 pre-wake guard does NOT flag startTime === dayWakeTime (boundary)", async () => {
+    // The guard is `startTime < dayWakeTime` (strict). Without an explicit
+    // equality-case test, a regression to `<=` would silently reject a
+    // legitimate event at the day's exact wake time. Pins the inclusive
+    // side of the boundary.
+    const recorded = projectedNap({
+      lifecycle: { state: "recorded", annotatedAt: 11 * 60 + 30 },
+      startTime: 11 * 60 + 30,
+      endTime: 12 * 60 + 30,
+    });
+    render(
+      <EventEditDrawerV3
+        open
+        mode="edit"
+        event={recorded}
+        owners={owners}
+        nowMinutes={NOW}
+        bedtimeThreshold={THRESHOLD}
+        defaultWakeTime={DEFAULT_WAKE_TIME}
+        dayWakeTime={7 * 60}
+        onSave={() => {}}
+        onCancel={() => {}}
+      />,
+    );
+    const start = screen.getByLabelText("Start time");
+    await userEvent.clear(start);
+    await userEvent.type(start, "07:00"); // exactly at dayWakeTime
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(screen.getByRole("button", { name: "Save" })).toBeEnabled();
+  });
+
   it("§F66 review: B7 pre-wake guard does NOT block a pre-wake daily_recurring (review-found false positive)", async () => {
     // The B7 rationale (AM/PM mistake wrecks cascade) is
     // cascade-specific. daily_recurring is fixed-time / explicit-slot
@@ -540,6 +571,37 @@ describe("EventEditDrawerV3", () => {
       />,
     );
     expect(screen.queryByRole("button", { name: "Delete" })).toBeNull();
+  });
+
+  it("§F66 audit B11: delete button is SHOWN for a recorded bottle when annotatedAt !== startTime", () => {
+    // The auto-promote signature is BOTH (state === "recorded") AND
+    // (annotatedAt === startTime). A drawer save on a previously-
+    // auto-promoted bottle keeps state "recorded" but bumps annotatedAt
+    // to nowMinutes — Delete must remain visible. Without this row,
+    // dropping the `annotatedAt === startTime` clause from
+    // `isAutoPromotedBottle` would hide Delete from EVERY recorded
+    // bottle, including drawer-edited ones.
+    render(
+      <EventEditDrawerV3
+        open
+        mode="edit"
+        event={projectedBottle({
+          id: "recorded_bottle_2",
+          startTime: 10 * 60,
+          // startTime=10:00 but annotatedAt=11:00 — user opened the
+          // drawer at 11:00 and re-saved, bumping annotatedAt.
+          lifecycle: { state: "recorded", annotatedAt: 11 * 60 },
+        })}
+        owners={owners}
+        nowMinutes={NOW}
+        bedtimeThreshold={THRESHOLD}
+        defaultWakeTime={DEFAULT_WAKE_TIME}
+        onSave={() => {}}
+        onCancel={() => {}}
+        onDelete={() => {}}
+      />,
+    );
+    expect(screen.getByRole("button", { name: "Delete" })).toBeVisible();
   });
 
   it("§F66 B11: delete button is SHOWN for a manually-logged bottle (lifecycle completed)", () => {

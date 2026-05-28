@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { NO_OWNER, type Event, type TimeMin } from "@/v3/schemas";
 import { ContextualActionButton, type ContextualActionButtonProps } from "./ContextualActionButton";
@@ -232,6 +232,37 @@ describe("ContextualActionButton", () => {
       await userEvent.click(screen.getByRole("button", { name: /bottle logged/i }));
       await userEvent.click(screen.getByRole("button", { name: /cancel/i }));
       expect(onLogBottle).not.toHaveBeenCalled();
+    });
+
+    it("§F66 audit: '✓ Bottle logged' auto-hides after LOGGED_AFFORDANCE_MS (4000ms)", () => {
+      // AffordanceTimer schedules a setTimeout to unmount the button so
+      // a subsequent end-nap / log-bottle can take over. Without a
+      // timer test, regressions to the constant (or removing the
+      // cleanup) would only surface in the field. Fake timers let us
+      // pin both the "still visible at 3999ms" and "gone past 4000ms"
+      // sides of the boundary.
+      vi.useFakeTimers();
+      try {
+        render(
+          <ContextualActionButton
+            {...makeProps({
+              nextProjectedBottle: loggedBottle(hm(11, 50)),
+              nowMinutes: hm(11, 55),
+            })}
+          />,
+        );
+        expect(screen.getByRole("button", { name: /bottle logged/i })).toBeVisible();
+        act(() => {
+          vi.advanceTimersByTime(3999);
+        });
+        expect(screen.getByRole("button", { name: /bottle logged/i })).toBeVisible();
+        act(() => {
+          vi.advanceTimersByTime(2); // past 4000ms
+        });
+        expect(screen.queryByRole("button", { name: /bottle logged/i })).toBeNull();
+      } finally {
+        vi.useRealTimers();
+      }
     });
 
     it("auto-promoted (lifecycle.state === 'recorded', not 'completed') still shows 'Log bottle now' — user hasn't committed yet", () => {
