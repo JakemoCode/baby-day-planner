@@ -366,13 +366,7 @@ function canCascade(events: Event[], ctx: Context): boolean {
     // don't consume a daytime slot — a baby who ate overnight
     // shouldn't get fewer morning/afternoon predictions than one
     // who didn't. Compare against chainBottles, not bottles.
-    //
-    // §F66 fast-follow B10: user-suppressed slots reduce the target.
-    // Without this, the cascade would re-fill every gap the user
-    // explicitly deleted, looping the cascade forever.
-    const suppressedCount = (ctx.day.suppressedBottleEventKeys ?? []).length;
-    const effTarget = Math.max(0, target - suppressedCount);
-    return chainBottles.length < effTarget;
+    return chainBottles.length < target;
   }
 
   // Anchored case: check if cascade could extend forward. DOMAIN §2:
@@ -555,18 +549,7 @@ function projectBottleChain(events: Event[], ctx: Context): Event[] {
     prev = projection;
   }
 
-  // §F66 fast-follow B10: drop projections whose eventKey is in the
-  // user's per-day suppression list. The cascade walks the full
-  // chain (so subsequent emissions land at their natural times), but
-  // the user-deleted slots are filtered before output. Auto-promote
-  // and useAutoPromotePersistence see the filtered view, so the
-  // deleted bottles stay deleted.
-  const suppressedSet = new Set(ctx.day.suppressedBottleEventKeys ?? []);
-  const visibleProjections = suppressedSet.size
-    ? projections.filter((p) => !suppressedSet.has(p.eventKey))
-    : projections;
-
-  return [...trimmedEvents, ...visibleProjections];
+  return [...trimmedEvents, ...projections];
 }
 
 // ---------------------------------------------------------------------------
@@ -597,8 +580,8 @@ const RuleRenumberBottlesChronologically: Rule = {
   description:
     "Renumber projected bottle eventKey/label; recorded bottles keep their pinned number",
   dependsOn: ["R5"],
-  matches: (events, ctx) => {
-    const target = computeProjectedRenumber(events, ctx.day.suppressedBottleEventKeys ?? []);
+  matches: (events) => {
+    const target = computeProjectedRenumber(events);
     for (const b of bottlesByStartTime(events)) {
       if (b.lifecycle.state !== "projected") continue;
       const next = target.get(b.id);
@@ -606,8 +589,8 @@ const RuleRenumberBottlesChronologically: Rule = {
     }
     return false;
   },
-  produces: (events, ctx) => {
-    const renamed = computeProjectedRenumber(events, ctx.day.suppressedBottleEventKeys ?? []);
+  produces: (events) => {
+    const renamed = computeProjectedRenumber(events);
     return events.map((e) => {
       if (!isBottle(e)) return e;
       // Dream-feed slot has its own stable eventKey + label; renumber
@@ -627,32 +610,23 @@ const RuleRenumberBottlesChronologically: Rule = {
 /**
  * Returns a map from projected-bottle id → { eventKey, label } using
  * the smallest unused number starting from `max(recordedNumbers) + 1`,
- * skipping any numbers already used by recorded bottles or suppressed
- * via `Day.suppressedBottleEventKeys` (§F66 fast-follow B10). Projected
+ * skipping any numbers already used by recorded bottles. Projected
  * bottles are assigned in chronological order.
  */
 function computeProjectedRenumber(
   events: Event[],
-  suppressedKeys: string[],
 ): Map<string, { eventKey: string; label: string }> {
   const all = bottlesByStartTime(events);
-  const takenNums = new Set<number>();
+  const recordedNums = new Set<number>();
   for (const b of all) {
     if (b.lifecycle.state === "projected") continue;
     const m = /^bottle_(\d+)$/.exec(b.eventKey);
-    if (m) takenNums.add(parseInt(m[1]!, 10));
+    if (m) recordedNums.add(parseInt(m[1]!, 10));
   }
-  // Suppressed bottle numbers also count as "taken" — renumbering must
-  // not reassign a number the user explicitly removed, or the cascade
-  // would silently re-fill the slot under a stale identity.
-  for (const key of suppressedKeys) {
-    const m = /^bottle_(\d+)$/.exec(key);
-    if (m) takenNums.add(parseInt(m[1]!, 10));
-  }
-  const maxRecorded = takenNums.size > 0 ? Math.max(...takenNums) : 0;
+  const maxRecorded = recordedNums.size > 0 ? Math.max(...recordedNums) : 0;
   let n = maxRecorded + 1;
   const skipUsed = () => {
-    while (takenNums.has(n)) n++;
+    while (recordedNums.has(n)) n++;
   };
   const renamed = new Map<string, { eventKey: string; label: string }>();
   for (const b of all) {

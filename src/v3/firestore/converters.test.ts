@@ -28,7 +28,6 @@ describe("v3DayConverter", () => {
       suppressedRecurringIds: ["dinner"],
       suppressedDaycareDay: false,
       suppressedDreamFeed: false,
-      suppressedBottleEventKeys: [],
       templateId: "tpl-saturday",
     };
     const wired = v3DayConverter.toFirestore(day) as Record<string, unknown>;

@@ -133,9 +133,6 @@ export function aDay(overrides: Partial<Day> = {}): Day {
     status: overrides.status ?? "active",
     suppressedRecurringIds: overrides.suppressedRecurringIds ?? [],
     suppressedDaycareDay: overrides.suppressedDaycareDay ?? false,
-    ...(overrides.suppressedBottleEventKeys !== undefined
-      ? { suppressedBottleEventKeys: overrides.suppressedBottleEventKeys }
-      : {}),
     ...(overrides.wakeTime !== undefined ? { wakeTime: overrides.wakeTime } : {}),
     ...(overrides.templateId !== undefined ? { templateId: overrides.templateId } : {}),
     ...(overrides.ownerOverrides !== undefined ? { ownerOverrides: overrides.ownerOverrides } : {}),

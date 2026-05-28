@@ -12,7 +12,6 @@ import { useDrawer } from "@/v3/hooks/useDrawer";
 import { db } from "@/lib/firebase/client";
 import {
   editWakeTime,
-  suppressBottleForDay,
   suppressDaycareForDay,
   suppressDreamFeedForDay,
   suppressRecurringForDay,
@@ -63,13 +62,6 @@ export default function TimelinePage() {
           {
             matches: (e) => e.type === "bottle" && e.eventKey === "bottle_dream",
             apply: () => suppressDreamFeedForDay(db, CHILD_ID, day.id),
-          },
-          {
-            // §F66 fast-follow B10: deleting a rhythm-cascade bottle
-            // suppresses the slot so the cascade + auto-promote +
-            // useAutoPromotePersistence don't resurrect it.
-            matches: (e) => e.type === "bottle" && /^bottle_\d+$/.test(e.eventKey),
-            apply: (e) => suppressBottleForDay(db, CHILD_ID, day.id, e.eventKey),
           },
         ]
       : [],

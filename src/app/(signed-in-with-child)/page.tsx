@@ -27,7 +27,6 @@ import {
   getOrCreatePlannedDay,
   promoteFromPlan,
   startNewDay,
-  suppressBottleForDay,
   suppressDaycareForDay,
   suppressDreamFeedForDay,
   suppressRecurringForDay,
@@ -106,17 +105,6 @@ export default function DashboardPage() {
         {
           matches: (e) => e.type === "bottle" && e.eventKey === "bottle_dream",
           apply: () => suppressDreamFeedForDay(db, CHILD_ID, day.id),
-        },
-        {
-          // §F66 fast-follow B10: deleting a rhythm-cascade bottle
-          // (auto-promote ghost, manual log, or drawer-edited
-          // recording) suppresses the slot for the rest of the day.
-          // Without this, the cascade re-emits + auto-promote +
-          // useAutoPromotePersistence resurrect the doc immediately.
-          // bottle_dream is handled above; only rhythm-chain bottles
-          // (bottle_N) match here.
-          matches: (e) => e.type === "bottle" && /^bottle_\d+$/.test(e.eventKey),
-          apply: (e) => suppressBottleForDay(db, CHILD_ID, day.id, e.eventKey),
         },
       ]
     : [];
