@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { db } from "@/lib/firebase/client";
 import { promoteFromPlan } from "../repositories/days";
 import { deleteTomorrowPlan, saveTomorrowPlan } from "../repositories/tomorrowPlans";
@@ -64,11 +64,27 @@ export function useTomorrowPlanState(
   const form = useTomorrowPlanForm(plan, loading, settings.defaultWakeTime);
   const { wakeTime, templateId, extras, ownerOverrides, hasEdits, hydrated } = form;
 
+  // True from the start of clear() until the delete has propagated
+  // (subscription emits null). Hard-suppresses autosave for that window
+  // so a clear can't be undone: after reset() the form is at defaults
+  // but the stale plan still lingers (plan !== null), which would
+  // otherwise pass the autosave gate and write a defaults `draft`,
+  // resurrecting the doc we just deleted.
+  const [clearing, setClearing] = useState(false);
+  /* eslint-disable react-hooks/set-state-in-effect */
+  useEffect(() => {
+    // The delete has landed (plan gone) — clear the flag so subsequent
+    // edits autosave normally again.
+    if (clearing && plan === null) setClearing(false);
+  }, [clearing, plan]);
+  /* eslint-enable react-hooks/set-state-in-effect */
+
   // Autosave snapshot — null until hydrated (so we never persist the
-  // defaults ahead of the loaded plan), and null when the user hasn't
-  // touched anything AND there's no pre-existing plan (no empty docs).
+  // defaults ahead of the loaded plan), null while a clear is in flight,
+  // and null when the user hasn't touched anything AND there's no
+  // pre-existing plan (no empty docs).
   const autosaveInput: TomorrowPlanInput | null = useMemo(() => {
-    if (!hydrated) return null;
+    if (!hydrated || clearing) return null;
     if (!hasEdits && plan === null) return null;
     return {
       wakeTime,
@@ -76,7 +92,7 @@ export function useTomorrowPlanState(
       extras,
       ...(templateId !== undefined ? { startTemplateId: templateId } : {}),
     };
-  }, [hydrated, hasEdits, plan, wakeTime, ownerOverrides, extras, templateId]);
+  }, [hydrated, clearing, hasEdits, plan, wakeTime, ownerOverrides, extras, templateId]);
 
   useAutosaveTomorrowPlan(childId, date, autosaveInput, plan);
 
@@ -102,10 +118,13 @@ export function useTomorrowPlanState(
   };
 
   const clear = async () => {
+    // Suppress autosave for the whole delete→propagate window (cleared
+    // by the effect above once plan goes null), so neither the stale
+    // plan nor the blanked form can resurrect the doc.
+    setClearing(true);
     await deleteTomorrowPlan(db, childId, date);
-    // Blank the form to defaults. reset() stays hydrated, so the
-    // not-yet-propagated (stale) plan snapshot can't re-hydrate the
-    // values we just deleted — which autosave would otherwise resurrect.
+    // Blank the form to defaults. reset() stays hydrated, so the stale
+    // snapshot can't re-hydrate the values we just deleted.
     form.reset();
   };
 

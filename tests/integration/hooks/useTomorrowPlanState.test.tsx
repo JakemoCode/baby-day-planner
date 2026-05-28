@@ -3,13 +3,15 @@
  * Integration test: useTomorrowPlanState composed clear() seam (#12).
  *
  * The form buffer (useTomorrowPlanForm) is unit-tested in isolation,
- * but clear()'s correctness depends on a LIVE ordering that a unit test
- * can only simulate: deleteTomorrowPlan must push `plan = null` through
- * the real useV3TomorrowPlan subscription BEFORE reset()'s re-armed
- * hydration runs — otherwise the re-arm would re-hydrate from the stale
- * plan and the form wouldn't blank. This exercises the real
- * subscription + real form + real repo writes against the emulator to
- * pin that ordering.
+ * but clear()'s correctness lives in the LIVE composition of delete +
+ * blank + autosave-suppression against a real subscription — a unit
+ * test can only simulate it. clear() must (a) delete the doc, (b) blank
+ * the form, and (c) NOT let autosave resurrect the doc during the window
+ * where the form is already blanked but the deleted-doc null snapshot
+ * hasn't propagated yet (the `clearing` flag suppresses autosave across
+ * that window). This exercises the real subscription + real form + real
+ * repo writes against the emulator, including a wait past the autosave
+ * debounce to prove no draft is rewritten.
  */
 
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
@@ -78,15 +80,19 @@ describe("useTomorrowPlanState — clear() seam (emulator-backed)", () => {
     expect(result.current.ownerOverrides).toEqual({ nap_1: { slot: "parent1" } });
     expect(result.current.hasEdits).toBe(true);
 
-    // The seam under test: clear() deletes the doc; the subscription
-    // emits null, and reset()'s re-arm folds that null in → defaults.
+    // The seam under test: clear() deletes the doc and blanks the form.
+    // reset() stays hydrated, so the stale (not-yet-null) snapshot can't
+    // re-hydrate the deleted values and autosave can't resurrect them.
     await act(async () => {
       await result.current.clear();
     });
 
+    // clear() awaits deleteTomorrowPlan, so the doc is already gone.
+    expect(await loadTomorrowPlan(testDb, "child-1", DATE)).toBeNull();
+
+    // UI state catches up once the subscription emits null.
     await waitFor(
-      async () => {
-        expect(await loadTomorrowPlan(testDb, "child-1", DATE)).toBeNull();
+      () => {
         expect(result.current.status).toBe("no-plan");
         expect(result.current.wakeTime).toBe(DEFAULT_WAKE);
         expect(result.current.ownerOverrides).toEqual({});
@@ -94,5 +100,14 @@ describe("useTomorrowPlanState — clear() seam (emulator-backed)", () => {
       },
       { timeout: 2000 },
     );
+
+    // Guard the residual window: wait past the autosave debounce (250ms)
+    // and confirm no defaults `draft` was written back. Without the
+    // `clearing` suppression, the blanked-form-but-stale-plan window
+    // would resurrect the doc as a draft once the timer fired.
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 400));
+    });
+    expect(await loadTomorrowPlan(testDb, "child-1", DATE)).toBeNull();
   });
 });
