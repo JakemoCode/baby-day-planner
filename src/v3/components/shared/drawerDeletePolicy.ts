@@ -60,10 +60,7 @@ export function isAutoPromotedBottleEvent(event: Event): boolean {
 }
 
 /**
- * The full Delete-visibility decision. Delete shows only in edit mode
- * with an onDelete handler wired, never for cascade-owned auto-promoted
- * events, and only when the event is either a real recording or has a
- * suppression path.
+ * True when the drawer should render a Delete affordance for this event.
  */
 export function canDeleteEvent(
   event: Event,

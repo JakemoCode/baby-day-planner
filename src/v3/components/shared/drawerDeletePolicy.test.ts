@@ -88,9 +88,9 @@ describe("isAutoPromotedBottleEvent", () => {
   });
 
   it("is false for a completed bottle (manual Log Bottle Now)", () => {
-    expect(
-      isAutoPromotedBottleEvent(ev({ type: "bottle", startTime: 480, lifecycle: completed(480) })),
-    ).toBe(false);
+    expect(isAutoPromotedBottleEvent(ev({ type: "bottle", lifecycle: completed(480) }))).toBe(
+      false,
+    );
   });
 
   it("is false for the dream-feed slot even when its lifecycle matches the signature", () => {
@@ -137,6 +137,15 @@ describe("canDeleteEvent", () => {
           eventKey: "recurring:tummy",
           lifecycle: { state: "projected" },
         }),
+        opts,
+      ),
+    ).toBe(true);
+  });
+
+  it("is true for a projected dream-feed bottle (suppression path, not daily_recurring)", () => {
+    expect(
+      canDeleteEvent(
+        ev({ type: "bottle", eventKey: "bottle_dream", lifecycle: { state: "projected" } }),
         opts,
       ),
     ).toBe(true);
