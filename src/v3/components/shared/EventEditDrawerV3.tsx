@@ -293,7 +293,7 @@ export function EventEditDrawerV3({
       owner: form.owner,
       label: form.label,
     };
-    const built = formToEvent(formForTransform, sourceEvent, nowMinutes);
+    const built = formToEvent(formForTransform, sourceEvent, nowMinutes, mode);
     // Defensive: even with inputs disabled, force time/endTime/amount
     // back to the source's values when editing a future-projected event.
     // Guarantees the resulting save is owner-only and routes through

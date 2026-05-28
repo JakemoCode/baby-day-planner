@@ -370,6 +370,59 @@ describe("reduceLifecycle — DRAWER_SAVE", () => {
     expect(next).toEqual({ state: "recorded", annotatedAt: NOW });
   });
 
+  // ── create mode (FAB-added events) ────────────────────────────────────────
+
+  it("create mode + bottle at now → completed (committed reality)", () => {
+    const next = reduceLifecycle(
+      { state: "projected" },
+      {
+        type: "DRAWER_SAVE",
+        eventType: "bottle",
+        eventKind: "instant",
+        timeChanged: false,
+        hasEndTime: false,
+        nowMinutes: NOW,
+        mode: "create",
+        startTime: NOW,
+      },
+    );
+    expect(next).toEqual({ state: "completed", committedAt: NOW });
+  });
+
+  it("create mode + bottle in the future → recorded (scheduled)", () => {
+    const next = reduceLifecycle(
+      { state: "projected" },
+      {
+        type: "DRAWER_SAVE",
+        eventType: "bottle",
+        eventKind: "instant",
+        timeChanged: false,
+        hasEndTime: false,
+        nowMinutes: NOW,
+        mode: "create",
+        startTime: NOW + 120,
+      },
+    );
+    expect(next).toEqual({ state: "recorded", annotatedAt: NOW });
+  });
+
+  it("create mode + scheduling type (nap) at now → recorded (scheduling stays scheduled)", () => {
+    const next = reduceLifecycle(
+      { state: "projected" },
+      {
+        type: "DRAWER_SAVE",
+        eventType: "nap",
+        eventKind: "block",
+        timeChanged: false,
+        hasEndTime: true,
+        nowMinutes: NOW,
+        mode: "create",
+        startTime: NOW,
+      },
+    );
+    expect(next).toEqual({ state: "recorded", annotatedAt: NOW });
+  });
+
   // ── recorded source ─────────────────────────────────────────────────────
 
   it("recorded nap + time changed → recorded (idempotent re-scheduling)", () => {

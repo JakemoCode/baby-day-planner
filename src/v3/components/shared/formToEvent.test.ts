@@ -9,6 +9,7 @@ import { aContext, aDay, aSettings } from "../../__tests__/factories";
 import { projectDay } from "../../engine/projectDay";
 import { NO_OWNER, type Event } from "../../schemas";
 import { formToEvent, type FormState } from "./formToEvent";
+import { canDeleteEvent } from "./drawerDeletePolicy";
 
 const NOW = 8 * 60 + 30;
 
@@ -319,5 +320,49 @@ describe("formToEvent — exactOptionalPropertyTypes safety", () => {
     const form: FormState = { ...formFromEvent(source), owner: undefined };
     const next = formToEvent(form, source, NOW);
     expect(next.owner).toEqual({ slot: "none" });
+  });
+});
+
+describe("formToEvent — create mode (FAB-added events)", () => {
+  // A FAB-created bottle is a brand-new event the user is asserting, not
+  // an annotation of an existing projection. At-or-past now it's a
+  // committed real feed → `completed`; a future create is scheduled →
+  // `recorded`. (The pre-fix bug: create at exactly now produced
+  // `recorded` with annotatedAt === startTime, which collided with the
+  // §F66 auto-promote-hide heuristic and suppressed the Delete button.)
+  it("bottle created at now → completed (committed reality)", () => {
+    const source = projectedBottle({ startTime: NOW });
+    const next = formToEvent(formFromEvent(source), source, NOW, "create");
+    expect(next.lifecycle).toEqual({ state: "completed", committedAt: NOW });
+  });
+
+  it("bottle created in the past → completed", () => {
+    const source = projectedBottle({ startTime: NOW - 30 });
+    const next = formToEvent(formFromEvent(source), source, NOW, "create");
+    expect(next.lifecycle).toEqual({ state: "completed", committedAt: NOW });
+  });
+
+  it("bottle created in the future → recorded (scheduled, not yet real)", () => {
+    const source = projectedBottle({ startTime: NOW + 120 });
+    const next = formToEvent(formFromEvent(source), source, NOW, "create");
+    expect(next.lifecycle).toEqual({ state: "recorded", annotatedAt: NOW });
+  });
+
+  it("edit mode at now stays recorded (only create asserts reality)", () => {
+    // Same inputs but mode "edit" (the default): annotating a projection
+    // without a time change → recorded, as before. Guards the create
+    // branch from leaking into the edit path.
+    const source = projectedBottle({ startTime: NOW });
+    const next = formToEvent(formFromEvent(source), source, NOW, "edit");
+    expect(next.lifecycle).toEqual({ state: "recorded", annotatedAt: NOW });
+  });
+
+  // Seam: the whole point of the fix. A bottle created at now must be
+  // deletable through the drawer. Pre-fix it saved as recorded with
+  // annotatedAt === startTime → canDeleteEvent returned false.
+  it("a bottle created at now is deletable (the bug this fix closes)", () => {
+    const source = projectedBottle({ startTime: NOW });
+    const created = formToEvent(formFromEvent(source), source, NOW, "create");
+    expect(canDeleteEvent(created, { mode: "edit", hasOnDelete: true })).toBe(true);
   });
 });
