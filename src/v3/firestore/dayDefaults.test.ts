@@ -71,7 +71,6 @@ describe("withV3DayDefaults", () => {
     expect(out!.suppressedDaycareDay).toBe(true);
   });
 
-
   it("does not invent templateId when neither field is present", () => {
     const out = withV3DayDefaults({
       id: "d-1",

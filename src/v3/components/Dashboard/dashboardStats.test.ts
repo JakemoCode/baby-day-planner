@@ -93,7 +93,7 @@ describe("napTotals", () => {
   it("clamps in-progress nap's contribution to elapsed time (now - startTime)", () => {
     const now = (14 * 60 + 30) as TimeMin; // 2:30pm
     const events: Event[] = [
-        // Completed 9:00–10:00.
+      // Completed 9:00–10:00.
       nap({ startTime: (9 * 60) as TimeMin, endTime: (10 * 60) as TimeMin }),
       // In-progress 1:15pm, placeholder endTime 4:02pm → 75 min elapsed.
       nap({ startTime: (13 * 60 + 15) as TimeMin, endTime: (16 * 60 + 2) as TimeMin }),
