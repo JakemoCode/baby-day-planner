@@ -13,16 +13,15 @@
 
 import { useMemo } from "react";
 import type { Firestore } from "firebase/firestore";
-import type { Event, OwnershipTemplate } from "../schemas";
+import type { Day, Event, OwnershipTemplate, Settings } from "../schemas";
 import { useV3Day } from "./useV3Day";
 import { useV3Settings } from "./useV3Settings";
 import { useV3Events } from "./useV3Events";
 import { useV3Templates } from "./useV3Templates";
 import { useV3Projection } from "./useV3Projection";
-import { useDrawer, type DrawerState } from "./useDrawer";
+import { useDrawer, type DrawerState, type UseDrawerResult } from "./useDrawer";
 import { useDayDrawerSuppressions } from "./useDayDrawerSuppressions";
 import { updateDayOwnerOverride } from "../repositories/days";
-import type { Day, Settings } from "../schemas";
 
 export type UseDayPageStateResult = {
   day: Day | null;
@@ -35,11 +34,11 @@ export type UseDayPageStateResult = {
   template: OwnershipTemplate | undefined;
   projected: Event[];
   drawer: DrawerState;
-  openCreate: ReturnType<typeof useDrawer>["openCreate"];
-  openEdit: ReturnType<typeof useDrawer>["openEdit"];
-  close: ReturnType<typeof useDrawer>["close"];
-  onSave: ReturnType<typeof useDrawer>["onSave"];
-  onDelete: ReturnType<typeof useDrawer>["onDelete"];
+  openCreate: UseDrawerResult["openCreate"];
+  openEdit: UseDrawerResult["openEdit"];
+  close: UseDrawerResult["close"];
+  onSave: UseDrawerResult["onSave"];
+  onDelete: UseDrawerResult["onDelete"];
 };
 
 export function useDayPageState(db: Firestore, childId: string): UseDayPageStateResult {

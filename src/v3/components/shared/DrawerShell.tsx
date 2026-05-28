@@ -25,12 +25,10 @@ export type DrawerShellProps = {
 
 export function DrawerShell(props: DrawerShellProps): React.JSX.Element {
   const { drawer, settings, day, nowMinutes, projected, onSave, onDelete, onCancel } = props;
-  const key =
-    drawer.open && drawer.mode === "edit"
-      ? drawer.event.id
-      : drawer.open && drawer.mode === "create"
-        ? drawer.template.id
-        : "closed";
+  let key = "closed";
+  if (drawer.open) {
+    key = drawer.mode === "edit" ? drawer.event.id : drawer.template.id;
+  }
 
   return (
     <EventEditDrawerV3
