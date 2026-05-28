@@ -1,18 +1,6 @@
 /*
- * Test utilities for component tests.
- *
- * Provides `renderWithAuth` that wraps the UI under test in a mocked
- * AuthProvider. Most components live under `(authed)` and call useAuth
- * indirectly through child components (Header, KebabMenu, SettingsAccount).
- *
- * Hooks that touch Firestore (`useDay`, `useEvents`, `useSettings`,
- * `useTemplates`, `useSyncStatus`) should be mocked per-test via
- * `vi.mock("@/hooks/...")`. Examples in any existing hook test file.
- *
- * Usage:
- *   import { renderWithAuth, screen } from "@/test-utils";
- *   renderWithAuth(<MyComponent />);
- *   renderWithAuth(<MyComponent />, { auth: { status: "forbidden" } });
+ * Shared test utilities. `renderWithAuth` wraps components in a mocked
+ * AuthProvider + ChildProvider. Mock Firestore hooks per-test via vi.mock.
  */
 
 import type { ReactElement, ReactNode } from "react";

@@ -1,16 +1,4 @@
-/**
- * applyDreamFeedLabel — render-time relabeling helper.
- *
- * Behavior contract per docs/v3/SIMPLIFICATION_SCOPE.md §3:
- *   - When settings.dreamFeedEnabled === false, return events unchanged.
- *   - When no bedtime exists, return events unchanged.
- *   - When enabled + bedtime present, the FIRST bottle (by startTime)
- *     whose startTime > bedtime.startTime is relabeled "Dream Feed".
- *   - Lifecycle-agnostic: recorded bottles are relabeled too. "Dream
- *     Feed" is the slot name, not a forecast hint.
- *   - Only ONE bottle is relabeled — subsequent post-bedtime bottles
- *     keep their normal "Bottle N" labels.
- */
+/** applyDreamFeedLabel — render-time relabeling (SIMPLIFICATION_SCOPE.md §3). */
 
 import { describe, expect, it } from "vitest";
 import {
@@ -76,8 +64,7 @@ describe("applyDreamFeedLabel", () => {
   });
 
   it("DOES relabel a recorded bottle when it's the first post-bedtime bottle (slot, not forecast)", () => {
-    // Per Jake 2026-05-14: "Dream Feed" is the name of the slot. If
-    // the user actually logged a 10 PM bottle, it IS the dream feed.
+    // "Dream Feed" names the slot — a real logged post-bedtime bottle IS the dream feed.
     const settings = aSettings({ dreamFeedEnabled: true });
     const bedtime = aProjectedBedtime({ start: 19 * 60 });
     const recorded = aRecordedBottle({
@@ -104,9 +91,7 @@ describe("applyDreamFeedLabel", () => {
   });
 
   it("picks earliest by startTime, not array order", () => {
-    // Events aren't guaranteed time-sorted in every callsite. The
-    // relabel target is the post-bedtime bottle with the earliest
-    // startTime, not the first one encountered in iteration.
+    // callsites don't guarantee time-sorted events; target is the earliest by startTime.
     const settings = aSettings({ dreamFeedEnabled: true });
     const bedtime = aProjectedBedtime({ start: 19 * 60 });
     const later = aProjectedBottle({

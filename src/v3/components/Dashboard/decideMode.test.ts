@@ -66,7 +66,6 @@ describe("decideMode — ADR-0003 multi-modal dashboard button", () => {
 
   it("returns end-bedtime when in-progress bedtime exists and no bottle window is open", () => {
     const bedtime = inProgressBedtime();
-    // Morning, 6am, with no projected bottle nearby
     expect(decideMode({ inProgressBedtime: bedtime, nowMinutes: hm(6) })).toEqual({
       kind: "end-bedtime",
       bedtime,
@@ -76,7 +75,7 @@ describe("decideMode — ADR-0003 multi-modal dashboard button", () => {
   it("auto-sunsets end-bedtime once a projected bottle's window opens (Now ≥ start − 15)", () => {
     const bedtime = inProgressBedtime();
     const bottle = projectedBottle(hm(7, 0));
-    // Now = 6:50 → bottle window [6:45, 7:15] is open. End-bedtime falls through.
+    // now 6:50 → bottle window [6:45, 7:15] open; end-bedtime falls through
     const out = decideMode({
       inProgressBedtime: bedtime,
       nextProjectedBottle: bottle,

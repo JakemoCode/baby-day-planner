@@ -1,17 +1,7 @@
 /**
- * Tomorrow page (V3 + §F12 PR 3).
- *
- * Verifies the page composition of the F17+F12 draft/confirm UI:
- * status pill, Confirm + Clear buttons, autosave indirection through
- * useTomorrowPlanState. (Promote-to-today was dropped; the auto-
- * apply-at-midnight behavior is exercised via useReconcileActiveDay
- * integration tests, not here.)
- *
- * Plan-state mechanics (load, autosave, hydrate, edit-revert) are
- * covered in integration tests under tests/integration/hooks. This
- * file mocks useTomorrowPlanState at the module boundary so the page
- * test exercises layout + confirm-flow wiring without re-testing
- * Firestore.
+ * Tomorrow page — verifies layout + confirm-flow wiring (status pill, Confirm/Clear buttons).
+ * Plan-state mechanics live in tests/integration/hooks; this mocks useTomorrowPlanState
+ * at the boundary so the test doesn't re-exercise Firestore.
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";

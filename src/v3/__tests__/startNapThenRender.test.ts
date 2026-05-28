@@ -1,14 +1,6 @@
 /**
  * Seam test: Start Nap Now → renderProjection.
- *
- * Reproduces the §F24/F25 bug class Jake hit on 2026-05-16:
- *   - User taps "Start Nap Now" → nap_1 written with id === eventKey === "nap_1"
- *   - The cascade projects nap_2 right after
- *   - renderProjection should NOT synthesize a putdown chip whose window
- *     falls inside the in-progress nap_1 body
- *
- * The seam: NapActionButton-minted event (slot id) → projectDay → renderProjection.
- * Each layer is exercised with the real implementation (no mocks).
+ * No mocks; covers putdown suppression inside in-progress nap and effectiveEnd rewriting.
  */
 
 import { describe, expect, it } from "vitest";
@@ -19,13 +11,8 @@ import { renderProjection } from "../ui/renderProjection";
 import { aContext, aDay, aSettings } from "./factories";
 import { PUTDOWN_KIND_TAG } from "../components/Timeline/expandPutdown";
 
-// Mirrors the exact shape NapActionButton now mints: id === eventKey === "nap_N",
-// endTime set to startTime + napLen (placeholder).
-// "Start Nap Now"-shaped fixture: recorded + NO endTime. effectiveEndOf
-// auto-extends from the placeholder `startTime + napLen` until the user
-// taps End Nap (which writes endTime + flips to completed). The napLen
-// parameter is unused now (kept for call-site stability) — the placeholder
-// derives at read time from `ctx.settings.defaultNapLengthMinutes`.
+// "Start Nap Now" shape: recorded + no endTime; effectiveEndOf auto-extends until End Nap is tapped.
+// napLen param unused (kept for call-site stability); placeholder derives from settings.
 function recordedNapSlot(n: number, startTime: number, _napLen: number): Event {
   const key = `nap_${n}`;
   return {
@@ -84,7 +71,6 @@ describe("seam: Start Nap Now → renderProjection", () => {
       nowMinutes: 9 * 60 + 30, // 30 min into the nap
     });
 
-    // Engine projects the full day including nap_2 after the in-progress nap_1.
     const projected = projectDay({
       day: ctx.day,
       settings: ctx.settings,
@@ -92,23 +78,13 @@ describe("seam: Start Nap Now → renderProjection", () => {
       nowMinutes: ctx.nowMinutes,
     });
 
-    // Confirm nap_2 is projected (sanity).
     const nap2 = projected.find((e) => e.eventKey === "nap_2");
     expect(nap2).toBeDefined();
     expect(nap2?.lifecycle.state).toBe("projected");
 
-    // Run the full render pipeline including putdown expansion.
     const rendered = renderProjection(projected, settings, ctx.nowMinutes);
-
-    // Collect all putdown chips.
     const putdownChips = rendered.filter((e) => e.eventKey === PUTDOWN_KIND_TAG);
-
-    // No putdown chip should land inside nap_1's body.
-    // nap_1 effectiveEnd at now=9:30: 9:30 < endTime=10:00 → effectiveEnd = 10:00.
-    // putdown chip for nap_2 would be [nap_2.start - 15, nap_2.start].
-    // nap_2.start = wakeTime + ww1 + napLen + ww2 = 7:00 + 2h + 1h + 2h15 = 12:15.
-    // putdown window = [12:00, 12:15] — well outside nap_1 [9:00, 10:00].
-    // This test instead verifies no chip lands INSIDE nap_1 [9:00, 10:00).
+    // Verify no putdown chip lands inside nap_1 [9:00, effectiveEnd).
     const nap1SoftEnd = nap1Started.startTime + napLen;
     const chipsInsideNap1 = putdownChips.filter(
       (chip) => chip.startTime >= nap1Started.startTime && chip.startTime < nap1SoftEnd,
@@ -143,19 +119,13 @@ describe("seam: Start Nap Now → renderProjection", () => {
 
     const rendered = renderProjection(projected, settings, ctx.nowMinutes);
     const putdownChips = rendered.filter((e) => e.eventKey === PUTDOWN_KIND_TAG);
-    // At least one putdown chip should exist for the upcoming projected nap.
     expect(putdownChips.length).toBeGreaterThan(0);
   });
 
-  // The original Jake bug (2026-05-16): renderer reads event.endTime, so an
-  // in-progress recorded nap whose `now > endTime` rendered clipped at the
-  // placeholder. renderProjection now bakes effectiveEnd into the event so
-  // the renderer naturally draws the extended block.
   it("renderProjection rewrites in-progress recorded nap endTime to effectiveEnd (R6.8 visual fix)", () => {
     const wakeTime = 7 * 60;
     const napLen = 60;
-    // nap_1 recorded at 9:00, placeholder endTime = 10:00. Now = 10:30 (30 min past).
-    // Expected: rendered nap_1 has endTime rewritten to 11:00 (1 extension).
+    // nap_1 at 9:00, placeholder endTime 10:00, now 10:30 → effectiveEnd 11:00 (1 extension).
     const nap1 = recordedNapSlot(1, 9 * 60, napLen);
 
     const settings = aSettings({
@@ -182,7 +152,6 @@ describe("seam: Start Nap Now → renderProjection", () => {
 
     const rendered = renderProjection(projected, settings, ctx.nowMinutes);
     const renderedNap1 = rendered.find((e) => e.id === "nap_1");
-    // endTime is rewritten to effectiveEnd. baseEnd=10:00, now=10:30, 1 extension → 11:00.
     expect(renderedNap1?.endTime).toBe(11 * 60);
   });
 
@@ -215,8 +184,7 @@ describe("seam: Start Nap Now → renderProjection", () => {
 
     const rendered = renderProjection(projected, settings, ctx.nowMinutes);
     const renderedNap1 = rendered.find((e) => e.id === "nap_1");
-    // Capped at startTime + 4*napLen = 13:00.
-    expect(renderedNap1?.endTime).toBe(13 * 60);
+    expect(renderedNap1?.endTime).toBe(13 * 60); // cap: startTime + 4*napLen
   });
 
   it("renderProjection does NOT rewrite endTime for completed naps", () => {
@@ -230,7 +198,6 @@ describe("seam: Start Nap Now → renderProjection", () => {
       defaultWakeTime: wakeTime,
     });
     const day = aDay({ wakeTime });
-    // Completed nap with explicit endTime; never auto-extended.
     const completedNap: Event = {
       id: "nap_1",
       dayId: "day_test",
@@ -260,17 +227,13 @@ describe("seam: Start Nap Now → renderProjection", () => {
 
     const rendered = renderProjection(projected, settings, ctx.nowMinutes);
     const renderedNap1 = rendered.find((e) => e.id === "nap_1");
-    expect(renderedNap1?.endTime).toBe(9 * 60 + 30); // unchanged
+    expect(renderedNap1?.endTime).toBe(9 * 60 + 30); // completed: endTime unchanged
   });
 
   it("effectiveEnd caps at startTime + 4×napLen — applies at render time (expandPutdown), not cascade", () => {
     const wakeTime = 7 * 60;
     const napLen = 60;
-    // nap_1: recorded with COMMITTED endTime 10:00 (drawer-saved shape).
-    // now = 14:00 (4 hours later). The cascade uses the committed endTime
-    // (10:00) as cursor — so ww_2 starts at 10:00, regardless of how
-    // effectiveEndOf would handle in-progress extension on a different
-    // shape. (The point of this test: cascade ≠ render-time effectiveEnd.)
+    // Drawer-saved nap (committed endTime 10:00): cascade uses endTime as cursor, not effectiveEnd.
     const nap1 = drawerSavedNapSlot(1, 9 * 60, 10 * 60);
 
     const settings = aSettings({
@@ -295,8 +258,7 @@ describe("seam: Start Nap Now → renderProjection", () => {
       nowMinutes: ctx.nowMinutes,
     });
 
-    // Cascade cursor uses endTime (10:00), so ww_2 starts at nap_1.endTime.
     const ww2 = projected.find((e) => e.eventKey === "wake_window_2");
-    expect(ww2?.startTime).toBe(nap1.endTime); // 10:00 — cascade uses recorded endTime
+    expect(ww2?.startTime).toBe(nap1.endTime); // cascade uses committed endTime as cursor
   });
 });

@@ -10,13 +10,7 @@ export type OwnerPillProps = {
   className?: string | undefined;
 };
 
-/**
- * Small inline pill showing an owner's display name, tinted with their
- * configured color via the `--owner-color` CSS variable.
- *
- * Returns `null` when `owner` is undefined, or when the owner ref no
- * longer resolves to a configured owner (stale `otherId`).
- */
+/** Tinted owner name pill; null when owner is unset or the otherId no longer resolves. */
 export function OwnerPill({ owner, owners, className }: OwnerPillProps) {
   if (!owner) return null;
   const name = ownerDisplayName(owner, owners);

@@ -17,18 +17,9 @@ export type UseReconcileActiveDayResult = {
 };
 
 /**
- * §F17 — bring the active day in sync with the calendar.
- *
- * On mount:
- *   1. Reads the current active day (one-shot query)
- *   2. If `active.date === today` → no-op
- *   3. Else: promotes today (from confirmed TomorrowPlan if any, else
- *      settings defaults) and archives the prior active day in the
- *      process (inherited from `startNewDay`)
- *
- * Uses a deterministic Day id (`day-${childId}-${date}`) so concurrent
- * parent-opens at the date boundary land on the same doc (idempotent
- * setDoc).
+ * On mount, reconciles the active day with today. Promotes from a confirmed
+ * TomorrowPlan if one exists, otherwise uses settings defaults. Deterministic
+ * day id makes concurrent calls idempotent.
  */
 export function useReconcileActiveDay(
   childId: string,
@@ -37,15 +28,8 @@ export function useReconcileActiveDay(
 ): UseReconcileActiveDayResult {
   const [done, setDone] = useState(false);
   const [error, setError] = useState<Error | undefined>(undefined);
-  // Capture defaultWakeTime in a ref so the effect's deps stay
-  // `[childId, today]`. Without this, settings loading async after
-  // first render (e.g. `settings?.defaultWakeTime ?? FALLBACK`) flips
-  // the value once and re-fires the entire reconcile — the second
-  // promote would overwrite the first with the new wake time.
-  // Idempotent setDoc keeps the doc consistent but the side-effects
-  // double-fire. The ref keeps the LATEST value visible to the async
-  // work without retriggering it. Assignment in a no-dep effect (not
-  // during render) per react-hooks/rules-of-hooks.
+  // Ref keeps the latest defaultWakeTime available to the effect without adding it
+  // as a dep — settings loading async would otherwise re-fire the reconcile a second time.
   const wakeTimeRef = useRef(defaultWakeTime);
   useEffect(() => {
     wakeTimeRef.current = defaultWakeTime;
@@ -60,10 +44,7 @@ export function useReconcileActiveDay(
       const activeSnap = await getDocs(activeQuery);
       const active = activeSnap.empty ? null : activeSnap.docs[0]!.data();
 
-      // Best-effort: GC any plans whose date has already passed. Runs
-      // alongside the active-day check so stale state never accumulates.
-      // Errors here don't block promote — they just leave shadow docs
-      // that the next reconcile will catch.
+      // Best-effort GC of past plans; errors leave shadow docs for the next reconcile.
       deleteStaleTomorrowPlans(db, childId, today).catch((err) => {
         console.error("[useReconcileActiveDay] stale-plan GC failed", err);
       });
@@ -73,8 +54,7 @@ export function useReconcileActiveDay(
         return;
       }
 
-      // Active is stale or missing. Look for a confirmed plan for today;
-      // fall back to settings defaults.
+      // Active day is stale or missing; promote from confirmed plan or settings defaults.
       const plan = await loadTomorrowPlan(db, childId, today);
       if (plan?.status === "confirmed") {
         await promoteFromPlan(db, childId, plan, wakeTimeRef.current);

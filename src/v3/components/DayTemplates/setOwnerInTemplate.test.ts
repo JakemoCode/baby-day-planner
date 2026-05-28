@@ -1,18 +1,8 @@
 /**
- * setOwnerInTemplate updates a single owner slot on an OwnershipTemplate
- * driven by the event's `eventKey` (`nap_N`, `wake_window_N`,
- * `bottle_N`, `bedtime`). Used by the Day Templates editor and the
- * Tomorrow preview to assign owners to projected events.
- *
- * Behavioral choices documented by tests:
- *  - Index N is 1-based in the eventKey (`nap_2` → index 1).
- *  - When N exceeds the current array length, intermediate slots are
- *    filled with `undefined` (sparse) so the chosen index lines up.
- *    The schema models gap-filled positions as `OwnerSlotEntry`
- *    (`OwnerRef | undefined`) per cleanup §1.6, so consumers must
- *    tolerate undefined entries; engine R12.x rules already skip them.
- *  - `owner === undefined` clears the slot (sets to `undefined`).
- *  - Unknown / malformed `eventKey` returns the template unchanged.
+ * setOwnerInTemplate — updates a single owner slot on an OwnershipTemplate
+ * keyed by eventKey (`nap_N`, `wake_window_N`, `bottle_N`, `bedtime`).
+ * Index is 1-based; out-of-bounds gaps are filled with undefined (R12.x skips them).
+ * `owner === undefined` clears the slot; unknown/malformed keys return the template unchanged.
  */
 
 import { describe, expect, it } from "vitest";

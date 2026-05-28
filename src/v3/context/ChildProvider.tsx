@@ -16,12 +16,7 @@ export type ChildProviderResolution =
   | { status: "no-child" }
   | { status: "ready"; child: Child };
 
-/**
- * Resolves the current auth uid → /users/{uid} → first childId → /children/{id}.
- * Returns a discriminated union so callers can render gates/loading/redirects
- * explicitly. This is the read-only resolver; `ChildProvider` composes it
- * with a Context that exposes the resolved Child to descendants.
- */
+/** Resolves uid → user doc → first childId → Child; returns a discriminated union for loading/gate rendering. */
 export function useChildResolution(): ChildProviderResolution {
   const auth = useAuth();
   const uid = auth.user?.uid ?? "";

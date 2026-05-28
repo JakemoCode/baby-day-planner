@@ -126,8 +126,7 @@ describe("R11.1 — duplicate id in settings emits only one event", () => {
     });
     const evs = out.filter((e) => e.type === "daily_recurring");
     expect(evs).toHaveLength(1);
-    // First entry wins (encountered first in the array).
-    expect(evs[0]!.label).toBe("First");
+    expect(evs[0]!.label).toBe("First"); // first entry wins
     expect(evs[0]!.startTime).toBe(12 * 60);
   });
 });

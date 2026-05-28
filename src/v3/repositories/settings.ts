@@ -1,10 +1,4 @@
-/**
- * V3 settings repository.
- *
- * Single-doc store at `/children/{childId}/settings/current`. Same path
- * as V2; wire shape is the V3 Settings type — TimeMin numbers
- * throughout, slot-based owners, daycare config, etc.
- */
+/** V3 settings repository. Single doc at `/children/{childId}/settings/current`. */
 
 import { doc, getDoc, onSnapshot, setDoc, type Firestore } from "firebase/firestore";
 import { settingsPath } from "@/lib/firestore/paths";

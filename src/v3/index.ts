@@ -1,9 +1,4 @@
-/**
- * V3 public exports.
- *
- * Phase 1 surface: types + engine entry point + lifecycle reducer.
- * No UI or React surface ships in Phase 1 — V2 stays wired everywhere.
- */
+/** V3 public exports: types, engine entry point, and lifecycle reducer. */
 
 export type {
   AllowlistDoc,

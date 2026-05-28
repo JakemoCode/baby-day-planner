@@ -11,13 +11,7 @@ export type ConfirmDialogProps = {
   cancelLabel?: string;
   onConfirm: () => void;
   onCancel: () => void;
-  /**
-   * Optional dismiss handler for Escape / backdrop click. When provided,
-   * Escape and backdrop fire `onDismiss` instead of `onCancel` — useful
-   * when the explicit Cancel button has a destructive default and you
-   * want "I haven't decided" to leave state alone. Falls back to
-   * `onCancel` when omitted (backwards-compatible).
-   */
+  /** Escape/backdrop handler. Use when Cancel is destructive and "I haven't decided" should be a no-op. Falls back to onCancel. */
   onDismiss?: () => void;
 };
 

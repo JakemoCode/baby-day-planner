@@ -41,10 +41,8 @@ describe("useV3Events", () => {
   });
 
   it("passes converter-defaulted events through unchanged", async () => {
-    // The converter (v3EventConverter.fromFirestore) applies withV3EventDefaults
-    // before the watcher callback fires; the hook is a pure subscriber and
-    // must not re-apply defaults. Simulate what the converter produces:
-    // a fully-shaped event with kind and hasPutdown already set.
+    // Converter applies withV3EventDefaults before the callback fires; the hook
+    // must not re-apply defaults. Simulate a fully-shaped converter output.
     let cb: ((events: Event[]) => void) | undefined;
     watchEventsMock.mockImplementation((_db, _cid, _did, callback) => {
       cb = callback;
@@ -86,10 +84,7 @@ describe("useV3Events", () => {
       await result.current.saveEvent(newEvent);
     });
     expect(createEventMock).toHaveBeenCalledWith({}, "child-1", newEvent);
-    // Optimistic state must contain the exact event we inserted, not
-    // just "something with that id." A bug that wrote a partial copy
-    // (e.g. stripping lifecycle on insert) would have passed a mere
-    // .toBeDefined() check.
+    // Assert the exact inserted event — a partial copy (e.g. stripped lifecycle) would pass .toBeDefined().
     expect(result.current.events.find((e) => e.id === "e-new")).toEqual(newEvent);
   });
 
@@ -150,11 +145,8 @@ describe("useV3Events", () => {
   });
 
   describe("dayId-change re-subscription (audit P0-2 seam)", () => {
-    // The dashboard chain: useV3Day delivers a new day → page rerenders
-    // with the new day.id → useV3Events is called with the new dayId
-    // and must (a) stop watching the previous dayId, (b) start watching
-    // the new one. Without this, events from the OLD day still appear
-    // on the dashboard after a "Start New Day" cycle.
+    // Must stop watching the old dayId and start watching the new one;
+    // otherwise stale events from the previous day appear after a new-day cycle.
     it("transitions from empty dayId to a real one: subscribes once, with the new id", () => {
       const unsub = vi.fn();
       watchEventsMock.mockReturnValue(unsub);

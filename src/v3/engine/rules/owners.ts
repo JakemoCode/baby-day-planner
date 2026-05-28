@@ -1,26 +1,7 @@
 /**
- * R12.x — Template-driven owner inheritance.
- *
- * Source: docs/v3/ENGINE_SPEC.md §12.
- *
- * Implemented here:
- *   R12.2 — projected naps inherit template.napOwners[N-1]
- *   R12.3 — projected wake_windows inherit template.wakeWindowOwners[N-1]
- *           (NOT from same-index nap; V3 reverses V2)
- *   R12.5 — projected bedtime inherits template.bedtimeOwner
- *   R12.6 — projected bottles inherit template.bottleOwners[N-1] in
- *           chronological order (after R5.4 renumber)
- *
- * Implemented elsewhere (cross-referenced for completeness):
- *   R12.1 — manual/recorded events keep owner: enforced by §0
- *           reality-wins guard in evaluator.ts plus per-rule gating on
- *           `lifecycle.state === "projected"`.
- *   R12.4 — projected putdown owner = parent's owner: structural; render
- *           layer reads it from the parent (hasPutdown flag, R6).
- *   R12.7 — drawer "no owner" omits field: UI / Phase 3.
- *   R12.8 — pump owner = pumpOwnerSlot: handled in pumps.ts (R9).
- *           Dream feed is render-only label now — no owner inheritance.
- *   R12.9 — extras / dailyRecurring carry their own defaults; not template-driven.
+ * R12.2/3/5/6/10 — Template-driven and per-day owner inheritance for
+ * projected naps, wake_windows, bedtime, and bottles. R12.10 applies
+ * Day.ownerOverrides last, beating template defaults.
  */
 
 import {
@@ -34,10 +15,7 @@ import {
 import type { Rule } from "../evaluator";
 import { hasType, isBedtime, isProjected } from "../helpers";
 
-/**
- * Build a rule that stamps `template.<list>[N-1]` onto projected events of
- * `type` whose `eventKey` is `${keyPrefix}${N}` and whose owner is unset.
- */
+/** Build a rule that stamps template owner[N-1] onto projected events of the given type. */
 function templateOwnerByIndexRule(spec: {
   id: string;
   description: string;
@@ -55,10 +33,7 @@ function templateOwnerByIndexRule(spec: {
   }
 
   function isStampable(event: Event, overrides: Record<string, unknown> | undefined): boolean {
-    // Skip slots that have a Day.ownerOverrides entry (any value, including
-    // null = explicit NO_OWNER). R12.10 owns those eventKeys; if template
-    // rules also touched them we'd cycle: template stamps default → R12.10
-    // re-applies null override → template re-stamps → ...
+    // Skip eventKeys claimed by R12.10 (any value, including null) to avoid stamp→override→stamp cycles.
     if (overrides && Object.hasOwn(overrides, event.eventKey)) return false;
     return isType(event) && isProjected(event) && isNoOwner(event.owner);
   }
@@ -93,9 +68,7 @@ function templateOwnerByIndexRule(spec: {
 }
 
 // ---------------------------------------------------------------------------
-// R12.2 — Naps
-// R12.3 — Wake windows (NOT from same-index nap; V3 reverses V2)
-// R12.6 — Bottles (chronological, after R5.4 renumber)
+// R12.2 / R12.3 / R12.6 — Naps, wake_windows (V3 reverses V2 indexing), bottles
 // ---------------------------------------------------------------------------
 
 const RuleApplyTemplateNapOwners = templateOwnerByIndexRule({
@@ -119,21 +92,17 @@ const RuleApplyTemplateWakeWindowOwners = templateOwnerByIndexRule({
 const RuleApplyTemplateBottleOwners = templateOwnerByIndexRule({
   id: "R12.6",
   description: "Stamp template.bottleOwners[N-1] onto projected bottles in chronological order",
-  // Depend on R5.4 (renumber) so bottle eventKeys are in chronological
-  // order before we map index → owner.
-  dependsOn: ["R5.4"],
+  dependsOn: ["R5.4"], // R5.4 must renumber before index→owner mapping
   type: "bottle",
   keyPrefix: "bottle_",
   ownerList: (t) => t.bottleOwners,
 });
 
 // ---------------------------------------------------------------------------
-// R12.5 — Bedtime (singleton template field, not a list)
+// R12.5 — Bedtime
 // ---------------------------------------------------------------------------
 
-// A projected bedtime is eligible for the template's bedtimeOwner stamp
-// only when it has no owner yet AND no per-day ownerOverride claims its
-// slot (an explicit override always wins over the template default).
+// Eligible only when no owner set and no per-day ownerOverride claims the slot.
 function isStampableBedtime(
   e: Event,
   overrides: Record<string, OwnerRef | null> | undefined,
@@ -161,13 +130,7 @@ const RuleApplyTemplateBedtimeOwner: Rule = {
   },
 };
 
-/**
- * Parse `${prefix}${N}` → N. Returns null on mismatch.
- *
- * Strict-numeric: `parseInt('1abc', 10)` returns 1, which would let a
- * malformed eventKey like `nap_1abc` silently map to napOwners[0]. We
- * require the suffix to be all digits.
- */
+/** Parse `${prefix}${N}` → N; strict-numeric suffix (guards against `nap_1abc` → napOwners[0]). */
 const DIGIT_SUFFIX = /^\d+$/;
 function indexFromKey(eventKey: string, keyPrefix: string): number | null {
   if (!eventKey.startsWith(keyPrefix)) return null;
@@ -179,16 +142,12 @@ function indexFromKey(eventKey: string, keyPrefix: string): number | null {
 }
 
 // ---------------------------------------------------------------------------
-// R12.10 — Day.ownerOverrides (§F12 + §F17, see docs/v3/F17_F12_SCOPE.md §4)
+// R12.10 — Day.ownerOverrides
 // ---------------------------------------------------------------------------
 
 /**
- * Beats all template-driven owner inheritance for matching eventKeys.
- * `null` in the map = explicit NO_OWNER (the user un-assigned a slot
- * that would otherwise default to an owner). Missing key = no override.
- *
- * dependsOn includes all R12.x template rules so this rule runs after
- * them and is the final say on projected-event ownership.
+ * Applies Day.ownerOverrides to projected events; beats all template rules.
+ * null = explicit NO_OWNER; missing key = no override.
  */
 const RuleApplyDayOwnerOverrides: Rule = {
   id: "R12.10",

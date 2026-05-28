@@ -1,18 +1,8 @@
 // @vitest-environment node
 /**
- * §F3 + §F10 onboarding seam test.
- *
- * Exercises the full WRITE chain that `WelcomePage.submit` performs,
- * then verifies the READ chain that `(signed-in-with-child)/layout.tsx`
- * uses via `useChildResolution` to resolve a freshly-onboarded user.
- *
- * Real emulator, real repos, real converters. Catches:
- *   - missing/extra fields in any of the 3 doc writes
- *   - rule mismatches (e.g. childIds field shape, uid ownership)
- *   - resolution chain breakage (user→firstChildId→child)
- *
- * Does NOT mount React — the React layer is covered by component tests.
- * This is the data-layer seam.
+ * Onboarding data-layer seam: the WRITE chain `WelcomePage.submit` performs, then
+ * the READ chain `useChildResolution` uses (user→firstChildId→child). Real emulator,
+ * real repos. Does NOT mount React — that layer is covered by component tests.
  */
 
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
@@ -25,7 +15,7 @@ import { createUser, loadUser } from "../../src/v3/repositories/users";
 import { saveSettings, getSettings } from "../../src/v3/repositories/settings";
 import { withV3SettingsDefaults } from "../../src/v3/firestore/settingsDefaults";
 
-describe("§F3 + §F10 onboarding seam (data layer)", () => {
+describe("onboarding seam (data layer)", () => {
   let env: RulesTestEnvironment;
   beforeAll(async () => {
     env = await startTestEnv();
@@ -99,23 +89,17 @@ describe("§F3 + §F10 onboarding seam (data layer)", () => {
   });
 
   it("partially-onboarded state: user with empty childIds is distinguishable from no user", async () => {
-    // Defensive — shouldn't happen with WelcomePage.submit() since it writes
-    // childIds populated. But if invite flow or some other path ever creates
-    // an empty user, the resolution chain must distinguish "no doc" (route
-    // to welcome) from "empty childIds" (also route to welcome).
+    // Resolution must distinguish "no doc" from "empty childIds" — both route to welcome.
     await createUser(db(), { uid: ALLOWED_USER.uid, childIds: [], createdAt: 0 });
     const userDoc = await loadUser(db(), ALLOWED_USER.uid);
     expect(userDoc).not.toBeNull();
     expect(userDoc!.childIds).toEqual([]);
   });
 
-  // §F17/§F12 PR 3 — locks the rules behavior for the onboarding-batch
-  // race. After the writeBatch commits, the layout's child snapshot
-  // listener can fire BEFORE the local view of the user doc reflects
-  // its new `childIds`. canAccessChild's isLinkedToChild path returns
-  // false in that gap; the creator-fallback (isChildCreator) keeps
-  // reads alive. This test simulates the race by writing only the
-  // child doc and asserting the read still succeeds via createdBy.
+  // Onboarding-batch race: the child snapshot listener can fire before the local
+  // user doc reflects its new childIds, so canAccessChild's isLinkedToChild path
+  // fails in that gap; isChildCreator (createdBy) keeps reads alive. Simulated here
+  // by writing only the child doc and asserting the read still succeeds.
   it("creator-fallback: child readable without a user doc (onboarding race)", async () => {
     const conn = db();
     const newId = doc(collection(conn, CHILDREN)).id;

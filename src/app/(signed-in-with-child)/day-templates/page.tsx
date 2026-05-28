@@ -41,17 +41,14 @@ export default function DayTemplatesPage() {
   const { templates, loading: templatesLoading } = useV3Templates(CHILD_ID);
   const [selectedDay, setSelectedDay] = useState<DayKey>("saturday");
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
-  // Local override after a save — listTemplates is one-shot; this keeps
-  // the UI reflecting the latest edits without a manual refetch.
+  // Local override after save — listTemplates is one-shot so the UI needs this to reflect edits.
   const [edits, setEdits] = useState<Record<string, OwnershipTemplate>>({});
 
   const saturday = edits[SATURDAY_ID] ?? templates.find((t) => t.id === SATURDAY_ID) ?? DEFAULT_SAT;
   const sunday = edits[SUNDAY_ID] ?? templates.find((t) => t.id === SUNDAY_ID) ?? DEFAULT_SUN;
   const activeTemplate = selectedDay === "saturday" ? saturday : sunday;
 
-  // Synthetic day for the preview projection. V3 `Day` requires
-  // `suppressedRecurringIds` and `suppressedDaycareDay`; `wakeTime` is
-  // a TimeMin (number), not a "HH:MM" string.
+  // Synthetic Day for template preview projection.
   const syntheticDay: Day = useMemo(
     () => ({
       id: SYNTHETIC_DAY_ID,
@@ -148,8 +145,7 @@ export default function DayTemplatesPage() {
         dimPast={false}
         pxPerHour={settings.timelinePxPerHour}
         onEventTap={(event) => {
-          // Gate via templateSlotForEvent — non-mappable events (extras,
-          // pumps) have no template slot and shouldn't open the picker.
+          // Only events with a template slot (naps, wake windows, bottles) open the picker.
           if (templateSlotForEvent(event) === undefined) return;
           setSelectedEventId(event.id);
         }}

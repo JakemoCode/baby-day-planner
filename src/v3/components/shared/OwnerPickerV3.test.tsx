@@ -1,11 +1,6 @@
 /**
- * OwnerPickerV3 — slot-based picker driven by Settings.owners.
- *
- * Differences from V2 OwnerPicker:
- *   - Options are derived from OwnersConfig at render time (not hardcoded)
- *   - Display strings come from `displayName` (renames don't rewrite events)
- *   - "None" still selectable to clear an annotation
- *   - selected state compares slot identity via ownerRefEquals, not strings
+ * OwnerPickerV3 — slot-based picker derived from OwnersConfig at render time.
+ * Display strings from `displayName` (renames don't rewrite events); selection via ownerRefEquals.
  */
 
 import { describe, expect, it, vi } from "vitest";
@@ -68,7 +63,7 @@ describe("OwnerPickerV3", () => {
     expect(onChange).toHaveBeenCalledWith({ slot: "other", otherId: "daycare" });
   });
 
-  it("clicking None emits NO_OWNER to clear the ref (§F37)", async () => {
+  it("clicking None emits NO_OWNER to clear the ref", async () => {
     const onChange = vi.fn();
     render(<OwnerPickerV3 owners={owners} value={{ slot: "parent1" }} onChange={onChange} />);
     await userEvent.click(screen.getByRole("button", { name: "None" }));

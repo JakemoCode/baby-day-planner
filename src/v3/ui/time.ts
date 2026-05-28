@@ -105,22 +105,13 @@ export function formatStartDelta(deltaMinutes: number): { text: string; isNow: b
   return { text: `in ${formatHoursMinutes(deltaMinutes)}`, isNow: false };
 }
 
-/**
- * Read the wall clock and return the current local time as a TimeMin
- * (minutes since local midnight). Used by action buttons that log
- * "now" events.
- */
+/** Current local time as TimeMin (minutes since local midnight). Used by action buttons that log "now" events. */
 export function currentLocalMinutes(): TimeMin {
   const now = new Date();
   return now.getHours() * 60 + now.getMinutes();
 }
 
-/**
- * Read the wall clock and return today's local calendar date as an
- * ISO `YYYY-MM-DD` string. Matches the format of `Day.date`. Used by
- * the bottle save-path to route overnight feeds to the correct
- * calendar day (the midnight rule — DOMAIN.md §2).
- */
+/** Current local calendar date as `YYYY-MM-DD` (matches `Day.date`). Overnight bottles use this to route to the correct day (DOMAIN.md §2). */
 export function currentLocalDate(): string {
   const now = new Date();
   const y = now.getFullYear();

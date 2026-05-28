@@ -16,7 +16,6 @@ describe("WakeConfirmSheet", () => {
   it("emits onConfirm with the parsed time when 'Start day' is clicked", async () => {
     const onConfirm = vi.fn();
     render(<WakeConfirmSheet nowMinutes={NOW} onConfirm={onConfirm} onCancel={vi.fn()} />);
-    // User edits the time to 6:30 AM (they were checking phone late).
     const input = screen.getByLabelText(/wake time/i) as HTMLInputElement;
     await userEvent.clear(input);
     await userEvent.type(input, "06:30");
@@ -32,10 +31,7 @@ describe("WakeConfirmSheet", () => {
   });
 
   it("captures nowMinutes fresh on each mount (parent must conditionally mount)", () => {
-    // Caller contract: parent renders `{open && <WakeConfirmSheet ... />}`
-    // so each open creates a new instance with the current `nowMinutes`.
-    // Verify by unmounting + remounting with a different value — the
-    // input must reflect the LATEST mount's value, not the first.
+    // Parent uses `{open && <WakeConfirmSheet/>}` so each open creates a fresh instance.
     const { unmount } = render(
       <WakeConfirmSheet nowMinutes={(8 * 60) as TimeMin} onConfirm={vi.fn()} onCancel={vi.fn()} />,
     );

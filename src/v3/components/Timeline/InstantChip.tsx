@@ -15,15 +15,7 @@ export type InstantChipProps = {
   onClick?: () => void;
 };
 
-/**
- * Chip label rules (parity with V2 + new V3 types):
- *   - bottle uses event.label — typically "Bottle N" from R5.4 chronological
- *     renumber, OR "Dream Feed" from the render-time relabel
- *     (src/v3/ui/dreamFeedLabel.ts)
- *   - bedtime → "Bed", pump → "Pump" (or label if it already starts with Pump)
- *   - daycare_dropoff/pickup → "Daycare ↓" / "Daycare ↑"
- *   - daily_recurring / extra → use the event's label directly
- */
+/** Returns the chip display label: bedtime→"Bed", pump→"Pump", daycare→arrow variants, others use event.label. */
 function chipText(event: Event): string {
   if (event.type === "bedtime") return "Bed";
   if (event.type === "pump") return event.label.startsWith("Pump") ? event.label : "Pump";
@@ -49,17 +41,8 @@ type ChipContentProps = {
 };
 
 /**
- * §F2b layout phases (driven by overflow detection on the label):
- *   wrapped=false → row 1: [label time], row 2: [owner]   (Jake's phase 0/1)
- *   wrapped=true  → row 1: [label],      row 2: [time · owner]  (phase 2/3)
- * If even with the time vacating row 1 the label still overflows the
- * chip's max-width, the label ellipses (phase 4).
- *
- * Stability: this component is keyed by (label|time) from the parent, so
- * fresh content gets a fresh wrapped=false starting state — no in-effect
- * prop→state sync. Once wrapped flips true after measurement, we don't
- * re-evaluate (would oscillate). ResizeObserver on the chip resets
- * wrapped=false on container resize so we re-test at the new width.
+ * Two-row layout: unwrapped shows [label time]/[owner]; wrapped shows [label]/[time · owner].
+ * Keyed by (label|time) for fresh state on content change. ResizeObserver resets to re-test at new width.
  */
 function ChipContent({ label, time, ownerName, slotKey, TagAttrs }: ChipContentProps): ReactNode {
   const { Tag, interactiveProps, staticAttr, eventType, colorMode, style, dataOwner } = TagAttrs;

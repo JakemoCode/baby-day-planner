@@ -1,7 +1,4 @@
-/**
- * V3 PromoteTomorrowButton — pure presentational button that invokes
- * the supplied handler. Confirmation flow lives at the page level.
- */
+/** PromoteTomorrowButton — presentational; confirmation flow lives at the page level. */
 
 import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";

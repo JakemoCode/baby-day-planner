@@ -36,7 +36,7 @@ export type EventEditDrawerV3Props = {
    */
   defaultWakeTime: TimeMin;
   /**
-   * §F66 fast-follow: today's actual wakeTime (from `Day.wakeTime`),
+   * Today's actual wakeTime (from `Day.wakeTime`),
    * used to validate that an edited startTime isn't accidentally
    * AM/PM-confused below the day's wake (e.g. user types 12:30 meaning
    * 12:30pm but the picker reads it as 0:30am, which silently wrecks
@@ -69,12 +69,8 @@ function validateForm(
   dayWakeTime: TimeMin | undefined,
 ): FormErrors {
   const errors: FormErrors = {};
-  // §F66 fast-follow B7: pre-wake guard. AM/PM picker mistakes (12:30
-  // intending pm but stored as 0:30am) anchor a nap or rhythm bottle
-  // before wakeTime and wreck the cascade. Catch it at validation
-  // time. Scope to cascade-anchoring types only — daily_recurring,
-  // daycare, dream-feed, pump, and extras are fixed-time / explicit-
-  // slot events that the user may legitimately schedule pre-wake.
+  // Pre-wake guard: AM/PM picker mistakes can anchor a cascade event before wakeTime.
+  // Scope to cascade-anchoring types only (nap, rhythm bottle).
   const isCascadeAnchoring =
     type === "nap" || (type === "bottle" && eventKey !== DREAM_FEED_EVENT_KEY);
   if (
@@ -99,10 +95,7 @@ function validateForm(
     const overlap = existingEvents.find((e) => {
       if (e.id === editingId) return false;
       if (e.type !== "nap") return false;
-      // Putdown synthetics carry `type: "nap"` for timeline geometry
-      // but represent the wind-down lane, not a real nap. The user
-      // intentionally schedules naps adjacent to their putdown chip;
-      // flagging that as an overlap blocks legitimate saves.
+      // Putdown synthetics share type "nap" for geometry but aren't real naps; skip.
       if (isRenderSynthetic(e)) return false;
       if (e.endTime === undefined) return false;
       if (!isRecorded(e.lifecycle)) return false;
@@ -154,7 +147,7 @@ type InternalForm = {
   startTime: TimeMin | undefined;
   endTime: TimeMin | undefined;
   amountOz: number | undefined;
-  owner: OwnerRef; // §F37: always defined; NO_OWNER for unassigned
+  owner: OwnerRef; // always defined; NO_OWNER for unassigned
   label: string;
 };
 
@@ -189,10 +182,7 @@ export function EventEditDrawerV3({
   const sourceEvent = event;
   const [form, setForm] = useState<InternalForm>(() => eventToForm(sourceEvent));
   const [confirmOpen, setConfirmOpen] = useState(false);
-  // Past-threshold prompt: when a nap edit crosses bedtimeThreshold,
-  // hold the would-be saved Event here pending the parent's "Change to
-  // bedtime?" decision. Yes → delete original (if recorded) + save a
-  // bedtime doc; No → save the held nap as-is. Per spec PR #146 R2.
+  // Holds a nap that crossed bedtimeThreshold pending "Change to bedtime?" confirmation.
   const [pendingPastThresholdNap, setPendingPastThresholdNap] = useState<Event | null>(null);
   const titleId = useId();
 
@@ -211,15 +201,13 @@ export function EventEditDrawerV3({
   const type = sourceEvent.type;
   const baseTitle =
     mode === "create" ? (CREATE_TITLE_BY_TYPE[type] ?? "Add event") : EDIT_TITLE_BY_TYPE[type];
-  // §F56: bake the human label into the heading so "Edit recurring event" names which one.
+  // Include the label in the heading so recurring events are named.
   const title =
     mode === "edit" && type === "daily_recurring" && sourceEvent.label
       ? `${baseTitle}: ${sourceEvent.label}`
       : baseTitle;
 
-  // Delete-button visibility (recorded-vs-suppression routing,
-  // auto-promote carve-outs) lives in drawerDeletePolicy as pure,
-  // unit-tested functions — see that module for the full rationale.
+  // Delete visibility delegated to drawerDeletePolicy (pure, testable).
   const canDelete = canDeleteEvent(sourceEvent, { mode, hasOnDelete: onDelete !== undefined });
 
   const confirmCopy =
@@ -241,13 +229,8 @@ export function EventEditDrawerV3({
   const showOwner = OWNER_TYPES.has(type);
   const showLabel = type === "extra";
 
-  // §F66 future-event drawer rule: lock time + amount on future-
-  // projected rhythm events (nap, rhythm bottle). Carve-out (§F66
-  // fast-follow C2 sick-day flex): the chronologically-NEXT projected
-  // nap and bottle are editable so the user can anchor them to baby's
-  // actual rhythm. Once anchored, cascade re-projects everything past
-  // the new anchor — farther-out events stay locked because their
-  // times will reflow from the pin.
+  // Lock time/amount on future-projected rhythm events except the chronologically-next
+  // nap/bottle (editable so the user can pin the current rhythm anchor).
   const isNextOfType = isNextProjectedOfType(sourceEvent, existingEvents ?? [], nowMinutes);
   const futureProjected =
     mode === "edit" && isFutureProjected(sourceEvent, nowMinutes) && !isNextOfType;
@@ -264,12 +247,7 @@ export function EventEditDrawerV3({
 
   const handleStartTimeChange = (raw: string) => {
     const next = parseHM24(raw);
-    // Naps and pumps preserve their start→end duration as the user
-    // nudges startTime — both imply a duration baked into their
-    // template (nap default length, pump default duration). Extras
-    // decide instant-vs-block at save based on whether the user
-    // explicitly entered an endTime, so we DON'T auto-fill endTime
-    // from a startTime change for extras.
+    // Naps and pumps preserve duration on startTime nudge. Extras don't auto-fill endTime.
     const preservesDuration = type === "nap" || type === "pump";
     if (!preservesDuration || next === undefined) {
       setForm((prev) => ({ ...prev, startTime: next }));
@@ -294,15 +272,9 @@ export function EventEditDrawerV3({
       label: form.label,
     };
     const built = formToEvent(formForTransform, sourceEvent, nowMinutes, mode);
-    // Defensive: even with inputs disabled, force time/endTime/amount
-    // back to the source's values when editing a future-projected event.
-    // Guarantees the resulting save is owner-only and routes through
-    // setOwnerOverride in useDrawer.onSave, keeping the event projected.
-    // Sanitize: startTime, endTime, amountOz, and label all reset to
-    // source values. Label matters because useDrawer's isOwnerOnlyEdit
-    // includes it in the diff — without resetting, a label edit on a
-    // future-projected extra would route to saveEvent and silently
-    // promote the slot to recorded.
+    // Sanitize future-projected saves back to source values so the edit routes through
+    // setOwnerOverride (owner-only path) and never promotes the slot to recorded.
+    // Label is included: isOwnerOnlyEdit checks it, so a label change would route to saveEvent.
     const next: Event = futureProjected
       ? {
           ...built,
@@ -313,10 +285,7 @@ export function EventEditDrawerV3({
         }
       : built;
 
-    // Prompt trigger: a nap whose startTime crossed from below
-    // threshold to at/after threshold during this edit (spec R2 / Q6).
-    // Owner-only edits on already-late naps don't re-prompt; back-edits
-    // from past-threshold to within-threshold don't prompt either.
+    // Trigger prompt when a nap's startTime crosses bedtimeThreshold in this edit.
     const crossedThreshold =
       next.type === "nap" &&
       sourceEvent.startTime < bedtimeThreshold &&
@@ -334,16 +303,9 @@ export function EventEditDrawerV3({
     if (!pendingPastThresholdNap) return;
     const napCandidate = pendingPastThresholdNap;
     setPendingPastThresholdNap(null);
-    // Per DOMAIN.md §3: bedtime IS the day's last sleep. Its endTime
-    // is the next morning's wake (defaultWakeTime + 24h), NOT the
-    // source nap's endTime — the nap's recorded endTime represents
-    // a within-day sleep, but bedtime extends through the night.
-    // Lifecycle is `recorded` (user is anchoring bedtime in reality;
-    // "in progress" is a time property, not a lifecycle state).
+    // Bedtime endTime is next-morning wake (defaultWakeTime + 24h), not the source nap's endTime.
     const bedtimeBase: Event = {
-      // §F59: align id convention with useDrawer (`recorded_${eventKey}`)
-      // so this and any subsequent edit / Start-Bedtime tap write to the
-      // same Firestore doc instead of orphaning a `bedtime`-id doc.
+      // Deterministic id so subsequent edits write to the same Firestore doc.
       id: recordedIdFor("bedtime"),
       dayId: napCandidate.dayId,
       eventKey: "bedtime",
@@ -353,15 +315,10 @@ export function EventEditDrawerV3({
       startTime: napCandidate.startTime,
       endTime: nextDayAt(defaultWakeTime),
       hasPutdown: false,
-      // `recorded`: putdown.ts derives hasPutdown from {projected, recorded}.
-      // Cascade's manualBedtime check is `!isProjected`, so `recorded`
-      // remains authoritative and matches the drawer-edit shape.
-      owner: napCandidate.owner, // §F37: owner is required (NO_OWNER if unassigned)
+      owner: napCandidate.owner,
       lifecycle: { state: "recorded", annotatedAt: nowMinutes },
     };
-    // Sequence: delete original FIRST so the dual-doc state can never
-    // surface (the user sees one chip turn into the other, not two).
-    // Awaiting both surfaces failures rather than fire-and-forget.
+    // Delete original first to avoid a brief dual-chip state.
     if (isRecorded(sourceEvent.lifecycle) && onDelete) {
       await onDelete(sourceEvent);
     }
@@ -376,9 +333,7 @@ export function EventEditDrawerV3({
   };
 
   const handleDismissPrompt = () => {
-    // Escape / backdrop dismiss: clear the pending save without
-    // committing. Returns the user to the drawer with their edits
-    // intact so they can re-decide or change the time.
+    // Dismiss without committing; user returns to the drawer with edits intact.
     setPendingPastThresholdNap(null);
   };
 

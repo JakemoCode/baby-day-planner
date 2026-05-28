@@ -1,10 +1,4 @@
-/**
- * V3 TemplateOwnerPicker — slot-based owner picker for an event in a
- * template. Differences from V2:
- *   - Reads the current owner from the template (not event.owner string).
- *   - Renders OwnerPickerV3 (slot-based, derived from settings.owners).
- *   - onSelect emits OwnerRef | undefined; "None" clears the slot.
- */
+/** TemplateOwnerPicker — slot-based picker reading current owner from the template, not event.owner. */
 
 import { describe, expect, it, vi } from "vitest";
 import { render, screen, userEvent } from "@/test-utils";

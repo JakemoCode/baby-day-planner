@@ -1,10 +1,6 @@
 import type { Event } from "../schemas";
 
-/**
- * Returns a sortable timestamp for dedup ranking: most-recently-annotated
- * event wins. Returns -1 for events with no annotation timestamp (e.g.
- * planned events), so they sort last.
- */
+/** Sortable annotation timestamp for dedup ranking; -1 for non-annotated (projected) events. */
 export function annotationTime(e: Event): number {
   if (e.lifecycle.state === "recorded") return e.lifecycle.annotatedAt;
   if (e.lifecycle.state === "completed") return e.lifecycle.committedAt;

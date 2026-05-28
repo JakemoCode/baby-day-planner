@@ -63,30 +63,19 @@ export default function DashboardPage() {
     onSave,
     onDelete,
   } = useDayPageState(db, CHILD_ID);
-  // §F17 — auto-reconcile the active day on every dashboard mount.
-  // Side-effect only; the new active day flows back through useV3Day's
-  // subscription. Defaults to settings.defaultWakeTime if no confirmed
-  // plan exists for today.
+  // Auto-reconciles the active day on mount; result flows back via useV3Day subscription.
   useReconcileActiveDay(CHILD_ID, todayDate(), settings?.defaultWakeTime ?? 7 * 60);
-  // §F59 — one-shot orphan cleanup per day load. Pre-§F59 inconsistent
-  // write-path id conventions could leave two Firestore docs sharing
-  // `(type, eventKey)` (one `nap_N`, one `recorded_nap_N`). Deletes the
-  // loser (most-recent annotation wins). Idempotent — no-op once clean.
+  // One-shot orphan cleanup: removes duplicate Firestore event docs sharing (type, eventKey). Idempotent.
   useEffect(() => {
     if (!day?.id) return;
     void reconcileDuplicateEventDocs(db, CHILD_ID, day.id);
   }, [CHILD_ID, day?.id]);
-  // §F12 — surface today's plan to the dev StartDayButton so it can
-  // re-promote from the plan vs defaults during dogfood iteration.
+  // Supplies the dev StartDayButton with today's confirmed plan for re-promotion.
   const { plan: todaysPlan } = useV3TomorrowPlan(CHILD_ID, todayDate());
   const hasTomorrowPlan = todaysPlan?.status === "confirmed";
   const [wakeSheetOpen, setWakeSheetOpen] = useState(false);
 
-  // §F66 fast-follow B5: persist engine-auto-promoted bottles to
-  // Firestore so they survive the next cascade pass. Without this,
-  // the morning bottle predictions vanish the moment any real
-  // recording exists (R5's anchored branch suppresses cold-start
-  // emission). See useAutoPromotePersistence for the philosophy.
+  // Persists engine-auto-promoted bottles so they survive the next cascade pass.
   useAutoPromotePersistence({
     db,
     childId: CHILD_ID,
@@ -94,68 +83,32 @@ export default function DashboardPage() {
     actuals,
   });
 
-  // Loading + just-mounted + post-onboarding all collapse to the same
-  // skeleton. The previous code flashed a "Start first day" CTA between
-  // (a) the active-day subscription emitting loading=false and (b) the
-  // day data actually arriving — looked like the dashboard was empty/
-  // broken for ~500ms post-onboarding. useReconcileActiveDay will write
-  // a Day if none exists, so we can always trust that one is coming;
-  // skeleton until then.
-  //
-  // Wake gate: explicit undefined check — `wakeTime: 0` is technically
-  // valid (midnight) and must NOT be treated as "no day yet". Settings
-  // is guaranteed present post-§F3 onboarding (layout redirects to
-  // /welcome otherwise), so `!settings` collapses to a defensive load
-  // state rather than a first-time-bootstrap branch.
+  // Show skeleton until day+settings arrive. `wakeTime === undefined` is the gate
+  // (not `!wakeTime`) because wakeTime:0 is valid (midnight).
   if (dayLoading || settingsLoading || !settings || !day || day.wakeTime === undefined) {
     return <DashboardSkeleton />;
   }
 
   const next = nextDashboardEvent(projected, nowMinutes);
 
-  // Symmetric ±15min window around the nearest projected bottle slot —
-  // the contextual button's Log Bottle Time mode shows BOTH before and
-  // after the projected time (engine auto-promote flips lifecycle when
-  // Now crosses startTime, but the user can still confirm with a real
-  // log up to LOG_BOTTLE_WINDOW_MIN after).
   const nb = nearestBottleInWindow(projected, nowMinutes, LOG_BOTTLE_WINDOW_MIN);
   const nn = nextNap(projected, nowMinutes);
   const cww = currentWakeWindow(projected, nowMinutes);
-  // Source from `projected` (not `actuals`) so engine-side Now-cross
-  // auto-promote (ADR-0001) surfaces in-progress naps even when the
-  // user hasn't written a Firestore record yet. A projected nap whose
-  // startTime <= Now is flipped to `recorded` by the evaluator; that
-  // recording lives in `projected` only, not `actuals`. Without this,
-  // tapping a chip mid-nap wouldn't surface End Nap because the
-  // dashboard only saw Firestore-persisted events.
-  // Skip render-synthetic putdown chips. They carry `type: "nap"` for
-  // timeline geometry and inherit the parent's lifecycle — so a
-  // recorded nap with startTime > Now produces a synthetic putdown
-  // that passes isInProgress (its window contains Now). Without this
-  // filter, the dashboard fires "End nap" during putdown, before the
-  // real nap has started.
+  // Use `projected` (not `actuals`) to surface engine-auto-promoted in-progress naps.
+  // Filter out render-synthetic putdown chips — they inherit the parent's lifecycle
+  // and would falsely trigger "End nap" before the real nap starts.
   const inProgressNap = projected.find(
     (e) => e.type === "nap" && !isRenderSynthetic(e) && isInProgress(e, settings, nowMinutes),
   );
-  // Bedtime in-progress detection is intentionally NOT time-windowed.
-  // `isInProgress` requires `startTime <= now`, but a bedtime that began
-  // at 8 PM yesterday-frame (startTime=1200) and is being checked at
-  // 6:42 AM next morning (nowMinutes=402) would fail that check even
-  // though it's the exact state where the user needs "End overnight
-  // sleep" / wake-up. A recorded bedtime stays in-progress until the
-  // user explicitly ends it (TIME_EDIT → completed) or wakes the new
-  // day via the wake CTA.
+  // Bedtime in-progress is lifecycle-based, not time-windowed — a recorded bedtime
+  // that started at 8 PM appears "in-progress" next morning until the wake CTA fires.
   const inProgressBedtime = actuals.find(
     (e) => e.type === "bedtime" && e.lifecycle.state === "recorded",
   );
   const bedtime = projectedBedtime(projected);
 
   const handleLogBottle = async (bottle: Event) => {
-    // §F22 / midnight rule (DOMAIN.md §2): a bottle recorded at 2 AM
-    // belongs to today's *calendar* day, not the currently-active day
-    // doc (which is yesterday's planning day until the user starts the
-    // new one). If the wall-clock date differs from the active day's
-    // date, lazy-create a `planned` doc for that date and write there.
+    // Midnight rule: a 2 AM bottle belongs to the calendar date, not the still-active prior day.
     const bottleDate = todayDate();
     if (bottleDate !== day.date) {
       const target = await getOrCreatePlannedDay(
@@ -169,13 +122,8 @@ export default function DashboardPage() {
     }
     await saveEvent(bottle);
   };
-  // TIME_EDIT on a recorded nap → completed. The event may be either
-  // a Firestore-persisted actual (id stable) or an engine projection
-  // that auto-promoted to recorded (id synthetic, e.g. proj_nap_t540).
-  // Only rewrite to the §F59 deterministic id when the source is a
-  // projection — never overwrite the original doc id of a real actual
-  // (would orphan an imported / legacy doc that doesn't already follow
-  // the `recorded_${eventKey}` convention).
+  // Only rewrite to the deterministic id when the source is an engine projection —
+  // never overwrite an actual's original doc id (would orphan legacy docs).
   const handleEndNap = async (event: Event, endTime: number) => {
     if (!day || day.id === "") return;
     const id = isEngineEmittedId(event.id) ? recordedIdFor(event.eventKey) : event.id;
@@ -186,11 +134,7 @@ export default function DashboardPage() {
       lifecycle: reduceLifecycle(event.lifecycle, { type: "TIME_EDIT", at: endTime }),
     });
   };
-  // "End overnight sleep" = morning wake-up. Opens the confirm sheet
-  // (handler on the JSX), Confirm fires startNewDay — which atomically
-  // archives the active day, trims yesterday's bedtime endTime, and
-  // creates the new day. The bedtime trim is startNewDay's job; this
-  // handler doesn't TIME_EDIT the bedtime directly.
+  // Confirms morning wake-up; startNewDay archives the active day and trims yesterday's bedtime.
   const handleConfirmWake = async (wakeTime: TimeMin) => {
     setWakeSheetOpen(false);
     await startNewDay(db, CHILD_ID, {
@@ -201,18 +145,8 @@ export default function DashboardPage() {
     });
   };
   const handleStartDay = async ({ useTomorrowPlan }: { useTomorrowPlan: boolean }) => {
-    // Dev StartDayButton re-promote: archive today and re-create either
-    // from the confirmed plan (matches the auto-rollover path) or from
-    // settings defaults. Both paths use the deterministic id so the
-    // re-write replaces today's existing doc idempotently.
-    //
-    // §F66 fast-follow: same-date Start New Day collides on the
-    // deterministic dayId (`day-${childId}-${date}`), so the events
-    // subcollection under that id keeps yesterday's writes. For the
-    // dev rollover we explicitly delete all events under the active
-    // day's id BEFORE the day-doc replace — gives the user a true
-    // blank canvas. Production auto-rollover (different date) doesn't
-    // hit this path; this is dev-only.
+    // Dev-only: delete all events before replacing the day doc to avoid subcollection collision
+    // on the deterministic dayId when rolling over on the same calendar date.
     if (day?.id) {
       const existing = await listEvents(db, CHILD_ID, day.id);
       await Promise.all(existing.map((e) => deleteEvent(db, CHILD_ID, day.id, e.id)));
@@ -287,10 +221,7 @@ export default function DashboardPage() {
         onCancel={close}
       />
 
-      {/* Conditionally mount so each open creates a fresh component
-          with a fresh `useState(formatHM24(nowMinutes))` initial value.
-          Unconditional mount would snapshot `nowMinutes` at dashboard
-          mount; by morning the prefill would be stale. */}
+      {/* Conditional mount ensures each open gets a fresh nowMinutes initial value. */}
       {wakeSheetOpen && (
         <WakeConfirmSheet
           nowMinutes={nowMinutes}

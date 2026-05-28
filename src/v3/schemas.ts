@@ -25,21 +25,12 @@ export type TimeMin = number;
 export type OwnerSlot = "parent1" | "parent2";
 
 /**
- * Owner assignment on an event. Includes an explicit `{ slot: "none" }`
- * sentinel for "unassigned" — §F37 (2026-05-18) — so we never represent
- * the absence-of-owner as `undefined`. Two reasons:
+ * Owner assignment on an event. Uses `{ slot: "none" }` for unassigned rather than
+ * `undefined` for two reasons: (1) Firestore `updateDoc` is field-merge — omitting `owner`
+ * leaves the stale value; writing `none` clears it explicitly. (2) "User said no owner" is
+ * semantically distinct from "field never set."
  *
- * 1. **Firestore `updateDoc` is field-merge.** A patch that omits the
- *    `owner` field does not clear it on the server; the stale value
- *    survives. Writing `{ slot: "none" }` as a real value sidesteps the
- *    entire merge dance.
- * 2. **Discrete state > implicit absence.** "User explicitly said no
- *    owner" is semantically different from "field was never set"; the
- *    "none" slot makes the distinction explicit at the schema layer.
- *
- * `OwnerSlot` (parent1/parent2) is unchanged — it's the narrower type
- * used by `defaultOwnerSlot` / `pumpOwnerSlot` in Settings, which MUST
- * resolve to a real parent.
+ * `OwnerSlot` (parent1/parent2) is the narrower type for Settings fields that MUST resolve to a real parent.
  */
 export type OwnerRef = { slot: OwnerSlot } | { slot: "other"; otherId: string } | { slot: "none" };
 
@@ -136,7 +127,7 @@ export type Event = {
 
   label: string;
   /**
-   * Owner is always present (§F37 2026-05-18). Use `{ slot: "none" }`
+   * Owner is always present (2026-05-18). Use `{ slot: "none" }`
    * (or the `NO_OWNER` constant) for unassigned. Old documents missing
    * the field are auto-promoted to `NO_OWNER` by `withV3EventDefaults`
    * at the read seam.
@@ -172,12 +163,12 @@ export type Day = {
   suppressedRecurringIds: string[];
   /** Per-day daycare opt-out (R21.5). */
   suppressedDaycareDay: boolean;
-  /** §F66 fast-follow: per-day dream-feed opt-out. R5.5 skips emission when true. */
+  /** Per-day dream-feed opt-out. R5.5 skips emission when true. */
   suppressedDreamFeed?: boolean;
   /** Optional template id selected for this day. */
   templateId?: string;
   /**
-   * §F12/§F17 — per-event owner overrides keyed by `eventKey`
+   * Per-event owner overrides keyed by `eventKey`
    * (e.g. `"nap_1"`, `"bottle_2"`). Carried forward from the
    * `TomorrowPlan` at promote time. `null` = explicit NO_OWNER;
    * missing key = no override (default cascade applies). The
@@ -229,9 +220,9 @@ export type DailyRecurring = {
 };
 
 /**
- * §F4 (2026-05-20): `color` fields were retired from the editor — owner
+ * (2026-05-20): `color` fields were retired from the editor — owner
  * colors are now slot-keyed via `--color-owner-*` tokens. The field
- * stays optional on the type so persisted pre-§F4 docs continue to
+ * stays optional on the type so persisted pre-existing docs continue to
  * validate; nothing reads it anymore.
  */
 export type OwnersConfig = {
@@ -250,12 +241,7 @@ export type DaycareConfig = {
   dropoffTime: TimeMin;
   /** Nominal pickup time — same nap-shift behavior as dropoffTime. */
   pickupTime: TimeMin;
-  /**
-   * Optional for back-compat with pre-2026-05-20 settings docs that
-   * pinned a parent slot to dropoff/pickup. Read-ignored now; daycare
-   * events project owner-less and are assigned per-day via the
-   * timeline picker like every other event.
-   */
+  /** Back-compat with pre-2026-05-20 docs. Read-ignored; daycare events are now owner-less by default, assigned per-day. */
   dropoffOwnerSlot?: OwnerSlot;
   pickupOwnerSlot?: OwnerSlot;
   weekdays: WeekdayFlags;
@@ -276,14 +262,9 @@ export type BottleChainConfig = {
 export type BottleAmountRule = { minWeeks: number; amountOz: number };
 
 /**
- * Amount-conditional interval rule. Ported from V2 (`src/domain/bottleRules.ts`
- * pre-cutover) — the V3 rewrite silently dropped this; restoring per
- * 2026-05-11 user feedback.
- *
- * Semantics: when the most-recent bottle's `amountOz` falls in `[minOz, maxOz]`
- * (or `[minOz, ∞)` when `maxOz` is undefined), the next bottle is projected
- * `intervalMinutes` later. Most-specific (narrowest range) wins on overlap.
- * When no rule matches, the engine falls back to `defaultBottleIntervalMinutes`.
+ * Amount-conditional interval rule (ported from V2; silently dropped in initial V3 rewrite, restored 2026-05-11).
+ * When the last bottle's `amountOz` falls in `[minOz, maxOz)` (or `[minOz, ∞)` when `maxOz` undefined),
+ * the next bottle projects `intervalMinutes` later. Narrowest range wins; falls back to `defaultBottleIntervalMinutes`.
  */
 export type BottleIntervalRule = {
   minOz: number;
@@ -309,14 +290,9 @@ export type Settings = {
   defaultWakeTime: TimeMin;
 
   // Bedtime & nap
-  /** Probability shaper (R7.6). See ADR-0002: in the §F66 model this becomes
-   * the latest end-time allowed for a projected nap (engine drops any
-   * cascade nap whose endTime exceeds this). Engine wiring lands in PR2. */
+  /** Latest endTime allowed for a projected nap; cascade naps exceeding this are dropped (R7.6, ADR-0002). */
   bedtimeThreshold: TimeMin;
-  /** Floor for projected bedtime startTime (ADR-0002, §F66). Engine never
-   * projects bedtime before this time; cascade-natural bedtime is
-   * `max(earliestBedtime, lastNapEnd + WW)`. Recorded bedtime ignores it.
-   * Engine wiring lands in PR2. */
+  /** Floor for projected bedtime startTime — `max(earliestBedtime, lastNapEnd + WW)` (ADR-0002). Ignored for recorded bedtime. */
   earliestBedtime: TimeMin;
   /** Drives R7.6.1 convert-prompt window. */
   defaultNapLengthMinutes: number;
@@ -347,10 +323,8 @@ export type Settings = {
   /** Default duration of a pump session; pumps render as blocks of this length. */
   defaultPumpDurationMinutes: number;
 
-  // Dream feed — when enabled, the engine emits a special projected
-  // bottle at `dreamFeedTime` (counts toward bottlesPerDay) and the
-  // renderer labels it "Dream Feed". Subject to Now-cross auto-promote
-  // like any projected bottle (ADR-0001). See CONTEXT.md "dream feed".
+  // Dream feed — when enabled, R5.5 emits a projected bottle at `dreamFeedTime` (counts toward bottlesPerDay).
+  // Renderer labels it "Dream Feed". Subject to Now-cross auto-promote (ADR-0001).
   dreamFeedEnabled: boolean;
   /** TimeMin for the projected dream-feed bottle (e.g. 23 * 60 = 11pm). */
   dreamFeedTime: TimeMin;
@@ -409,26 +383,13 @@ export type ProjectInput = {
 };
 
 /**
- * §F39 / §F12 / §F17 TomorrowPlan — the user's per-date plan for "tomorrow".
- * Persisted only on first edit (page-idle → no doc). Auto-promoted on
- * calendar rollover when `status === "confirmed"` (see
- * docs/v3/F17_F12_SCOPE.md).
+ * TomorrowPlan — user's per-date plan for "tomorrow". Persisted only on first edit.
+ * Auto-promoted on calendar rollover when `status === "confirmed"` (docs/v3/F17_F12_SCOPE.md).
  *
- * - `status` — `"draft"` autosaves on every edit but does NOT auto-promote;
- *   `"confirmed"` is eligible for auto-promotion when the calendar date
- *   matches. Any edit to a confirmed plan reverts it to draft.
- * - `wakeTime` — optional TimeMin override of `settings.defaultWakeTime`
- *   for the planned day. Missing = use the setting default.
- * - `confirmedAt` — TimeMin (local-day frame) when the user last confirmed.
- *   Cleared when reverting to draft.
- * - `ownerOverrides` is keyed by eventKey (e.g. `"nap_1"`, `"bottle_2"`).
- *   `null` = explicit "None" (user unassigned); missing key = no override
- *   (fall back to template-projected default).
- * - `extras` are custom events the user added via the FAB on `/tomorrow`.
- *   They land on the new day as projected events at promote time.
- * - `startTemplateId` is the template that was used as one-shot prefill,
- *   stored for traceability. Template edits do NOT propagate (snapshot
- *   semantics).
+ * - `status`: `"draft"` autosaves but does NOT auto-promote; `"confirmed"` is eligible; any edit reverts to draft.
+ * - `ownerOverrides`: keyed by eventKey; `null` = explicit None; missing key = no override (cascade default).
+ * - `extras`: FAB-added custom events, land as projected events at promote time.
+ * - `startTemplateId`: one-shot prefill template, stored for traceability. Template edits do NOT propagate.
  */
 export type TomorrowPlan = {
   childId: string;
@@ -443,12 +404,8 @@ export type TomorrowPlan = {
 };
 
 /**
- * §F10 Child — identity record for a tracked child. One doc per child
- * at `/children/{id}/`. All child-scoped subcollections (settings, days,
- * events, templates, tomorrowPlans) live underneath.
- *
- * `id` matches the Firestore doc id. `createdBy` is the uid of the user
- * who ran onboarding; future co-parents are linked via `/users/{uid}.childIds`.
+ * Child — identity record at `/children/{id}/`. Child-scoped subcollections live underneath.
+ * `createdBy` is the onboarding uid; co-parents are linked via `/users/{uid}.childIds`.
  */
 export type Child = {
   id: string;
@@ -462,11 +419,8 @@ export type Child = {
 };
 
 /**
- * §F3 User — per-auth-user record mapping a Firebase uid to the children
- * they can access. One doc per uid at `/users/{uid}/`. Existence of this
- * doc is the signal "auth user has been introduced to the app"; an empty
- * `childIds` array means "signed in but hasn't onboarded yet" and gates
- * the welcome flow.
+ * User — per-uid record at `/users/{uid}/` mapping auth users to accessible children.
+ * Doc existence = "introduced to app"; empty `childIds` = signed in but not yet onboarded.
  */
 export type User = {
   uid: string;
@@ -476,13 +430,8 @@ export type User = {
 };
 
 /**
- * §F3 PR #2 Invite — single-use co-parent invite. Creator mints one, shares
- * the token (via copy-link or stubbed email), recipient signs in and consumes
- * it to gain access to the child.
- *
- * `token` is a Firebase auto-id and matches the doc id at `/invites/{token}`.
- * `consumedBy` / `consumedAt` are set atomically with the user-doc childIds
- * append in `consumeInvite`'s transaction — see invitesRepo.
+ * Invite — single-use co-parent invite at `/invites/{token}`.
+ * `consumedBy`/`consumedAt` are set atomically with the user-doc childIds append in `consumeInvite`.
  */
 export type Invite = {
   token: string;

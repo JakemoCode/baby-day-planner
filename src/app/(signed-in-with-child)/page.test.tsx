@@ -45,9 +45,8 @@ vi.mock("@/v3/repositories/days", () => ({
   getOrCreatePlannedDay: (...args: unknown[]) => getOrCreatePlannedDayMock(...args),
   promoteFromPlan: (...args: unknown[]) => promoteFromPlanMock(...args),
 }));
-// §F12/§F17 hooks introduced in PR 2 — mocked to keep the page test
-// focused on dashboard rendering, not the rollover seam. The hook itself
-// is covered by tests/integration/hooks/useReconcileActiveDay.test.tsx.
+// Mocked to keep this test focused on dashboard rendering; rollover seam
+// covered by tests/integration/hooks/useReconcileActiveDay.test.tsx.
 vi.mock("@/v3/hooks/useReconcileActiveDay", () => ({
   useReconcileActiveDay: () => ({ done: true }),
 }));
@@ -56,8 +55,7 @@ vi.mock("@/v3/hooks/useV3TomorrowPlan", () => ({
 }));
 vi.mock("@/v3/repositories/events", () => ({
   createEvent: (...args: unknown[]) => createEventMock(...args),
-  // §F59 fire-and-forget effect on mount; mock to a no-op so tests don't
-  // hit the real Firestore module.
+  // fire-and-forget on mount; no-op so tests don't hit Firestore.
   reconcileDuplicateEventDocs: vi.fn().mockResolvedValue({ deleted: [] }),
 }));
 vi.mock("@/v3/repositories/settings", () => ({
@@ -153,9 +151,7 @@ describe("DashboardPage (V3)", () => {
   });
 
   it("shows skeleton when there is no active day yet (useReconcileActiveDay will create one)", () => {
-    // Previously this branch rendered a "Start first day" CTA. Now the
-    // skeleton holds the space until useReconcileActiveDay's side-effect
-    // creates the active day and the subscription delivers it.
+    // Skeleton holds until useReconcileActiveDay creates the day and the subscription delivers it.
     setupHooks({ day: null, settings: makeSettings() });
     renderWithAuth(<DashboardPage />);
     expect(screen.getByLabelText(/loading dashboard/i)).toBeVisible();
@@ -169,11 +165,9 @@ describe("DashboardPage (V3)", () => {
     expect(screen.queryByRole("button", { name: /Start first day/i })).toBeNull();
   });
 
-  it("settings missing post-§F3: dashboard renders skeleton, not the Wake up gate", () => {
-    // After §F3 onboarding, the layout guarantees /users/{uid}.childIds[0]
-    // → /children/{id} resolved AND its /settings/current doc exists. If
-    // settings turns up null in the dashboard, treat as a transient load —
-    // never re-spawn the bootstrap-seed flow that PR #1 removed.
+  it("settings missing after onboarding: dashboard renders skeleton, not the Wake up gate", () => {
+    // Post-onboarding the layout guarantees settings exist; null here is a transient load,
+    // not a cue to re-spawn the bootstrap flow.
     setupHooks({ day: null, settings: null });
     renderWithAuth(<DashboardPage />);
     expect(screen.queryByRole("button", { name: /Start first day/i })).toBeNull();
@@ -183,8 +177,7 @@ describe("DashboardPage (V3)", () => {
   it("wake-gate: Day with wakeTime === 0 (midnight) is a valid active day", () => {
     setupHooks({ day: makeDay({ wakeTime: 0 }), nowMinutes: 8 * 60 });
     renderWithAuth(<DashboardPage />);
-    // Must NOT show the Wake up button; should show the dashboard surface
-    // (the always-present stats panels).
+    // wakeTime=0 is a valid wake; dashboard should render normally.
     expect(screen.queryByRole("button", { name: /Start first day/i })).toBeNull();
     expect(screen.getByRole("region", { name: /bottle stats/i })).toBeVisible();
   });
@@ -200,9 +193,7 @@ describe("DashboardPage (V3)", () => {
   });
 
   it("shows dashboard normally when there is still an upcoming event after bedtime", () => {
-    // A post-bedtime bottle (this is how a dream feed manifests in the
-    // new render-only-label model — a regular bottle whose label happens
-    // to be "Dream Feed").
+    // Dream feed = a regular bottle whose label happens to be "Dream Feed".
     const upcoming: Event = {
       id: "evt-1",
       dayId: "day-1",
@@ -231,17 +222,14 @@ describe("DashboardPage (V3)", () => {
       kind: "block",
       label: "Nap 1",
       startTime: 9 * 60,
-      endTime: 10 * 60, // placeholder endTime set by NapActionButton
+      endTime: 10 * 60, // placeholder
       hasPutdown: false,
       owner: NO_OWNER,
       lifecycle: { state: "recorded", annotatedAt: 9 * 60 },
     };
     const { saveEvent } = setupHooks({
       actuals: [inProgressNap],
-      // §F66 fast-follow: dashboard now sources inProgressNap from the
-      // engine projection (so auto-promoted naps fire End Nap too). In
-      // production, projectDay includes actuals via reality-wins; the
-      // test mock has to mirror that.
+      // projectDay includes actuals via reality-wins; test mock mirrors that.
       projected: [inProgressNap],
       nowMinutes: 9 * 60 + 30, // 30 min into the nap (within [startTime, endTime])
     });
@@ -254,11 +242,7 @@ describe("DashboardPage (V3)", () => {
     await Promise.resolve();
 
     expect(saveEvent).toHaveBeenCalledTimes(1);
-    // saveEvent receives the full updated nap. endTime is whatever wall
-    // clock the button captured. committedAt is the end time (TIME_EDIT
-    // action: the moment the user confirmed "nap is over"). The id is
-    // §F59-deterministic `recorded_${eventKey}` so subsequent edits
-    // overwrite the same doc.
+    // id is deterministic `recorded_${eventKey}` so subsequent edits overwrite the same doc.
     expect(saveEvent).toHaveBeenCalledWith(
       expect.objectContaining({
         id: "recorded_nap_1",
@@ -277,7 +261,7 @@ describe("DashboardPage (V3)", () => {
       kind: "block",
       label: "Bedtime",
       startTime: 20 * 60, // 8 PM yesterday-frame
-      endTime: 7 * 60 + 24 * 60, // R7.1 placeholder = next-morning 7 AM
+      endTime: 7 * 60 + 24 * 60, // R7.1 placeholder: next-morning 7 AM
       hasPutdown: false,
       owner: NO_OWNER,
       lifecycle: { state: "recorded", annotatedAt: 20 * 60 },
@@ -308,9 +292,7 @@ describe("DashboardPage (V3)", () => {
       await userEvent.type(input, "06:30");
       await userEvent.click(screen.getByRole("button", { name: /^start day$/i }));
 
-      // startNewDay is called with newWakeTime = 6:30 in the new day's frame.
-      // The bedtime trim is startNewDay's responsibility (covered by
-      // days.test.ts) — saveEvent must NOT be called directly here.
+      // Bedtime trim is startNewDay's responsibility (covered by days.test.ts); saveEvent must NOT be called.
       expect(startNewDayMock).toHaveBeenCalledTimes(1);
       expect(startNewDayMock).toHaveBeenCalledWith(
         expect.anything(),
@@ -337,15 +319,11 @@ describe("DashboardPage (V3)", () => {
   });
 
   it("uniqueRecordedKeys counts distinct eventKey across recorded actuals only", () => {
-    // Pin the wall clock to the test day's date so the §F22 calendar-day
-    // routing in handleLogBottle takes the same-day branch (i.e. uses
-    // createOptimistic, not the cross-day createEvent path).
+    // Pin clock to active day's date so handleLogBottle takes the same-day path.
     vi.useFakeTimers({ shouldAdvanceTime: true });
     vi.setSystemTime(new Date("2026-05-10T09:00:00"));
-    // Two recorded bottle docs with the SAME eventKey (Start/End pair),
-    // plus one projected bottle (must be ignored). nextNumber should be 2,
-    // not 3 — verified via the ContextualActionButton's Log bottle now
-    // mode promoting the next projected bottle's eventKey.
+    // Two recorded docs with the SAME eventKey + one projected (ignored).
+    // nextNumber should be 2, not 3.
     const recordedBottle: Event = {
       id: "b1",
       dayId: "day-1",
@@ -385,9 +363,7 @@ describe("DashboardPage (V3)", () => {
     });
     renderWithAuth(<DashboardPage />);
 
-    // Click Log bottle now → handler should produce a Bottle whose
-    // eventKey is bottle_2 (1 unique recorded + 1, matching the projected
-    // slot promoted by the contextual button).
+    // Log bottle now → eventKey should be bottle_2 (1 unique recorded + 1).
     const btn = screen.getByRole("button", { name: /Log bottle now/i });
     btn.click();
 
@@ -397,9 +373,8 @@ describe("DashboardPage (V3)", () => {
     );
   });
 
-  it("§F22 — bottle recorded at 2 AM next-day routes to a freshly-created planned day, not the active day", async () => {
-    // Pin the wall clock to 2 AM on the day AFTER the active day's date.
-    // Active day.date = "2026-05-10"; wall clock = 2026-05-11 02:00.
+  it("bottle recorded at 2 AM next-day routes to a freshly-created planned day, not the active day", async () => {
+    // Wall clock = 2026-05-11 02:00 (day after active day.date = "2026-05-10").
     vi.useFakeTimers({ shouldAdvanceTime: true });
     vi.setSystemTime(new Date("2026-05-11T02:00:00"));
 
@@ -438,9 +413,8 @@ describe("DashboardPage (V3)", () => {
     await Promise.resolve();
     await Promise.resolve();
 
-    // Cross-day path: saveEvent NOT called (would land on active day via
-    // hook's dayId). getOrCreatePlannedDay called with the wall-clock date.
-    // createEvent called with the bottle docked under tomorrow's id.
+    // Cross-day path: saveEvent must NOT be called (would land on active day).
+    // createEvent must use tomorrow's dayId.
     expect(saveEvent).not.toHaveBeenCalled();
     expect(getOrCreatePlannedDayMock).toHaveBeenCalledTimes(1);
     expect(getOrCreatePlannedDayMock).toHaveBeenCalledWith(

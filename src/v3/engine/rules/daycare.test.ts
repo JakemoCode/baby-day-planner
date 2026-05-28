@@ -1,14 +1,5 @@
 /**
  * R21.x — Daycare dropoff/pickup as instant events.
- *
- * Coverage in this file:
- *   R21.1 — daycare_dropoff and daycare_pickup are instant events,
- *           projected with NO_OWNER (per-day owner is assigned via the
- *           timeline drawer, like every other event — 2026-05-20 redesign)
- *   R21.2 — projection gated on enabled + weekday + not-suppressed
- *   R21.2 — *shift* projected daycare events to nap.endTime when the
- *           nominal Settings time falls inside a nap interval
- *   R21.5 — Day.suppressedDaycareDay skips projection
  */
 
 import { describe, expect, it } from "vitest";
@@ -74,13 +65,8 @@ describe("R21.1 — daycare projection (owner-less)", () => {
     expect(pickup!.kind).toBe("instant");
     expect(dropoff!.startTime).toBe(8 * 60 + 30);
     expect(pickup!.startTime).toBe(17 * 60 + 30);
-    // ADR-0006: 8:30 is before default nowMinutes (12:00) → auto-promoted
-    // to recorded by the engine's Now-cross pass. The test's intent is
-    // that daycare emits the events at the configured times; lifecycle
-    // follows the universal time-vs-now rule, not daycare-specific logic.
-    expect(dropoff!.lifecycle.state).toBe("recorded");
-    // 2026-05-20: events project owner-less so the timeline drawer can assign per-day.
-    expect(dropoff!.owner).toEqual(NO_OWNER);
+    expect(dropoff!.lifecycle.state).toBe("recorded"); // 8:30 < nowMinutes=12:00 → auto-promoted
+    expect(dropoff!.owner).toEqual(NO_OWNER); // owner-less; assigned per-day via timeline drawer
     expect(pickup!.owner).toEqual(NO_OWNER);
   });
 
@@ -148,9 +134,7 @@ describe("R21.1 — daycare projection (owner-less)", () => {
 
 describe("R21.2 — nominal time shifted out of nap windows", () => {
   it("dropoff falling inside a projected nap shifts to nap end", () => {
-    // Wake 7:00, single wake window 30min → nap_1 starts 7:30.
-    // Default nap length 45min → nap_1 ends 8:15. Dropoff nominal 8:00.
-    // Expect: dropoff shifts to 8:15 (nap end).
+    // WW=30min → nap_1 at [7:30, 8:15); nominal dropoff=8:00 → shifts to 8:15.
     const ctx = aContext({
       day: aDay({ wakeTime: 7 * 60, date: "2026-05-08" }),
       settings: aSettings({
@@ -171,10 +155,7 @@ describe("R21.2 — nominal time shifted out of nap windows", () => {
   });
 
   it("pickup falling inside a projected nap shifts to nap end", () => {
-    // Deterministic cascade: WW=110min, napLen=45, wake 7:00 →
-    //   nap_1 8:50–9:35, nap_2 11:25–12:10, nap_3 14:00–14:45,
-    //   nap_4 16:35–17:20.
-    // Pickup nominal 17:00 falls inside nap_4 → expect shift to 17:20.
+    // WW=110min, napLen=45: nap_4 at [16:35, 17:20); nominal pickup=17:00 → shifts to 17:20.
     const ctx = aContext({
       day: aDay({ wakeTime: 7 * 60, date: "2026-05-08" }),
       settings: aSettings({
@@ -197,11 +178,7 @@ describe("R21.2 — nominal time shifted out of nap windows", () => {
   });
 
   it("recorded nap with no endTime: daycare shifts to nap.startTime + napLen", () => {
-    // Repro of Jake's bug: user moves nap_1 start to 7:55 (just before
-    // dropoff at 8:00). If the drawer leaves endTime undefined, raw
-    // endTime is missing — earlier R21.2 silently skipped the shift.
-    // Now: effectiveEndOf returns startTime + napLen as the base (=
-    // 7:55 + 45 = 8:40), so daycare correctly shifts to 8:40.
+    // Drawer can omit endTime; effectiveEndOf uses startTime + napLen (7:55+45=8:40) → dropoff shifts to 8:40.
     const recordedNap = {
       id: "rec_nap_1",
       dayId: "d1",
@@ -209,8 +186,7 @@ describe("R21.2 — nominal time shifted out of nap windows", () => {
       type: "nap" as const,
       kind: "block" as const,
       startTime: 7 * 60 + 55,
-      // endTime intentionally OMITTED — mirrors the broken state the
-      // drawer can leave a nap in after a start-time edit.
+      // endTime intentionally omitted — mirrors drawer state after a start-time edit.
       label: "Nap 1",
       owner: NO_OWNER,
       hasPutdown: false,
@@ -219,7 +195,7 @@ describe("R21.2 — nominal time shifted out of nap windows", () => {
     const ctx = aContext({
       day: aDay({ wakeTime: 7 * 60, date: "2026-05-08" }),
       actuals: [recordedNap],
-      // nowMinutes < nap.startTime + napLen so no auto-extend kicks in.
+      // nowMinutes < 8:40 so no auto-extend
       nowMinutes: 8 * 60,
       settings: aSettings({
         wakeWindowsMinutes: [],
@@ -239,10 +215,7 @@ describe("R21.2 — nominal time shifted out of nap windows", () => {
   });
 
   it("recorded daycare event is NOT shifted even if it lands inside a nap (reality-wins)", () => {
-    // The engine's checkRealityWins invariant forbids any rule from
-    // mutating a recorded event's time/owner/amount. If a user explicitly
-    // records a handoff at 8:00 and a nap covers that time, R21.2 must
-    // leave the recorded event alone — the user's commitment is canonical.
+    // Recorded events cannot be mutated; R21.2 shift applies only to projected events.
     const recordedPickup = {
       id: "recorded_daycare_pickup",
       dayId: "d1",
@@ -266,12 +239,11 @@ describe("R21.2 — nominal time shifted out of nap windows", () => {
         daycare: {
           enabled: true,
           dropoffTime: 6 * 60, // pre-wake; no conflict
-          pickupTime: 17 * 60, // nominal pickup is also irrelevant; the recorded one is what's evaluated
+          pickupTime: 17 * 60,
           weekdays: ALL_DAYS_TRUE,
         },
       }),
     });
-    // Engine must not throw; recorded event passes through unchanged.
     expect(() => run(ctx)).not.toThrow();
     const out = run(ctx);
     const pickup = out.find((e) => e.id === "recorded_daycare_pickup")!;
@@ -304,8 +276,7 @@ describe("R21.2 — nominal time shifted out of nap windows", () => {
     const ctx = aContext({
       day: aDay({ wakeTime: 7 * 60, date: "2026-05-08" }),
       settings: aSettings({
-        // Long wake window — no nap before 9:00.
-        wakeWindowsMinutes: [180, 120, 120, 120, 120, 120],
+        wakeWindowsMinutes: [180, 120, 120, 120, 120, 120], // long first WW → no nap before 10:00
         defaultNapLengthMinutes: 45,
         bottleChain: { bottlesPerDay: 0, bufferAfterWakeMinutes: 10 },
         daycare: {

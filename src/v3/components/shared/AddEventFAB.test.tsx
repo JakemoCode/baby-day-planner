@@ -16,11 +16,10 @@ describe("AddEventFAB", () => {
     const onCreate = vi.fn();
     render(<AddEventFAB {...baseProps} onCreate={onCreate} />);
 
-    // Picker not shown until the FAB is tapped.
     expect(screen.queryByRole("button", { name: /bottle/i })).toBeNull();
     await userEvent.click(screen.getByRole("button", { name: /add an event/i }));
 
-    // Picker is shown; no event created until a type is chosen.
+    // Picker shown; no event created until a type is chosen.
     expect(screen.getByRole("button", { name: /bottle/i })).toBeVisible();
     expect(onCreate).not.toHaveBeenCalled();
 
@@ -35,9 +34,8 @@ describe("AddEventFAB", () => {
 
     await userEvent.click(screen.getByRole("button", { name: /add an event/i }));
 
-    // No picker bottom-sheet appeared (it isn't rendered at all)…
+    // No picker sheet — create form requested directly with an extra template.
     expect(screen.queryByRole("dialog")).toBeNull();
-    // …and the create form is requested directly with an extra template.
     expect(onCreate).toHaveBeenCalledTimes(1);
     expect(onCreate.mock.calls[0]![0].type).toBe("extra");
   });

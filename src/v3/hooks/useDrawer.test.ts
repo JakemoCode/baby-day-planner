@@ -1,17 +1,6 @@
 /**
- * useDrawer — concentrated projected-event re-save protocol.
- *
- * All eight behaviors in priority order per §A spec:
- *
- *   1. openCreate(template) opens drawer in create mode with the template
- *   2. openEdit(event) opens drawer in edit mode with the event
- *   3. close() closes the drawer
- *   4. onSave(event) for create mode persists the event as-is
- *   5. onSave(event) for edit mode where event IS in actuals persists with same id
- *   6. onSave(event) for edit mode where event is NOT in actuals re-IDs to
- *      `recorded_${event.eventKey}` and persists
- *   7. onDelete(event) where event is in actuals calls deleteOptimistic(event.id)
- *   8. onDelete(event) where event is projected (not in actuals) just closes
+ * useDrawer — projected-event re-save protocol.
+ * Covers create/edit modes, projected-event re-ID, owner-override routing, and delete paths.
  */
 
 import { describe, expect, it, vi } from "vitest";
@@ -92,9 +81,7 @@ function setup({
     ReturnType<typeof vi.fn>;
   suppressRecurring?: ((recurringId: string) => Promise<void>) & ReturnType<typeof vi.fn>;
 } = {}) {
-  // §F66 fast-follow: useDrawer now takes a `DrawerSuppression[]` array
-  // instead of one optional callback per type. Tests build the array
-  // from the explicit `suppressRecurring` arg.
+  // Build DrawerSuppression[] from the explicit suppressRecurring arg.
   const suppressions = suppressRecurring
     ? [
         {
@@ -217,11 +204,8 @@ describe("useDrawer", () => {
     expect(saveEvent).toHaveBeenCalledWith(expect.objectContaining({ id: "recorded_bottle_3" }));
   });
 
-  // §F63: owner-only edit on projected event → setOwnerOverride, NOT saveEvent.
-  // Without this routing, the lifecycle reducer promotes the projected nap
-  // to "recorded", which anchors its time and prevents the cascade from
-  // re-projecting. Jake hit this 2026-05-24 — nap 4:35-5:20 stuck while
-  // bedtime threshold approached because owner was assigned hours earlier.
+  // owner-only edit on projected event must route to setOwnerOverride, not saveEvent.
+  // saveEvent would promote to recorded, anchoring time and preventing cascade re-projection.
   it("owner-only edit on projected event routes to setOwnerOverride (not saveEvent)", async () => {
     const projected = makeEvent({ id: "proj-nap-3", eventKey: "nap_3" });
     const saveEvent = makeSaveEvent();
@@ -250,8 +234,7 @@ describe("useDrawer", () => {
 
     act(() => result.current.openEdit(projected));
 
-    // User changes startTime AND owner — time-change forces a recorded
-    // doc (cascade should re-anchor, not push the nap).
+    // Time change forces a recorded doc — cascade re-anchors from the new time.
     const edited = {
       ...projected,
       startTime: 10 * 60 + 30,
@@ -292,8 +275,7 @@ describe("useDrawer", () => {
   it("falls back to legacy recorded-doc path when setOwnerOverride callback is omitted", async () => {
     const projected = makeEvent({ id: "proj-nap-3", eventKey: "nap_3" });
     const saveEvent = makeSaveEvent();
-    // Note: no setOwnerOverride passed — simulates the /tomorrow page
-    // which has its own ownerOverrides plumbing.
+    // No setOwnerOverride: simulates pages (e.g. /tomorrow) with their own plumbing.
     const { result } = setup({ actuals: [], saveEvent });
 
     act(() => result.current.openEdit(projected));
@@ -340,9 +322,7 @@ describe("useDrawer", () => {
     expect(result.current.drawer).toEqual({ open: false });
   });
 
-  // §F65 — daily_recurring delete routes through suppressRecurring,
-  // not through Firestore doc deletion (the recurring is projected, not
-  // persisted as a Day event).
+  // projected daily_recurring delete routes through suppressRecurring, not Firestore doc delete.
   it("onDelete on a projected daily_recurring routes through suppressRecurring", async () => {
     const recurring = makeEvent({
       id: "proj_recurring:rec-tummy",
@@ -367,9 +347,7 @@ describe("useDrawer", () => {
   });
 
   it("onDelete on a recorded daily_recurring deletes the doc AND suppresses for the day", async () => {
-    // User recorded a recurring event then changed their mind — both
-    // the persisted doc and the projection-suppression need to run so
-    // the slot stays empty for the rest of the day.
+    // Both doc delete and suppression must run so the slot stays empty for the day.
     const recurring = makeActualEvent({
       id: "recorded_recurring:rec-tummy",
       eventKey: "recurring:rec-tummy",
@@ -396,8 +374,7 @@ describe("useDrawer", () => {
   });
 
   it("onDelete on a daily_recurring falls back to plain delete when suppressRecurring is not wired", async () => {
-    // Defensive: pages that don't pass the suppress callback (e.g. a
-    // read-only history view) shouldn't crash on a recurring delete.
+    // Pages without a suppress callback (e.g. read-only history) must not crash.
     const recurring = makeActualEvent({
       id: "recorded_recurring:rec-tummy",
       eventKey: "recurring:rec-tummy",

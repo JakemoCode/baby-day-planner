@@ -43,10 +43,8 @@ describe("resolvedEnd", () => {
   // ── recorded WITH endTime (user-committed extent) — NO auto-extend ────────
 
   it("recorded WITH endTime: returns endTime regardless of now (no auto-extend)", () => {
-    // Jake's 2026-05-20 bug repro: nap committed at 9:00–10:00, now is
-    // way past at 15:00. Without the fix, this auto-extended to the cap
-    // (4×napLen = 13:00) and visually masked daycare chips R21.2 had
-    // shifted to 10:00. With the fix, returns 10:00 cleanly.
+    // A user-committed endTime must not auto-extend past `now` — doing so masked
+    // daycare chips (R21.2) that had shifted to the real end.
     const nap = recordedNapWithEnd(9 * 60, 10 * 60);
     expect(resolvedEnd(nap, config, 9 * 60 + 30)).toBe(10 * 60);
     expect(resolvedEnd(nap, config, 10 * 60 + 1)).toBe(10 * 60);

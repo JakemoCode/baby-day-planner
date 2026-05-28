@@ -1,10 +1,6 @@
 /**
- * OwnersConfigEditor — V3-only. No V2 equivalent because V2 hardcoded
- * "Jake/Kelly/Daycare" in OwnerPicker. V3 owners are user-editable
- * (REQUIREMENTS §1.7) and drive the OwnerPicker options.
- *
- * §F4 (2026-05-20): per-owner Color hex inputs removed. Owner colors are
- * now slot-keyed via tokens (see ownerColor()); identity-only here.
+ * OwnersConfigEditor — V3 user-editable owners (REQUIREMENTS §1.7).
+ * Color hex inputs removed; colors are slot-keyed via tokens (ownerColor()).
  */
 
 import { useState } from "react";
@@ -46,7 +42,7 @@ describe("OwnersConfigEditor", () => {
     render(<OwnersConfigEditor value={owners()} onChange={() => {}} />);
     expect(screen.getByLabelText("Parent 1 name")).toHaveValue("Jake");
     expect(screen.getByLabelText("Parent 2 name")).toHaveValue("Sam");
-    // Color input is gone post-§F4.
+    // Color input is gone.
     expect(document.getElementById("parent1-color")).toBeNull();
     expect(document.getElementById("parent2-color")).toBeNull();
   });

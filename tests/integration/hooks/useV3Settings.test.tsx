@@ -1,16 +1,8 @@
 // @vitest-environment jsdom
 /**
- * Integration test: useV3Settings hook
- *
- * Exercises the seam: real Firestore emulator → real settings repository →
- * useV3Settings hook → withV3SettingsDefaults. Previously mocked with
- * vi.mock("../repositories/settings") which left the wiring silently
- * untested — the defaulter passed its own unit tests but the hook→repo→
- * defaulter chain was never exercised with real Firestore data.
- *
- * settingsDefaults.test.ts covers withV3SettingsDefaults in isolation.
- * This test's job is the SEAM: real Firestore → real repo → real hook →
- * defaulted shape.
+ * Seam test: real Firestore emulator → real settings repo → useV3Settings →
+ * withV3SettingsDefaults. settingsDefaults.test.ts covers the defaulter in
+ * isolation; this proves the hook→repo→defaulter wiring with real data.
  */
 
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
@@ -22,17 +14,10 @@ import { saveSettings } from "../../../src/v3/repositories/settings";
 import type { Settings } from "../../../src/v3/schemas";
 import { useV3Settings } from "../../../src/v3/hooks/useV3Settings";
 
-// ---------------------------------------------------------------------------
-// Emulator db — populated in beforeAll, read by the module mock below.
-// ---------------------------------------------------------------------------
-
 let testDb: Firestore;
 
-// Replace the production Firebase singleton with the emulator-backed db.
-// vi.mock is hoisted above all imports by Vitest's transform, so the factory
-// runs before the hook module resolves. The getter pattern defers value
-// resolution to call time so `testDb` is populated by beforeAll before any
-// test invokes the hook.
+// Point the Firebase singleton at the emulator db. Getter defers resolution to
+// call time so beforeAll can populate `testDb` before the hoisted mock is read.
 vi.mock("@/lib/firebase/client", () => ({
   get db() {
     return testDb;
@@ -60,13 +45,7 @@ beforeEach(async () => {
   testDb = ctx.firestore() as unknown as Firestore;
 });
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-/** Minimal settings doc — only the fields a first-time user might have set.
- * Deliberately omits bottleChain, owners, daycare etc. to verify the
- * defaulter fills them in through the real wiring. */
+/** Minimal doc that omits bottleChain/owners/daycare so the defaulter must fill them. */
 const minimalSettings = {
   childId: "child-1",
   defaultWakeTime: 7 * 60,
@@ -105,17 +84,13 @@ describe("useV3Settings (emulator-backed)", () => {
       // Explicitly-written field is preserved.
       expect(result.current.settings?.defaultWakeTime).toBe(7 * 60);
 
-      // Defaulter fills in bottleChain — the key seam this test covers.
-      // settingsDefaults.test.ts validates the defaulter in isolation;
-      // this test proves the hook → repo → defaulter wiring is real.
+      // Defaulter fills bottleChain through the real wiring — the seam under test.
       expect(result.current.settings?.bottleChain).toEqual({
         bottlesPerDay: 5,
         bufferAfterWakeMinutes: 10,
       });
 
-      // Defaulter fills in the owners config with the expected shape.
-      // §F4: per-owner color was removed (slot-keyed tokens now); only
-      // displayName is asserted.
+      // owners color is slot-keyed now, so only displayName is asserted.
       expect(result.current.settings?.owners.parent1).toMatchObject({
         displayName: expect.any(String),
       });

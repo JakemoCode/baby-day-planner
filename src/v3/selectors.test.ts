@@ -187,10 +187,8 @@ describe("projectedBedtime", () => {
 });
 
 describe("selectors ignore render-synthetic putdown events (regression)", () => {
-  // Putdown synthetics carry the parent's type (so timeline geometry stays
-  // typed) but eventKey === PUTDOWN_KIND_TAG. Without filtering, a nap-
-  // parent putdown looks like the next nap by type — and its eventKey would
-  // get minted as a Firestore doc id ("__putdown__" → INVALID_ARGUMENT).
+  // Without filtering, a nap-parent putdown wins nextNap by type — its PUTDOWN_KIND_TAG eventKey
+  // would be minted as a Firestore doc id ("__putdown__" → INVALID_ARGUMENT).
   const syntheticNapPutdown = makeEvent({
     id: "putdown:nap-1",
     eventKey: PUTDOWN_KIND_TAG,

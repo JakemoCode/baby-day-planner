@@ -1,9 +1,7 @@
 /**
- * Converter unit tests. The integration tests at
- * `src/v3/repositories/days.test.ts` exercise these via a real
- * Firestore emulator; this file exercises the converter functions
- * directly with mock snapshots so round-trip behavior is provable in
- * the unit suite.
+ * Converter unit tests — exercises converter functions directly with mock
+ * snapshots. Integration tests in days.test.ts cover the same converters via
+ * a real Firestore emulator.
  */
 
 import { describe, expect, it } from "vitest";

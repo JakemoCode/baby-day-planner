@@ -1,11 +1,4 @@
-/**
- * V3 Child repository.
- *
- * One doc per child at `children/{id}`. Created during §F3 onboarding;
- * `id` is a Firebase auto-id generated client-side. All child-scoped
- * subcollections (settings, days, events, templates, tomorrowPlans)
- * live underneath the same path.
- */
+/** V3 Child repository. One doc per child at `children/{id}`. */
 
 import { doc, getDoc, onSnapshot, setDoc, type Firestore } from "firebase/firestore";
 import { childPath } from "@/lib/firestore/paths";

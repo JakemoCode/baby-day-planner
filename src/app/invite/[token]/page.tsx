@@ -11,16 +11,8 @@ import styles from "./page.module.css";
 type ClaimState = { status: "idle" } | { status: "error"; message: string };
 
 /**
- * §F3 PR #2: invite consumption route.
- *
- * Top-level route (NOT inside (signed-in-with-child) — that group requires a
- * resolved child, and the WHOLE point of this route is to grant access to
- * one). Works for both signed-in and signed-out arrivals:
- *
- *   - Signed-out  → show SignIn; on auth success, the `useEffect` claim kicks in.
- *   - Signed-in   → call consumeInvite immediately, redirect to / on success.
- *   - On error    → render the error inline (token expired, already consumed, etc.)
- *                   so the user can take action (ask the inviter for a new link).
+ * Invite consumption route — top-level (not inside signed-in-with-child) since it grants child access.
+ * Signed-out → shows SignIn then claims on auth. Signed-in → claims immediately.
  */
 export default function InvitePage() {
   const params = useParams<{ token: string }>();
@@ -28,10 +20,7 @@ export default function InvitePage() {
   const { user, status } = useAuth();
   const router = useRouter();
   const [claim, setClaim] = useState<ClaimState>({ status: "idle" });
-  // Once-guard against React Strict Mode's double effect-fire in dev:
-  // without it, two concurrent consumeInvite transactions would race and
-  // the second would throw "already consumed". Ref (not state) avoids
-  // re-renders.
+  // Guards against React Strict Mode double-fire — second consumeInvite call would throw "already consumed".
   const startedRef = useRef(false);
 
   useEffect(() => {

@@ -1,11 +1,6 @@
 /**
- * createEventTemplate seeds a projected V3 Event for the FAB-driven
- * "add event" flow. The drawer then promotes it to the right lifecycle
- * state at save (formToEvent decides — projected → completed/started/
- * recorded based on what the user changes).
- *
- * Sequential eventKeys (`bottle_N`, `nap_N`) anchor the engine's
- * cascade so chained types continue forecasting from the new event.
+ * createEventTemplate seeds a projected V3 Event for the FAB "add event" flow.
+ * Sequential eventKeys (`bottle_N`, `nap_N`) anchor the engine cascade.
  */
 
 import { describe, expect, it } from "vitest";
@@ -64,8 +59,7 @@ describe("buildCreateTemplate (V3)", () => {
   });
 
   it("ignores projected bottles when numbering — agrees with uniqueRecordedKeys", () => {
-    // 1 recorded + 1 projected → next ordinal is 2, NOT 3. Without the
-    // lifecycle filter the FAB path drifts ahead of StartBottleButton.
+    // 1 recorded + 1 projected → next ordinal is 2, not 3; lifecycle filter keeps FAB in sync.
     const projectedBottle: Event = {
       id: "b-proj",
       dayId: "d-1",
@@ -91,9 +85,7 @@ describe("buildCreateTemplate (V3)", () => {
   });
 
   it("with projected[] passed, picks max(eventKey N) + 1 across actuals + projected", () => {
-    // When the engine has emitted bottle_5 as a projection and only
-    // bottle_1 is recorded, a new template must claim bottle_6 —
-    // NOT bottle_2 (which would collide with the engine's projection).
+    // engine projected bottle_5 + only bottle_1 recorded → new template must claim bottle_6, not bottle_2.
     const projectedAhead: Event = {
       id: "b-proj-5",
       dayId: "d-1",
@@ -120,9 +112,7 @@ describe("buildCreateTemplate (V3)", () => {
   });
 
   it("with empty projected[] passed, still scans actual eventKeys (regex path)", () => {
-    // Exercises the projected-branch when projected[] is present but
-    // empty — must still take max(actuals' eventKey N) + 1, not the
-    // length-based count of the no-projected branch.
+    // projected[] present but empty → must use max(actuals N) + 1, not the length count.
     const tpl = buildCreateTemplate({
       type: "bottle",
       dayId: "d-1",
@@ -135,10 +125,7 @@ describe("buildCreateTemplate (V3)", () => {
   });
 
   it("with a gap in recorded ordinals, picks max + 1 — NOT first-free", () => {
-    // bottle_1 + bottle_4 (no _2 or _3) must yield bottle_5, not bottle_2.
-    // The cascade depends on monotonic eventKey ordinals, so filling a
-    // gap would collide with any future engine projection that re-uses
-    // the missing slot.
+    // bottle_1 + bottle_4 → bottle_5; filling the gap would collide with engine projections.
     const tpl = buildCreateTemplate({
       type: "bottle",
       dayId: "d-1",
@@ -150,10 +137,7 @@ describe("buildCreateTemplate (V3)", () => {
     expect(tpl.eventKey).toBe("bottle_5");
   });
 
-  // Per spec PR #146: parents adjust by editing existing projected
-  // nap chips, never by adding new naps via FAB. The "nap" branch in
-  // buildCreateTemplate is removed; the picker no longer offers it.
-  // A defensive throw catches any stray caller.
+  // nap removed from CreatableType (PR #146); parents edit projected chips instead.
   it("throws if called with type='nap' (not a CreatableType anymore)", () => {
     expect(() =>
       buildCreateTemplate({
@@ -168,8 +152,7 @@ describe("buildCreateTemplate (V3)", () => {
   });
 
   it("seeds a pump template (block) with default duration and unique eventKey", () => {
-    // Pumps are duration events (20–30 min); template starts as block
-    // with endTime = startTime + defaultPumpDurationMinutes.
+    // endTime = startTime + defaultPumpDurationMinutes
     const s = settings();
     const tpl = buildCreateTemplate({
       type: "pump",
@@ -186,8 +169,7 @@ describe("buildCreateTemplate (V3)", () => {
   });
 
   it("seeds an extra template (instant) with empty label; kind upgrades to block on save iff endTime is set", () => {
-    // Template defaults to instant — final kind is decided in
-    // formToEvent based on whether the user fills in endTime.
+    // final kind decided in formToEvent based on whether user fills in endTime
     const tpl = buildCreateTemplate({
       type: "extra",
       dayId: "d-1",

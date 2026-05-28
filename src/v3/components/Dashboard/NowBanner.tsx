@@ -12,16 +12,7 @@ export type NowBannerProps = {
   nowMinutes: TimeMin;
 };
 
-/**
- * Single banner slot. Content priority (highest first):
- *   1. in-progress bedtime
- *   2. in-progress nap
- *   3. current wake window
- *   4. nothing
- *
- * These are mutually exclusive in normal flow — the engine cascade
- * guarantees a wake window starts immediately after a nap ends.
- */
+/** Banner showing in-progress bedtime > nap > current wake window; mutually exclusive by engine cascade. */
 export function NowBanner({
   wakeWindow,
   inProgressNap,

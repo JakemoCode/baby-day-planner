@@ -1,10 +1,6 @@
 /**
- * V3 events repository.
- *
- * CRUD against Firestore for V3-shape events. Path-compatible with V2
- * (`children/{childId}/days/{dayId}/events/{eventId}`) so cutover is a
- * straight import swap; the wire shape changes (TimeMin numbers,
- * lifecycle discriminated union, slot-based owners).
+ * V3 events repository. Path-compatible with V2
+ * (`children/{childId}/days/{dayId}/events/{eventId}`).
  */
 
 import {
@@ -74,18 +70,9 @@ export function watchEvents(
 }
 
 /**
- * §F59 orphan cleanup: detect docs that share `(type, eventKey)` —
- * orphans from the pre-§F59 era when NapActionButton wrote bare-eventKey
- * ids and useDrawer wrote `recorded_${eventKey}` ids for the same slot.
- *
- * For each duplicate group, keep the most-recently-annotated event and
- * delete the rest. Mirrors the policy in `renderProjection.ts`'s Pass 0
- * dedup so visual and persisted state agree.
- *
- * Idempotent: a second invocation finds no duplicates and is a no-op.
- * Safe to call on every dashboard mount.
- *
- * Returns the list of deleted doc ids for telemetry / testing.
+ * Detect and remove duplicate docs sharing `(type, eventKey)`. Keeps the
+ * most-recently-annotated; mirrors Pass 0 dedup in renderProjection.ts.
+ * Idempotent; returns deleted doc ids.
  */
 export async function reconcileDuplicateEventDocs(
   db: Firestore,
@@ -107,7 +94,7 @@ export async function reconcileDuplicateEventDocs(
     const sorted = [...group].sort((a, b) => {
       const aT = annotationTime(a);
       const bT = annotationTime(b);
-      if (aT !== bT) return bT - aT; // descending — winner first
+      if (aT !== bT) return bT - aT; // descending: winner first
       return a.id < b.id ? -1 : 1; // stable tie-break
     });
     const losers = sorted.slice(1);

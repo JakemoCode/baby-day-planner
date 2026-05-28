@@ -1,26 +1,10 @@
 /**
- * R11.x — Daily recurring event rules.
+ * R11.x daily recurring event rules. Source: docs/v3/ENGINE_SPEC.md §11.
+ * Projects one event per enabled, non-suppressed dailyRecurring entry; an
+ * existing event at the same eventKey (R11.5) or a suppressed id (R11.6) blocks it.
  *
- * Source: docs/v3/ENGINE_SPEC.md §11.
- *
- * Implemented here:
- *   R11.1 — Settings.dailyRecurring is the source of truth.
- *   R11.2 — each enabled entry projects one event with eventKey
- *           `recurring:{id}`; durationMinutes > 0 → block, else instant.
- *   R11.5 — existing event at the same eventKey suppresses projection.
- *   R11.6 — ids in Day.suppressedRecurringIds are skipped for that day.
- *
- * Out-of-scope here (handled elsewhere):
- *   R11.3 — drawer / overlap / validation behavior is a UI concern,
- *           Phase 3.
- *   R11.4 — multiple recurring events of any combination — emergent
- *           from R11.2 plus the tests below.
- *
- * Known gap (deferred to R12 owners work):
- *   defaultOwnerSlot is typed `OwnerSlot = parent1 | parent2`. The spec
- *   contemplates "other" caregivers as default owners, but expressing
- *   that requires widening the schema (an `OwnerRef` instead of an
- *   `OwnerSlot`). Out of scope for this rule — track with R12.
+ * Known gap (deferred to R12 owners work): defaultOwnerSlot is `parent1 | parent2`;
+ * supporting "other" caregivers as default owners needs an `OwnerRef`, not an `OwnerSlot`.
  */
 
 import type { Context, DailyRecurring as RecurringConfig, Event } from "../../schemas";
@@ -34,9 +18,6 @@ const isRecurring = hasType("daily_recurring");
 const RuleProjectDailyRecurring: Rule = {
   id: "R11.2",
   description: "Project a daily_recurring event for each enabled, non-suppressed setting entry",
-  // Cheap pre-filter: if no entry is enabled and not suppressed, the rule
-  // can short-circuit without the eventKey scan. The full dedup work
-  // happens once inside `produces`.
   matches: (events, ctx) =>
     ctx.settings.dailyRecurring.some(
       (e) => e.enabled && !ctx.day.suppressedRecurringIds.includes(e.id),
@@ -50,9 +31,7 @@ const RuleProjectDailyRecurring: Rule = {
 
 function missingRecurring(events: readonly Event[], ctx: Context): RecurringConfig[] {
   const suppressed = new Set(ctx.day.suppressedRecurringIds);
-  // Defensive id-dedup (settings UI should prevent duplicates, but a
-  // malformed Firestore doc shouldn't double-emit). First entry wins.
-  const seenIds = new Set<string>();
+  const seenIds = new Set<string>(); // dedup in case of malformed Firestore doc; first entry wins
   const candidates: Array<RecurringConfig & { eventKey: string }> = [];
   for (const entry of ctx.settings.dailyRecurring) {
     if (!entry.enabled) continue;
@@ -61,18 +40,13 @@ function missingRecurring(events: readonly Event[], ctx: Context): RecurringConf
     seenIds.add(entry.id);
     candidates.push({ ...entry, eventKey: recurringEventKeyFor(entry.id) });
   }
-  // R11.5: filter out entries whose eventKey already exists on a
-  // daily_recurring event (recorded or projected). Includes recorded events
-  // intentionally — §0 reality-wins axiom: a recorded event with this key
-  // means reality already happened; leave it untouched.
+  // R11.5: recorded and projected events both suppress projection (reality wins).
   return missingScheduledEvents(candidates, events.filter(isRecurring));
 }
 
 function buildProjection(ctx: Context, entry: RecurringConfig): Event {
   const eventKey = recurringEventKeyFor(entry.id);
-  // R11.2: durationMinutes > 0 → block. Treat 0 (or undefined) as
-  // instant; a zero-length block is nonsensical and would render
-  // weirdly.
+  // durationMinutes > 0 → block; 0 or undefined → instant (zero-length block is nonsensical).
   const isBlock = entry.durationMinutes !== undefined && entry.durationMinutes > 0;
   const ownerSlot = entry.defaultOwnerSlot;
   return projectedEvent({

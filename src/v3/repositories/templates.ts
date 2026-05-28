@@ -1,8 +1,4 @@
-/**
- * V3 templates repository.
- * Path-compatible with V2 (`children/{childId}/templates/{templateId}`).
- * Wire shape: V3 OwnershipTemplate uses slot-based OwnerRefs.
- */
+/** V3 templates repository. Path-compatible with V2 (`children/{childId}/templates/{templateId}`). */
 
 import { collection, deleteDoc, doc, getDocs, setDoc, type Firestore } from "firebase/firestore";
 import { templatePath, templatesCollectionPath } from "@/lib/firestore/paths";

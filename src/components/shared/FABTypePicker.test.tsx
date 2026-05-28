@@ -13,8 +13,7 @@ describe("FABTypePicker", () => {
     expect(screen.getByRole("button", { name: /bottle/i })).toBeVisible();
     expect(screen.getByRole("button", { name: /pump/i })).toBeVisible();
     expect(screen.getByRole("button", { name: /custom/i })).toBeVisible();
-    // Per spec PR #146: parents adjust naps via drawer-edit on
-    // existing chips, not via FAB. The picker no longer offers nap.
+    // Nap removed from FAB picker (PR #146): parents adjust naps via drawer-edit on existing chips.
     expect(screen.queryByRole("button", { name: /^nap$/i })).toBeNull();
   });
 

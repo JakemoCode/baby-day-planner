@@ -1,8 +1,4 @@
-/**
- * V3 TomorrowPreview — renders TimelineV3 over the V3 engine output for
- * a synthesized planned Day. Tomorrow has no "now": no NowBar and no
- * dim-past. Mirrors the V2 component but on V3 types end-to-end.
- */
+/** Timeline preview for a planned Tomorrow day; no NowBar and no dim-past. */
 
 "use client";
 

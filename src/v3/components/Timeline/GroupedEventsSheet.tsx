@@ -18,12 +18,7 @@ export type GroupedEventsSheetProps = {
   onTapEvent: (event: Event) => void;
 };
 
-/**
- * §F55 — list-sheet companion to {@link CollapsedInstantCluster}. Opens
- * when the user taps a "N events" chip and lists the underlying events
- * as tappable rows. Each row routes to the same `onEventTap` the parent
- * timeline already wires for normal chips.
- */
+/** Sheet listing events inside a collapsed cluster; each row taps through to the edit drawer. */
 export function GroupedEventsSheet({
   open,
   items,

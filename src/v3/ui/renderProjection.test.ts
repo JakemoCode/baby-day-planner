@@ -98,8 +98,7 @@ describe("renderProjection — composed render-layer pipeline", () => {
   });
 
   it("respects nowMinutes when provided (putdown expansion gates by time)", () => {
-    // nowMinutes past the putdown window should suppress the synthetic chip
-    // (R6.7 — render-time guard).
+    // R6.7 render-time guard suppresses chips when now is past the window.
     const now = 10 * 60; // already at nap.start
     const out = renderProjection([projectedNap({})], baseSettings, now);
     const putdown = out.find((e) => e.eventKey === PUTDOWN_KIND_TAG);

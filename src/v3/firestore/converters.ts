@@ -44,10 +44,9 @@ export const v3UserConverter = passthrough<User>();
 export const v3InviteConverter = passthrough<Invite>();
 
 /**
- * Settings converter applies `normalizeSettingsDoc` on read so partial /
- * legacy docs become engine-safe Settings across every read path, including
- * consumers that bypass `useV3Settings` (e.g. one-shot `getSettings` calls).
- * Mirrors the pattern established by `v3EventConverter`.
+ * Settings converter applies `normalizeSettingsDoc` on read so partial/legacy
+ * docs become engine-safe across every read path, including one-shot
+ * `getSettings` callers that bypass `useV3Settings`.
  */
 export const v3SettingsConverter: FirestoreDataConverter<Settings> = {
   toFirestore: (data) => data,
@@ -60,10 +59,8 @@ export const v3SettingsConverter: FirestoreDataConverter<Settings> = {
 
 /**
  * Event converter applies `withV3EventDefaults` on read so partial docs
- * become engine-safe Events across every read path, including consumers
- * that bypass `useV3Events` (e.g. the one-shot `listEvents` call in the
- * history detail page). Without this, a partial doc missing `lifecycle`
- * or `kind` would crash the engine / renderer downstream.
+ * become engine-safe across every read path. Without this, docs missing
+ * `lifecycle` or `kind` crash the engine/renderer downstream.
  */
 export const v3EventConverter: FirestoreDataConverter<Event> = {
   toFirestore: (data) => data,
@@ -73,10 +70,8 @@ export const v3EventConverter: FirestoreDataConverter<Event> = {
 };
 
 /**
- * Day converter applies `withV3DayDefaults` on read so partial day docs
- * become engine-safe Day objects across every read path: `getDay`,
- * `getDayByDate`, `listArchivedDays`, `watchActiveDay`. Write path stays
- * passthrough — V3 callers always supply a fully-shaped Day.
+ * Day converter applies `withV3DayDefaults` on read across all read paths.
+ * Write path is passthrough — V3 callers always supply a fully-shaped Day.
  */
 export const v3DayConverter: FirestoreDataConverter<Day> = {
   toFirestore: (data) => data,

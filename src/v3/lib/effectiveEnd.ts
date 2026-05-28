@@ -1,49 +1,18 @@
 /**
- * Derives the resolved end time for an in-progress recorded nap.
+ * Render-layer helpers for in-progress nap end time.
  *
- * An in-progress nap (lifecycle.state === "recorded") may run past its
- * placeholder endTime. When `now > event.endTime`, the resolved end
- * auto-extends by one napLen per extension window, capped at 3 extensions
- * (= startTime + 4×napLen).
- *
- * When a recorded nap has no endTime (legacy data or edge case), the soft end
- * is `startTime + napLen` — same placeholder the cascade uses.
- *
- * Used by (render-layer only):
- *   - inProgressNap selector (page.tsx) — End Nap button visibility
- *   - putdown overlap gate (expandPutdown.ts) — R6.8
- *   - renderProjection — bakes resolved endTime into rendered event
- *
- * NOT used by the cascade cursor in naps.ts: past naps shouldn't stretch
- * future wake-windows, so the cascade advances by the recorded endTime
- * directly. Auto-extend is a render-only concern.
- *
- * Only extends for `lifecycle.state === "recorded"`. All other states
- * (projected, completed) pass through `event.endTime ?? event.startTime`.
+ * A recorded nap with no endTime auto-extends by napLen per window, capped at 3 extensions (4×napLen).
+ * NOT used by the cascade cursor — auto-extend is render-only.
  */
 
 import type { Event, Settings, TimeMin } from "../schemas";
 
-/**
- * The minimal slice of Settings this Module reads. Accepts a full Settings
- * (structurally a superset) OR a small object literal — no `as unknown as
- * Settings` casts needed at call sites that don't have a real Settings on
- * hand (e.g. `expandPutdown.ts` which gets a scalar from its caller).
- */
+/** Minimal Settings slice; accepts a full Settings or a plain object literal — no casting needed at call sites. */
 export type EffectiveEndConfig = Pick<Settings, "defaultNapLengthMinutes">;
 
 /**
- * True when an event is currently in its in-progress window:
- * - lifecycle.state === "recorded" (user-anchored but not yet done)
- * - startTime <= now (it has started)
- * - now < resolvedEnd (it hasn't auto-extended past its cap)
- *
- * Callers are responsible for pre-filtering by event type (e.g. nap,
- * bedtime) — this predicate only checks timing and lifecycle.
- *
- * Used by:
- *   - inProgressNap selector (page.tsx) — End Nap button visibility
- *   - expandPutdown.ts — R6.8 in-progress overlap gate
+ * True when a recorded event has started but not yet reached its resolved end.
+ * Callers must pre-filter by event type; this checks timing and lifecycle only.
  */
 export function isInProgress(e: Event, config: EffectiveEndConfig, now: TimeMin): boolean {
   if (e.lifecycle.state !== "recorded") return false;
@@ -55,24 +24,13 @@ export function resolvedEnd(event: Event, config: EffectiveEndConfig, now: TimeM
   const napLen = config.defaultNapLengthMinutes;
   const { lifecycle, startTime, endTime } = event;
 
-  // Projected / completed: render to the committed extent. Completed naps
-  // have endTime; projected naps' cascade-derived endTime is present too.
+  // Projected / completed: pass through committed endTime.
   if (lifecycle.state !== "recorded") {
     return endTime ?? startTime;
   }
 
-  // Recorded WITH endTime → user has committed both timestamps via the
-  // drawer (which always sets endTime). No auto-extend; render to the
-  // chosen extent.
-  //
-  // Recorded WITHOUT endTime → "Start Nap Now, waiting for End Nap." The
-  // placeholder `startTime + napLen` extends as time passes (capped at
-  // 3 extensions = 4×napLen total) so the rendered block continues to
-  // grow visually until the user taps End or edits via the drawer.
-  //
-  // The "no endTime" signal is owned by NapActionButton.Start (no endTime
-  // on creation) vs. EventEditDrawerV3.handleSave (always writes endTime
-  // because the form has start AND end fields).
+  // Recorded WITH endTime: drawer-committed, no auto-extend.
+  // Recorded WITHOUT endTime: "Start Nap Now" path; placeholder grows until user taps End.
   if (endTime !== undefined) {
     return endTime;
   }

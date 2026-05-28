@@ -1,18 +1,8 @@
 /**
- * V3 Event defensive defaults.
- *
- * Defense-in-depth normalizer applied at the converter boundary. Fills
- * `hasPutdown` (default `false`) and ensures `kind` is set; everything
- * else is passed through. V3 docs are already fully shaped; this is
- * insurance against partial writes / hand-edited docs.
- *
- * Also delegates a one-time lifecycle migration to `migrateLegacyLifecycle`
- * (in `lifecycle.ts`): legacy docs with `state: "started"` or
- * `state: "overridden"` are rewritten to the post-PR-#166 vocabulary
- * (`recorded`). Both legacy states map to `recorded` because both meant
- * "user has anchored this event."
- *
- * Used by `v3EventConverter.fromFirestore` — the single canonical seam.
+ * V3 Event defensive defaults. Fills `hasPutdown` (default `false`) and
+ * derives `kind` if missing. Also delegates a one-time lifecycle migration
+ * (PR-#166): `started`/`overridden` → `recorded`. Applied only at
+ * `v3EventConverter.fromFirestore` — the single canonical seam.
  */
 
 import { NO_OWNER, type Event, type EventKind, type EventType } from "../schemas";
@@ -38,7 +28,7 @@ export function withV3EventDefaults(input: Partial<Event>): Event {
     startTime: input.startTime ?? 0,
     label: input.label ?? "",
     hasPutdown: input.hasPutdown ?? false,
-    // §F37: owner is required; pre-F37 docs missing the field migrate to NO_OWNER on read.
+    // owner is required; pre-existing docs missing the field migrate to NO_OWNER on read.
     owner: input.owner ?? NO_OWNER,
     lifecycle: migratedLifecycle ?? input.lifecycle ?? { state: "projected" },
   };

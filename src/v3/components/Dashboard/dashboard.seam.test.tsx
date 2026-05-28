@@ -1,19 +1,8 @@
 /**
- * §F32 seam integration test — real projectDay across all four dashboard surfaces.
- *
- * Motivation: two CTA-driven bugs shipped through the unit suite in PRs #166
- * and #168 because unit tests pass per-layer while join bugs live at the
- * composites. Per workspace memory feedback_seam_coverage_required.md, any
- * action-chain feature needs at least one test exercising the REAL engine +
- * REAL selectors + rendered output.
- *
- * F32 is read-heavy but introduces composite logic at the joins:
- *   - nextDashboardEvent skip for in-progress naps
- *   - NowBanner priority (in-progress nap > wake window)
- *   - panel totals (bottleTotals / napTotals over actuals)
- *   - in-progress-sleep handling
- *
- * Both tests use REAL projectDay with REAL settings; no engine mocking.
+ * Seam integration test — real projectDay across all four dashboard surfaces.
+ * Two CTA-driven bugs (PRs #166, #168) shipped through the unit suite because
+ * join bugs are invisible to per-layer tests. Both tests use REAL projectDay +
+ * REAL settings; no engine mocking.
  */
 
 import { describe, it, expect } from "vitest";
@@ -91,9 +80,7 @@ function completedNapActual(start: TimeMin, end: TimeMin): Event {
 }
 
 function inProgressNapActual(start: TimeMin, endPlaceholder: TimeMin): Event {
-  // In-progress nap: lifecycle "recorded" with placeholder endTime
-  // (start + defaultNapLengthMinutes). isInProgress() detects this
-  // via the time window, not the lifecycle state.
+  // lifecycle "recorded" with placeholder endTime; isInProgress() detects via time window.
   return {
     id: `n-${start}-ip`,
     dayId: day.id,
@@ -166,27 +153,20 @@ describe("Dashboard seam — real projectDay + new panels", () => {
     // NowBanner: in-progress nap wins over wake window.
     expect(screen.getByText(/nap in progress/i)).toBeVisible();
 
-    // NextEventCard: next must NOT be the in-progress nap itself — unconditionally,
-    // regardless of whether next turns out to be a nap, bottle, or bedtime.
-    // A regression where nextDashboardEvent returned the in-progress nap would slip
-    // past a conditional type-guard check.
+    // NextEventCard: must NOT be the in-progress nap itself.
     expect(next).toBeDefined();
     expect(next?.id).not.toBe(inProgressNap?.id);
-    // next is the projected second nap (starts ~12:30 after the in-progress nap ends at 11:45).
+    // next is the projected second nap (~12:30, after the in-progress nap ends at 11:45).
     expect(next?.type === "bottle" || next?.type === "nap").toBe(true);
     expect(next?.startTime).toBeGreaterThan(11 * 60 + 45);
 
-    // Panel totals via helpers (independent confirmation of the join).
-    // §F48d: the in-progress nap (startTime=10:45, placeholder
-    // endTime=11:45, now=11:00) contributes its ELAPSED 15 min —
-    // not the full 60-min placeholder duration. Future-startTime
-    // naps would be fully excluded; in-progress ones clamp endTime
-    // to now.
+    // Panel totals: in-progress nap (10:45–11:45 placeholder, now=11:00)
+    // contributes only elapsed 15 min, not the full placeholder duration.
     const bTotals = bottleTotals(actuals, now);
     expect(bTotals).toEqual({ count: 2, oz: 9 });
 
     const nTotals = napTotals(actuals, now);
-    // Completed 9:00–10:00 (60 min) + in-progress 10:45–now (15 min).
+    // completed 9:00–10:00 (60 min) + in-progress 10:45–now (15 min)
     expect(nTotals).toEqual({ count: 2, totalMinutes: 75 });
 
     // Rendered text matches.

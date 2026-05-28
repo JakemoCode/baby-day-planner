@@ -1,12 +1,6 @@
 "use client";
 
-/**
- * Standard <EventEditDrawerV3> mount used by both the dashboard and
- * timeline pages. Owns the `key=` reset-on-event-id ternary and the
- * `dayWakeTime` conditional spread that both pages used to spell out
- * verbatim. Tomorrow page mounts the drawer differently (no Day doc
- * yet, plan-state-driven) and stays inline.
- */
+/** Shared EventEditDrawerV3 mount for dashboard and timeline. Tomorrow page mounts its own. */
 
 import type { Event, Settings, TimeMin, Day } from "../../schemas";
 import type { DrawerState } from "../../hooks/useDrawer";

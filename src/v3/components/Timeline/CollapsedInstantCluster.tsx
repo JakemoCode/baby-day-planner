@@ -19,19 +19,7 @@ export type CollapsedInstantClusterProps = {
   onTap: () => void;
 };
 
-/**
- * §F55 — collapsed render for ≥2 instant events that would overlap
- * vertically on the timeline. One chip shows the count and time range;
- * tap opens a sheet that lists each underlying event.
- *
- * Design choices:
- *   - Stacked colored dots (capped at 4) give a visual hint of how many
- *     events are inside without leaning on text.
- *   - "N events" label keeps the chip's content predictable regardless of
- *     event types/owners inside.
- *   - Same right-gutter geometry as {@link InstantCluster} so collapsed
- *     and normal clusters interleave cleanly on the timeline.
- */
+/** Collapsed chip for ≥2 overlapping instants; tap opens a sheet listing each event. */
 export function CollapsedInstantCluster({
   items,
   startMinutes,
@@ -51,8 +39,7 @@ export function CollapsedInstantCluster({
   const preposition = startMinutes === endMinutes ? "at" : "from";
   const a11y = `${count} events ${preposition} ${range}, tap to view`;
 
-  // Cap displayed dots at 4 so the chip width stays bounded. The full
-  // list lives in the sheet anyway.
+  // Cap dots at 4 to bound chip width; full list in the sheet.
   const dotEvents = items.slice(0, 4);
 
   return (

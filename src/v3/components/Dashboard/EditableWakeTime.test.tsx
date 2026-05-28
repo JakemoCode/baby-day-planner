@@ -1,10 +1,7 @@
 /**
- * EditableWakeTime: small display-and-edit affordance for Day.wakeTime.
- *
- * Tests cover the state machine (display ↔ edit), commit semantics
- * (unchanged → no onChange; invalid → silent revert), keyboard
- * shortcuts, and variant styling. No Firestore / no engine — pure
- * controlled component, so all assertions use real impls.
+ * EditableWakeTime — display ↔ edit state machine for Day.wakeTime.
+ * Covers commit semantics (unchanged/invalid → no onChange), keyboard shortcuts,
+ * and variant styling. Pure controlled component; no Firestore or engine.
  */
 
 import { describe, expect, it, vi } from "vitest";
@@ -33,9 +30,7 @@ describe("EditableWakeTime", () => {
     const input = screen.getByLabelText(/woke at/i) as HTMLInputElement;
     expect(input).toBeVisible();
     expect(input.value).toBe("07:00");
-    // Focus is deferred to next frame via requestAnimationFrame so the
-    // time picker opens immediately. Without this assertion, dropping
-    // the rAF focus call would silently regress keyboard-flow ergonomics.
+    // Focus deferred via rAF so the time picker opens immediately.
     await waitFor(() => expect(input).toHaveFocus());
   });
 
@@ -97,10 +92,7 @@ describe("EditableWakeTime", () => {
   });
 
   it("Save with invalid (unparseable) input does NOT call onChange and exits edit mode", async () => {
-    // Covers the parsed === undefined branch in handleSave (the
-    // "silent revert" the file docstring claims to test). Without this
-    // case, a regression that swapped `setEditing(false); return;` for
-    // `onChange(NaN as TimeMin)` would pass.
+    // Covers the parsed === undefined branch in handleSave (silent revert).
     const user = userEvent.setup();
     const onChange = vi.fn();
     render(<EditableWakeTime wakeTime={SEVEN_AM} onChange={onChange} />);

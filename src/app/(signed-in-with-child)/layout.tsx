@@ -7,14 +7,8 @@ import { AppShell } from "@/components/shared/AppShell";
 import { ChildProvider, useChildResolution } from "@/v3/context/ChildProvider";
 
 /**
- * Gates the (signed-in-with-child) route group on three conditions:
- *   1. Auth resolved + allowlisted    → otherwise → /sign-in
- *   2. /users/{uid} doc exists        → otherwise → /welcome (first sign-in)
- *   3. user.childIds non-empty        → otherwise → /welcome (signed-in, not yet onboarded)
- *
- * If all three pass, resolves /children/{firstChildId} and renders AppShell
- * wrapped in ChildProvider. Loading state shows during any of the chained
- * Firestore reads.
+ * Guards this route group: unauthenticated → /sign-in, no child → /welcome.
+ * Resolves the first child and renders AppShell in ChildProvider when ready.
  */
 export default function SignedInWithChildLayout({ children }: { children: ReactNode }) {
   const { status } = useAuth();
@@ -27,13 +21,8 @@ export default function SignedInWithChildLayout({ children }: { children: ReactN
     }
   }, [status, router]);
 
-  // Once we've ever resolved to "ready" this session, never redirect to
-  // /welcome again. This catches the post-onboarding-writeBatch race where
-  // the fresh useV3User subscription briefly fires with the pre-write
-  // cached snapshot (user=null) before the server snapshot arrives —
-  // bouncing back to /welcome would remount WelcomePage at step 1 (bug
-  // Jake hit on 2026-05-19). Latched in an effect so the ref update
-  // doesn't fire during render; the redirect effect below reads it.
+  // Latches true once "ready" — prevents /welcome redirect during the post-onboarding Firestore race
+  // where the cached pre-write snapshot (user=null) arrives before the server snapshot.
   const everReadyRef = useRef(false);
 
   useEffect(() => {

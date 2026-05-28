@@ -1,10 +1,4 @@
-/**
- * templateSlot dispatch — covers each slot kind plus the
- * "doesn't map to a slot" cases (extras, pumps, malformed keys).
- * The setOwnerAt round-trip is verified incidentally via the
- * existing setOwnerInTemplate.test.ts; here we exercise the
- * dispatch directly so the contract is documented in one place.
- */
+/** templateSlot dispatch — covers each slot kind, unmapped types (extras, pumps), and malformed keys. */
 
 import { describe, expect, it } from "vitest";
 import type { Event, OwnerRef, OwnershipTemplate } from "../../schemas";

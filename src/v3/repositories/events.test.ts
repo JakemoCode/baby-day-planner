@@ -1,11 +1,6 @@
 // @vitest-environment node
 /**
  * V3 events repository — Firestore CRUD against real emulator.
- *
- * Mirrors the V2 events repo test (src/repositories/events.test.ts) so
- * the cutover at consumer sites stays a one-import-line change. Shape
- * difference: V3 events use TimeMin (number) for startTime/endTime and
- * a discriminated `lifecycle` union.
  */
 
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
@@ -108,14 +103,11 @@ describe("v3 events repository", () => {
     expect(got?.lifecycle).toEqual({ state: "recorded", annotatedAt: 9 * 60 + 2 });
   });
 
-  it("§F37 round-trip: assigning then unassigning owner persists NO_OWNER (no stale value)", async () => {
-    // Seam test for the §F37 fix. Pre-F37, "unassign owner" tried to delete the
-    // owner field via updateDoc with a patch missing `owner` — but Firestore
-    // updateDoc is field-merge: omitted fields are LEFT UNTOUCHED, so the prior
-    // owner survived. Post-F37, "unassigned" is the explicit { slot: "none" }
-    // value, so updateDoc always overwrites the field. This test fails if
-    // anyone reverts the schema change AND lets the owner-clear path go back
-    // to merging a field-less patch.
+  it("round-trip: assigning then unassigning owner persists NO_OWNER (no stale value)", async () => {
+    // Pre-fix, "unassign" sent a patch without `owner` — Firestore
+    // updateDoc is field-merge so omitted fields are LEFT UNTOUCHED and the
+    // prior owner survived. Fix: NO_OWNER = explicit { slot: "none" }, so
+    // updateDoc always overwrites. Fails if the schema change is reverted.
     const database = db();
     await createEvent(database, "child-1", ev({ id: "e-owner-flip", owner: { slot: "parent1" } }));
     await updateEvent(database, "child-1", "day-1", "e-owner-flip", {
@@ -133,20 +125,11 @@ describe("v3 events repository", () => {
     expect(got2?.owner).toEqual({ slot: "parent2" });
   });
 
-  it("§F37 wake_window seam: two edits of the same projection collapse to ONE doc, last write wins", async () => {
-    // Regression test for the wake_window "intermittent owner change" symptom
-    // Jake hit during F37 click-test. timeline/page.tsx onSave used to re-ID
-    // every projected→recorded transition with a fresh random id; each save
-    // created a new override doc. With multiple docs at same eventKey, R4.2's
-    // Map iteration order (sorted by startTime, tiebroken by random doc id)
-    // picked the survivor nondeterministically.
-    //
-    // Fix: use a DETERMINISTIC id (`recorded_${eventKey}`) so the 2nd+ edit
-    // routes through updateOptimistic on the SAME doc.
-    //
-    // This test simulates the page handler's save flow at the repository
-    // layer — two `createEvent`-then-`updateEvent` cycles with the deterministic
-    // id pattern — and asserts the final state is ONE doc with the latest owner.
+  it("wake_window seam: two edits of the same projection collapse to ONE doc, last write wins", async () => {
+    // onSave used to re-ID every projected→recorded transition with a
+    // fresh random id. Multiple docs at the same eventKey made R4.2's tiebreak
+    // nondeterministic. Fix: deterministic id (`recorded_${eventKey}`) routes
+    // 2nd+ edits through updateOptimistic on the SAME doc.
     const database = db();
     const ww2Id = "recorded_wake_window_2";
 
@@ -193,12 +176,10 @@ describe("v3 events repository", () => {
     expect(ww2Docs2[0]!.owner).toEqual(NO_OWNER);
   });
 
-  describe("reconcileDuplicateEventDocs (§F59 orphan cleanup)", () => {
-    // Pre-§F59, NapActionButton wrote `id: nap_N` and useDrawer wrote
-    // `id: recorded_nap_N` for the same logical slot — leaving two
-    // Firestore docs with the same eventKey but different ids. This
-    // function cleans those up: keep the most-recent-annotation winner,
-    // delete the losers.
+  describe("reconcileDuplicateEventDocs (orphan cleanup)", () => {
+    // NapActionButton wrote `id: nap_N` while useDrawer wrote
+    // `id: recorded_nap_N` for the same slot — two Firestore docs, same
+    // eventKey, different ids. Keeps the most-recent-annotation winner.
     it("deletes the loser when two docs share (type, eventKey); keeps the most-recent annotation", async () => {
       const database = db();
       // Drawer-edited orphan (older annotation).

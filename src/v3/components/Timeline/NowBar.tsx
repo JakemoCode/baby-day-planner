@@ -11,11 +11,7 @@ export type NowBarProps = {
   nowMinutes: TimeMin;
 };
 
-/**
- * "Now" indicator: 2px horizontal line + colored time pill in the axis
- * lane (left of the line). Pill MUST NOT extend into the block lane —
- * §12 anti-requirement that the pill never covers event content.
- */
+/** "Now" line + axis-lane time pill. Pill must not extend into the block lane (§12). */
 export function NowBar({ topPx, axisWidthPx, rightPx = 0, nowMinutes }: NowBarProps) {
   return (
     <>

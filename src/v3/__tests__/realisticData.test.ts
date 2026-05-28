@@ -1,9 +1,6 @@
 /**
- * Realistic data smoke tests.
- *
- * Runs the V3 engine + defaulters against fixtures mirroring real
- * Firestore states (clean V3, partial V3, partial-of-any-shape).
- * Catches defaulter blind spots BEFORE production. Failures here are P0.
+ * Smoke tests: engine + defaulters against fixtures mirroring real Firestore
+ * states (clean/partial V3, mixed). Catches defaulter blind spots — failures are P0.
  */
 
 import { describe, expect, it } from "vitest";
@@ -31,8 +28,7 @@ describe("withV3SettingsDefaults — realistic data", () => {
     const out = withV3SettingsDefaults(fixtures.settings.v2 as Partial<Settings>);
     expect(out).not.toBeNull();
     expect(out!.bottleChain).toEqual({ bottlesPerDay: 5, bufferAfterWakeMinutes: 10 });
-    // V2 fixture has no `owners` field — defaulter fills it with empty
-    // displayNames so the Settings form has something to bind to.
+    // No `owners` field → defaulter fills empty displayNames for the form to bind to.
     expect(out!.owners.parent1.displayName).toBe("");
     expect(out!.owners.parent2.displayName).toBe("");
     expect(out!.daycare.weekdays.mon).toBe(false);

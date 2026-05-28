@@ -1,9 +1,6 @@
 /**
- * EventEditDrawerV3 — V3 lifecycle dispatch, slot-based owner picker,
- * TimeMin form values. The form-state lifecycle math is fully covered
- * in formToEvent.test.ts; this file validates the React drawer
- * rendering + integration: the right fields show per type, the right
- * onSave payload assembles, validation surfaces overlap errors.
+ * EventEditDrawerV3 — rendering + integration: field visibility by type,
+ * onSave payload shape, validation. Lifecycle math covered in formToEvent.test.ts.
  */
 
 import React, { useEffect } from "react";
@@ -108,7 +105,7 @@ describe("EventEditDrawerV3", () => {
     expect(screen.queryByLabelText("End time")).not.toBeInTheDocument();
   });
 
-  it("§F56: drawer heading for a recurring event includes the event label", () => {
+  it("drawer heading for a recurring event includes the event label", () => {
     const recurring: Event = {
       id: "rec-1",
       dayId: "d-1",
@@ -163,8 +160,7 @@ describe("EventEditDrawerV3", () => {
 
   it("saves nap time edit as overridden lifecycle (predict-don't-prescribe: drawer is scheduling intent, not reality)", async () => {
     const onSave = vi.fn();
-    // §F66: time-edit path requires the inputs to be enabled, which
-    // means the event is NOT future-projected. Use a recorded nap.
+    // Use a recorded nap so time inputs are enabled (future-projected events are locked).
     const source = projectedNap({
       lifecycle: { state: "recorded", annotatedAt: 9 * 60 },
     });
@@ -193,10 +189,7 @@ describe("EventEditDrawerV3", () => {
 
   it("blocks save when end time is not after start time", async () => {
     const onSave = vi.fn();
-    // §F66: editing a projected event whose startTime is in the future
-    // is owner-only (inputs disabled). To exercise the end-time validation
-    // path, use a recorded event — that's the post-§F66 shape any
-    // editable-time nap takes after engine auto-promote.
+    // Use a recorded event — projected future events have disabled time inputs.
     const recorded = projectedNap({
       lifecycle: { state: "recorded", annotatedAt: 9 * 60 },
     });
@@ -235,9 +228,7 @@ describe("EventEditDrawerV3", () => {
       owner: NO_OWNER,
       lifecycle: { state: "completed", committedAt: 11 * 60 },
     };
-    // Source nap at 11:30–12:00 — clear of recordedNap (9:30–11:00).
-    // Editing start to 9:00 then introduces overlap. Use a recorded
-    // lifecycle so the time inputs are enabled (§F66 future-event rule).
+    // Use recorded lifecycle so time inputs are enabled; edit start to 9:00 introduces overlap.
     const source = projectedNap({
       startTime: 11 * 60 + 30,
       endTime: 12 * 60,
@@ -263,11 +254,8 @@ describe("EventEditDrawerV3", () => {
     expect(screen.getByRole("alert")).toHaveTextContent(/Overlaps Nap 2/);
   });
 
-  it("§F66 fast-follow B7: flags startTime < dayWakeTime as a pre-wake error (AM/PM safeguard)", async () => {
-    // User had a nap at 11:30am, intended to push to 12:30pm but the
-    // time picker stored it as 0:30 (am). Validator must catch this
-    // before save — anchoring a nap or bottle before wakeTime wrecks
-    // the cascade silently.
+  it("flags startTime < dayWakeTime as a pre-wake error (AM/PM safeguard)", async () => {
+    // AM/PM mistake (e.g. 0:30 instead of 12:30) silently wrecks the cascade; validator must catch it.
     const recorded = projectedNap({
       lifecycle: { state: "recorded", annotatedAt: 11 * 60 + 30 },
       startTime: 11 * 60 + 30,
@@ -296,11 +284,8 @@ describe("EventEditDrawerV3", () => {
     expect(onSave).not.toHaveBeenCalled();
   });
 
-  it("§F66 audit: B7 pre-wake guard does NOT flag startTime === dayWakeTime (boundary)", async () => {
-    // The guard is `startTime < dayWakeTime` (strict). Without an explicit
-    // equality-case test, a regression to `<=` would silently reject a
-    // legitimate event at the day's exact wake time. Pins the inclusive
-    // side of the boundary.
+  it("B7 pre-wake guard does NOT flag startTime === dayWakeTime (boundary)", async () => {
+    // Guard is strict `<`; pins that startTime === wakeTime is not rejected (regression to `<=`).
     const recorded = projectedNap({
       lifecycle: { state: "recorded", annotatedAt: 11 * 60 + 30 },
       startTime: 11 * 60 + 30,
@@ -327,11 +312,8 @@ describe("EventEditDrawerV3", () => {
     expect(screen.getByRole("button", { name: "Save" })).toBeEnabled();
   });
 
-  it("§F66 review: B7 pre-wake guard does NOT block a pre-wake daily_recurring (review-found false positive)", async () => {
-    // The B7 rationale (AM/PM mistake wrecks cascade) is
-    // cascade-specific. daily_recurring is fixed-time / explicit-slot
-    // and the user may legitimately schedule it pre-wake (e.g., 5am
-    // medication). Validator must NOT block.
+  it("B7 pre-wake guard does NOT block a pre-wake daily_recurring (review-found false positive)", async () => {
+    // daily_recurring is explicit-schedule (not cascade); legitimate to schedule pre-wake (e.g. 5am medication).
     const preWakeRecurring: Event = {
       id: "proj_recurring:rec-medication",
       dayId: "d-1",
@@ -362,11 +344,8 @@ describe("EventEditDrawerV3", () => {
     expect(screen.getByRole("button", { name: "Save" })).toBeEnabled();
   });
 
-  it("§F66 fast-follow B1: does not flag overlap against a render-synthetic putdown chip", async () => {
-    // §F66 dogfood: tapping a nap's end-time edit would surface
-    // "Overlaps Putdown" because the synthetic putdown chip carries
-    // `type: "nap"` for timeline geometry. Validator now skips
-    // render-synthetic events (eventKey === PUTDOWN_KIND_TAG).
+  it("does not flag overlap against a render-synthetic putdown chip", async () => {
+    // Synthetic putdown carries type="nap" for layout; validator skips eventKey===PUTDOWN_KIND_TAG.
     const putdownSynthetic: Event = {
       id: "putdown:nap-2",
       dayId: "d-1",
@@ -409,7 +388,7 @@ describe("EventEditDrawerV3", () => {
 
   it("does not flag overlap against still-projected events", async () => {
     const projectedOther = projectedNap({ id: "other", startTime: 9 * 60 + 30, label: "Nap 2" });
-    // Source is recorded so its time inputs are editable (§F66).
+    // Recorded source → time inputs editable.
     const source = projectedNap({
       lifecycle: { state: "recorded", annotatedAt: 9 * 60 },
     });
@@ -470,11 +449,8 @@ describe("EventEditDrawerV3", () => {
     expect(screen.queryByRole("button", { name: "Delete" })).not.toBeInTheDocument();
   });
 
-  // PR-A0.4: re-edits of an already-recorded event must update the
-  // existing Firestore doc, not create a duplicate. The timeline page's
-  // onSave routes via `actuals.some(a => a.id === drawer.event.id)` —
-  // this wrapper mirrors that logic so we can verify the routing
-  // contract from the drawer-level test surface.
+  // Re-edits of a recorded event must update the existing doc, not create a duplicate.
+  // Mirrors the page's actuals-membership routing contract.
   it("re-edit of an overridden actual routes to update, not create (actuals-membership)", async () => {
     const overriddenNap: Event = {
       id: "manual-X",
@@ -522,9 +498,7 @@ describe("EventEditDrawerV3", () => {
     const next: Event = updateOptimistic.mock.calls[0]![1];
     expect(next.id).toBe("manual-X");
     expect(next.owner).toEqual({ slot: "parent2" });
-    // Already-recorded source keeps its original annotatedAt — only
-    // projected→recorded transitions stamp NOW. The contract under
-    // test here is the create-vs-update routing, not the lifecycle math.
+    // Already-recorded keeps its original annotatedAt; only projected→recorded stamps NOW.
     expect(next.lifecycle).toEqual({ state: "recorded", annotatedAt: 10 * 60 });
     expect(createOptimistic).not.toHaveBeenCalled();
   });
@@ -547,11 +521,8 @@ describe("EventEditDrawerV3", () => {
     expect(screen.getByRole("button", { name: "Delete" })).toBeInTheDocument();
   });
 
-  it("§F66 B11: delete button is HIDDEN for an auto-promoted bottle (recorded + annotatedAt===startTime)", () => {
-    // Auto-promote signature: lifecycle state "recorded" with
-    // annotatedAt === startTime. Manual logs use "completed" and
-    // drawer saves bump annotatedAt to nowMinutes, so neither
-    // matches.
+  it("delete button is HIDDEN for an auto-promoted bottle (recorded + annotatedAt===startTime)", () => {
+    // Auto-promote signature: recorded + annotatedAt===startTime. Manual logs use completed; drawer saves bump annotatedAt.
     render(
       <EventEditDrawerV3
         open
@@ -573,14 +544,8 @@ describe("EventEditDrawerV3", () => {
     expect(screen.queryByRole("button", { name: "Delete" })).toBeNull();
   });
 
-  it("§F66 audit B11: delete button is SHOWN for a recorded bottle when annotatedAt !== startTime", () => {
-    // The auto-promote signature is BOTH (state === "recorded") AND
-    // (annotatedAt === startTime). A drawer save on a previously-
-    // auto-promoted bottle keeps state "recorded" but bumps annotatedAt
-    // to nowMinutes — Delete must remain visible. Without this row,
-    // dropping the `annotatedAt === startTime` clause from
-    // `isAutoPromotedBottle` would hide Delete from EVERY recorded
-    // bottle, including drawer-edited ones.
+  it("delete button is SHOWN for a recorded bottle when annotatedAt !== startTime", () => {
+    // Dropping `annotatedAt===startTime` from the auto-promote check would hide Delete on all recorded bottles.
     render(
       <EventEditDrawerV3
         open
@@ -588,8 +553,7 @@ describe("EventEditDrawerV3", () => {
         event={projectedBottle({
           id: "recorded_bottle_2",
           startTime: 10 * 60,
-          // startTime=10:00 but annotatedAt=11:00 — user opened the
-          // drawer at 11:00 and re-saved, bumping annotatedAt.
+          // Drawer re-save at 11:00 bumped annotatedAt away from startTime.
           lifecycle: { state: "recorded", annotatedAt: 11 * 60 },
         })}
         owners={owners}
@@ -604,10 +568,8 @@ describe("EventEditDrawerV3", () => {
     expect(screen.getByRole("button", { name: "Delete" })).toBeVisible();
   });
 
-  it("§F66 B11: delete button is SHOWN for a manually-logged bottle (lifecycle completed)", () => {
-    // ContextualActionButton.buildLoggedBottle writes lifecycle
-    // {state:"completed", committedAt}. User wants to delete the
-    // extra bottle they added — Delete must remain available.
+  it("delete button is SHOWN for a manually-logged bottle (lifecycle completed)", () => {
+    // buildLoggedBottle writes lifecycle completed; user must be able to delete it.
     render(
       <EventEditDrawerV3
         open
@@ -629,12 +591,8 @@ describe("EventEditDrawerV3", () => {
     expect(screen.getByRole("button", { name: "Delete" })).toBeVisible();
   });
 
-  it("§F66 B11: delete button is HIDDEN for an auto-promoted nap (proj_ id + recorded lifecycle)", () => {
-    // An auto-promoted nap exists only in transient engine output —
-    // there's no Firestore doc to delete. The engine re-emits and
-    // re-auto-promotes on the next pass, so Delete would visibly
-    // accomplish nothing. Detection: id starts with "proj_" + sleep
-    // type.
+  it("delete button is HIDDEN for an auto-promoted nap (proj_ id + recorded lifecycle)", () => {
+    // Auto-promoted nap has no Firestore doc; engine re-emits it next pass so Delete is a visual no-op.
     render(
       <EventEditDrawerV3
         open
@@ -655,7 +613,7 @@ describe("EventEditDrawerV3", () => {
     expect(screen.queryByRole("button", { name: "Delete" })).toBeNull();
   });
 
-  it("§F65: delete button is shown for a PROJECTED daily_recurring event", () => {
+  it("delete button is shown for a PROJECTED daily_recurring event", () => {
     const recurring: Event = {
       id: "proj_recurring:rec-tummy",
       dayId: "d-1",
@@ -685,7 +643,7 @@ describe("EventEditDrawerV3", () => {
     expect(screen.getByRole("button", { name: "Delete" })).toBeVisible();
   });
 
-  it("§F65: delete confirmation for a daily_recurring uses skip-today copy", async () => {
+  it("delete confirmation for a daily_recurring uses skip-today copy", async () => {
     const recurring: Event = {
       id: "proj_recurring:rec-tummy",
       dayId: "d-1",
@@ -713,12 +671,12 @@ describe("EventEditDrawerV3", () => {
       />,
     );
     await userEvent.click(screen.getByRole("button", { name: "Delete" }));
-    // Dialog uses role=alertdialog or dialog depending on ConfirmDialog impl.
+    // ConfirmDialog may use alertdialog or dialog role.
     expect(screen.getByText(/Skip Tummy time today/i)).toBeVisible();
     expect(screen.getByText(/come back tomorrow/i)).toBeVisible();
   });
 
-  // §F9 PORT — drawer per-type form coverage previously asserted in V2.
+  // Per-type form field coverage.
 
   it("wake_window form shows only the owner picker (no time / amount / label inputs)", () => {
     const ww: Event = {
@@ -751,8 +709,7 @@ describe("EventEditDrawerV3", () => {
     expect(screen.queryByLabelText("End time")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Amount (oz)")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Label")).not.toBeInTheDocument();
-    // Owner picker is the only field — assert via the picker's group role
-    // so a stray "Jake"-named button elsewhere can't false-positive.
+    // Assert via group role to avoid false-positive from stray "Jake" buttons.
     const ownerGroup = screen.getByRole("group", { name: /owner/i });
     expect(within(ownerGroup).getByRole("button", { name: "Jake" })).toBeInTheDocument();
     expect(within(ownerGroup).getByRole("button", { name: "Sam" })).toBeInTheDocument();
@@ -792,10 +749,7 @@ describe("EventEditDrawerV3", () => {
     expect(screen.getByRole("button", { name: "Jake" })).toBeInTheDocument();
   });
 
-  // PR #196 removed Settings per-day-owner for daycare with the intent that
-  // owner is assigned per-event via the timeline drawer like every other
-  // event. The drawer's `showOwner` flag silently omitted both daycare
-  // types, so dropoff/pickup had no owner UI anywhere.
+  // Daycare owner is per-event (drawer); earlier `showOwner` flag silently excluded both types.
   it.each(["daycare_dropoff", "daycare_pickup"] as const)(
     "%s form shows the owner picker",
     (type) => {
@@ -832,10 +786,7 @@ describe("EventEditDrawerV3", () => {
 });
 
 describe("Past-threshold prompt when editing a nap (physiology cascade)", () => {
-  // Per spec PR #146 R2: a nap whose startTime crosses from below to
-  // at/after bedtimeThreshold prompts "Change to bedtime?" before save.
-  // Yes → delete original (if recorded) + save bedtime doc. No → save
-  // as nap; cascade emits projected bedtime after.
+  // Nap crossing bedtimeThreshold prompts "Change to bedtime?". Yes → delete nap + save bedtime. No → save as nap.
 
   const recordedNap = (start: TimeMin, end: TimeMin): Event => ({
     id: "nap-rec",
@@ -908,14 +859,9 @@ describe("Past-threshold prompt when editing a nap (physiology cascade)", () => 
         eventKey: "bedtime",
         startTime: 20 * 60,
         label: "Bedtime",
-        // Per DOMAIN.md §3: bedtime extends to next morning's wake.
-        // Source nap's endTime (10:00) is dropped; bedtime endTime
-        // = defaultWakeTime + 24h = 7:00 + 1440 = 1860.
+        // DOMAIN.md §3: endTime = defaultWakeTime + 24h; source nap's endTime dropped.
         endTime: DEFAULT_WAKE_TIME + 24 * 60,
-        // `recorded` lifecycle: the user dragged a projected chip
-        // to declare "the projected bedtime is at this time."
-        // `recorded` triggers putdown synthesis (putdown.ts:42) AND
-        // is treated as manualBedtime by the cascade (!isProjected).
+        // recorded triggers putdown synthesis and manualBedtime cascade path.
         lifecycle: expect.objectContaining({ state: "recorded" }),
       }),
     );
@@ -971,7 +917,7 @@ describe("Past-threshold prompt when editing a nap (physiology cascade)", () => 
     await userEvent.type(startInput, "20:00");
     await userEvent.click(screen.getByRole("button", { name: /save/i }));
     expect(screen.getByText(/change to bedtime\?/i)).toBeVisible();
-    // Escape dismisses the prompt — neither path saves nor deletes.
+    // Escape dismisses without saving or deleting.
     await userEvent.keyboard("{Escape}");
     expect(screen.queryByText(/change to bedtime\?/i)).toBeNull();
     expect(onSave).not.toHaveBeenCalled();
@@ -1001,7 +947,7 @@ describe("Past-threshold prompt when editing a nap (physiology cascade)", () => 
     expect(onSave).toHaveBeenCalled();
   });
 
-  describe("§F66 future-event drawer rule (ADR-0001)", () => {
+  describe("future-event drawer rule (ADR-0001)", () => {
     const futureNap = () =>
       projectedNap({
         id: "nap-future",
@@ -1046,9 +992,7 @@ describe("Past-threshold prompt when editing a nap (physiology cascade)", () => 
     it("disables amount input on a future projected bottle but keeps owner editable", () => {
       renderDrawer({ event: futureBottle() });
       expect(screen.getByLabelText(/amount/i)).toBeDisabled();
-      // OwnerPickerV3 renders interactive owner buttons (not a labeled input).
-      // It's enough to confirm at least one owner button is in the DOM and
-      // clickable — the picker itself has its own coverage.
+      // OwnerPickerV3 uses buttons, not a labeled input; picker has its own coverage.
       const ownerButtons = screen
         .getAllByRole("button")
         .filter((btn) => /jake|sam|no owner/i.test(btn.textContent ?? ""));
@@ -1089,11 +1033,8 @@ describe("Past-threshold prompt when editing a nap (physiology cascade)", () => 
       expect(screen.getByLabelText(/start time/i)).not.toBeDisabled();
     });
 
-    it("§F66 fast-follow C2: chronologically-NEXT projected nap is editable (sick-day flex)", () => {
-      // Two projected naps in the future. The earlier one (nap_2) is
-      // the "next" — user should be able to anchor it to baby's actual
-      // rhythm. The later one (nap_3) stays locked because cascade
-      // will re-project it from the pin.
+    it("chronologically-NEXT projected nap is editable (sick-day flex)", () => {
+      // Earliest future projected nap is editable; later ones stay locked (cascade re-projects from pin).
       const nap2 = projectedNap({
         id: "nap-2",
         eventKey: "nap_2",
@@ -1111,7 +1052,7 @@ describe("Past-threshold prompt when editing a nap (physiology cascade)", () => 
       expect(screen.queryByRole("note")).toBeNull();
     });
 
-    it("§F66 fast-follow C2: farther-out projected nap stays locked (cascade re-projects from the pin)", () => {
+    it("farther-out projected nap stays locked (cascade re-projects from the pin)", () => {
       const nap2 = projectedNap({
         id: "nap-2",
         eventKey: "nap_2",
@@ -1130,10 +1071,7 @@ describe("Past-threshold prompt when editing a nap (physiology cascade)", () => 
     });
 
     it("sanitizes the save payload back to source values even if the form somehow holds different time/amount", async () => {
-      // Owner-only edit on a future projected nap: change owner, save.
-      // The save payload's startTime/endTime must equal source values
-      // (the disabled inputs make this trivially true today, but the
-      // sanitize step is the defense-in-depth guard).
+      // Defense-in-depth: payload startTime/endTime must equal source regardless of form state.
       const onSave = vi.fn();
       const source = futureNap();
       renderDrawer({ event: source, onSave });
@@ -1149,11 +1087,7 @@ describe("Past-threshold prompt when editing a nap (physiology cascade)", () => 
       expect(saved.owner).toEqual({ slot: "parent1" });
     });
 
-    // Seam test: full chain drawer → useDrawer → setOwnerOverride.
-    // Verifies that an owner edit on a future-projected event routes
-    // through ownerOverrides (keeping the slot projected) and NOT
-    // through saveEvent (which would promote to recorded and pin the
-    // time — the §F64 bug class).
+    // Seam: future-projected owner edit must route through setOwnerOverride (not saveEvent, which pins time).
     it("seam: drawer + useDrawer routes future-projected owner edit through setOwnerOverride, not saveEvent", async () => {
       const source = futureNap();
       const saveEvent = vi.fn().mockResolvedValue(undefined);
@@ -1169,7 +1103,6 @@ describe("Past-threshold prompt when editing a nap (physiology cascade)", () => 
         );
         useEffect(() => {
           openEdit(source);
-          // openEdit is stable across renders; safe to call once on mount.
           // eslint-disable-next-line react-hooks/exhaustive-deps
         }, []);
         if (!drawer.open || drawer.mode !== "edit") return null;
@@ -1189,7 +1122,7 @@ describe("Past-threshold prompt when editing a nap (physiology cascade)", () => 
       }
 
       render(<Harness />);
-      // Wait for the openEdit effect to flush.
+      // Flush the openEdit effect.
       await screen.findByRole("dialog");
       const jakeBtn = screen.getAllByRole("button").find((b) => /jake/i.test(b.textContent ?? ""));
       await userEvent.click(jakeBtn!);

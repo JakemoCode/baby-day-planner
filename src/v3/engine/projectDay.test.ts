@@ -43,8 +43,7 @@ describe("projectDay", () => {
   });
 
   it("defaults nowMinutes to end-of-day when caller doesn't pass it", () => {
-    // Indirectly verified: the default rule set is empty, but a custom rule
-    // can read nowMinutes from context. We assert on the value.
+    // Probe via a custom rule that captures nowMinutes from context.
     let observedNow: number | null = null;
     const probe: Rule = {
       id: "R.probe",

@@ -178,12 +178,9 @@ describe("isNextProjectedOfType (sick-day carve-out)", () => {
     expect(isNextProjectedOfType(daycare, [daycare], 12 * 60)).toBe(false);
   });
 
-  it("§F66 fast-follow: ignores render-synthetic putdown chips when picking the next nap", () => {
-    // Synthetic putdown carries type="nap" + parent's "projected"
-    // lifecycle for timeline geometry. Without the synthetic filter,
-    // its earlier startTime (nap.startTime - putdownLead) wins the
-    // "earliest projected nap" lottery and the real nap is marked
-    // as NOT next → drawer locks the real nap's time input.
+  it("ignores render-synthetic putdown chips when picking the next nap", () => {
+    // Synthetic putdown has type="nap" and an earlier startTime than the real nap.
+    // Without the filter it wins the "earliest projected nap" lottery → drawer locks the real nap's input.
     const realNap = proj("nap2", "nap", 14 * 60);
     const putdownSynthetic: Event = {
       ...proj("putdown:nap2", "nap", 14 * 60 - 15),

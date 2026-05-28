@@ -1,13 +1,8 @@
 "use client";
 
 /**
- * V3 projection hook. Composes the engine, the per-render `nowMinutes`
- * clock, and the caller's day/settings/actuals into a sorted Event[]
- * ready for the timeline.
- *
- * The engine is pure — recomputing on every render is sub-millisecond
- * and side-effect-free, so we do not memoize. The 30s `useNowMinutes`
- * tick is what drives "in 12 min" deltas to refresh.
+ * Composes engine + nowMinutes + day/settings/actuals into a sorted Event[] for the timeline.
+ * Not memoized: engine is pure and sub-millisecond; the 30s tick drives delta refreshes.
  */
 
 import { useNowMinutes } from "../../hooks/useNowMinutes";

@@ -48,8 +48,7 @@ export function AddEventFAB({
     );
   };
 
-  // With only one type on offer, the picker is a pointless extra tap —
-  // the FAB opens that type's create form directly (/tomorrow: Custom).
+  // Single-type shortcut: skip the picker and open the create form directly.
   const soleType = types?.length === 1 ? types[0] : undefined;
 
   if (soleType !== undefined) {

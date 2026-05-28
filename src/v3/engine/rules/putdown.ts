@@ -1,25 +1,7 @@
 /**
- * R6.x — Putdown rules (render-only flag).
- *
- * Source: docs/v3/ENGINE_SPEC.md §6.
- *
- * R6.1: putdown is purely predictive — never recorded, never persisted.
- * The engine sets `hasPutdown: true` on naps and bedtimes whose lifecycle
- * still points to a future moment (`projected` or `recorded`). The
- * renderer (`expandPutdownBlocks`) further gates by `nowMinutes` — R6.7
- * suppresses the synthetic when the moment has passed in real time.
- *
- * Why both `projected` AND `recorded`: a user-anchored nap (e.g. drawer
- * time-edit, owner annotation) has `lifecycle.state === "recorded"` but
- * the putdown window may still be in the future. The putdown is still
- * relevant. The pre-fix code only allowed `projected`, so owner edits
- * silently killed the putdown block.
- *
- * Why NOT `completed`: completed events represent past reality. On an
- * archived-day read (renderer's `nowMinutes` unavailable), the renderer
- * would otherwise inject phantom putdown visuals around historical events.
- *
- * R6.2: derived from the parent event; no separate Firestore doc.
+ * R6.1 — Sets hasPutdown=true on naps/bedtimes with lifecycle projected or recorded.
+ * `completed` is excluded: past events must not produce phantom putdown visuals.
+ * Renderer gates further by nowMinutes.
  */
 
 import type { Event } from "../../schemas";

@@ -1,10 +1,7 @@
 // @vitest-environment jsdom
 /**
- * Integration test: useAutosaveTomorrowPlan (§F12 PR 3)
- *
- * Drives the autosave seam: when /tomorrow form state changes, after
- * a debounce delay a TomorrowPlan with status="draft" appears in
- * Firestore. Subsequent edits update the same doc (one per date).
+ * Autosave seam: after a debounce, /tomorrow form changes write a draft
+ * TomorrowPlan to Firestore; later edits update the same doc (one per date).
  */
 
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
@@ -47,7 +44,6 @@ beforeEach(async () => {
 const DATE = "2026-05-22";
 
 describe("useAutosaveTomorrowPlan (emulator-backed)", () => {
-  // Slice A
   it("persists a draft TomorrowPlan when input becomes non-null", async () => {
     type Input = Parameters<typeof useAutosaveTomorrowPlan>[2];
     const { rerender } = renderHook(
@@ -84,7 +80,6 @@ describe("useAutosaveTomorrowPlan (emulator-backed)", () => {
     expect(plan?.extras).toEqual([]);
   });
 
-  // Slice B
   it("edit to a confirmed plan reverts status to draft + clears confirmedAt", async () => {
     // Seed: existing confirmed plan in Firestore
     await saveTomorrowPlan(testDb, "child-1", {

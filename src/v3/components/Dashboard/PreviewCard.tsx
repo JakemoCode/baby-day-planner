@@ -22,11 +22,7 @@ export type PreviewCardProps = {
   ariaLabel?: string;
 };
 
-/**
- * Shared skeleton for dashboard preview cards (Next Bottle, Next Nap, etc.).
- * Renders heading + primary/empty + optional subtitle + optional meta in a
- * stack matching `PreviewCard.module.css`.
- */
+/** Shared skeleton for dashboard preview cards: heading + primary/empty + subtitle + meta. */
 export function PreviewCard({
   heading,
   primary,

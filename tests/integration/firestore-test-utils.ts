@@ -21,14 +21,9 @@ export const ALLOWED_USER = { uid: "jake-uid", email: "jake136@yahoo.com" };
 export const FORBIDDEN_USER = { uid: "stranger-uid", email: "stranger@example.com" };
 
 /**
- * Seed `/users/{uid}` with the given childIds, bypassing security rules.
- *
- * Most repo tests now require the user → childIds mapping to exist because
- * `/children/{id}` (and its subcollections) are gated on `request.auth.uid in
- * users.childIds`. Without this seed, every authenticated write would fail
- * with permission-denied even for the canonical ALLOWED_USER.
- *
- * Call inside `beforeEach` after `env.clearFirestore()`.
+ * Seed `/users/{uid}` with childIds, bypassing rules. Required because `/children/{id}`
+ * is gated on `request.auth.uid in users.childIds` — without it every authenticated
+ * write is permission-denied. Call inside `beforeEach` after `env.clearFirestore()`.
  */
 export async function seedAllowedUser(
   env: RulesTestEnvironment,

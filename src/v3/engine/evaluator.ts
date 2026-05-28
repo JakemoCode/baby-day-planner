@@ -1,19 +1,7 @@
 /**
- * Rules engine evaluator.
- *
- * Source: docs/v3/ARCHITECTURE_V3.md §2.
- *
- * Properties:
- * - Deterministic (CC2): same input → same output.
- * - Bounded: MAX_PASSES safety net; rules cycle in finite passes or throw.
- * - Loud failure: assertAfter and the §0 reality-wins guard throw with the
- *   offending rule id and a snapshot of the event state.
- * - Order from data: rules declare `dependsOn` ids; the evaluator topo-sorts.
- *
- * The reality-wins axiom (§2.0):
- *   No rule may add, remove, or mutate any event whose lifecycle.state is
- *   `recorded` or `completed`. The safeProduces wrapper enforces this by
- *   diffing recorded events before/after each rule run.
+ * Rules engine evaluator: topo-sorts rules by `dependsOn`, iterates to a
+ * fixed point, and enforces the reality-wins axiom (no rule may mutate a
+ * recorded/completed event).
  */
 
 import { isRecorded, NO_OWNER, type Context, type Event, type Lifecycle } from "../schemas";
@@ -57,11 +45,7 @@ export class EvaluationError extends Error {
 // Topological sort
 // ---------------------------------------------------------------------------
 
-/**
- * Order rules so that each rule's `dependsOn` ids precede it. Throws on
- * unknown dependencies or cycles — both are configuration bugs that should
- * surface at startup, not at evaluation time.
- */
+/** Order rules by `dependsOn`; throws on unknown deps or cycles. */
 export function topoSort(rules: Rule[]): Rule[] {
   const byId = new Map<string, Rule>();
   for (const rule of rules) {
@@ -71,7 +55,6 @@ export function topoSort(rules: Rule[]): Rule[] {
     byId.set(rule.id, rule);
   }
 
-  // Validate that every dependsOn id resolves.
   for (const rule of rules) {
     for (const depId of rule.dependsOn ?? []) {
       if (!byId.has(depId)) {
@@ -108,14 +91,9 @@ export function topoSort(rules: Rule[]): Rule[] {
 // ---------------------------------------------------------------------------
 
 /**
- * A recorded event is identified by (id, lifecycle-state). The guard checks
- * that the set of recorded events emerges from a rule unchanged: same ids,
- * same lifecycle state for each, no removals, no rewrites of recorded fields.
- *
- * wake_window events are excluded from this guard even when their lifecycle is
- * `recorded` — they are engine projection artifacts used to carry scheduling
- * metadata (owner annotations). R4.2 intentionally drops them after merging
- * their metadata onto the cascade-derived projection.
+ * Asserts recorded events pass through a rule unmodified.
+ * wake_window events are excluded even when recorded — R4.2 intentionally
+ * drops recorded wake_window docs after merging their owner annotation.
  */
 function checkRealityWins(ruleId: string, before: Event[], after: Event[]): void {
   const beforeRecorded = before.filter((e) => isRecorded(e.lifecycle) && e.type !== "wake_window");
@@ -147,11 +125,7 @@ function checkRealityWins(ruleId: string, before: Event[], after: Event[]): void
   }
 }
 
-/**
- * Recorded events have authoritative type, time, owner, and payload.
- * Display fields (label, hasPutdown) MAY be re-derived by rules. eventKey
- * is also mutable (R5.4 chronological renumber rewrites recorded bottle keys).
- */
+/** Checks identity of fields that are frozen after recording; label/hasPutdown may be re-derived. */
 function recordedFieldsMatch(a: Event, b: Event): boolean {
   if (a.type !== b.type) return false;
   if (a.startTime !== b.startTime) return false;
@@ -163,10 +137,7 @@ function recordedFieldsMatch(a: Event, b: Event): boolean {
 }
 
 function sameOwner(a: Event["owner"], b: Event["owner"]): boolean {
-  // §F37: owner is required and uses { slot: "none" } for unassigned.
-  // Belt-and-suspenders: coerce `undefined` (legacy data, untyped
-  // fixtures) to NO_OWNER so a pre-F37 in-memory event doesn't crash
-  // the evaluator before the read-seam defaulter runs.
+  // Coerce undefined (legacy data) to NO_OWNER so pre-existing events don't crash before the defaulter runs.
   const aRef = a ?? NO_OWNER;
   const bRef = b ?? NO_OWNER;
   if (aRef.slot !== bRef.slot) return false;
@@ -188,7 +159,7 @@ function sameLifecycle(a: Lifecycle, b: Lifecycle): boolean {
 }
 
 // ---------------------------------------------------------------------------
-// Structural equality (for fixed-point detection)
+// Structural equality (fixed-point detection)
 // ---------------------------------------------------------------------------
 
 function eventsEqual(a: Event[], b: Event[]): boolean {
@@ -226,15 +197,11 @@ export type EvaluateOptions = {
   maxPasses?: number;
 };
 
-/**
- * Iterate rules to a fixed point. Returns events sorted by startTime.
- * Throws EvaluationError if convergence fails or any rule asserts false.
- */
+/** Iterate rules to a fixed point; returns events sorted by startTime. */
 export function evaluate(rules: Rule[], ctx: Context, options: EvaluateOptions = {}): Event[] {
   const ordered = topoSort(rules);
   const maxPasses = options.maxPasses ?? MAX_PASSES;
 
-  // Reality-wins axiom: actuals enter the events array unchanged.
   let events: Event[] = [...ctx.actuals];
 
   let pass = 0;
@@ -265,14 +232,9 @@ export function evaluate(rules: Rule[], ctx: Context, options: EvaluateOptions =
     );
   }
 
-  // Now-cross auto-promote (ADR-0006 Concern A): any projected event
-  // whose startTime is at or before nowMinutes flips to recorded. The
-  // user lives in reality and may not have logged the event yet —
-  // promotion claims the engine's best guess; if it didn't actually
-  // happen, the user reconciles by deleting via the drawer.
-  // Downstream consumers (render layer, cascade rules in subsequent
-  // engine runs) see past events as recorded and use them to inform
-  // remaining projections rather than re-projecting them.
+  // Now-cross auto-promote: projected events whose startTime ≤ nowMinutes
+  // flip to recorded so downstream rules and the render layer treat them
+  // as committed reality.
   events = events.map((e) =>
     e.lifecycle.state === "projected" && e.startTime <= ctx.nowMinutes
       ? { ...e, lifecycle: { state: "recorded", annotatedAt: e.startTime } }

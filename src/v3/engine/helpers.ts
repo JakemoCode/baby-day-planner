@@ -1,11 +1,4 @@
-/**
- * Shared helpers for V3 rules.
- *
- * Goal: keep rule files focused on *intent* (match conditions, transformations)
- * by hoisting the repeated event-literal construction and predicate plumbing
- * into one place. Each rule still owns its domain logic; helpers only express
- * the mechanics.
- */
+/** Shared predicate and event-construction helpers for V3 rules. */
 
 import type { Context, Event, EventKind, EventType, OwnerRef } from "../schemas";
 import { isRecorded, NO_OWNER } from "../schemas";
@@ -29,11 +22,7 @@ export function hasType(type: EventType): (event: Event) => boolean {
   return (event) => event.type === type;
 }
 
-/**
- * Pre-bound type predicates for the types that appear in two or more rule
- * files. Single-use predicates (e.g. `isPump`, `isRecurring`) stay local to
- * their rule file — consolidation only helps when there's actual duplication.
- */
+/** Pre-bound predicates for types used in multiple rule files. */
 export const isNap = hasType("nap");
 export const isWakeWindow = hasType("wake_window");
 export const isBedtime = hasType("bedtime");
@@ -57,10 +46,7 @@ export type ProjectedEventInput = {
   hasPutdown?: boolean;
 };
 
-/**
- * Build a `projected` Event with the boilerplate filled in. Optional fields
- * are only set when defined to honor `exactOptionalPropertyTypes`.
- */
+/** Build a projected Event; optional fields omitted when undefined (exactOptionalPropertyTypes). */
 export function projectedEvent(input: ProjectedEventInput): Event {
   const event: Event = {
     id: input.id,
@@ -71,7 +57,7 @@ export function projectedEvent(input: ProjectedEventInput): Event {
     startTime: input.startTime,
     label: input.label,
     hasPutdown: input.hasPutdown ?? false,
-    owner: input.owner ?? NO_OWNER, // §F37: owner is required; default to unassigned
+    owner: input.owner ?? NO_OWNER, // owner is required; default to unassigned
     lifecycle: { state: "projected" },
   };
   if (input.endTime !== undefined) event.endTime = input.endTime;

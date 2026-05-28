@@ -101,7 +101,6 @@ describe("evaluate — basics", () => {
       produces: (events) => [...events, aProjectedBottle({ start: 9 * 60 })],
     };
     evaluate([ruleB, ruleSeed, ruleA], aContext());
-    // R.B should always have observed the renamed label, never the original.
     expect(seenA.every((l) => l === "A1")).toBe(true);
   });
 
@@ -141,8 +140,7 @@ describe("evaluate — basics", () => {
         return null;
       },
     };
-    // assertAfter only runs when produces returns a *changed* event set —
-    // so we set up a rule that mutates and then asserts.
+    // assertAfter runs only when produces returns a changed event set.
     const mutator: Rule = {
       id: "R.mutator",
       description: "extend nap label",
@@ -157,7 +155,7 @@ describe("evaluate — basics", () => {
         return null;
       },
     };
-    void assertion; // unused; kept to demonstrate rule shape
+    void assertion;
     expect(() => evaluate([seed, mutator], aContext())).toThrow(/R.mutator/);
   });
 });

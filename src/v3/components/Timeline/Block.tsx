@@ -22,8 +22,7 @@ export type BlockProps = {
   rightPx: number;
 };
 
-// a11y-only verbose range: screen readers do better with the full
-// "1:00 PM" pronunciation than the timeline's compact "1-1:15p".
+/** Full-length range string for screen readers; timeline shows compact form. */
 function formatRangeVerbose(start: number, end: number): string {
   return `${formatTimeForDisplay(start)} to ${formatTimeForDisplay(end)}`;
 }
@@ -59,18 +58,12 @@ export function Block({
   const a11y = `${event.label}${rangeA11y ? ` ${rangeA11y}` : ""}${ownerName ? ` ${ownerName}` : ""}`;
   const napShortForm = event.type === "nap" && heightPx < NAP_TWO_ROW_THRESHOLD_PX;
   const isPutdown = event.eventKey === PUTDOWN_KIND_TAG;
-  // Pump: "Pump" + time range on two lines. Owner is conveyed by the
-  // left-stripe color (existing [data-owner] rule), not by text —
-  // "owner knows who they are." Block is sized to content (max-content)
-  // and inset 4px from the main block's right edge so a sliver of the
-  // parent block's shoulder shows past the pump.
+  // Pump owner conveyed by left-stripe color, not text; sized to max-content and inset from parent.
   const isPump = event.type === "pump";
   const positionStyle = isPump
     ? { right: `${rightPx}px`, width: "max-content" as const }
     : { left: `${leftPx}px`, right: `${rightPx}px` };
-  // Reuse V2's "putdown" data-type so the existing CSS selectors apply.
-  // V3 doesn't have a putdown type at the schema level; this is the
-  // renderer's contract with the stylesheet, not with the data model.
+  // "putdown" data-type reuses V2 stylesheet selectors; not a schema type.
   const dataType = isPutdown ? "putdown" : event.type;
 
   return (

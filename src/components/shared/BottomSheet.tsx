@@ -16,11 +16,7 @@ export type BottomSheetProps = {
   children: ReactNode;
 };
 
-/**
- * A polished bottom-sheet drawer: dim backdrop, slide-up animation,
- * grab handle, title, body, Cancel. Dismisses on backdrop click,
- * Cancel, or Escape. Used by `FABTypePicker` and `TemplateOwnerPicker`.
- */
+/** Slide-up bottom sheet with backdrop, grab handle, and Cancel. Dismisses on backdrop click or Escape. */
 export function BottomSheet({ open, title, onCancel, ariaLabel, children }: BottomSheetProps) {
   useEffect(() => {
     if (!open) return;

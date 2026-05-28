@@ -16,13 +16,9 @@ function sortByStart(events: Event[]): Event[] {
 }
 
 /**
- * Render-synthetic putdown events carry their parent's `type` (so the
- * timeline geometry can stay typed) but `eventKey === PUTDOWN_KIND_TAG`.
- * Selectors operating on "engine events" must ignore them — otherwise a
- * synthetic putdown with `type === "nap"` looks like the next nap and
- * gets routed to e.g. `nextProjectedNap.eventKey`. (Caused a Firestore
- * INVALID_ARGUMENT crash on Start Nap Now when its id was minted from
- * the putdown's PUTDOWN_KIND_TAG eventKey.)
+ * Render-synthetic putdowns carry their parent's `type` but `eventKey === PUTDOWN_KIND_TAG`.
+ * Selectors must filter them out — a nap-parent putdown otherwise looks like the next nap
+ * and its PUTDOWN_KIND_TAG eventKey would be minted as a Firestore doc id (INVALID_ARGUMENT crash).
  */
 function isEngineEvent(e: Event): boolean {
   return !isRenderSynthetic(e);

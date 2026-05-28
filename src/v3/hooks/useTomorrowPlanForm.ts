@@ -2,14 +2,8 @@
 
 /**
  * Local form buffer for /tomorrow's plan editor.
- *
- * Owns the editable fields, one-shot hydration from the loaded plan,
- * the `hasEdits` derivation, and a `reset()`. Deliberately knows
- * nothing about Firestore — `useTomorrowPlanState` composes this with
- * the subscription, autosave, and write-path actions. Splitting the
- * buffer out keeps the subtle hydration timing (clamped to run once,
- * never clobbering a user edit with a late snapshot) in one
- * independently-testable place.
+ * Owns editable fields, one-shot hydration, hasEdits, and reset().
+ * Knows nothing about Firestore — composed by useTomorrowPlanState.
  */
 
 import { useEffect, useMemo, useState } from "react";
@@ -25,24 +19,14 @@ export type UseTomorrowPlanFormResult = {
   upsertExtra: (event: Event) => void;
   removeExtra: (eventId: string) => void;
   setOwnerOverride: (eventKey: string, owner: OwnerRef | null) => void;
-  /**
-   * True when any field differs from the settings-derived defaults
-   * baseline. Gates the Confirm button and (with `hydrated`) autosave.
-   */
+  /** True when any field differs from the defaults baseline. Gates Confirm and autosave. */
   hasEdits: boolean;
-  /**
-   * False until the first plan snapshot has been folded into the form.
-   * Consumers must not autosave before this flips true, or they'd
-   * persist the default values ahead of the real loaded plan.
-   */
+  /** False until the first snapshot has been folded in. Autosave must not fire before this. */
   hydrated: boolean;
   /**
-   * Blank the fields back to defaults. Used by clear() after the plan
-   * doc is deleted. Deliberately leaves `hydrated` TRUE: re-arming it
-   * would let the still-in-flight (not-yet-null) plan snapshot
-   * re-hydrate the form with the values being deleted — and autosave
-   * would then resurrect the doc. Staying hydrated keeps the form
-   * blank; the subscription's null arrives and changes nothing.
+   * Blank fields to defaults. Leaves `hydrated` TRUE: re-arming would
+   * let the still-in-flight plan snapshot re-hydrate the deleted values
+   * and autosave would resurrect the doc.
    */
   reset: () => void;
 };
@@ -56,15 +40,11 @@ export function useTomorrowPlanForm(
   const [templateId, setTemplateId] = useState<string | undefined>(undefined);
   const [extras, setExtras] = useState<Event[]>([]);
   const [ownerOverrides, setOwnerOverrides] = useState<Record<string, OwnerRef | null>>({});
-  // Clamps hydration to run exactly once when the snapshot first
-  // resolves — avoids overwriting user edits with a late-arriving snapshot.
+  // Runs once; prevents late snapshots from overwriting user edits.
   const [hydrated, setHydrated] = useState(false);
 
-  // One-shot hydration from the loaded plan. The multiple setState
-  // calls are intentional: each field mirrors a different plan field so
-  // subsequent user edits are independent. React-hooks linter flags
-  // setState-in-effect, but hydrating async-loaded server state is the
-  // canonical exception.
+  // One-shot hydration; multiple setState calls are intentional (each field is independent).
+  // setState-in-effect is the canonical exception for async-loaded server state.
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (loading || hydrated) return;
@@ -108,9 +88,7 @@ export function useTomorrowPlanForm(
     setTemplateId(undefined);
     setExtras([]);
     setOwnerOverrides({});
-    // Stay hydrated — see the `reset` doc on UseTomorrowPlanFormResult.
-    // Re-arming (setHydrated(false)) would re-hydrate from the stale,
-    // not-yet-deleted plan and autosave would resurrect the doc.
+    // Stay hydrated — re-arming would re-hydrate from the stale plan and autosave would resurrect the doc.
     setHydrated(true);
   };
 

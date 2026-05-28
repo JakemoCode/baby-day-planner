@@ -1,17 +1,7 @@
 // @vitest-environment jsdom
 /**
- * Integration test: useTomorrowPlanState composed clear() seam (#12).
- *
- * The form buffer (useTomorrowPlanForm) is unit-tested in isolation,
- * but clear()'s correctness lives in the LIVE composition of delete +
- * blank + autosave-suppression against a real subscription — a unit
- * test can only simulate it. clear() must (a) delete the doc, (b) blank
- * the form, and (c) NOT let autosave resurrect the doc during the window
- * where the form is already blanked but the deleted-doc null snapshot
- * hasn't propagated yet (the `clearing` flag suppresses autosave across
- * that window). This exercises the real subscription + real form + real
- * repo writes against the emulator, including a wait past the autosave
- * debounce to prove no draft is rewritten.
+ * Integration test: useTomorrowPlanState — clear() seam (real subscription + real repo).
+ * Verifies: delete doc, blank form, and autosave suppression across the clearing window.
  */
 
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
@@ -36,9 +26,7 @@ vi.mock("@/lib/firebase/client", () => ({
   },
 }));
 
-// Keep every repo fn real except deleteTomorrowPlan, which stays real by
-// default but can be made to reject once (to exercise clear()'s
-// failed-delete path).
+// Real repo except deleteTomorrowPlan, which can be made to reject (failed-delete path).
 vi.mock("../../../src/v3/repositories/tomorrowPlans", async (importOriginal) => {
   const actual = await importOriginal<typeof TomorrowPlansRepo>();
   return {
@@ -98,17 +86,13 @@ describe("useTomorrowPlanState — clear() seam (emulator-backed)", () => {
     expect(result.current.ownerOverrides).toEqual({ nap_1: { slot: "parent1" } });
     expect(result.current.hasEdits).toBe(true);
 
-    // The seam under test: clear() deletes the doc and blanks the form.
-    // reset() stays hydrated, so the stale (not-yet-null) snapshot can't
-    // re-hydrate the deleted values and autosave can't resurrect them.
+    // clear() deletes + blanks; reset() stays hydrated so stale snapshot can't re-hydrate.
     await act(async () => {
       await result.current.clear();
     });
 
-    // clear() awaits deleteTomorrowPlan, so the doc is already gone.
     expect(await loadTomorrowPlan(testDb, "child-1", DATE)).toBeNull();
 
-    // UI state catches up once the subscription emits null.
     await waitFor(
       () => {
         expect(result.current.status).toBe("no-plan");
@@ -119,10 +103,7 @@ describe("useTomorrowPlanState — clear() seam (emulator-backed)", () => {
       { timeout: 2000 },
     );
 
-    // Guard the residual window: wait past the autosave debounce (250ms)
-    // and confirm no defaults `draft` was written back. Without the
-    // `clearing` suppression, the blanked-form-but-stale-plan window
-    // would resurrect the doc as a draft once the timer fired.
+    // Wait past autosave debounce; without the clearing flag, blanked form would resurrect the doc.
     await act(async () => {
       await new Promise((r) => setTimeout(r, 400));
     });
@@ -149,16 +130,13 @@ describe("useTomorrowPlanState — clear() seam (emulator-backed)", () => {
       { timeout: 2000 },
     );
 
-    // Force the delete to reject — clear() must restore the clearing flag
-    // and re-throw, not leave autosave disabled.
+    // Force delete to reject — clearing flag must be restored so autosave isn't permanently disabled.
     vi.mocked(deleteTomorrowPlan).mockRejectedValueOnce(new Error("offline"));
     await act(async () => {
       await expect(result.current.clear()).rejects.toThrow("offline");
     });
 
-    // The doc still exists (delete failed). A subsequent edit must still
-    // autosave — proving `clearing` was restored, not stuck true. If the
-    // flag were stuck, autosaveInput would stay null and this never saves.
+    // Doc still exists; subsequent edit must autosave to prove clearing flag was restored.
     act(() => result.current.setWakeTime(DEFAULT_WAKE + 5));
     await waitFor(
       async () => {

@@ -1,17 +1,8 @@
 /**
- * Owner display-name + color lookup. The engine stores OwnerRef as a
- * slot identity (parent1 / parent2 / other[id]); the configured display
- * string lives on Settings.owners and is read here at render time.
- *
- * Returning `""` / `null` for missing refs (stale `otherId`, undefined
- * ref) is deliberate: a deleted "other" owner shouldn't crash the
- * timeline. The renderer falls back to its unassigned affordance.
- *
- * §F4 (2026-05-20): `ownerColor` returns CSS variable references against
- * the slot-keyed `--color-owner-*` tokens rather than reading a per-owner
- * hex from Settings. parent-1/parent-2 are fixed; "other" owners map to
- * slots 3..6 by their index in `owners.other[]`, cycling back to 3 if
- * more than four are configured (rare).
+ * Render-time owner display-name + color lookup from OwnerRef slot identity.
+ * Missing/stale refs return ""/null deliberately so a deleted "other" owner
+ * doesn't crash the timeline. `ownerColor` maps "other" owners to slot tokens
+ * `--color-owner-3..6` by index, cycling if more than four are configured.
  */
 
 import type { OwnerRef, OwnersConfig } from "../schemas";
