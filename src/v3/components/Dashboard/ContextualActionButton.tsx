@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { NO_OWNER, type Event, type TimeMin } from "@/v3/schemas";
+import { recordedIdFor } from "@/v3/lib/eventConventions";
 import { currentLocalMinutes } from "@/v3/ui/time";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { ActionButton } from "./ActionButton";
@@ -59,7 +60,7 @@ function buildLoggedBottle(
   // `recorded_${eventKey}` id makes subsequent drawer edits / re-taps
   // overwrite the same Firestore doc.
   return {
-    id: `recorded_${projected.eventKey}`,
+    id: recordedIdFor(projected.eventKey),
     dayId,
     eventKey: projected.eventKey,
     type: "bottle",

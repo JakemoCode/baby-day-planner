@@ -7,6 +7,12 @@ import type { Event, EventType, OwnerRef, OwnersConfig, TimeMin } from "../../sc
 import { isRecorded, NO_OWNER } from "../../schemas";
 import { isFutureProjected, isNextProjectedOfType } from "../../lifecycle";
 import { isRenderSynthetic } from "../../lib/syntheticEvents";
+import {
+  DREAM_FEED_EVENT_KEY,
+  isDreamFeed,
+  isEngineEmittedId,
+  recordedIdFor,
+} from "../../lib/eventConventions";
 import { formatHM24, formatTimeForDisplay, nextDayAt, parseHM24 } from "../../ui/time";
 import { OwnerPickerV3 } from "./OwnerPickerV3";
 import { formToEvent, type FormState } from "./formToEvent";
@@ -73,7 +79,8 @@ function validateForm(
   // time. Scope to cascade-anchoring types only — daily_recurring,
   // daycare, dream-feed, pump, and extras are fixed-time / explicit-
   // slot events that the user may legitimately schedule pre-wake.
-  const isCascadeAnchoring = type === "nap" || (type === "bottle" && eventKey !== "bottle_dream");
+  const isCascadeAnchoring =
+    type === "nap" || (type === "bottle" && eventKey !== DREAM_FEED_EVENT_KEY);
   if (
     isCascadeAnchoring &&
     dayWakeTime !== undefined &&
@@ -220,7 +227,7 @@ export function EventEditDrawerV3({
   //   - daycare_dropoff/pickup (→ Day.suppressedDaycareDay, §F66 fast-follow)
   //   - dream-feed slot (→ Day.suppressedDreamFeed, §F66 fast-follow)
   // useDrawer routes each path.
-  const isDreamFeedSlot = type === "bottle" && sourceEvent.eventKey === "bottle_dream";
+  const isDreamFeedSlot = type === "bottle" && isDreamFeed(sourceEvent);
   const hasSuppressionPath =
     type === "daily_recurring" ||
     type === "daycare_dropoff" ||
@@ -235,7 +242,7 @@ export function EventEditDrawerV3({
   // annotatedAt === startTime. Manual logs use "completed" and drawer
   // saves bump annotatedAt to nowMinutes, so neither collides.
   const isAutoPromotedSleep =
-    (type === "nap" || type === "bedtime") && sourceEvent.id.startsWith("proj_");
+    (type === "nap" || type === "bedtime") && isEngineEmittedId(sourceEvent.id);
   const isAutoPromotedBottle =
     type === "bottle" &&
     !isDreamFeedSlot &&
@@ -370,7 +377,7 @@ export function EventEditDrawerV3({
       // §F59: align id convention with useDrawer (`recorded_${eventKey}`)
       // so this and any subsequent edit / Start-Bedtime tap write to the
       // same Firestore doc instead of orphaning a `bedtime`-id doc.
-      id: "recorded_bedtime",
+      id: recordedIdFor("bedtime"),
       dayId: napCandidate.dayId,
       eventKey: "bedtime",
       type: "bedtime",

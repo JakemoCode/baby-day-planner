@@ -44,6 +44,7 @@ import type { Rule } from "../evaluator";
 import { intervalForAmount } from "../bottleIntervalRules";
 import { hasType, isProjected, projectedEvent } from "../helpers";
 import { MINUTES_PER_DAY } from "../../ui/time";
+import { DREAM_FEED_EVENT_KEY, isDreamFeed } from "../../lib/eventConventions";
 
 // ---------------------------------------------------------------------------
 // Predicates / helpers
@@ -114,18 +115,6 @@ function buildProjectedBottle(ctx: Context, n: number, startTime: number): Event
     `Bottle ${n}`,
     startTime,
   );
-}
-
-const DREAM_FEED_EVENT_KEY = "bottle_dream";
-
-/**
- * The dream-feed slot is a sentinel — it has the type "bottle" but
- * lives outside the rhythm chain by design (R5.5). All rhythm-cascade
- * sites that walk over bottles (trim, renumber, chronological index)
- * must skip it to avoid corrupting cascade math or looping the engine.
- */
-function isDreamFeed(e: Event): boolean {
-  return e.eventKey === DREAM_FEED_EVENT_KEY;
 }
 
 /**

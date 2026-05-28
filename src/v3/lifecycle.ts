@@ -21,6 +21,7 @@
 
 import type { Event, EventKind, EventType, Lifecycle, TimeMin } from "./schemas";
 import { isRenderSynthetic } from "./lib/syntheticEvents";
+import { isDreamFeed } from "./lib/eventConventions";
 
 // ---------------------------------------------------------------------------
 // Predicates
@@ -56,7 +57,7 @@ export function isFutureProjected(event: Event, nowMinutes: TimeMin): boolean {
   if (event.lifecycle.state !== "projected") return false;
   if (event.startTime <= nowMinutes) return false;
   if (event.type !== "nap" && event.type !== "bottle") return false;
-  if (event.type === "bottle" && event.eventKey === "bottle_dream") return false;
+  if (event.type === "bottle" && isDreamFeed(event)) return false;
   if (isRenderSynthetic(event)) return false;
   return true;
 }

@@ -34,6 +34,7 @@ import { doc, runTransaction, type Firestore } from "firebase/firestore";
 import { v3EventConverter } from "../firestore/converters";
 import { eventPath } from "@/lib/firestore/paths";
 import type { Event } from "../schemas";
+import { DREAM_FEED_EVENT_KEY, isEngineEmittedId, recordedIdFor } from "../lib/eventConventions";
 
 export type UseAutoPromotePersistenceInput = {
   db: Firestore | null;
@@ -61,12 +62,12 @@ export function useAutoPromotePersistence(input: UseAutoPromotePersistenceInput)
       // (Day.suppressedDreamFeed). Auto-persisting it would create a
       // second write path that bypasses the suppression-from-emission
       // model the rest of the dream-feed code uses.
-      if (e.eventKey === "bottle_dream") continue;
+      if (e.eventKey === DREAM_FEED_EVENT_KEY) continue;
       if (e.lifecycle.state === "projected") continue;
       // Already-persisted events have non-"proj_" ids — their
       // lifecycle came from Firestore, not from auto-promote.
-      if (!e.id.startsWith("proj_")) continue;
-      const recordedId = `recorded_${e.eventKey}`;
+      if (!isEngineEmittedId(e.id)) continue;
+      const recordedId = recordedIdFor(e.eventKey);
       if (actualIds.has(recordedId)) continue;
       // §F66 review: cache key MUST include dayId. The Firestore path
       // is dayId-scoped but recordedId alone collides across days,

@@ -9,14 +9,9 @@ import { useV3Projection } from "@/v3/hooks/useV3Projection";
 import { useV3Settings } from "@/v3/hooks/useV3Settings";
 import { useV3Templates } from "@/v3/hooks/useV3Templates";
 import { useDrawer } from "@/v3/hooks/useDrawer";
+import { useDayDrawerSuppressions } from "@/v3/hooks/useDayDrawerSuppressions";
 import { db } from "@/lib/firebase/client";
-import {
-  editWakeTime,
-  suppressDaycareForDay,
-  suppressDreamFeedForDay,
-  suppressRecurringForDay,
-  updateDayOwnerOverride,
-} from "@/v3/repositories/days";
+import { editWakeTime, updateDayOwnerOverride } from "@/v3/repositories/days";
 import { LoadingState } from "@/components/shared/LoadingState";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { FAB } from "@/components/shared/FAB";
@@ -36,6 +31,7 @@ export default function TimelinePage() {
   const { settings, loading: settingsLoading } = useV3Settings(CHILD_ID);
   const { events: actuals, saveEvent, deleteOptimistic } = useV3Events(CHILD_ID, day?.id ?? "");
   const { templates } = useV3Templates(CHILD_ID);
+  const drawerSuppressions = useDayDrawerSuppressions(db, CHILD_ID, day?.id);
   const { drawer, openCreate, openEdit, close, onSave, onDelete } = useDrawer(
     actuals,
     saveEvent,
@@ -43,28 +39,7 @@ export default function TimelinePage() {
     day?.id
       ? (eventKey, owner) => updateDayOwnerOverride(db, CHILD_ID, day.id, eventKey, owner)
       : undefined,
-    // §F65/§F66 — per-day suppressions when "delete" means "skip today".
-    day?.id
-      ? [
-          {
-            matches: (e) => e.type === "daily_recurring",
-            apply: (e) => {
-              const id = e.eventKey.startsWith("recurring:")
-                ? e.eventKey.slice("recurring:".length)
-                : e.eventKey;
-              return suppressRecurringForDay(db, CHILD_ID, day.id, id);
-            },
-          },
-          {
-            matches: (e) => e.type === "daycare_dropoff" || e.type === "daycare_pickup",
-            apply: () => suppressDaycareForDay(db, CHILD_ID, day.id),
-          },
-          {
-            matches: (e) => e.type === "bottle" && e.eventKey === "bottle_dream",
-            apply: () => suppressDreamFeedForDay(db, CHILD_ID, day.id),
-          },
-        ]
-      : [],
+    drawerSuppressions,
   );
   const [pickerOpen, setPickerOpen] = useState(false);
 

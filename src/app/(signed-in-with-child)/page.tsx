@@ -22,14 +22,13 @@ import { useV3Projection } from "@/v3/hooks/useV3Projection";
 import { useAutoPromotePersistence } from "@/v3/hooks/useAutoPromotePersistence";
 import { useV3TomorrowPlan } from "@/v3/hooks/useV3TomorrowPlan";
 import { useReconcileActiveDay } from "@/v3/hooks/useReconcileActiveDay";
-import { useDrawer, type DrawerSuppression } from "@/v3/hooks/useDrawer";
+import { useDrawer } from "@/v3/hooks/useDrawer";
+import { useDayDrawerSuppressions } from "@/v3/hooks/useDayDrawerSuppressions";
+import { isEngineEmittedId, recordedIdFor } from "@/v3/lib/eventConventions";
 import {
   getOrCreatePlannedDay,
   promoteFromPlan,
   startNewDay,
-  suppressDaycareForDay,
-  suppressDreamFeedForDay,
-  suppressRecurringForDay,
   updateDayOwnerOverride,
 } from "@/v3/repositories/days";
 import {
@@ -87,27 +86,7 @@ export default function DashboardPage() {
   // re-promote from the plan vs defaults during dogfood iteration.
   const { plan: todaysPlan } = useV3TomorrowPlan(CHILD_ID, todayDate());
   const hasTomorrowPlan = todaysPlan?.status === "confirmed";
-  const drawerSuppressions: DrawerSuppression[] = day?.id
-    ? [
-        {
-          matches: (e) => e.type === "daily_recurring",
-          apply: (e) => {
-            const id = e.eventKey.startsWith("recurring:")
-              ? e.eventKey.slice("recurring:".length)
-              : e.eventKey;
-            return suppressRecurringForDay(db, CHILD_ID, day.id, id);
-          },
-        },
-        {
-          matches: (e) => e.type === "daycare_dropoff" || e.type === "daycare_pickup",
-          apply: () => suppressDaycareForDay(db, CHILD_ID, day.id),
-        },
-        {
-          matches: (e) => e.type === "bottle" && e.eventKey === "bottle_dream",
-          apply: () => suppressDreamFeedForDay(db, CHILD_ID, day.id),
-        },
-      ]
-    : [];
+  const drawerSuppressions = useDayDrawerSuppressions(db, CHILD_ID, day?.id);
   const { drawer, openCreate, close, onSave, onDelete } = useDrawer(
     actuals,
     saveEvent,
@@ -228,7 +207,7 @@ export default function DashboardPage() {
   // the `recorded_${eventKey}` convention).
   const handleEndNap = async (event: Event, endTime: number) => {
     if (!day || day.id === "") return;
-    const id = event.id.startsWith("proj_") ? `recorded_${event.eventKey}` : event.id;
+    const id = isEngineEmittedId(event.id) ? recordedIdFor(event.eventKey) : event.id;
     await saveEvent({
       ...event,
       id,

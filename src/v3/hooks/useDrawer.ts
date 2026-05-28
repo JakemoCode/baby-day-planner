@@ -18,6 +18,7 @@
 
 import { useState } from "react";
 import type { Event } from "../schemas";
+import { recordedIdFor } from "../lib/eventConventions";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -130,7 +131,7 @@ export function useDrawer(
         // deterministically so subsequent edits route through update
         // (not create) — fixes the intermittent wake-window owner bug
         // from PR #186.
-        await saveEvent({ ...event, id: `recorded_${event.eventKey}` });
+        await saveEvent({ ...event, id: recordedIdFor(event.eventKey) });
       } else {
         await saveEvent(event);
       }
