@@ -20,7 +20,7 @@ import {
   suppressDreamFeedForDay,
   suppressRecurringForDay,
 } from "../repositories/days";
-import { DREAM_FEED_EVENT_KEY } from "../lib/eventConventions";
+import { DREAM_FEED_EVENT_KEY, recurringIdFromEventKey } from "../lib/eventConventions";
 
 export function useDayDrawerSuppressions(
   db: Firestore,
@@ -31,12 +31,8 @@ export function useDayDrawerSuppressions(
   return [
     {
       matches: (e) => e.type === "daily_recurring",
-      apply: (e) => {
-        const id = e.eventKey.startsWith("recurring:")
-          ? e.eventKey.slice("recurring:".length)
-          : e.eventKey;
-        return suppressRecurringForDay(db, childId, dayId, id);
-      },
+      apply: (e) =>
+        suppressRecurringForDay(db, childId, dayId, recurringIdFromEventKey(e.eventKey)),
     },
     {
       matches: (e) => e.type === "daycare_dropoff" || e.type === "daycare_pickup",

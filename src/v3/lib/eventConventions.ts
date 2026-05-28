@@ -40,3 +40,22 @@ export const DREAM_FEED_EVENT_KEY = "bottle_dream";
 export function isDreamFeed(e: { eventKey: string }): boolean {
   return e.eventKey === DREAM_FEED_EVENT_KEY;
 }
+
+/**
+ * Daily-recurring eventKey wraps the Settings.dailyRecurring entry's
+ * id with this prefix so the cascade can identify projections that
+ * came from a recurring template vs. an ad-hoc event. The drawer's
+ * "delete" path reverses this to write the raw id into
+ * `Day.suppressedRecurringIds`.
+ */
+export const RECURRING_KEY_PREFIX = "recurring:";
+
+export function recurringEventKeyFor(id: string): string {
+  return `${RECURRING_KEY_PREFIX}${id}`;
+}
+
+export function recurringIdFromEventKey(eventKey: string): string {
+  return eventKey.startsWith(RECURRING_KEY_PREFIX)
+    ? eventKey.slice(RECURRING_KEY_PREFIX.length)
+    : eventKey;
+}
