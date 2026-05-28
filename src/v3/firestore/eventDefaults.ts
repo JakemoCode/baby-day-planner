@@ -28,7 +28,7 @@ export function withV3EventDefaults(input: Partial<Event>): Event {
     startTime: input.startTime ?? 0,
     label: input.label ?? "",
     hasPutdown: input.hasPutdown ?? false,
-    // §F37: owner is required; pre-F37 docs missing the field migrate to NO_OWNER on read.
+    // owner is required; pre-existing docs missing the field migrate to NO_OWNER on read.
     owner: input.owner ?? NO_OWNER,
     lifecycle: migratedLifecycle ?? input.lifecycle ?? { state: "projected" },
   };

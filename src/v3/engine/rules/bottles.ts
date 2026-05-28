@@ -278,7 +278,7 @@ function projectBottleChain(events: Event[], ctx: Context): Event[] {
   // the cascade runs to bedtime/midnight regardless of bottlesPerDay.
   const reachedColdStartCap = () => !isAnchored && chainCount >= target;
 
-  // §F54 — Overnight-near-wake guard: if an overnight bottle's forward interval
+  // Overnight-near-wake guard: if an overnight bottle's forward interval
   // extends past wake+buffer, seed the cold-start cascade from that later time.
   const overnightAnchors = bottles
     .filter((b) => !isProjected(b) && b.startTime < wakeTime)
@@ -299,7 +299,7 @@ function projectBottleChain(events: Event[], ctx: Context): Event[] {
   if (chainBottles.length > 0) {
     prev = chainBottles[chainBottles.length - 1]!;
   } else {
-    // Cold start: seed at seedTime (wake+buffer, shifted by §F54 overnight guard).
+    // Cold start: seed at seedTime (wake+buffer, shifted by overnight guard).
     if (reachedColdStartCap()) return [...trimmedEvents, ...projections];
     if (seedTime >= cap) return [...trimmedEvents, ...projections];
     const seed = snap(seedTime);

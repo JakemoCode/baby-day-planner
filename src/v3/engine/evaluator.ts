@@ -137,7 +137,7 @@ function recordedFieldsMatch(a: Event, b: Event): boolean {
 }
 
 function sameOwner(a: Event["owner"], b: Event["owner"]): boolean {
-  // Coerce undefined (legacy data) to NO_OWNER so pre-§F37 events don't crash before the defaulter runs.
+  // Coerce undefined (legacy data) to NO_OWNER so pre-existing events don't crash before the defaulter runs.
   const aRef = a ?? NO_OWNER;
   const bRef = b ?? NO_OWNER;
   if (aRef.slot !== bRef.slot) return false;

@@ -9,7 +9,7 @@ export type OwnersConfigEditorProps = {
   onChange: (next: OwnersConfig) => void;
 };
 
-/** §F4: display name editor only; colors are fixed by slot via tokens.css. */
+/** Display name editor only; colors are fixed by slot via tokens.css. */
 export function OwnersConfigEditor({ value, onChange }: OwnersConfigEditorProps) {
   const updateParent = (slot: "parent1" | "parent2", patch: Partial<OwnersConfig["parent1"]>) => {
     onChange({ ...value, [slot]: { ...value[slot], ...patch } });

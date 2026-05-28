@@ -114,7 +114,7 @@ describe("v3 days repository", () => {
     expect(got?.wakeTime).toBe(7 * 60 + 5);
   });
 
-  // §F63: owner-only edits route to Day.ownerOverrides (not the events collection)
+  // Owner-only edits route to Day.ownerOverrides (not the events collection)
   // so the engine remains free to re-project the event's time.
   it("updateDayOwnerOverride merges into existing ownerOverrides map (does not replace)", async () => {
     const database = db();
@@ -150,7 +150,7 @@ describe("v3 days repository", () => {
     expect(got?.ownerOverrides).toEqual({ nap_1: { slot: "parent2" } });
   });
 
-  // §F65: routes through Day.suppressedRecurringIds (R11.6) — Settings.dailyRecurring
+  // Routes through Day.suppressedRecurringIds (R11.6) — Settings.dailyRecurring
   // stays intact so the recurring re-appears tomorrow.
   it("suppressRecurringForDay adds a recurring id to an empty suppression list", async () => {
     const database = db();
@@ -176,7 +176,7 @@ describe("v3 days repository", () => {
     expect(got?.suppressedRecurringIds).toEqual(["rec-tummy"]);
   });
 
-  // §F66: flips Day.suppressedDaycareDay (R21.5) without touching Settings.daycare.
+  // Flips Day.suppressedDaycareDay (R21.5) without touching Settings.daycare.
   it("suppressDaycareForDay flips suppressedDaycareDay to true", async () => {
     const database = db();
     await createDay(database, day({ suppressedDaycareDay: false }));
@@ -193,7 +193,7 @@ describe("v3 days repository", () => {
     expect(got?.suppressedDaycareDay).toBe(true);
   });
 
-  // §F66: routes through Day.suppressedDreamFeed; R5.5 stops emitting the slot.
+  // Routes through Day.suppressedDreamFeed; R5.5 stops emitting the slot.
   it("suppressDreamFeedForDay flips suppressedDreamFeed to true", async () => {
     const database = db();
     await createDay(database, day({ suppressedDreamFeed: false }));
@@ -287,7 +287,7 @@ describe("v3 days repository", () => {
   // startNewDay (PR-A0.2)
   // -------------------------------------------------------------------------
 
-  // §F17: deterministic `day-${childId}-${date}` id makes concurrent rollover
+  // Deterministic `day-${childId}-${date}` id makes concurrent rollover
   // safe — both clients write the same doc id via idempotent setDoc.
   it("derives a deterministic id when newDayId is omitted", async () => {
     const database = db();
@@ -589,7 +589,7 @@ describe("v3 days repository", () => {
   });
 
   // ---------------------------------------------------------------------------
-  // promoteFromPlan (§F17)
+  // promoteFromPlan
   // ---------------------------------------------------------------------------
 
   const aPlan = (overrides: Partial<TomorrowPlan> = {}): TomorrowPlan => ({
@@ -626,7 +626,7 @@ describe("v3 days repository", () => {
     });
   });
 
-  // §F17: plan extras get persisted as projected Event docs; dayId is
+  // Plan extras get persisted as projected Event docs; dayId is
   // rewritten from the plan-side placeholder to the real newDayId.
   it("promoteFromPlan writes plan.extras as projected Event docs on the new Day", async () => {
     const database = db();
@@ -656,7 +656,7 @@ describe("v3 days repository", () => {
     expect(events[0]?.lifecycle.state).toBe("projected");
   });
 
-  // §F17: inherits startNewDay's archive seam — pre-existing active day
+  // Inherits startNewDay's archive seam — pre-existing active day
   // flips to archived in the same transaction.
   it("archives any pre-existing active day in the same transaction", async () => {
     const database = db();

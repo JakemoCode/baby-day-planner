@@ -1,6 +1,6 @@
 /**
  * OwnersConfigEditor — V3 user-editable owners (REQUIREMENTS §1.7).
- * Color hex inputs removed (§F4); colors are slot-keyed via tokens (ownerColor()).
+ * Color hex inputs removed; colors are slot-keyed via tokens (ownerColor()).
  */
 
 import { useState } from "react";
@@ -42,7 +42,7 @@ describe("OwnersConfigEditor", () => {
     render(<OwnersConfigEditor value={owners()} onChange={() => {}} />);
     expect(screen.getByLabelText("Parent 1 name")).toHaveValue("Jake");
     expect(screen.getByLabelText("Parent 2 name")).toHaveValue("Sam");
-    // Color input is gone post-§F4.
+    // Color input is gone.
     expect(document.getElementById("parent1-color")).toBeNull();
     expect(document.getElementById("parent2-color")).toBeNull();
   });

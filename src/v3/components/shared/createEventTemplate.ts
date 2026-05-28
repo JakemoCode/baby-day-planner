@@ -43,7 +43,7 @@ export function buildCreateTemplate({
       startTime: nowMinutes,
       amountOz: settings.defaultBottleAmountOz,
       hasPutdown: false,
-      owner: NO_OWNER, // §F37: owner required; new events start unassigned
+      owner: NO_OWNER, // owner required; new events start unassigned
       lifecycle: { state: "projected" },
     };
   }
@@ -60,7 +60,7 @@ export function buildCreateTemplate({
       startTime: nowMinutes,
       endTime: nowMinutes + settings.defaultPumpDurationMinutes,
       hasPutdown: false,
-      owner: NO_OWNER, // §F37: owner required
+      owner: NO_OWNER, // owner required
       lifecycle: { state: "projected" },
     };
   }
@@ -77,7 +77,7 @@ export function buildCreateTemplate({
       label: "",
       startTime: nowMinutes,
       hasPutdown: false,
-      owner: NO_OWNER, // §F37: owner required
+      owner: NO_OWNER, // owner required
       lifecycle: { state: "projected" },
     };
   }

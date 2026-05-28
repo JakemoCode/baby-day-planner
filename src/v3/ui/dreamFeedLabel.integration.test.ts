@@ -1,7 +1,7 @@
 /**
  * Integration: full projectDay + applyDreamFeedLabel path.
  *
- * Post-§F66 / PR-6: R5.5 emits a projected dream-feed bottle at `settings.dreamFeedTime`.
+ * PR-6: R5.5 emits a projected dream-feed bottle at `settings.dreamFeedTime`.
  * The label-pass is a no-op when R5.5 already labeled it "Dream Feed", but also relabels
  * any post-bedtime bottle that slips through (resilience). Pre-PR-6, the cascade always
  * capped at bedtime so dream-feed was render-only with no projected bottle to relabel.
@@ -17,7 +17,7 @@ describe("applyDreamFeedLabel — end-to-end with projectDay", () => {
   it("cold-start with 6 bottles + bedtime at 22:00: rhythm cascade caps at bedtime; R5.5 emits dream-feed at 23:00 with the Dream Feed label", () => {
     // WW [120, 150, 180, 180, 30] + napLen 60 + threshold 22:30 →
     // nap_5 start 22:00, endTime=23:00 > 22:30 → ADR-0002: drop.
-    // §F66 fast-follow B8: bedtime = max(earliestBedtime=18:00,
+    // bedtime = max(earliestBedtime=18:00,
     // wwStart+WW=21:30+30=22:00) = 22:00. Full WW before bedtime.
     const ctx = aContext({
       day: aDay({ wakeTime: 7 * 60 }),

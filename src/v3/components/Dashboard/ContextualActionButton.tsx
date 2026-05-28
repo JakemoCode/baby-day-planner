@@ -48,7 +48,7 @@ function buildLoggedBottle(
   defaultBottleAmountOz: number,
   startTime: TimeMin,
 ): Event {
-  // §F59/§F60: same eventKey collapses projected/recorded pair; deterministic id lets re-taps overwrite same doc.
+  // Same eventKey collapses projected/recorded pair; deterministic id lets re-taps overwrite same doc.
   return {
     id: recordedIdFor(projected.eventKey),
     dayId,

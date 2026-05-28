@@ -57,7 +57,7 @@ export function formToEvent(
     delete (next as { amountOz?: number }).amountOz;
   }
 
-  // §F37: owner is required; NO_OWNER is explicit, never absent.
+  // owner is required; NO_OWNER is explicit, never absent.
   next.owner = form.owner ?? NO_OWNER;
 
   return next;

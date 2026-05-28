@@ -55,7 +55,7 @@ describe("v3 groupInstants", () => {
   });
 });
 
-describe("mergeNearbyGroups (§F55)", () => {
+describe("mergeNearbyGroups", () => {
   it("returns groups unchanged when none overlap vertically", () => {
     const groups = groupInstants([
       ev({ id: "a", startTime: 9 * 60 }),

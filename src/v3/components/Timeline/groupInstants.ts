@@ -31,7 +31,7 @@ export function groupInstants(events: Event[]): InstantGroup[] {
 }
 
 /**
- * §F55 — merges groups whose chips would overlap on the y-axis into a single collapsed cluster.
+ * Merges groups whose chips would overlap on the y-axis into a single collapsed cluster.
  * Strict less-than gap comparison: exact-threshold is "just clears." Transitively chains.
  */
 export function mergeNearbyGroups(

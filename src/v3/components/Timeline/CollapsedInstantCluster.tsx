@@ -19,7 +19,7 @@ export type CollapsedInstantClusterProps = {
   onTap: () => void;
 };
 
-/** §F55 — collapsed chip for ≥2 overlapping instants; tap opens a sheet listing each event. */
+/** Collapsed chip for ≥2 overlapping instants; tap opens a sheet listing each event. */
 export function CollapsedInstantCluster({
   items,
   startMinutes,

@@ -47,7 +47,7 @@ function eventBase(
     startTime: start,
     label: overrides.label ?? eventKey,
     hasPutdown: overrides.hasPutdown ?? false,
-    owner: overrides.owner ?? NO_OWNER, // §F37: owner is required; default to unassigned
+    owner: overrides.owner ?? NO_OWNER, // owner is required; default to unassigned
     lifecycle,
   };
   if (end !== undefined) event.endTime = end;

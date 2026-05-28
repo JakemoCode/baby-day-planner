@@ -6,7 +6,7 @@ export function ownerSlotKey(ref: OwnerRef | undefined): string | null {
   if (!ref) return null;
   switch (ref.slot) {
     case "none":
-      return null; // §F37: unassigned — no attr
+      return null; // unassigned — no attr
     case "parent1":
       return "parent1";
     case "parent2":

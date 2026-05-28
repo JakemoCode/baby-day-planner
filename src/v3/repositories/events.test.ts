@@ -103,8 +103,8 @@ describe("v3 events repository", () => {
     expect(got?.lifecycle).toEqual({ state: "recorded", annotatedAt: 9 * 60 + 2 });
   });
 
-  it("§F37 round-trip: assigning then unassigning owner persists NO_OWNER (no stale value)", async () => {
-    // §F37: pre-fix, "unassign" sent a patch without `owner` — Firestore
+  it("round-trip: assigning then unassigning owner persists NO_OWNER (no stale value)", async () => {
+    // Pre-fix, "unassign" sent a patch without `owner` — Firestore
     // updateDoc is field-merge so omitted fields are LEFT UNTOUCHED and the
     // prior owner survived. Fix: NO_OWNER = explicit { slot: "none" }, so
     // updateDoc always overwrites. Fails if the schema change is reverted.
@@ -125,8 +125,8 @@ describe("v3 events repository", () => {
     expect(got2?.owner).toEqual({ slot: "parent2" });
   });
 
-  it("§F37 wake_window seam: two edits of the same projection collapse to ONE doc, last write wins", async () => {
-    // §F37: onSave used to re-ID every projected→recorded transition with a
+  it("wake_window seam: two edits of the same projection collapse to ONE doc, last write wins", async () => {
+    // onSave used to re-ID every projected→recorded transition with a
     // fresh random id. Multiple docs at the same eventKey made R4.2's tiebreak
     // nondeterministic. Fix: deterministic id (`recorded_${eventKey}`) routes
     // 2nd+ edits through updateOptimistic on the SAME doc.
@@ -176,8 +176,8 @@ describe("v3 events repository", () => {
     expect(ww2Docs2[0]!.owner).toEqual(NO_OWNER);
   });
 
-  describe("reconcileDuplicateEventDocs (§F59 orphan cleanup)", () => {
-    // §F59: NapActionButton wrote `id: nap_N` while useDrawer wrote
+  describe("reconcileDuplicateEventDocs (orphan cleanup)", () => {
+    // NapActionButton wrote `id: nap_N` while useDrawer wrote
     // `id: recorded_nap_N` for the same slot — two Firestore docs, same
     // eventKey, different ids. Keeps the most-recent-annotation winner.
     it("deletes the loser when two docs share (type, eventKey); keeps the most-recent annotation", async () => {

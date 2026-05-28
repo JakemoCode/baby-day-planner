@@ -18,7 +18,7 @@ export type GroupedEventsSheetProps = {
   onTapEvent: (event: Event) => void;
 };
 
-/** §F55 — sheet listing events inside a collapsed cluster; each row taps through to the edit drawer. */
+/** Sheet listing events inside a collapsed cluster; each row taps through to the edit drawer. */
 export function GroupedEventsSheet({
   open,
   items,

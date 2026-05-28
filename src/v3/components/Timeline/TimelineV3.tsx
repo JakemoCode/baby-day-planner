@@ -57,7 +57,7 @@ const DEFAULT_VIEWPORT = { start: 5 * 60, end: 21 * 60 };
 const DEFAULT_VIEWPORT_END_CAP = 24 * 60; // midnight
 const SCROLL_TOP_PADDING_PX = 80;
 const DEFAULT_PX_PER_HOUR = 120;
-// §F55 — collision threshold: 38 px ≈ wrapped chip height + 4 px gap. Update if chip CSS changes.
+// Collision threshold: 38 px ≈ wrapped chip height + 4 px gap. Update if chip CSS changes.
 const COLLAPSE_CHIP_HEIGHT_PX = 38;
 const COLLAPSE_VERTICAL_GAP_PX = 4;
 
@@ -146,7 +146,7 @@ export function TimelineV3({
     };
   }, [events, pxPerMin, viewportPaddingMin, clampToEvents]);
 
-  // §F55: populated when user taps a collapsed cluster.
+  // Populated when user taps a collapsed cluster.
   const [groupedSheet, setGroupedSheet] = useState<InstantGroup | null>(null);
 
   useEffect(() => {
@@ -154,7 +154,7 @@ export function TimelineV3({
     if (!scrollToNowOnMount || nowMinutes === undefined || events.length === 0) return;
     const root = rootRef.current;
     if (!root) return;
-    // §F52: AppShell's <main> is the scroll container; walk up to find it, fall back to window.
+    // AppShell's <main> is the scroll container; walk up to find it, fall back to window.
     const scrollParent = findScrollParent(root);
     const targetTopWithinList = (nowMinutes - originMinutes) * pxPerMin;
     if (scrollParent instanceof HTMLElement) {
@@ -253,7 +253,7 @@ export function TimelineV3({
         {groups.map((g) => {
           const topPx = yOf(g.startMinutes);
           const past = isPast(g.startMinutes);
-          // §F55: 2+ events collapse to a single chip; tap opens listing sheet.
+          // 2+ events collapse to a single chip; tap opens listing sheet.
           if (g.items.length >= 2) {
             return (
               <CollapsedInstantCluster
@@ -274,7 +274,7 @@ export function TimelineV3({
             <InstantCluster
               key={g.key}
               items={g.items}
-              topPx={topPx} /* §F2b: self-centers via translateY(-50%) */
+              topPx={topPx} /* self-centers via translateY(-50%) */
               rightPx={4}
               widthPx={140}
               leaderWidthPx={LEADER_LINE_W}

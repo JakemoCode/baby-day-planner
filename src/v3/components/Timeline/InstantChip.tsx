@@ -41,7 +41,7 @@ type ChipContentProps = {
 };
 
 /**
- * §F2b — two-row layout: unwrapped shows [label time]/[owner]; wrapped shows [label]/[time · owner].
+ * Two-row layout: unwrapped shows [label time]/[owner]; wrapped shows [label]/[time · owner].
  * Keyed by (label|time) for fresh state on content change. ResizeObserver resets to re-test at new width.
  */
 function ChipContent({ label, time, ownerName, slotKey, TagAttrs }: ChipContentProps): ReactNode {

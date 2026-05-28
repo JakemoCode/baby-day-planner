@@ -36,7 +36,7 @@ export type EventEditDrawerV3Props = {
    */
   defaultWakeTime: TimeMin;
   /**
-   * §F66 fast-follow: today's actual wakeTime (from `Day.wakeTime`),
+   * Today's actual wakeTime (from `Day.wakeTime`),
    * used to validate that an edited startTime isn't accidentally
    * AM/PM-confused below the day's wake (e.g. user types 12:30 meaning
    * 12:30pm but the picker reads it as 0:30am, which silently wrecks
@@ -69,7 +69,7 @@ function validateForm(
   dayWakeTime: TimeMin | undefined,
 ): FormErrors {
   const errors: FormErrors = {};
-  // §F66 pre-wake guard: AM/PM picker mistakes can anchor a cascade event before wakeTime.
+  // Pre-wake guard: AM/PM picker mistakes can anchor a cascade event before wakeTime.
   // Scope to cascade-anchoring types only (nap, rhythm bottle).
   const isCascadeAnchoring =
     type === "nap" || (type === "bottle" && eventKey !== DREAM_FEED_EVENT_KEY);
@@ -147,7 +147,7 @@ type InternalForm = {
   startTime: TimeMin | undefined;
   endTime: TimeMin | undefined;
   amountOz: number | undefined;
-  owner: OwnerRef; // §F37: always defined; NO_OWNER for unassigned
+  owner: OwnerRef; // always defined; NO_OWNER for unassigned
   label: string;
 };
 
@@ -201,7 +201,7 @@ export function EventEditDrawerV3({
   const type = sourceEvent.type;
   const baseTitle =
     mode === "create" ? (CREATE_TITLE_BY_TYPE[type] ?? "Add event") : EDIT_TITLE_BY_TYPE[type];
-  // §F56: include the label in the heading so recurring events are named.
+  // Include the label in the heading so recurring events are named.
   const title =
     mode === "edit" && type === "daily_recurring" && sourceEvent.label
       ? `${baseTitle}: ${sourceEvent.label}`
@@ -305,7 +305,7 @@ export function EventEditDrawerV3({
     setPendingPastThresholdNap(null);
     // Bedtime endTime is next-morning wake (defaultWakeTime + 24h), not the source nap's endTime.
     const bedtimeBase: Event = {
-      // §F59: deterministic id so subsequent edits write to the same Firestore doc.
+      // Deterministic id so subsequent edits write to the same Firestore doc.
       id: recordedIdFor("bedtime"),
       dayId: napCandidate.dayId,
       eventKey: "bedtime",
@@ -315,7 +315,7 @@ export function EventEditDrawerV3({
       startTime: napCandidate.startTime,
       endTime: nextDayAt(defaultWakeTime),
       hasPutdown: false,
-      owner: napCandidate.owner, // §F37
+      owner: napCandidate.owner,
       lifecycle: { state: "recorded", annotatedAt: nowMinutes },
     };
     // Delete original first to avoid a brief dual-chip state.

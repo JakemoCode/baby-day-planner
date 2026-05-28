@@ -254,7 +254,7 @@ describe("R5.1 — cascade resumes from the latest recorded bottle", () => {
   });
 });
 
-describe("Sequential cascade — bottle landing in nap snaps to putdown.startTime (§F66 PR 3c)", () => {
+describe("Sequential cascade — bottle landing in nap snaps to putdown.startTime (PR 3c)", () => {
   it("a projected bottle landing inside nap_1 snaps to nap.start - putdownLead (the start of putdown)", () => {
     // bottle_2 proposed at 10:15, inside nap_1 [10:00, 11:00]:
     // snapOutOfNap → 10:00; snapToPutdown [9:45, 10:30] → 9:45. bottle_2 = 9:45.
@@ -384,7 +384,7 @@ describe("R5.6 — convergence regression (mirrors property-test failure)", () =
   });
 });
 
-describe("Sequential cascade — snap-out-of-nap + putdown-anchor (§F66 PR 3c)", () => {
+describe("Sequential cascade — snap-out-of-nap + putdown-anchor (PR 3c)", () => {
   it("placeholder bottle landing in nap_1 snaps to nearer edge then putdown-anchor pulls subsequent bottles to putdown.startTime", () => {
     // wake 7:00, buffer 10, interval 180, recorded nap_1 9:30-11:00 (napLen=90).
     // bottle_2 at 10:10 → snapOutOfNap → 9:30 → snapToPutdown [9:15, 10:15] → 9:15.
@@ -695,7 +695,7 @@ describe("R5.1 — recorded bottles anchor the cascade", () => {
   });
 
   it("late-day recorded anchor: forward-only cascade to midnight (no backfill per DOMAIN §2)", () => {
-    // §F54: late-day anchor forward-only; missing morning slots not phantom-filled.
+    // Late-day anchor forward-only; missing morning slots not phantom-filled.
     // Recorded at 19:10; forward: 22:10 → 25:10 ≥ 1440 → stop. Result: [19:10, 22:10].
     const overridden: Event = aProjectedBottle({
       id: "manual_bottle_1",
@@ -945,9 +945,9 @@ describe("Sequential bottle cascade — midnight rule (DOMAIN.md §2)", () => {
   });
 });
 
-describe("Sequential bottle cascade — forward-only from anchor (§F54)", () => {
+describe("Sequential bottle cascade — forward-only from anchor", () => {
   it("mid-day recorded anchor: forward-only cascade to midnight, no backfill", () => {
-    // §F54: mid-day recording doesn't phantom-anchor missing morning slots.
+    // Mid-day recording doesn't phantom-anchor missing morning slots.
     // Recorded at 13:00; forward: 16:00, 19:00, 22:00, then 25:00 ≥ 1440 → stop.
     const recorded = aRecordedBottle({
       id: "actual_bottle_midday",
@@ -986,7 +986,7 @@ describe("Sequential bottle cascade — forward-only from anchor (§F54)", () =>
     expect(recordedOut?.lifecycle.state).toBe("completed");
   });
 
-  it("§F54 — overnight bottle close to wake shifts the cold-start seed forward", () => {
+  it("overnight bottle close to wake shifts the cold-start seed forward", () => {
     // Overnight at 5am (240min interval): 5am + 240min = 9am > wake+buffer 7:10am → seed shifts to 9am.
     const overnight = aRecordedBottle({
       id: "overnight_5am",
@@ -1016,14 +1016,14 @@ describe("Sequential bottle cascade — forward-only from anchor (§F54)", () =>
       .sort((a, b) => a.startTime - b.startTime);
     expect(bottles.map((b) => b.startTime)).toEqual([
       5 * 60, // overnight (tallied; not in chain)
-      9 * 60, // §F54: shifted seed (5am + 240min)
+      9 * 60, // shifted seed (5am + 240min)
       13 * 60,
       17 * 60,
       21 * 60, // 4th chain bottle → cold-start cap
     ]);
   });
 
-  it("§F54 — overnight bottle far from wake leaves cold-start seed at wake+buffer", () => {
+  it("overnight bottle far from wake leaves cold-start seed at wake+buffer", () => {
     // Overnight at 2am (240min interval): 2am + 240min = 6am < wake+buffer 7:10am → no shift.
     const overnight = aRecordedBottle({
       id: "overnight_2am",
@@ -1207,7 +1207,7 @@ describe("Sequential bottle cascade — caps forward at bedtime (DOMAIN.md §1 +
     for (const b of bottles) {
       expect(b.startTime).toBeLessThan(19 * 60); // no bottle at/past bedtime
     }
-    // §F66 B8: bedtime = max(18:00, 16:30+150=19:00) = 19:00.
+    // B8: bedtime = max(18:00, 16:30+150=19:00) = 19:00.
     const bedtime = out.find((e) => e.type === "bedtime");
     expect(bedtime?.startTime).toBe(19 * 60);
   });
@@ -1315,7 +1315,7 @@ describe("Overnight bottle does NOT interrupt the bedtime block (DOMAIN.md §3)"
   });
 });
 
-describe("§F66 PR 3c — putdown bottle-anchor rule (ADR-0006 Concern B)", () => {
+describe("PR 3c — putdown bottle-anchor rule (ADR-0006 Concern B)", () => {
   // If a projected bottle lands in [nap.start - lead, nap.start + napLen/2], snap to nap.start - lead.
   // ADR-0006 Concern B: skip the snap if the target is ≤ Now (would cross the Now line backward).
 
@@ -1441,7 +1441,7 @@ describe("§F66 PR 3c — putdown bottle-anchor rule (ADR-0006 Concern B)", () =
   });
 });
 
-describe("R5.5 — dream-feed emission (§F66)", () => {
+describe("R5.5 — dream-feed emission", () => {
   it("emits a projected dream-feed bottle at settings.dreamFeedTime when enabled", () => {
     const ctx = aContext({
       day: aDay({ wakeTime: 7 * 60 }),
@@ -1615,7 +1615,7 @@ describe("R5.5 — dream-feed emission (§F66)", () => {
   });
 });
 
-describe("§F66 fast-follow B4 — past-time emit during nap edit snaps to nap edge", () => {
+describe("B4 — past-time emit during nap edit snaps to nap edge", () => {
   it("with an in-progress recorded nap, a past-time cascade emit snaps forward to the nap's future endTime", () => {
     // Cascade-natural 11:00 lands inside recorded nap [10:30-13:00]; near edge 10:30 < Now=12:00; B4 forward-snaps to 13:00.
     const recordedBottle = aRecordedBottle({

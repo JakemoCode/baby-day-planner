@@ -136,7 +136,7 @@ describe("Contextual button — seam (engine + render + decideMode)", () => {
     expect(mode.kind).toBe("end-nap");
   });
 
-  it("§F66 audit: round-trip — clicking Log Bottle flips alreadyLogged to true", () => {
+  it("round-trip — clicking Log Bottle flips alreadyLogged to true", () => {
     // Pins that projected → completed lifecycle transition is what flips alreadyLogged.
     const now = hm(11, 0);
     const initialEvents = project(now, [recordedBottle("bottle_1", hm(8))]);
@@ -172,7 +172,7 @@ describe("Contextual button — seam (engine + render + decideMode)", () => {
     expect(afterMode).toMatchObject({ kind: "log-bottle", alreadyLogged: true });
   });
 
-  it("§F66 fast-follow B2: with recorded Bottle 1 @ 8am and projected Bottle 2 in window, the selector targets Bottle 2 (not Bottle 1)", () => {
+  it("with recorded Bottle 1 @ 8am and projected Bottle 2 in window, the selector targets Bottle 2 (not Bottle 1)", () => {
     // Selector must target bottle_2 (the cascade slot), not bottle_1 (already logged).
     const now = hm(10, 54);
     const events = project(now, [recordedBottle("bottle_1", hm(8))]);

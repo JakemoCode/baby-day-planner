@@ -25,7 +25,7 @@ export type TimeMin = number;
 export type OwnerSlot = "parent1" | "parent2";
 
 /**
- * Owner assignment on an event. Uses `{ slot: "none" }` (§F37) for unassigned rather than
+ * Owner assignment on an event. Uses `{ slot: "none" }` for unassigned rather than
  * `undefined` for two reasons: (1) Firestore `updateDoc` is field-merge — omitting `owner`
  * leaves the stale value; writing `none` clears it explicitly. (2) "User said no owner" is
  * semantically distinct from "field never set."
@@ -127,7 +127,7 @@ export type Event = {
 
   label: string;
   /**
-   * Owner is always present (§F37 2026-05-18). Use `{ slot: "none" }`
+   * Owner is always present (2026-05-18). Use `{ slot: "none" }`
    * (or the `NO_OWNER` constant) for unassigned. Old documents missing
    * the field are auto-promoted to `NO_OWNER` by `withV3EventDefaults`
    * at the read seam.
@@ -163,12 +163,12 @@ export type Day = {
   suppressedRecurringIds: string[];
   /** Per-day daycare opt-out (R21.5). */
   suppressedDaycareDay: boolean;
-  /** §F66 fast-follow: per-day dream-feed opt-out. R5.5 skips emission when true. */
+  /** Per-day dream-feed opt-out. R5.5 skips emission when true. */
   suppressedDreamFeed?: boolean;
   /** Optional template id selected for this day. */
   templateId?: string;
   /**
-   * §F12/§F17 — per-event owner overrides keyed by `eventKey`
+   * Per-event owner overrides keyed by `eventKey`
    * (e.g. `"nap_1"`, `"bottle_2"`). Carried forward from the
    * `TomorrowPlan` at promote time. `null` = explicit NO_OWNER;
    * missing key = no override (default cascade applies). The
@@ -220,9 +220,9 @@ export type DailyRecurring = {
 };
 
 /**
- * §F4 (2026-05-20): `color` fields were retired from the editor — owner
+ * (2026-05-20): `color` fields were retired from the editor — owner
  * colors are now slot-keyed via `--color-owner-*` tokens. The field
- * stays optional on the type so persisted pre-§F4 docs continue to
+ * stays optional on the type so persisted pre-existing docs continue to
  * validate; nothing reads it anymore.
  */
 export type OwnersConfig = {
@@ -292,7 +292,7 @@ export type Settings = {
   // Bedtime & nap
   /** Latest endTime allowed for a projected nap; cascade naps exceeding this are dropped (R7.6, ADR-0002). */
   bedtimeThreshold: TimeMin;
-  /** Floor for projected bedtime startTime — `max(earliestBedtime, lastNapEnd + WW)` (ADR-0002, §F66). Ignored for recorded bedtime. */
+  /** Floor for projected bedtime startTime — `max(earliestBedtime, lastNapEnd + WW)` (ADR-0002). Ignored for recorded bedtime. */
   earliestBedtime: TimeMin;
   /** Drives R7.6.1 convert-prompt window. */
   defaultNapLengthMinutes: number;
@@ -383,7 +383,7 @@ export type ProjectInput = {
 };
 
 /**
- * §F39/§F12/§F17 TomorrowPlan — user's per-date plan for "tomorrow". Persisted only on first edit.
+ * TomorrowPlan — user's per-date plan for "tomorrow". Persisted only on first edit.
  * Auto-promoted on calendar rollover when `status === "confirmed"` (docs/v3/F17_F12_SCOPE.md).
  *
  * - `status`: `"draft"` autosaves but does NOT auto-promote; `"confirmed"` is eligible; any edit reverts to draft.
@@ -404,7 +404,7 @@ export type TomorrowPlan = {
 };
 
 /**
- * §F10 Child — identity record at `/children/{id}/`. Child-scoped subcollections live underneath.
+ * Child — identity record at `/children/{id}/`. Child-scoped subcollections live underneath.
  * `createdBy` is the onboarding uid; co-parents are linked via `/users/{uid}.childIds`.
  */
 export type Child = {
@@ -419,7 +419,7 @@ export type Child = {
 };
 
 /**
- * §F3 User — per-uid record at `/users/{uid}/` mapping auth users to accessible children.
+ * User — per-uid record at `/users/{uid}/` mapping auth users to accessible children.
  * Doc existence = "introduced to app"; empty `childIds` = signed in but not yet onboarded.
  */
 export type User = {
@@ -430,7 +430,7 @@ export type User = {
 };
 
 /**
- * §F3 Invite — single-use co-parent invite at `/invites/{token}`.
+ * Invite — single-use co-parent invite at `/invites/{token}`.
  * `consumedBy`/`consumedAt` are set atomically with the user-doc childIds append in `consumeInvite`.
  */
 export type Invite = {

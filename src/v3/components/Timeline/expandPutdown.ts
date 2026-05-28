@@ -82,7 +82,7 @@ function windowOverlapsInProgressSleep(
 function syntheticPutdown(parent: Event, lead: TimeMin): Event {
   // Parent type preserved so geometry rules stay typed; PUTDOWN_KIND_TAG eventKey drives render branching.
   const type: EventType = parent.type;
-  // §F37: owner required.
+  // owner required.
   const synthetic: Event = {
     id: `putdown:${parent.id}`,
     dayId: parent.dayId,

@@ -412,7 +412,7 @@ describe("R12.10 — Day.ownerOverrides applies to projected events", () => {
     expect(naps[1]!.owner).toEqual(PARENT1); // no override → template default
   });
 
-  it("§F63 — ownerOverride does NOT anchor the event's time or lifecycle", () => {
+  it("ownerOverride does NOT anchor the event's time or lifecycle", () => {
     // ownerOverride is annotation-only; the cascade must re-project time freely (not anchor like a recorded event).
     const baseSettings = aSettings({
       wakeWindowsMinutes: [120, 135],

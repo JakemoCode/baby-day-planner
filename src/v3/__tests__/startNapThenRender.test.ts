@@ -1,5 +1,5 @@
 /**
- * Seam test: Start Nap Now → renderProjection (§F24/F25).
+ * Seam test: Start Nap Now → renderProjection.
  * No mocks; covers putdown suppression inside in-progress nap and effectiveEnd rewriting.
  */
 

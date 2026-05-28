@@ -1,4 +1,4 @@
-/** List-sheet for collapsed-cluster tap target (§F55). Covers rendering, tap routing, dismiss. */
+/** List-sheet for collapsed-cluster tap target. Covers rendering, tap routing, dismiss. */
 
 import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";

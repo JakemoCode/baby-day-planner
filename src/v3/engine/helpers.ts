@@ -57,7 +57,7 @@ export function projectedEvent(input: ProjectedEventInput): Event {
     startTime: input.startTime,
     label: input.label,
     hasPutdown: input.hasPutdown ?? false,
-    owner: input.owner ?? NO_OWNER, // §F37: owner is required; default to unassigned
+    owner: input.owner ?? NO_OWNER, // owner is required; default to unassigned
     lifecycle: { state: "projected" },
   };
   if (input.endTime !== undefined) event.endTime = input.endTime;

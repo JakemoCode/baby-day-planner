@@ -8,7 +8,7 @@ import { ownerStyleVar } from "../../ui/ownerStyle";
 
 export type OwnerPickerV3Props = {
   owners: OwnersConfig;
-  /** Always defined (§F37); pass NO_OWNER for unassigned. */
+  /** Always defined; pass NO_OWNER for unassigned. */
   value: OwnerRef;
   onChange: (next: OwnerRef) => void;
   label?: string;

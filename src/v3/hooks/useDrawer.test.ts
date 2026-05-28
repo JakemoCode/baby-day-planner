@@ -204,7 +204,7 @@ describe("useDrawer", () => {
     expect(saveEvent).toHaveBeenCalledWith(expect.objectContaining({ id: "recorded_bottle_3" }));
   });
 
-  // §F63: owner-only edit on projected event must route to setOwnerOverride, not saveEvent.
+  // owner-only edit on projected event must route to setOwnerOverride, not saveEvent.
   // saveEvent would promote to recorded, anchoring time and preventing cascade re-projection.
   it("owner-only edit on projected event routes to setOwnerOverride (not saveEvent)", async () => {
     const projected = makeEvent({ id: "proj-nap-3", eventKey: "nap_3" });
@@ -322,7 +322,7 @@ describe("useDrawer", () => {
     expect(result.current.drawer).toEqual({ open: false });
   });
 
-  // §F65: projected daily_recurring delete routes through suppressRecurring, not Firestore doc delete.
+  // projected daily_recurring delete routes through suppressRecurring, not Firestore doc delete.
   it("onDelete on a projected daily_recurring routes through suppressRecurring", async () => {
     const recurring = makeEvent({
       id: "proj_recurring:rec-tummy",

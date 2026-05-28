@@ -293,7 +293,7 @@ describe("formToEvent — exactOptionalPropertyTypes safety", () => {
     expect("endTime" in next).toBe(false);
   });
 
-  it("clears owner to NO_OWNER when the form unsets it (§F37)", () => {
+  it("clears owner to NO_OWNER when the form unsets it", () => {
     const source = projectedNap({ owner: { slot: "parent1" } });
     const form: FormState = { ...formFromEvent(source), owner: undefined };
     const next = formToEvent(form, source, NOW);

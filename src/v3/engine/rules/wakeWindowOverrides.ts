@@ -31,7 +31,7 @@ const RuleApplyWakeWindowOverrides: Rule = {
       if (!isWakeWindow(e) || !isProjected(e)) return [e];
       const override = overridesByKey.get(e.eventKey);
       if (!override) return [e];
-      const next: Event = { ...e, owner: override.owner }; // §F37: unassigned = { slot: "none" }, not omitted
+      const next: Event = { ...e, owner: override.owner }; // unassigned = { slot: "none" }, not omitted
       if (override.label) next.label = override.label;
       return [next];
     });

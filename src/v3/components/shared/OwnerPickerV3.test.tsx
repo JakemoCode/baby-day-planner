@@ -63,7 +63,7 @@ describe("OwnerPickerV3", () => {
     expect(onChange).toHaveBeenCalledWith({ slot: "other", otherId: "daycare" });
   });
 
-  it("clicking None emits NO_OWNER to clear the ref (§F37)", async () => {
+  it("clicking None emits NO_OWNER to clear the ref", async () => {
     const onChange = vi.fn();
     render(<OwnerPickerV3 owners={owners} value={{ slot: "parent1" }} onChange={onChange} />);
     await userEvent.click(screen.getByRole("button", { name: "None" }));

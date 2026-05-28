@@ -28,7 +28,7 @@ import { isDreamFeed } from "./lib/eventConventions";
 // ---------------------------------------------------------------------------
 
 /**
- * §F66 / ADR-0001: true for projected rhythm-cascade events (nap, non-dream-feed bottle)
+ * ADR-0001: true for projected rhythm-cascade events (nap, non-dream-feed bottle)
  * whose startTime is strictly after nowMinutes. Excludes dream-feed (`bottle_dream` —
  * explicit-schedule, not cascade) and render-synthetic putdowns (inherit type="nap" but
  * aren't real nap slots — without this filter they'd win the "earliest projected nap"
@@ -50,7 +50,7 @@ export function isFutureProjected(event: Event, nowMinutes: TimeMin): boolean {
  * True iff `event` is the chronologically-earliest projected event of its type with
  * `startTime > nowMinutes`. The drawer exempts these so the user can anchor the next-up
  * nap/bottle to baby's actual rhythm (sick day, off-schedule). Dream-feed is excluded —
- * it's an explicit-schedule slot, not part of the rhythm chain. (§F66 fast-follow C2)
+ * it's an explicit-schedule slot, not part of the rhythm chain.
  */
 export function isNextProjectedOfType(
   event: Event,

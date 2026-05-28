@@ -1,4 +1,4 @@
-/** Collapsed cluster chip for ≥2 overlapping instant events (§F55). Integration in TimelineV3.test.tsx. */
+/** Collapsed cluster chip for ≥2 overlapping instant events. Integration in TimelineV3.test.tsx. */
 
 import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";

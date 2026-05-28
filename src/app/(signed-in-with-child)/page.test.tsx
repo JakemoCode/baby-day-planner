@@ -165,7 +165,7 @@ describe("DashboardPage (V3)", () => {
     expect(screen.queryByRole("button", { name: /Start first day/i })).toBeNull();
   });
 
-  it("settings missing post-§F3: dashboard renders skeleton, not the Wake up gate", () => {
+  it("settings missing after onboarding: dashboard renders skeleton, not the Wake up gate", () => {
     // Post-onboarding the layout guarantees settings exist; null here is a transient load,
     // not a cue to re-spawn the bootstrap flow.
     setupHooks({ day: null, settings: null });
@@ -373,7 +373,7 @@ describe("DashboardPage (V3)", () => {
     );
   });
 
-  it("§F22 — bottle recorded at 2 AM next-day routes to a freshly-created planned day, not the active day", async () => {
+  it("bottle recorded at 2 AM next-day routes to a freshly-created planned day, not the active day", async () => {
     // Wall clock = 2026-05-11 02:00 (day after active day.date = "2026-05-10").
     vi.useFakeTimers({ shouldAdvanceTime: true });
     vi.setSystemTime(new Date("2026-05-11T02:00:00"));

@@ -38,7 +38,7 @@ export function TemplateOwnerPicker({
 }: TemplateOwnerPickerProps) {
   const slot = templateSlotForEvent(event);
   const current = slot === undefined ? undefined : getOwnerAt(template, slot);
-  // §F37: missing template entry treated as NO_OWNER (OwnerPickerV3 requires defined value).
+  // Missing template entry treated as NO_OWNER (OwnerPickerV3 requires defined value).
   const picker = (
     <OwnerPickerV3
       owners={owners}

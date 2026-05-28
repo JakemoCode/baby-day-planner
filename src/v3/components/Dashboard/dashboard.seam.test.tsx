@@ -161,7 +161,7 @@ describe("Dashboard seam — real projectDay + new panels", () => {
     expect(next?.startTime).toBeGreaterThan(11 * 60 + 45);
 
     // Panel totals: in-progress nap (10:45–11:45 placeholder, now=11:00)
-    // contributes only elapsed 15 min, not the full placeholder duration (§F48d).
+    // contributes only elapsed 15 min, not the full placeholder duration.
     const bTotals = bottleTotals(actuals, now);
     expect(bTotals).toEqual({ count: 2, oz: 9 });
 

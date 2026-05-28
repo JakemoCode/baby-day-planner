@@ -190,7 +190,7 @@ describe("TimelineV3", () => {
     expect(height120).toBeCloseTo(height60 * 2, 0);
   });
 
-  it("§F55: renders a collapsed cluster when two instants would overlap vertically", async () => {
+  it("renders a collapsed cluster when two instants would overlap vertically", async () => {
     const events: Event[] = [
       ev({
         id: "v",
@@ -213,7 +213,7 @@ describe("TimelineV3", () => {
     expect(screen.queryAllByTestId("instant-chip")).toHaveLength(0);
   });
 
-  it("§F55: tapping the collapsed cluster opens a sheet listing both events", async () => {
+  it("tapping the collapsed cluster opens a sheet listing both events", async () => {
     const events: Event[] = [
       ev({
         id: "v",
@@ -238,7 +238,7 @@ describe("TimelineV3", () => {
     expect(screen.getByText("Diaper")).toBeVisible();
   });
 
-  it("§F55: tapping a sheet row calls onEventTap with that event and closes the sheet", async () => {
+  it("tapping a sheet row calls onEventTap with that event and closes the sheet", async () => {
     const onEventTap = vi.fn();
     const vitamin = ev({
       id: "v",
@@ -261,7 +261,7 @@ describe("TimelineV3", () => {
     expect(screen.queryByRole("dialog")).toBeNull();
   });
 
-  it("§F55: chips far apart in time still render individually (no collapse)", () => {
+  it("chips far apart in time still render individually (no collapse)", () => {
     const events: Event[] = [
       ev({ id: "a", type: "bottle", kind: "instant", startTime: 9 * 60, label: "Bottle 1" }),
       ev({ id: "b", type: "bottle", kind: "instant", startTime: 13 * 60, label: "Bottle 2" }),

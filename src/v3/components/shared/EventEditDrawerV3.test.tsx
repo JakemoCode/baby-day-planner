@@ -105,7 +105,7 @@ describe("EventEditDrawerV3", () => {
     expect(screen.queryByLabelText("End time")).not.toBeInTheDocument();
   });
 
-  it("§F56: drawer heading for a recurring event includes the event label", () => {
+  it("drawer heading for a recurring event includes the event label", () => {
     const recurring: Event = {
       id: "rec-1",
       dayId: "d-1",
@@ -254,7 +254,7 @@ describe("EventEditDrawerV3", () => {
     expect(screen.getByRole("alert")).toHaveTextContent(/Overlaps Nap 2/);
   });
 
-  it("§F66 fast-follow B7: flags startTime < dayWakeTime as a pre-wake error (AM/PM safeguard)", async () => {
+  it("flags startTime < dayWakeTime as a pre-wake error (AM/PM safeguard)", async () => {
     // AM/PM mistake (e.g. 0:30 instead of 12:30) silently wrecks the cascade; validator must catch it.
     const recorded = projectedNap({
       lifecycle: { state: "recorded", annotatedAt: 11 * 60 + 30 },
@@ -284,7 +284,7 @@ describe("EventEditDrawerV3", () => {
     expect(onSave).not.toHaveBeenCalled();
   });
 
-  it("§F66 audit: B7 pre-wake guard does NOT flag startTime === dayWakeTime (boundary)", async () => {
+  it("B7 pre-wake guard does NOT flag startTime === dayWakeTime (boundary)", async () => {
     // Guard is strict `<`; pins that startTime === wakeTime is not rejected (regression to `<=`).
     const recorded = projectedNap({
       lifecycle: { state: "recorded", annotatedAt: 11 * 60 + 30 },
@@ -312,7 +312,7 @@ describe("EventEditDrawerV3", () => {
     expect(screen.getByRole("button", { name: "Save" })).toBeEnabled();
   });
 
-  it("§F66 review: B7 pre-wake guard does NOT block a pre-wake daily_recurring (review-found false positive)", async () => {
+  it("B7 pre-wake guard does NOT block a pre-wake daily_recurring (review-found false positive)", async () => {
     // daily_recurring is explicit-schedule (not cascade); legitimate to schedule pre-wake (e.g. 5am medication).
     const preWakeRecurring: Event = {
       id: "proj_recurring:rec-medication",
@@ -344,7 +344,7 @@ describe("EventEditDrawerV3", () => {
     expect(screen.getByRole("button", { name: "Save" })).toBeEnabled();
   });
 
-  it("§F66 fast-follow B1: does not flag overlap against a render-synthetic putdown chip", async () => {
+  it("does not flag overlap against a render-synthetic putdown chip", async () => {
     // Synthetic putdown carries type="nap" for layout; validator skips eventKey===PUTDOWN_KIND_TAG.
     const putdownSynthetic: Event = {
       id: "putdown:nap-2",
@@ -521,7 +521,7 @@ describe("EventEditDrawerV3", () => {
     expect(screen.getByRole("button", { name: "Delete" })).toBeInTheDocument();
   });
 
-  it("§F66 B11: delete button is HIDDEN for an auto-promoted bottle (recorded + annotatedAt===startTime)", () => {
+  it("delete button is HIDDEN for an auto-promoted bottle (recorded + annotatedAt===startTime)", () => {
     // Auto-promote signature: recorded + annotatedAt===startTime. Manual logs use completed; drawer saves bump annotatedAt.
     render(
       <EventEditDrawerV3
@@ -544,7 +544,7 @@ describe("EventEditDrawerV3", () => {
     expect(screen.queryByRole("button", { name: "Delete" })).toBeNull();
   });
 
-  it("§F66 audit B11: delete button is SHOWN for a recorded bottle when annotatedAt !== startTime", () => {
+  it("delete button is SHOWN for a recorded bottle when annotatedAt !== startTime", () => {
     // Dropping `annotatedAt===startTime` from the auto-promote check would hide Delete on all recorded bottles.
     render(
       <EventEditDrawerV3
@@ -568,7 +568,7 @@ describe("EventEditDrawerV3", () => {
     expect(screen.getByRole("button", { name: "Delete" })).toBeVisible();
   });
 
-  it("§F66 B11: delete button is SHOWN for a manually-logged bottle (lifecycle completed)", () => {
+  it("delete button is SHOWN for a manually-logged bottle (lifecycle completed)", () => {
     // buildLoggedBottle writes lifecycle completed; user must be able to delete it.
     render(
       <EventEditDrawerV3
@@ -591,7 +591,7 @@ describe("EventEditDrawerV3", () => {
     expect(screen.getByRole("button", { name: "Delete" })).toBeVisible();
   });
 
-  it("§F66 B11: delete button is HIDDEN for an auto-promoted nap (proj_ id + recorded lifecycle)", () => {
+  it("delete button is HIDDEN for an auto-promoted nap (proj_ id + recorded lifecycle)", () => {
     // Auto-promoted nap has no Firestore doc; engine re-emits it next pass so Delete is a visual no-op.
     render(
       <EventEditDrawerV3
@@ -613,7 +613,7 @@ describe("EventEditDrawerV3", () => {
     expect(screen.queryByRole("button", { name: "Delete" })).toBeNull();
   });
 
-  it("§F65: delete button is shown for a PROJECTED daily_recurring event", () => {
+  it("delete button is shown for a PROJECTED daily_recurring event", () => {
     const recurring: Event = {
       id: "proj_recurring:rec-tummy",
       dayId: "d-1",
@@ -643,7 +643,7 @@ describe("EventEditDrawerV3", () => {
     expect(screen.getByRole("button", { name: "Delete" })).toBeVisible();
   });
 
-  it("§F65: delete confirmation for a daily_recurring uses skip-today copy", async () => {
+  it("delete confirmation for a daily_recurring uses skip-today copy", async () => {
     const recurring: Event = {
       id: "proj_recurring:rec-tummy",
       dayId: "d-1",
@@ -947,7 +947,7 @@ describe("Past-threshold prompt when editing a nap (physiology cascade)", () => 
     expect(onSave).toHaveBeenCalled();
   });
 
-  describe("§F66 future-event drawer rule (ADR-0001)", () => {
+  describe("future-event drawer rule (ADR-0001)", () => {
     const futureNap = () =>
       projectedNap({
         id: "nap-future",
@@ -1033,7 +1033,7 @@ describe("Past-threshold prompt when editing a nap (physiology cascade)", () => 
       expect(screen.getByLabelText(/start time/i)).not.toBeDisabled();
     });
 
-    it("§F66 fast-follow C2: chronologically-NEXT projected nap is editable (sick-day flex)", () => {
+    it("chronologically-NEXT projected nap is editable (sick-day flex)", () => {
       // Earliest future projected nap is editable; later ones stay locked (cascade re-projects from pin).
       const nap2 = projectedNap({
         id: "nap-2",
@@ -1052,7 +1052,7 @@ describe("Past-threshold prompt when editing a nap (physiology cascade)", () => 
       expect(screen.queryByRole("note")).toBeNull();
     });
 
-    it("§F66 fast-follow C2: farther-out projected nap stays locked (cascade re-projects from the pin)", () => {
+    it("farther-out projected nap stays locked (cascade re-projects from the pin)", () => {
       const nap2 = projectedNap({
         id: "nap-2",
         eventKey: "nap_2",

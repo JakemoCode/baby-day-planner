@@ -17,7 +17,7 @@ function buildInviteUrl(token: string): string {
   return `${window.location.origin}/invite/${token}`;
 }
 
-/** §F3: mints a 7-day co-parent invite token, surfaces the shareable link, and copies to clipboard. */
+/** Mints a 7-day co-parent invite token, surfaces the shareable link, and copies to clipboard. */
 export function InviteCoParentSection() {
   const { user } = useAuth();
   const child = useCurrentChild();

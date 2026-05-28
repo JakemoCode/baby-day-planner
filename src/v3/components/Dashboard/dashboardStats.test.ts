@@ -64,7 +64,7 @@ describe("bottleTotals", () => {
     expect(bottleTotals([], END_OF_DAY)).toEqual({ count: 0, oz: 0 });
   });
 
-  // §F48b: back-edited future startTime must not inflate count or oz total.
+  // Back-edited future startTime must not inflate count or oz total.
   it("excludes bottles whose startTime is in the future relative to now", () => {
     const now = (14 * 60) as TimeMin;
     const events: Event[] = [
@@ -89,7 +89,7 @@ describe("napTotals", () => {
     expect(napTotals(events, END_OF_DAY)).toEqual({ count: 2, totalMinutes: 60 + 78 });
   });
 
-  // §F48d: in-progress nap contributes elapsed time (not placeholder duration) to avoid hiding an active nap.
+  // In-progress nap contributes elapsed time (not placeholder duration) to avoid hiding an active nap.
   it("clamps in-progress nap's contribution to elapsed time (now - startTime)", () => {
     const now = (14 * 60 + 30) as TimeMin; // 2:30pm
     const events: Event[] = [
@@ -101,7 +101,7 @@ describe("napTotals", () => {
     expect(napTotals(events, now)).toEqual({ count: 2, totalMinutes: 60 + 75 });
   });
 
-  // §F48c: future-startTime nap (e.g. fat-fingered next-day entry) is fully excluded.
+  // Future-startTime nap (e.g. fat-fingered next-day entry) is fully excluded.
   it("excludes naps whose startTime is in the future relative to now", () => {
     const now = (14 * 60) as TimeMin;
     const events: Event[] = [
@@ -126,7 +126,7 @@ describe("lastBottle", () => {
     expect(lastBottle([bottle({ lifecycle: { state: "projected" } })], END_OF_DAY)).toBeUndefined();
   });
 
-  // §F48b: back-edited future startTime must not appear as "last bottle" (renders "0 min ago" at a future time).
+  // Back-edited future startTime must not appear as "last bottle" (renders "0 min ago" at a future time).
   it("excludes bottles whose startTime is in the future relative to now", () => {
     const now = (14 * 60) as TimeMin;
     const events: Event[] = [
@@ -152,7 +152,7 @@ describe("lastCompletedNap", () => {
     expect(lastCompletedNap(events, (15 * 60) as TimeMin)?.endTime).toBe(14 * 60);
   });
 
-  // §F48: back-edited future endTime must not appear as "Last nap" (renders "0 min ago").
+  // Back-edited future endTime must not appear as "Last nap" (renders "0 min ago").
   it("excludes naps whose endTime is in the future relative to now", () => {
     const now = (14 * 60 + 30) as TimeMin; // 2:30pm
     const events: Event[] = [

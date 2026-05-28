@@ -6,7 +6,7 @@ import { isRenderSynthetic } from "@/v3/lib/syntheticEvents";
 
 const DASHBOARD_NEXT_TYPES = new Set<Event["type"]>(["bottle", "nap", "bedtime"]);
 
-// §F48b/c: filter out recorded events back-edited to a future time (prevents "0 min ago" on future times).
+// Filter out recorded events back-edited to a future time (prevents "0 min ago" on future times).
 export function bottleTotals(events: Event[], now: TimeMin): { count: number; oz: number } {
   let count = 0;
   let oz = 0;
@@ -27,9 +27,9 @@ export function napTotals(events: Event[], now: TimeMin): { count: number; total
     if (e.type !== "nap") continue;
     if (!isRecorded(e.lifecycle)) continue;
     if (e.endTime === undefined) continue;
-    // §F48c: skip back-edited future naps.
+    // Skip back-edited future naps.
     if (e.startTime > now) continue;
-    // §F48d: in-progress nap contributes elapsed time only, not placeholder duration.
+    // In-progress nap contributes elapsed time only, not placeholder duration.
     const effectiveEnd = e.endTime > now ? now : e.endTime;
     count += 1;
     totalMinutes += effectiveEnd - e.startTime;
@@ -54,7 +54,7 @@ export function lastCompletedNap(events: Event[], now: TimeMin): Event | undefin
     if (e.type !== "nap") continue;
     if (!isRecorded(e.lifecycle)) continue;
     if (e.endTime === undefined) continue;
-    // §F48: exclude naps back-edited to a future endTime (prevents "0 min ago" with future clock string).
+    // Exclude naps back-edited to a future endTime (prevents "0 min ago" with future clock string).
     if (e.endTime > now) continue;
     if (!best || (best.endTime !== undefined && e.endTime > best.endTime)) best = e;
   }

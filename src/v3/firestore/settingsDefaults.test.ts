@@ -41,10 +41,10 @@ describe("makeDefaultSettings", () => {
 });
 
 // ---------------------------------------------------------------------------
-// §F66 — ADR-0002 bedtime model defaults
+// ADR-0002 bedtime model defaults
 // ---------------------------------------------------------------------------
 
-describe("§F66 bedtime defaults (ADR-0002)", () => {
+describe("bedtime defaults (ADR-0002)", () => {
   it("bedtimeThreshold default is 17:30 (latest projected nap end)", () => {
     const s = makeDefaultSettings("child-1");
     expect(s.bedtimeThreshold).toBe(17 * 60 + 30);

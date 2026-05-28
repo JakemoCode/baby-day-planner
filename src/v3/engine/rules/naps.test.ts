@@ -645,7 +645,7 @@ describe("R7.5 — projected nap CROSSING the threshold becomes bedtime", () => 
   });
 });
 
-describe("§F66 fast-follow B8 — bedtime anchors at end of full final wake window", () => {
+describe("B8 — bedtime anchors at end of full final wake window", () => {
   it("dropped nap leaves a full-WW gap before bedtime, not a stub at earliestBedtime", () => {
     // Dogfood bug: final WW was only 55min because bedtime stubbed at earliestBedtime.
     // WW=[120], napLen=90: ww4 17:30-19:30; nap4 endTime=21:00 > threshold=18:00 → drop.
@@ -923,10 +923,10 @@ describe("Cascade extends past wakeWindowsMinutes.length (physiology cascade)", 
   });
 });
 
-describe("§F66 bedtime cascade — ADR-0002", () => {
+describe("bedtime cascade — ADR-0002", () => {
   // ADR-0002: drop projected naps with endTime > bedtimeThreshold;
   // bedtime.startTime = max(earliestBedtime, lastNapEnd + WW).
-  // Fixes §F64: old rule placed bedtime at napStart, which could be < earliestBedtime.
+  // Fixes a bug where the old rule placed bedtime at napStart, which could be < earliestBedtime.
 
   it("drop projected nap whose endTime > bedtimeThreshold; bedtime lands at earliestBedtime floor", () => {
     // threshold=17:30, earliestBedtime=18:00, WW=120, napLen=45:
@@ -1000,7 +1000,7 @@ describe("§F66 bedtime cascade — ADR-0002", () => {
     expect(bedtime!.startTime).toBe(18 * 60);
   });
 
-  it("§F64 regression: bedtime.startTime >= earliestBedtime; no projected nap past threshold", () => {
+  it("regression: bedtime.startTime >= earliestBedtime; no projected nap past threshold", () => {
     // threshold=17:30, earliestBedtime=18:00: recorded nap ends 13:14 →
     // nap at 17:59-18:44 → endTime > 17:30 → drop; bedtime = max(18:00, 17:59) = 18:00.
     const recordedNap1 = aRecordedNap({
