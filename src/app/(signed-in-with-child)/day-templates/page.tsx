@@ -61,6 +61,7 @@ export default function DayTemplatesPage() {
       wakeTime: settings?.defaultWakeTime ?? 7 * 60,
       suppressedRecurringIds: [],
       suppressedDaycareDay: false,
+      suppressedDreamFeed: false,
     }),
     [settings?.defaultWakeTime],
   );

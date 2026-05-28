@@ -121,6 +121,7 @@ function TomorrowPageInner({
       wakeTime: planState.wakeTime,
       suppressedRecurringIds: [],
       suppressedDaycareDay: false,
+      suppressedDreamFeed: false,
     };
     if (planState.templateId) day.templateId = planState.templateId;
     // §F12 PR 3 bugfix — the preview Day must carry ownerOverrides so

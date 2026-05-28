@@ -24,11 +24,14 @@ import {
   editWakeTime,
   getDay,
   getDayByDate,
+  getOrCreatePlannedDay,
   listArchivedDays,
   promoteFromPlan,
   startNewDay,
-  updateDay,
+  suppressDaycareForDay,
+  suppressDreamFeedForDay,
   suppressRecurringForDay,
+  updateDay,
   updateDayOwnerOverride,
   watchActiveDay,
 } from "./days";
@@ -181,6 +184,56 @@ describe("v3 days repository", () => {
     await suppressRecurringForDay(database, "child-1", "day-1", "rec-tummy");
     const got = await getDay(database, "child-1", "day-1");
     expect(got?.suppressedRecurringIds).toEqual(["rec-tummy"]);
+  });
+
+  // §F66 — "delete daycare from today" flips the per-day flag the
+  // engine's R21.5 already honors, without touching Settings.daycare.
+  // Tomorrow's fresh Day starts with `false`.
+  it("suppressDaycareForDay flips suppressedDaycareDay to true", async () => {
+    const database = db();
+    await createDay(database, day({ suppressedDaycareDay: false }));
+    await suppressDaycareForDay(database, "child-1", "day-1");
+    const got = await getDay(database, "child-1", "day-1");
+    expect(got?.suppressedDaycareDay).toBe(true);
+  });
+
+  it("suppressDaycareForDay is idempotent — flipping when already true is a no-op", async () => {
+    const database = db();
+    await createDay(database, day({ suppressedDaycareDay: true }));
+    await suppressDaycareForDay(database, "child-1", "day-1");
+    const got = await getDay(database, "child-1", "day-1");
+    expect(got?.suppressedDaycareDay).toBe(true);
+  });
+
+  // §F66 — "delete dream feed from today" routes through
+  // Day.suppressedDreamFeed; R5.5 stops emitting the dream-feed slot.
+  it("suppressDreamFeedForDay flips suppressedDreamFeed to true", async () => {
+    const database = db();
+    await createDay(database, day({ suppressedDreamFeed: false }));
+    await suppressDreamFeedForDay(database, "child-1", "day-1");
+    const got = await getDay(database, "child-1", "day-1");
+    expect(got?.suppressedDreamFeed).toBe(true);
+  });
+
+  it("suppressDreamFeedForDay is idempotent — flipping when already true is a no-op", async () => {
+    const database = db();
+    await createDay(database, day({ suppressedDreamFeed: true }));
+    await suppressDreamFeedForDay(database, "child-1", "day-1");
+    const got = await getDay(database, "child-1", "day-1");
+    expect(got?.suppressedDreamFeed).toBe(true);
+  });
+
+  // Audit follow-up: getOrCreatePlannedDay previously minted
+  // `day-${date}-${Date.now()}` ids, racing concurrent overnight bottle
+  // saves into duplicate planned docs. Now uses deterministicDayId so
+  // repeat calls land on the same doc (idempotent setDoc).
+  it("getOrCreatePlannedDay uses a deterministic id and is idempotent under repeat calls", async () => {
+    const database = db();
+    const d1 = await getOrCreatePlannedDay(database, "child-1", "2026-06-01", 7 * 60);
+    const d2 = await getOrCreatePlannedDay(database, "child-1", "2026-06-01", 7 * 60);
+    expect(d1.id).toBe("day-child-1-2026-06-01");
+    expect(d2.id).toBe(d1.id);
+    expect(d2.status).toBe("planned");
   });
 
   it("archives by flipping status", async () => {

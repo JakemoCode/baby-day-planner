@@ -79,13 +79,14 @@ export async function getOrCreatePlannedDay(
   const existing = await getDayByDate(db, childId, date);
   if (existing) return existing;
   const newDay: Day = {
-    id: `day-${date}-${Date.now()}`,
+    id: deterministicDayId(childId, date),
     childId,
     date,
     status: "planned",
     wakeTime: defaultWakeTime,
     suppressedRecurringIds: [],
     suppressedDaycareDay: false,
+    suppressedDreamFeed: false,
   };
   await setDoc(dayRef(db, childId, newDay.id), newDay);
   return newDay;
@@ -395,6 +396,7 @@ export async function startNewDay(
       wakeTime: input.newWakeTime,
       suppressedRecurringIds: [],
       suppressedDaycareDay: false,
+      suppressedDreamFeed: false,
       ...(input.templateId !== undefined ? { templateId: input.templateId } : {}),
       ...(input.ownerOverrides !== undefined ? { ownerOverrides: input.ownerOverrides } : {}),
     };
