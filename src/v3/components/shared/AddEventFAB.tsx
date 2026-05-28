@@ -62,7 +62,7 @@ export function AddEventFAB({
       <FABTypePicker
         open={pickerOpen}
         {...(types ? { types } : {})}
-        onSelect={(type: CreatableType) => {
+        onSelect={(type) => {
           setPickerOpen(false);
           create(type);
         }}
