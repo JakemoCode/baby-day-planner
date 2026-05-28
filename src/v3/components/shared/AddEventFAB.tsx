@@ -1,15 +1,5 @@
 "use client";
 
-/**
- * Floating "Add an event" button + its type picker, with the
- * picker-open state and the type → template → openCreate flow owned
- * internally. Dashboard, timeline, and tomorrow all mounted the same
- * FAB + FABTypePicker + buildCreateTemplate wiring inline; this
- * collapses it. Pages differ only in the buildCreateTemplate inputs
- * (dayId, actuals source, nowMinutes anchor, whether projections
- * exist), which are passed as props.
- */
-
 import { useState } from "react";
 import type { Event, Settings, TimeMin } from "../../schemas";
 import { FAB } from "@/components/shared/FAB";

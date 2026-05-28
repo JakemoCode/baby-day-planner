@@ -32,8 +32,9 @@ export type BuildTemplateInput = {
    * would scan recorded events only and could claim an eventKey
    * already occupied by a projection.
    *
-   * Optional for callers that don't have it (rare; only legacy paths).
-   * When omitted, falls back to "count of recorded events + 1".
+   * Optional: the tomorrow page omits it (it plans against extras only,
+   * with no engine cascade to collide with). When omitted, slot
+   * numbering falls back to "count of recorded events + 1".
    */
   projected?: Event[];
 };
