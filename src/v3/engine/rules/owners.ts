@@ -27,13 +27,12 @@ import {
   isNoOwner,
   NO_OWNER,
   type Event,
+  type OwnerRef,
   type OwnerSlotEntry,
   type OwnershipTemplate,
 } from "../../schemas";
 import type { Rule } from "../evaluator";
-import { hasType, isProjected } from "../helpers";
-
-const isBedtime = hasType("bedtime");
+import { hasType, isBedtime, isProjected } from "../helpers";
 
 /**
  * Build a rule that stamps `template.<list>[N-1]` onto projected events of
@@ -132,33 +131,33 @@ const RuleApplyTemplateBottleOwners = templateOwnerByIndexRule({
 // R12.5 — Bedtime (singleton template field, not a list)
 // ---------------------------------------------------------------------------
 
+// A projected bedtime is eligible for the template's bedtimeOwner stamp
+// only when it has no owner yet AND no per-day ownerOverride claims its
+// slot (an explicit override always wins over the template default).
+function isStampableBedtime(
+  e: Event,
+  overrides: Record<string, OwnerRef | null> | undefined,
+): boolean {
+  return (
+    isBedtime(e) &&
+    isProjected(e) &&
+    isNoOwner(e.owner) &&
+    !(overrides && Object.hasOwn(overrides, e.eventKey))
+  );
+}
+
 const RuleApplyTemplateBedtimeOwner: Rule = {
   id: "R12.5",
   description: "Stamp template.bedtimeOwner onto a projected bedtime that has no owner",
   dependsOn: ["R3.1"],
   matches: (events, ctx) => {
     if (!ctx.template?.bedtimeOwner) return false;
-    const overrides = ctx.day.ownerOverrides;
-    return events.some(
-      (e) =>
-        isBedtime(e) &&
-        isProjected(e) &&
-        isNoOwner(e.owner) &&
-        !(overrides && Object.hasOwn(overrides, e.eventKey)),
-    );
+    return events.some((e) => isStampableBedtime(e, ctx.day.ownerOverrides));
   },
   produces: (events, ctx) => {
     const owner = ctx.template?.bedtimeOwner;
     if (!owner) return events;
-    const overrides = ctx.day.ownerOverrides;
-    return events.map((e) =>
-      isBedtime(e) &&
-      isProjected(e) &&
-      isNoOwner(e.owner) &&
-      !(overrides && Object.hasOwn(overrides, e.eventKey))
-        ? { ...e, owner }
-        : e,
-    );
+    return events.map((e) => (isStampableBedtime(e, ctx.day.ownerOverrides) ? { ...e, owner } : e));
   },
 };
 

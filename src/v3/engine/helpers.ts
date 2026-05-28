@@ -29,6 +29,16 @@ export function hasType(type: EventType): (event: Event) => boolean {
   return (event) => event.type === type;
 }
 
+/**
+ * Pre-bound type predicates for the types that appear in two or more rule
+ * files. Single-use predicates (e.g. `isPump`, `isRecurring`) stay local to
+ * their rule file — consolidation only helps when there's actual duplication.
+ */
+export const isNap = hasType("nap");
+export const isWakeWindow = hasType("wake_window");
+export const isBedtime = hasType("bedtime");
+export const isBottle = hasType("bottle");
+
 // ---------------------------------------------------------------------------
 // Event construction
 // ---------------------------------------------------------------------------

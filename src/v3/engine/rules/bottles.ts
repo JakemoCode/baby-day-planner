@@ -42,18 +42,24 @@
 import type { Context, Event } from "../../schemas";
 import type { Rule } from "../evaluator";
 import { intervalForAmount } from "../bottleIntervalRules";
-import { hasType, isProjected, projectedEvent } from "../helpers";
+import { isBedtime, isBottle, isProjected, projectedEvent } from "../helpers";
 import { MINUTES_PER_DAY } from "../../ui/time";
 import { DREAM_FEED_EVENT_KEY, isDreamFeed } from "../../lib/eventConventions";
 
-// ---------------------------------------------------------------------------
-// Predicates / helpers
-// ---------------------------------------------------------------------------
-
-const isBottle = hasType("bottle");
-const isBedtime = hasType("bedtime");
-
 const MIDNIGHT = MINUTES_PER_DAY;
+
+/**
+ * Parse the integer index out of a numbered bottle eventKey
+ * (`bottle_3` → 3). Returns null for non-numbered keys (e.g. the
+ * dream-feed slot `bottle_dream`). Mirrors `indexFromKey` in owners.ts;
+ * lives here because the bottle index format (`bottle_N`) is a
+ * bottles-rule convention, used both for next-index allocation and the
+ * R5.4 renumber pass.
+ */
+function bottleIndexFromKey(eventKey: string): number | null {
+  const match = /^bottle_(\d+)$/.exec(eventKey);
+  return match ? parseInt(match[1]!, 10) : null;
+}
 
 /**
  * Forward cap for the bottle cascade. The day's RHYTHM CHAIN is
@@ -422,8 +428,8 @@ function projectBottleChain(events: Event[], ctx: Context): Event[] {
   // Highest bottle eventKey index for new keys (R5.4 renumbers anyway,
   // but stable keys per pass keep the fixed-point check from looping).
   const maxIndex = bottles.reduce((m, b) => {
-    const match = /^bottle_(\d+)$/.exec(b.eventKey);
-    return match ? Math.max(m, parseInt(match[1]!, 10)) : m;
+    const idx = bottleIndexFromKey(b.eventKey);
+    return idx !== null ? Math.max(m, idx) : m;
   }, 0);
 
   let nextIndex = maxIndex + 1;
@@ -622,8 +628,8 @@ function computeProjectedRenumber(
   const recordedNums = new Set<number>();
   for (const b of all) {
     if (b.lifecycle.state === "projected") continue;
-    const m = /^bottle_(\d+)$/.exec(b.eventKey);
-    if (m) recordedNums.add(parseInt(m[1]!, 10));
+    const idx = bottleIndexFromKey(b.eventKey);
+    if (idx !== null) recordedNums.add(idx);
   }
   const maxRecorded = recordedNums.size > 0 ? Math.max(...recordedNums) : 0;
   let n = maxRecorded + 1;
