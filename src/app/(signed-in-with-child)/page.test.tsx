@@ -184,9 +184,9 @@ describe("DashboardPage (V3)", () => {
     setupHooks({ day: makeDay({ wakeTime: 0 }), nowMinutes: 8 * 60 });
     renderWithAuth(<DashboardPage />);
     // Must NOT show the Wake up button; should show the dashboard surface
-    // with at least the "add an event" FAB.
+    // (the always-present stats panels).
     expect(screen.queryByRole("button", { name: /Start first day/i })).toBeNull();
-    expect(screen.getByRole("button", { name: /Add an event/i })).toBeVisible();
+    expect(screen.getByRole("region", { name: /bottle stats/i })).toBeVisible();
   });
 
   it("renders dashboard normally past bedtimeThreshold with no upcoming event (F32: no EOD card)", () => {
@@ -196,7 +196,7 @@ describe("DashboardPage (V3)", () => {
     });
     renderWithAuth(<DashboardPage />);
     expect(screen.queryByRole("button", { name: /Start first day/i })).toBeNull();
-    expect(screen.getByRole("button", { name: /Add an event/i })).toBeVisible();
+    expect(screen.getByRole("region", { name: /bottle stats/i })).toBeVisible();
   });
 
   it("shows dashboard normally when there is still an upcoming event after bedtime", () => {
@@ -218,7 +218,7 @@ describe("DashboardPage (V3)", () => {
     setupHooks({ nowMinutes: 20 * 60, projected: [upcoming] });
     renderWithAuth(<DashboardPage />);
     expect(screen.queryByRole("button", { name: /Start first day/i })).toBeNull();
-    expect(screen.getByRole("button", { name: /Add an event/i })).toBeVisible();
+    expect(screen.getByRole("region", { name: /bottle stats/i })).toBeVisible();
   });
 
   it("handleEndNap saves completed nap with endTime committed (TIME_EDIT action)", async () => {

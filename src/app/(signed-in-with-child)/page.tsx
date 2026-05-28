@@ -28,7 +28,6 @@ import {
 } from "@/v3/repositories/events";
 import { db } from "@/lib/firebase/client";
 import { DashboardSkeleton } from "@/v3/components/Dashboard/DashboardSkeleton";
-import { AddEventFAB } from "@/v3/components/shared/AddEventFAB";
 import { DrawerShell } from "@/v3/components/shared/DrawerShell";
 import { NowBanner } from "@/v3/components/Dashboard/NowBanner";
 import { ContextualActionButton } from "@/v3/components/Dashboard/ContextualActionButton";
@@ -60,7 +59,6 @@ export default function DashboardPage() {
     saveEvent,
     projected,
     drawer,
-    openCreate,
     close,
     onSave,
     onDelete,
@@ -277,15 +275,6 @@ export default function DashboardPage() {
           </div>
         )}
       </div>
-
-      <AddEventFAB
-        dayId={day.id}
-        actuals={actuals}
-        settings={settings}
-        nowMinutes={nowMinutes}
-        projected={projected}
-        onCreate={openCreate}
-      />
 
       <DrawerShell
         drawer={drawer}
