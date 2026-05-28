@@ -149,7 +149,7 @@ describe("ContextualActionButton", () => {
     expect(bottle.lifecycle).toEqual({ state: "completed", committedAt: hm(13, 30) });
   });
 
-  describe("logged-state UX (§F66 fast-follow A3)", () => {
+  describe("logged-state UX", () => {
     const loggedBottle = (startTime: TimeMin): Event => ({
       ...projectedBottle(startTime),
       lifecycle: { state: "completed", committedAt: startTime },
@@ -234,13 +234,9 @@ describe("ContextualActionButton", () => {
       expect(onLogBottle).not.toHaveBeenCalled();
     });
 
-    it("§F66 audit: '✓ Bottle logged' auto-hides after LOGGED_AFFORDANCE_MS (4000ms)", () => {
-      // AffordanceTimer schedules a setTimeout to unmount the button so
-      // a subsequent end-nap / log-bottle can take over. Without a
-      // timer test, regressions to the constant (or removing the
-      // cleanup) would only surface in the field. Fake timers let us
-      // pin both the "still visible at 3999ms" and "gone past 4000ms"
-      // sides of the boundary.
+    it("'✓ Bottle logged' auto-hides after LOGGED_AFFORDANCE_MS (4000ms)", () => {
+      // Fake timers pin both sides of the 4000ms boundary; regressions to
+      // the constant or missing cleanup would otherwise only surface in the field.
       vi.useFakeTimers();
       try {
         render(

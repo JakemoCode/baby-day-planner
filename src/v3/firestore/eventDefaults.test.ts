@@ -1,10 +1,6 @@
 /**
- * V3 Event defensive defaults — post-PR-C1.
- *
- * V2 bridge tests (string startTime coercion, source/status/recorded
- * triplet → lifecycle, V2 owner-string resolution) were removed when
- * the V2 surface was deleted. The defaulter now only handles defense
- * in depth on partial V3 docs.
+ * V3 Event defensive defaults — post-PR-C1. V2 bridge tests were removed
+ * when the V2 surface was deleted; defaulter now handles partial V3 docs only.
  */
 
 import { describe, expect, it } from "vitest";

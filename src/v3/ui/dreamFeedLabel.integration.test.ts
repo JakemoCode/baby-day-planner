@@ -1,16 +1,10 @@
 /**
  * Integration: full projectDay + applyDreamFeedLabel path.
  *
- * Original context (pre-PR-6): Jake reported on 2026-05-13 that his
- * click-test showed a "Bottle 6" past bedtime instead of "Dream Feed".
- * In the pre-PR-6 engine, the rhythm cascade always capped at bedtime,
- * so dream-feed was render-only and had no projected bottle to relabel.
- *
- * Post-PR-6 (§F66): the engine emits a projected dream-feed bottle at
- * `settings.dreamFeedTime` via rule R5.5. The label-pass then either
- * leaves it alone (R5.5 already labels it "Dream Feed") or relabels a
- * separate post-bedtime bottle that happened to slip through, for
- * resilience.
+ * Post-§F66 / PR-6: R5.5 emits a projected dream-feed bottle at `settings.dreamFeedTime`.
+ * The label-pass is a no-op when R5.5 already labeled it "Dream Feed", but also relabels
+ * any post-bedtime bottle that slips through (resilience). Pre-PR-6, the cascade always
+ * capped at bedtime so dream-feed was render-only with no projected bottle to relabel.
  */
 
 import { describe, expect, it } from "vitest";

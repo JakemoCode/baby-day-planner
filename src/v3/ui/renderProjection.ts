@@ -74,11 +74,8 @@ export function renderProjection(
 }
 
 /**
- * Collapse events that share `(type, eventKey)` — orphans from
- * inconsistent write-path id conventions. Most-recent annotation wins;
- * stable id tie-break. Events without an eventKey, and projections, pass
- * through (projections are deterministic and shouldn't duplicate; we
- * still dedup them defensively under the same policy).
+ * Collapse events sharing `(type, eventKey)` — orphans from inconsistent write-path id conventions.
+ * Most-recent annotation wins; stable id tie-break. Projections pass through (deterministic, but deduped defensively).
  */
 function dedupBySlotKey(events: Event[]): Event[] {
   const winnerByKey = new Map<string, Event>();

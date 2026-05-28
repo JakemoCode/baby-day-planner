@@ -1,17 +1,7 @@
 /**
- * WelcomePage UI seam test.
- *
- * Exercises form rendering, the three-step transition (identity →
- * parents+wake → first-day preview), field-to-handler wiring, and
- * submit ordering. The actual Firestore writes are mocked here — the
- * real write chain (Child + Settings + User + Day 1 order, schema
- * correctness, rule-friendliness) is covered by
+ * WelcomePage UI seam test — form wiring, three-step transition, and submit ordering.
+ * Real write-chain coverage (schema, rule-friendliness) lives in
  * `tests/integration/onboarding.test.ts` against the real emulator.
- *
- * Together these two tests close the seam-coverage gap: this one catches UI
- * wiring regressions (field name typos, step-state loss, minutesFromTimeInput
- * bugs, missing trim/default fallbacks); the integration one catches data
- * shape and rule regressions.
  */
 
 import { describe, expect, it, vi, beforeEach } from "vitest";
@@ -39,9 +29,7 @@ vi.mock("firebase/firestore", async () => {
 
 vi.mock("@/lib/firebase/client", () => ({ db: {} }));
 
-// Step 3's preview mounts TimelineV3 → projectDay → renderProjection.
-// Stub TomorrowPreview to a lightweight marker so the seam test stays
-// focused on form wiring (the projection layer has its own tests).
+// Stub TomorrowPreview so the seam test stays focused on form wiring.
 vi.mock("@/v3/components/Tomorrow/TomorrowPreview", () => ({
   TomorrowPreview: () => <div data-testid="tomorrow-preview-stub" />,
 }));
@@ -113,7 +101,7 @@ describe("WelcomePage", () => {
     await userEvent.click(screen.getByRole("button", { name: /Next/i }));
     await userEvent.click(screen.getByRole("button", { name: /Start tracking/i }));
 
-    // §F12 PR 3: now 4 set() calls — Child, Settings, User, Day 1.
+    // 4 set() calls: Child, Settings, User, Day 1.
     expect(setBatchMock).toHaveBeenCalledTimes(4);
     expect(commitMock).toHaveBeenCalledTimes(1);
 

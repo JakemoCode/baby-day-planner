@@ -1,8 +1,4 @@
-/**
- * §F55 — collapsed cluster chip for ≥2 overlapping instant events.
- * Component-level tests for the chip itself. Integration with timeline
- * positioning + sheet routing lives in TimelineV3.test.tsx.
- */
+/** Collapsed cluster chip for ≥2 overlapping instant events (§F55). Integration in TimelineV3.test.tsx. */
 
 import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";

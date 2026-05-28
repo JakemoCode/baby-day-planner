@@ -1,21 +1,9 @@
 /**
- * V3 Settings construction and normalization.
- *
- * Two seams:
- *
- *   makeDefaultSettings(childId)
- *     Pure construction — builds a fully-shaped Settings from scratch with
- *     conservative defaults. No legacy awareness. Used by the settings page
- *     on first run (no doc exists yet) and the welcome/onboarding page.
- *
- *   normalizeSettingsDoc(raw)
- *     Firestore read seam — applies migrations for legacy shapes, then fills
- *     any missing required fields via makeDefaultSettings logic. Used by the
- *     converter on every read.
- *
- * Defaults are deliberately conservative: numeric defaults match the
- * engine's expected ranges, daycare is disabled, owners use empty
- * displayNames so the UI prompts the user to set them.
+ * V3 Settings construction and normalization. Two seams:
+ * - `makeDefaultSettings(childId)` — pure first-run construction, no legacy awareness.
+ * - `normalizeSettingsDoc(raw)` — Firestore read seam; applies legacy migrations then
+ *   fills missing fields. Used by the converter on every read.
+ * Defaults are conservative: daycare disabled, owners have empty displayNames.
  */
 
 import type { PumpSession, Settings } from "../schemas";
@@ -83,10 +71,8 @@ const DEFAULTS: Omit<Settings, "childId"> = {
 const LEGACY_PLACEHOLDER_PX_PER_HOUR = 80;
 
 /**
- * Older settings docs persisted `pumpTimes` as `number[]` (TimeMin array).
- * The current shape is `PumpSession[]` with an optional per-session
- * duration override. Normalize legacy entries on read so callers always
- * see the object shape.
+ * Pre-#155 docs persisted `pumpTimes` as `number[]`; current shape is
+ * `PumpSession[]`. Normalize on read so callers always see the object shape.
  */
 function normalizePumpTimes(raw: unknown): PumpSession[] {
   if (!Array.isArray(raw)) return [];
@@ -108,9 +94,8 @@ function normalizePumpTimes(raw: unknown): PumpSession[] {
 }
 
 /**
- * Pure construction seam — builds a fully-shaped Settings from scratch.
- * No legacy migration logic fires. Used by the settings page on first run
- * when no Firestore doc exists yet, and by the welcome/onboarding page.
+ * Pure construction seam — builds fully-shaped Settings from scratch.
+ * No legacy migration. Used on first run (no doc yet) and during onboarding.
  */
 export function makeDefaultSettings(childId: string): Settings {
   return {
@@ -136,22 +121,16 @@ export function makeDefaultSettings(childId: string): Settings {
 }
 
 /**
- * Firestore read seam — applies all legacy migrations, then fills missing
- * required fields from DEFAULTS. Called by v3SettingsConverter on every
- * Firestore read.
- *
- * Migrations applied:
- * 1. pumpTimes: number[] → PumpSession[]  (pre-#155 shape)
- * 2. timelinePxPerHour 80 → 120 heuristic rewrite
- *    (gated on timelineColorMode == null so deliberate 80 values are kept)
+ * Firestore read seam — applies legacy migrations then fills missing fields.
+ * Called by v3SettingsConverter on every read. Migrations:
+ * 1. pumpTimes: number[] → PumpSession[] (pre-#155)
+ * 2. timelinePxPerHour 80 → 120 (gated on timelineColorMode==null so
+ *    deliberate 80 values are preserved)
  */
 export function normalizeSettingsDoc(raw: unknown): Settings {
   const input = raw as Partial<Settings>;
 
-  // Start from a fully-cloned defaults baseline so any field that input
-  // doesn't override (e.g. wakeWindowsMinutes, bottleIntervalRules) is a
-  // fresh array/object — never a reference to the shared DEFAULTS.
-  // Mirrors the symmetric guarantee makeDefaultSettings already provides.
+  // Fresh clone so unoverridden arrays/objects are never shared DEFAULTS refs.
   const baseline = makeDefaultSettings(input.childId ?? "");
 
   const merged: Settings = {
@@ -174,11 +153,9 @@ export function normalizeSettingsDoc(raw: unknown): Settings {
     },
   };
 
-  // One-time migration: rewrite the cutover-era 80 px/hour stub to V2's
-  // intended 120. Gated on `input.timelineColorMode == null` (the new
-  // field added in this same PR) so we don't clobber a user who later
-  // chooses 80 intentionally — any doc with 80 AND the new colorMode
-  // field set must be a deliberate choice, not the legacy stub.
+  // One-time migration: rewrite the cutover-era 80 px/hour stub to 120.
+  // Gated on timelineColorMode==null so deliberate 80 values (set alongside
+  // the colorMode field) are preserved.
   if (
     merged.timelinePxPerHour === LEGACY_PLACEHOLDER_PX_PER_HOUR &&
     input.timelineColorMode == null

@@ -1,7 +1,6 @@
 // @vitest-environment node
 /**
  * V3 Child repository — Firestore CRUD against real emulator.
- * §F10 PR #1: schema + repo, no UI/auth wiring yet.
  */
 
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";

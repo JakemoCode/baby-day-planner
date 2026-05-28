@@ -1,9 +1,4 @@
-/**
- * Test factories — small, opinionated helpers for building V3 fixtures.
- *
- * Goal: make tests read like prose. Reach for `aProjectedNap({ start: 13*60 })`
- * before reaching for the full Event literal.
- */
+/** Test factories — concise builders for V3 fixtures. Prefer `aProjectedNap({ start: 13*60 })` over full Event literals. */
 
 import {
   NO_OWNER,

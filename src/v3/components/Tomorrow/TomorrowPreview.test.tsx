@@ -1,7 +1,4 @@
-/**
- * V3 TomorrowPreview — renders TimelineV3 over a synthesized planned
- * Day + Settings (+ optional template + extras), using the V3 engine.
- */
+/** TomorrowPreview — renders TimelineV3 over a synthesized planned Day + Settings via the V3 engine. */
 
 import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";

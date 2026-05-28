@@ -1,7 +1,4 @@
-/**
- * V3 groupInstants — bucket instant-kind events by startTime.
- * V2 keyed by string ("HH:MM"); V3 keys by TimeMin number directly.
- */
+/** groupInstants — buckets instant-kind events by TimeMin (V2 used HH:MM string). */
 
 import { describe, expect, it } from "vitest";
 import type { Event } from "../../schemas";
@@ -58,7 +55,7 @@ describe("v3 groupInstants", () => {
   });
 });
 
-describe("v3 mergeNearbyGroups (§F55)", () => {
+describe("mergeNearbyGroups (§F55)", () => {
   it("returns groups unchanged when none overlap vertically", () => {
     const groups = groupInstants([
       ev({ id: "a", startTime: 9 * 60 }),
@@ -115,15 +112,13 @@ describe("v3 mergeNearbyGroups (§F55)", () => {
       ev({ id: "b", startTime: 9 * 60 + 5 }),
     ]);
     const merged = mergeNearbyGroups(groups, 15);
-    // Different key shape so React doesn't try to reuse a single-group DOM node
+    // Different key shape prevents React reusing a single-group DOM node.
     expect(merged[0]?.key).not.toBe("instant-group-540");
     expect(merged[0]?.key).toContain("540");
   });
 
   it("does not merge across a gap exactly equal to the collision window", () => {
-    // 30-min collision window; groups exactly 30 apart should NOT merge.
-    // Strict less-than keeps the semantics easy to reason about at
-    // exact thresholds (axis tick boundaries, etc.).
+    // Strict less-than: groups exactly 30 apart do NOT merge (preserves axis-tick semantics).
     const groups = groupInstants([
       ev({ id: "a", startTime: 9 * 60 }),
       ev({ id: "b", startTime: 9 * 60 + 30 }),

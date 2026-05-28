@@ -1,9 +1,6 @@
 /**
  * Property-test arbitraries for the V3 engine.
- *
- * Each generator produces a *valid* shape — invalid combinations are filtered
- * out via fc.pre() at the property site, not pre-baked here. Generators stay
- * minimal; properties compose them.
+ * Each generator produces a valid shape; invalid combinations are filtered via fc.pre() at the property site.
  */
 
 import fc from "fast-check";
@@ -69,12 +66,7 @@ const nextId = (): string => {
   return `evt_${idCounter}`;
 };
 
-/**
- * A recorded nap (start/end, completed lifecycle). End is always after start
- * within a sensible duration window. The eventKey targets one of the four
- * default nap-chain slots (nap_1..nap_4) so cascade-anchoring scenarios
- * actually exercise R3.3/R3.5/R3.6 in property runs.
- */
+/** Recorded nap targeting nap_1..nap_4 slots so cascade-anchoring scenarios exercise R3.3/R3.5/R3.6. */
 export const arbRecordedNap: fc.Arbitrary<Event> = fc
   .record({
     slot: fc.integer({ min: 1, max: 4 }),
@@ -124,10 +116,7 @@ export const arbActuals: fc.Arbitrary<Event[]> = fc.array(
 
 export const arbDay: fc.Arbitrary<Day> = arbDayTime.map((wakeTime) => aDay({ wakeTime }));
 
-/**
- * Settings vary enough to exercise different cadence shapes. Held within
- * realistic ranges so the cascade still produces sensible scenarios.
- */
+/** Settings spanning realistic ranges so the cascade produces sensible cadence shapes. */
 export const arbSettings: fc.Arbitrary<Settings> = fc
   .record({
     bottlesPerDay: fc.integer({ min: 2, max: 8 }),

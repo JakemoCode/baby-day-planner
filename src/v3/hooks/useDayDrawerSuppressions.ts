@@ -1,16 +1,9 @@
 "use client";
 
 /**
- * Per-day "delete" → suppression routing for the drawer.
- *
- * The drawer's onDelete handler walks this list and invokes the
- * matching `apply` to write a per-day suppression flag rather than
- * actually deleting from a shared template. Dashboard and timeline
- * pages both need the same routing, so the array lives here.
- *
- * Returns `[]` when there's no active day — the drawer's delete path
- * then falls through to the default behavior (true deletion of an
- * `actuals` doc).
+ * Per-day delete → suppression routing for the drawer. Writes a per-day
+ * suppression flag instead of deleting from a shared template. Returns `[]`
+ * when there's no active day, letting the drawer fall through to true deletion.
  */
 
 import type { Firestore } from "firebase/firestore";

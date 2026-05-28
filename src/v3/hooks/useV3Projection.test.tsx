@@ -1,16 +1,6 @@
 /**
- * useV3Projection — engine output as a React-friendly hook.
- *
- * Tests exercise the REAL engine (not a mock) so the hook's wiring
- * of day / settings / actuals / template into the projectDay context
- * is verified end-to-end. The previous version of this file mocked
- * `projectDay` entirely; the test "recomputes when actuals change"
- * asserted `result.current !== first` which is true for any React
- * re-render regardless of whether the hook propagated the new actuals
- * to the engine. Audit P1-3.
- *
- * `useNowMinutes` stays mocked — wall-clock time would make tests
- * non-deterministic. Every other side of the seam is real.
+ * Tests use the REAL engine to verify hook wiring end-to-end (audit P1-3).
+ * `useNowMinutes` is mocked for determinism; everything else is real.
  */
 
 import { describe, expect, it, vi } from "vitest";
@@ -70,28 +60,18 @@ describe("useV3Projection — engine wiring (real projectDay)", () => {
     const { result } = renderHook(() => useV3Projection({ day, settings, actuals: [] }));
     const events = result.current;
 
-    // Cascade must emit nap_1 + nap_2 from wakeWindowsMinutes=[120,150].
-    // Under the physiology cascade, additional naps are also projected
-    // via cadence-extension up to bedtime threshold; we assert the
-    // first two as the relevant chain prefix. The hook now runs the
-    // render pipeline (renderProjection), which inserts synthetic
-    // putdown chips with type="nap" and eventKey=PUTDOWN_KIND_TAG —
-    // filter those out to get just the canonical nap_N events.
+    // Assert first two naps (chain prefix); filter PUTDOWN_KIND_TAG synthetic chips.
     const naps = events.filter((e) => e.type === "nap" && e.eventKey !== PUTDOWN_KIND_TAG);
     expect(naps.slice(0, 2).map((n) => n.eventKey)).toEqual(["nap_1", "nap_2"]);
 
-    // First wake window starts at wakeTime, lasts 120 min. nap_1 follows.
     const ww1 = events.find((e) => e.eventKey === "wake_window_1");
     const nap1 = events.find((e) => e.eventKey === "nap_1");
     expect(ww1?.startTime).toBe(7 * 60);
     expect(ww1?.endTime).toBe(7 * 60 + 120);
     expect(nap1?.startTime).toBe(7 * 60 + 120);
 
-    // Bottle cascade emits 3 placeholders. The 3rd one (naive position
-    // 13:10) lands inside nap_2's putdown wind-down [12:15, 13:30]
-    // (nap_2 = 12:30-13:30, putdownLeadMinutes=15) and R5.6 nudges it
-    // to the after-edge 13:30 (closer to the predicted 13:10 than the
-    // before-edge 12:15). Bottles 1 and 2 are unaffected.
+    // Bottle 3 naive position 13:10 falls inside nap_2's putdown window;
+    // R5.6 nudges it to the after-edge 13:30.
     const bottles = events.filter((e) => e.type === "bottle");
     expect(bottles).toHaveLength(3);
     expect(bottles.map((b) => b.startTime)).toEqual([
@@ -118,13 +98,11 @@ describe("useV3Projection — engine wiring (real projectDay)", () => {
   });
 
   it("recompute on actuals change actually re-anchors the cascade (not just reference inequality)", () => {
-    // The OLD test asserted `result.current !== first` — true for any
-    // React re-render. The right assertion: a recorded nap at a non-
-    // default time changes the projected nap_1's geometry AND lifecycle.
+    // Asserts geometry + lifecycle change, not mere reference inequality (audit P1-3).
     const a1: Event[] = [];
     const recordedNap = aRecordedNap({
       eventKey: "nap_1",
-      start: 10 * 60, // 10:00, later than the empty-actuals cascade default 9:00
+      start: 10 * 60, // later than empty-actuals cascade default 9:00
       end: 11 * 60,
     });
     const a2: Event[] = [recordedNap];
@@ -136,7 +114,7 @@ describe("useV3Projection — engine wiring (real projectDay)", () => {
 
     const napsBefore = result.current.filter((e) => e.type === "nap");
     const nap1Before = napsBefore.find((n) => n.eventKey === "nap_1");
-    // Empty actuals: nap_1 is projected at wakeTime + first wake window.
+    // Empty actuals: projected at wakeTime + first wake window.
     expect(nap1Before?.startTime).toBe(7 * 60 + 120); // 9:00
     expect(nap1Before?.lifecycle.state).toBe("projected");
 
@@ -152,10 +130,7 @@ describe("useV3Projection — engine wiring (real projectDay)", () => {
   });
 
   it("template is threaded into the engine context AND influences output", () => {
-    // Old test asserted toHaveBeenCalledWith(...) on a spy — proving
-    // the hook passed the template object reference into projectDay
-    // but NOT that the template's effect materialized. Real-engine
-    // version: assert the templated owner appears on a projected event.
+    // Asserts owner materializes on output, not just that the reference was passed (audit P1-3).
     const template: OwnershipTemplate = aTemplate({ wakeWindowOwners: [PARENT1, PARENT2] });
     const { result } = renderHook(() => useV3Projection({ day, settings, actuals: [], template }));
     const wws = result.current.filter((e) => e.type === "wake_window");

@@ -1,8 +1,6 @@
 // @vitest-environment node
 /**
  * V3 templates repository — Firestore CRUD against real emulator.
- * Mirrors V2's surface so cutover at consumer sites is an import swap.
- * Wire shape: V3 OwnershipTemplate uses slot-based OwnerRefs.
  */
 
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";

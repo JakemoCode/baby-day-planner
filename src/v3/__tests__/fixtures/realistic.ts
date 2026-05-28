@@ -1,19 +1,9 @@
 /**
- * Realistic Firestore document fixtures.
+ * Realistic Firestore document fixtures (typed loosely as Record<string, unknown> — Firestore returns
+ * whatever it has; converters/defaulters promise the typed shape).
  *
- * Two shape categories cover what real production data looks like:
- *
- *   v3:      fully-shaped V3 docs (the happy path)
- *   partial: V3-shape doc missing fields the schema added later, or
- *            partially-filled docs that exercise the defaulter's
- *            backfill paths. (Two `Settings` fixtures named `v2` /
- *            `mixed` predate PR-C1 and survive as partial-fill probes
- *            — renaming them would ripple through several tests.)
- *
- * Typed loosely (Record<string, unknown>) because Firestore returns
- * whatever it has — the converters and defaulters are the layer that
- * promises a typed shape. Tests that assert against the fixtures
- * expose the real-world failure modes of the defaulters.
+ * `v3` = fully-shaped happy-path docs; `partial` = docs missing fields added later, exercising
+ * defaulter backfill. The `v2`/`mixed` Settings names predate PR-C1 — renaming would ripple tests.
  */
 
 // ---------------------------------------------------------------------------
@@ -167,11 +157,7 @@ export const v3EventBottleDoc: Record<string, unknown> = {
   owner: { slot: "parent1" },
 };
 
-// Recorded in-progress nap fixture. Pre-#166 this was named "Started" with
-// lifecycle.state === "started" and no endTime; the post-#166 model is that
-// every nap has an endTime (set on Start Nap Now to startTime + napLen),
-// and "in progress" is a time property — `recorded` + now within
-// [startTime, effectiveEnd).
+// Post-#166: "in progress" = recorded + now within [startTime, effectiveEnd). Pre-#166 used state "started" + no endTime.
 export const v3EventNapStartedDoc: Record<string, unknown> = {
   id: "nap-aaaa-bbbb",
   dayId: "day-2026-05-09",

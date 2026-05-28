@@ -59,11 +59,7 @@ export function SignIn() {
     }
   }
 
-  // When the user has just completed sign-in (status flipping
-  // loading → authorized via the redirect handshake) or is bootstrapping
-  // auth state on first paint, hide the sign-in card and show a "Signing
-  // you in…" state. Without this, the user briefly sees the sign-in
-  // card again before the layout redirects to /welcome or dashboard.
+  // Show spinner during redirect handshake / first paint to avoid a flash of the sign-in card.
   const isTransitioning = status === "loading" || status === "authorized";
 
   return (

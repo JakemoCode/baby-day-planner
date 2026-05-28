@@ -28,30 +28,14 @@ import { isDreamFeed } from "./lib/eventConventions";
 // ---------------------------------------------------------------------------
 
 /**
- * §F66 future-event drawer rule (ADR-0001 + CONTEXT.md "future-event
- * drawer rule"): the time/amount inputs on the drawer are locked only
- * for rhythm-cascade events (`nap`, non-dream-feed `bottle`) that are
- * strictly in the future. Daycare, daily-recurring, dream-feed, and
- * `extra` events are fixed-time / explicit-slot — the user can move
- * them per-day without breaking the cascade.
+ * §F66 / ADR-0001: true for projected rhythm-cascade events (nap, non-dream-feed bottle)
+ * whose startTime is strictly after nowMinutes. Excludes dream-feed (`bottle_dream` —
+ * explicit-schedule, not cascade) and render-synthetic putdowns (inherit type="nap" but
+ * aren't real nap slots — without this filter they'd win the "earliest projected nap"
+ * lottery and lock the real nap's drawer inputs).
  *
- * Conditions:
- *   - lifecycle is `projected`
- *   - `startTime > nowMinutes`
- *   - type is `nap` or `bottle` (the cascade-anchoring types)
- *   - NOT the dream-feed slot (`bottle_dream`) — that's explicit-
- *     schedule, not rhythm-cascade
- *   - NOT a render-synthetic putdown chip (these inherit type="nap"
- *     and the parent's projected lifecycle for timeline geometry;
- *     without the filter they'd claim the next-nap slot in
- *     {@link isNextProjectedOfType} via their earlier startTime and
- *     lock the real nap's drawer inputs)
- *
- * **Pure-event predicate**: does NOT know whether this event is the
- * chronologically-next of its type. The drawer combines this with
- * {@link isNextProjectedOfType} to allow per-day anchoring of the next
- * nap or bottle (sick-day flexibility, §F66 fast-follow C2):
- *   `lockTimeInputs = isFutureProjected(e, now) && !isNextProjectedOfType(e, allEvents, now)`
+ * Pure-event predicate — combine with {@link isNextProjectedOfType} for the drawer lock:
+ * `lockTimeInputs = isFutureProjected(e, now) && !isNextProjectedOfType(e, allEvents, now)`
  */
 export function isFutureProjected(event: Event, nowMinutes: TimeMin): boolean {
   if (event.lifecycle.state !== "projected") return false;
@@ -63,17 +47,10 @@ export function isFutureProjected(event: Event, nowMinutes: TimeMin): boolean {
 }
 
 /**
- * True iff `event` is the chronologically-earliest projected event of
- * its type whose `startTime > nowMinutes`. The drawer exempts these
- * from the time-lock so the user can anchor the next-up nap or bottle
- * to baby's actual rhythm (sick day, off-schedule day). Farther-out
- * events stay locked — once the user pins the next slot, the cascade
- * re-anchors and reprojects everything beyond it from that point.
- *
- * Dream-feed (`bottle_dream`) is not counted as the next bottle — it's
- * a separate schedule-time slot, not part of the rhythm chain.
- *
- * Established 2026-05-27 in §F66 fast-follow C2.
+ * True iff `event` is the chronologically-earliest projected event of its type with
+ * `startTime > nowMinutes`. The drawer exempts these so the user can anchor the next-up
+ * nap/bottle to baby's actual rhythm (sick day, off-schedule). Dream-feed is excluded —
+ * it's an explicit-schedule slot, not part of the rhythm chain. (§F66 fast-follow C2)
  */
 export function isNextProjectedOfType(
   event: Event,
@@ -153,11 +130,7 @@ export type LifecycleAction =
       timeChanged: boolean;
       hasEndTime: boolean;
       nowMinutes: TimeMin;
-      /**
-       * "create" when the drawer is saving a brand-new event (FAB →
-       * type picker), "edit" (or omitted) when annotating/editing an
-       * existing one. Drives the create-mode reality rule below.
-       */
+      /** "create" = FAB-created new event; "edit" / omitted = annotating an existing projection. */
       mode?: "create" | "edit";
       /** The event's startTime, needed in create mode to decide
        * committed-reality (now-or-past) vs scheduled-future. */
@@ -221,15 +194,9 @@ export function reduceLifecycle(current: Lifecycle, action: LifecycleAction): Li
       }
 
       if (current.state === "projected") {
-        // Create mode: a brand-new event the user is asserting through
-        // the drawer, not an annotation of an existing projection. If
-        // its time is now-or-past it's committed reality → completed
-        // (and therefore deletable — the §F66 auto-promote-hide
-        // heuristic in drawerDeletePolicy only fires on `recorded` with
-        // annotatedAt === startTime, which a now-saved create would
-        // otherwise collide with). A future create is a scheduled event
-        // → recorded. Scheduling types (nap/bedtime/recurring) and
-        // started-but-open blocks keep the recorded handling below.
+        // Create mode: brand-new event from the FAB (not an annotation of an existing projection).
+        // now-or-past → completed (committed reality, deletable); future → recorded (scheduled).
+        // Scheduling types and open blocks fall through to recorded handling below.
         if (
           mode === "create" &&
           startTime !== undefined &&

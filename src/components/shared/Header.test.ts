@@ -1,18 +1,14 @@
 /**
- * Parent-talk age formatting.
- *
- * The branching at thresholds (14 days, 12 weeks, 24 months) and the
- * calendar-month math at line 46-47 (subtract a month if now.date <
- * birth.date) are exactly the kind of off-by-one that types can't
- * guard. Table-driven with an explicit `now` to keep CI deterministic.
+ * Age formatting — threshold branching (14 days, 12 weeks, 24 months) and
+ * calendar-month math are off-by-one-prone; table-driven with explicit `now`
+ * to keep CI deterministic.
  */
 
 import { describe, expect, it, test } from "vitest";
 import { formatAge } from "./Header";
 
-// Local-date constructor (NOT `new Date("2026-05-26")` — that's UTC
-// midnight and skews .getMonth()/.getDate() in any non-UTC timezone,
-// which is exactly the off-by-one this function exists to avoid.
+// Local-date constructor (NOT `new Date("2026-05-26")` — UTC midnight skews
+// .getMonth()/.getDate() in non-UTC timezones).
 const NOW = new Date(2026, 4, 26); // May 26 2026, local
 
 describe("formatAge", () => {
@@ -25,21 +21,14 @@ describe("formatAge", () => {
     // Week boundary at 14 days
     ["2026-05-12", "2 weeks"],
     ["2026-05-05", "3 weeks"],
-    // Week→month boundary, months side. Pins `weeks < 12` (strict): 12
-    // weeks → months path, NOT "12 weeks". Catches the `<` → `<=` mutation.
-    // NB: we don't pin the adjacent weeks=11 side because the production
-    // day-count (`ms / 86_400_000`) loses an hour on DST, and DST dates
-    // differ by region (US 03-08, EU 03-29). Spans landing within ~1 day
-    // of the boundary flake across timezones; rows like 2026-03-02 sit
-    // safely on the months side in every tz checked.
+    // 12 weeks → months path (strict `<`); weeks=11 side omitted because the
+    // day-count loses an hour on DST and flakes near the boundary.
     ["2026-03-02", "2 months"],
-    // Calendar-month math, branch A — adjustment fires:
-    //   now=May 26, birth=Feb 27 → months=3 then -1 (now.date 26 < birth.date 27) → 2 months
+    // Branch A: May 26 + Feb 27 birth → 3 months -1 (26 < 27) = 2 months
     ["2026-02-27", "2 months"],
-    // Calendar-month math, branch B — anniversary day, NO adjustment:
-    //   now=May 26, birth=May 26 → months=12, now.date 26 NOT < birth.date 26 → 12 months
-    // Pins the equality side of `now.getDate() < birth.getDate()`; without
-    // this, flipping `<` to `<=` would render "11 months" undetected.
+    // Branch B: anniversary day, no adjustment. Pins equality side of `now.date < birth.date`;
+    // flipping `<` to `<=` would silently render "11 months".
+
     ["2025-05-26", "12 months"],
     // Year boundary at 24 months
     ["2024-05-26", "2 years"],

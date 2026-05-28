@@ -1,10 +1,6 @@
 /**
- * OwnersConfigEditor — V3-only. No V2 equivalent because V2 hardcoded
- * "Jake/Kelly/Daycare" in OwnerPicker. V3 owners are user-editable
- * (REQUIREMENTS §1.7) and drive the OwnerPicker options.
- *
- * §F4 (2026-05-20): per-owner Color hex inputs removed. Owner colors are
- * now slot-keyed via tokens (see ownerColor()); identity-only here.
+ * OwnersConfigEditor — V3 user-editable owners (REQUIREMENTS §1.7).
+ * Color hex inputs removed (§F4); colors are slot-keyed via tokens (ownerColor()).
  */
 
 import { useState } from "react";

@@ -1,7 +1,6 @@
 // @vitest-environment node
 /**
  * V3 Invite repository — Firestore CRUD against real emulator.
- * §F3 PR #2: co-parent invite flow.
  */
 
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
@@ -38,7 +37,6 @@ describe("v3 invites repository", () => {
   });
   beforeEach(async () => {
     await env.clearFirestore();
-    // Jake (inviter) must have "child-xyz" in his user doc — the tightened
     // /invites create rule requires childId in inviter's users.childIds.
     await seedAllowedUser(env, ALLOWED_USER.uid, ["child-xyz"]);
   });

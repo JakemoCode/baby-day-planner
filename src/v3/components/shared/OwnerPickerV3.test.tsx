@@ -1,11 +1,6 @@
 /**
- * OwnerPickerV3 — slot-based picker driven by Settings.owners.
- *
- * Differences from V2 OwnerPicker:
- *   - Options are derived from OwnersConfig at render time (not hardcoded)
- *   - Display strings come from `displayName` (renames don't rewrite events)
- *   - "None" still selectable to clear an annotation
- *   - selected state compares slot identity via ownerRefEquals, not strings
+ * OwnerPickerV3 — slot-based picker derived from OwnersConfig at render time.
+ * Display strings from `displayName` (renames don't rewrite events); selection via ownerRefEquals.
  */
 
 import { describe, expect, it, vi } from "vitest";

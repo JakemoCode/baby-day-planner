@@ -1,7 +1,6 @@
 // @vitest-environment node
 /**
  * V3 TomorrowPlan repository — Firestore CRUD against real emulator.
- * §F39 PR #1: schema + repo, no UI/engine wiring yet.
  */
 
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
@@ -111,10 +110,8 @@ describe("v3 tomorrowPlans repository", () => {
     expect(got).toBeNull();
   });
 
-  // §F12 PR 1 — slice 3: confirmTomorrowPlan flips a draft plan to
-  // confirmed and stamps confirmedAt. Caller passes the TimeMin in
-  // local-day frame (e.g. 19*60+42 for 7:42 PM) so tests stay
-  // deterministic and the prod call site stamps with currentLocalMinutes().
+  // Caller passes TimeMin so tests stay deterministic; prod stamps with
+  // currentLocalMinutes().
   it("confirmTomorrowPlan flips a draft plan to confirmed and stamps confirmedAt", async () => {
     await saveTomorrowPlan(db(), "aden", aPlan({ status: "draft" }));
     await confirmTomorrowPlan(db(), "aden", "2026-05-19", 19 * 60 + 42);
@@ -123,9 +120,7 @@ describe("v3 tomorrowPlans repository", () => {
     expect(got?.confirmedAt).toBe(19 * 60 + 42);
   });
 
-  // §F12 PR 1 — slice 4: markPlanDraft reverts a confirmed plan back
-  // to draft and clears confirmedAt. Called whenever the user edits
-  // a confirmed plan — they must explicitly re-confirm.
+  // Called whenever the user edits a confirmed plan — they must re-confirm.
   it("markPlanDraft reverts a confirmed plan back to draft and clears confirmedAt", async () => {
     await saveTomorrowPlan(db(), "aden", aPlan({ status: "confirmed", confirmedAt: 19 * 60 + 42 }));
     await markPlanDraft(db(), "aden", "2026-05-19");
@@ -134,8 +129,6 @@ describe("v3 tomorrowPlans repository", () => {
     expect(got?.confirmedAt).toBeUndefined();
   });
 
-  // §F12 PR 1 — slice 1 tracer bullet: the new lifecycle fields
-  // (status, wakeTime, confirmedAt) round-trip through save/load.
   it("round-trips status, wakeTime, and confirmedAt", async () => {
     const plan = aPlan({
       status: "confirmed",
@@ -162,9 +155,7 @@ describe("v3 tomorrowPlans repository", () => {
     expect(b?.startTemplateId).toBe("tpl-sunday");
   });
 
-  // watchTomorrowPlan / watchTomorrowDraftCount back the useV3TomorrowPlan
-  // and useV3TomorrowDraftCount hooks (which now just delegate). The
-  // subscription seam is exercised here against the real emulator.
+  // Subscription seam exercised against real emulator (backs the hooks).
   it("watchTomorrowPlan delivers null then the plan when it's written", async () => {
     const database = db();
     const seen: (TomorrowPlan | null)[] = [];

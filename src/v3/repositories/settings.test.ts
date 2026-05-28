@@ -1,8 +1,6 @@
 // @vitest-environment node
 /**
- * V3 settings repository — Firestore single-doc get/save/watch.
- * Stored at /children/{childId}/settings/current; same path as V2 so
- * cutover is an import swap.
+ * V3 settings repository — Firestore single-doc get/save/watch against real emulator.
  */
 
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
@@ -17,9 +15,6 @@ import type { Settings } from "../schemas";
 import { aSettings } from "../__tests__/factories";
 import { getSettings, saveSettings, watchSettings } from "./settings";
 
-// Test-specific overrides on top of the shared factory: child-1 id,
-// named owners (Jake/Sam), and bottleChain.bottlesPerDay=5 to anchor
-// the assertions below.
 const settings = (overrides: Partial<Settings> = {}): Settings =>
   aSettings({
     childId: "child-1",

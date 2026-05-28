@@ -1,11 +1,6 @@
 /**
- * Behavioural tests for TimelineV3. Coverage focuses on the V3 contract:
- * V3 event shapes render, putdown synthesis works end-to-end, owner refs
- * resolve to display strings + slot data attributes.
- *
- * Geometry parity with V2 is covered by the existing V2 tests. V3 owns
- * its own CSS modules now, with owner color flowing through the
- * `--owner-color` CSS custom property set inline by Block / InstantChip.
+ * TimelineV3 behavioural tests: V3 event shapes, putdown synthesis, owner ref resolution.
+ * Owner color flows through `--owner-color` CSS custom property set inline by Block/InstantChip.
  */
 
 import { describe, expect, it, vi } from "vitest";
@@ -60,9 +55,7 @@ describe("TimelineV3", () => {
   });
 
   it("renders pre-expanded putdown blocks (callers must run renderProjection)", () => {
-    // Putdown expansion moved out of TimelineV3 into renderProjection.
-    // The renderer just paints whatever it's given. Callers compose:
-    //   renderProjection(events, settings, nowMinutes?) → TimelineV3
+    // Expansion moved to renderProjection; TimelineV3 just paints what it receives.
     const expanded = expandPutdownBlocks([ev({ id: "nap1", hasPutdown: true })], {
       putdownLeadMinutes: 15,
       defaultNapLengthMinutes: 60,
@@ -103,8 +96,7 @@ describe("TimelineV3", () => {
     const events: Event[] = [ev({ id: "nap1", owner: { slot: "parent1" } })];
     render(<TimelineV3 events={events} owners={owners} />);
     const block = screen.getByTestId("timeline-block");
-    // Read the raw style attribute — jsdom normalizes hex to rgb() when
-    // accessed via .style, so assert against what the component emitted.
+    // getAttribute avoids jsdom normalizing hex to rgb().
     expect(block.getAttribute("style")).toContain("--owner-color: var(--color-owner-parent-1)");
   });
 
@@ -155,8 +147,6 @@ describe("TimelineV3", () => {
     expect(screen.getByTestId("now-pill")).toHaveTextContent("9:30a");
   });
 
-  // §F9 PORT — coverage previously asserted in V2 timeline tests.
-
   it("does NOT render the now-bar when nowMinutes is omitted", () => {
     render(<TimelineV3 events={[ev({ id: "nap1" })]} owners={owners} />);
     expect(screen.queryByTestId("now-line")).not.toBeInTheDocument();
@@ -164,7 +154,7 @@ describe("TimelineV3", () => {
   });
 
   it("marks past blocks with data-past='true' when dimPast + nowMinutes provided", () => {
-    // Nap at 9:00–10:00; "now" is 11:00 → nap is fully in the past.
+    // nap 9:00–10:00, now 11:00 → fully past
     render(
       <TimelineV3 events={[ev({ id: "nap1" })]} owners={owners} nowMinutes={11 * 60} dimPast />,
     );
@@ -196,7 +186,7 @@ describe("TimelineV3", () => {
     const height120 = parseFloat(screen.getByTestId("timeline-inner").style.height);
 
     expect(height60).toBeGreaterThan(0);
-    // Doubling pxPerHour doubles the rendered height (within rounding tolerance).
+    // Doubling pxPerHour doubles the height (within rounding tolerance).
     expect(height120).toBeCloseTo(height60 * 2, 0);
   });
 
@@ -281,9 +271,6 @@ describe("TimelineV3", () => {
     expect(screen.queryAllByTestId("instant-chip")).toHaveLength(2);
   });
 
-  // §11.A wake-instant deduplication: WAIVED. V3's EventType union does not
-  // include "wake" (per src/v3/schemas.ts — wake is derived from Day.wakeTime,
-  // never a top-level event), so the conflict the V2 test guarded against
-  // cannot be constructed with valid V3 data. The architecture removes the
-  // bug class entirely.
+  // §11.A wake-instant deduplication: WAIVED. V3 EventType has no "wake" event;
+  // wake is derived from Day.wakeTime, so the V2 conflict class cannot be constructed.
 });

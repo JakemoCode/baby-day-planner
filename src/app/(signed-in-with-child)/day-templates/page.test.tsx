@@ -1,13 +1,6 @@
 /**
- * DayTemplates page (V3) — integration coverage.
- *
- * Mocks the V3 hooks and the V3 templates repo so we can assert the
- * page wires:
- *   - useV3Settings + useV3Templates for data
- *   - TimelineV3 for preview (asserted indirectly via tap dispatch)
- *   - TemplateOwnerPicker (V3, slot-based)
- *   - setOwnerInTemplate (V3) -> OwnerRef gap-filled at the right index
- *   - saveTemplate (V3 repo) called with V3 OwnershipTemplate (displayName)
+ * DayTemplates page (V3) — verifies hook wiring (useV3Settings, useV3Templates),
+ * TimelineV3 tap dispatch, slot-based owner picker, and saveTemplate shape.
  */
 
 import { describe, expect, it, vi, beforeEach } from "vitest";
@@ -32,9 +25,7 @@ vi.mock("@/v3/repositories/templates", () => ({
 }));
 vi.mock("@/lib/firebase/client", () => ({ db: { __mock: "db" } }));
 
-// TimelineV3 is NOT mocked — its unit tests live in TimelineV3.test.tsx;
-// letting it render for real here adds integration coverage (page wires
-// correct events/owners → real blocks appear and are tappable).
+// TimelineV3 renders for real — adds integration coverage that the page wires correct events/owners.
 
 // ---- fixtures -----------------------------------------------------------
 
@@ -102,8 +93,7 @@ describe("DayTemplatesPage (V3)", () => {
 
   it("opens the V3 owner picker when a nap is tapped and clears on Cancel", async () => {
     renderWithAuth(<DayTemplatesPage />);
-    // Engine projects nap_1 from the synthetic day; the real TimelineV3
-    // renders it as a tappable <button> whose aria-label starts with "Nap 1".
+    // Real TimelineV3 renders nap_1 as a tappable button.
     const tapButton = await screen.findByRole("button", { name: /^Nap 1\b/i });
     await userEvent.click(tapButton);
     // Picker is rendered with the owner buttons (None + parent slots).
@@ -122,9 +112,7 @@ describe("DayTemplatesPage (V3)", () => {
     await userEvent.click(tapButton);
     await userEvent.click(await screen.findByRole("button", { name: "Sam" }));
     await waitFor(() => expect(saveTemplateMock).toHaveBeenCalledTimes(1));
-    // V3 wire shape — `displayName`, not V2's `label`.
-    // Owner slot for nap_1 is index 0; setOwnerInTemplate writes the
-    // OwnerRef (slot) — never a display string.
+    // V3 shape uses `displayName` (not V2's `label`); setOwnerInTemplate writes OwnerRef (slot), never a display string.
     expect(saveTemplateMock).toHaveBeenCalledWith(
       expect.anything(),
       "test-child-id",
@@ -136,17 +124,12 @@ describe("DayTemplatesPage (V3)", () => {
     const savedTemplate = (
       saveTemplateMock.mock.calls[0] as [unknown, string, OwnershipTemplate]
     )[2];
-    // Pin parent2 to index 0 specifically — that's the slot
-    // templateSlotForEvent assigns to nap_1 (index = N - 1). A regression
-    // in setOwnerInTemplate that wrote to the wrong index would still
-    // satisfy arrayContaining; this assertion fails on off-by-one.
+    // Pin index 0 specifically — templateSlotForEvent assigns nap_1 to index N-1=0.
+    // arrayContaining would miss an off-by-one in setOwnerInTemplate.
     expect(savedTemplate.napOwners[0]).toEqual({ slot: "parent2" });
     expect("label" in savedTemplate).toBe(false);
   });
 
-  // NOTE: "ignores taps on non-mappable events" was removed when TimelineV3
-  // was un-mocked. The gate logic (templateSlotForEvent → undefined for
-  // extras) is unit-tested in templateSlot.test.ts. Injecting an arbitrary
-  // extra event into the real timeline requires synthetic dispatch that
-  // isn't available without a mock; the unit coverage is sufficient.
+  // "ignores taps on non-mappable events" was removed when TimelineV3 was un-mocked.
+  // Gate logic (templateSlotForEvent → undefined) is unit-tested in templateSlot.test.ts.
 });

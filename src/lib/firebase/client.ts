@@ -1,19 +1,12 @@
 /*
- * Firebase client (eager init, direct env access).
+ * Firebase client (eager init).
  *
- * Two non-obvious rules baked in:
- *
- * 1. NEXT_PUBLIC_* env vars MUST be accessed via direct property
- *    (`process.env.NEXT_PUBLIC_FIREBASE_API_KEY`), never via dynamic key
- *    (`process.env[name]`). Next.js's compiler statically replaces direct
- *    accesses with literal values at build/dev compile time for both server
- *    and client bundles. Dynamic key access ships unchanged and reads as
- *    undefined in the browser.
- *
- * 2. We expose `auth` and `db` as real Firebase instances, NOT Proxies.
- *    The Firestore SDK does `instanceof` checks on these handles internally
- *    ("Type does not match the expected instance. Did you pass a reference
- *    from a different Firestore SDK?"); a Proxy fails those checks.
+ * Two non-obvious constraints:
+ * 1. NEXT_PUBLIC_* vars MUST use direct property access — Next.js statically
+ *    replaces them at compile time; dynamic key access (`process.env[name]`)
+ *    ships as undefined in the browser.
+ * 2. Export real Firebase instances, NOT Proxies — the Firestore SDK does
+ *    `instanceof` checks internally and rejects Proxy handles.
  */
 
 import { getApps, initializeApp, type FirebaseApp } from "firebase/app";
@@ -35,8 +28,7 @@ export const firebaseApp: FirebaseApp =
 export const auth: Auth = getAuth(firebaseApp);
 export const db: Firestore = getFirestore(firebaseApp);
 
-// Connect to local emulators when the env flag is set.
-// Browser-only — emulator suite runs on localhost which isn't reachable in SSR.
+// Connect to local emulators (browser-only; localhost isn't reachable in SSR).
 if (process.env.NEXT_PUBLIC_USE_FIREBASE_EMULATORS === "1" && typeof window !== "undefined") {
   const w = window as unknown as { __firebaseEmulatorsConnected?: boolean };
   if (!w.__firebaseEmulatorsConnected) {

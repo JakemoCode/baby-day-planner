@@ -1,13 +1,7 @@
 /**
- * V3 TomorrowForm — slot-aware Tomorrow plan form.
- *
- * V3 deltas vs V2 form:
- *   - wakeTime is TimeMin (number) on the value object; the input
- *     remains an HH:MM string and is converted at the boundary.
- *   - templateId picker uses V3 OwnershipTemplate.displayName (V2 used
- *     `label`).
- *   - Form has no V2-specific Bottle 1 / extras editor — those flows
- *     live elsewhere in V3 (drawer + extras list at the page level).
+ * TomorrowForm — slot-aware plan form. wakeTime is TimeMin on the value object;
+ * templateId picker uses OwnershipTemplate.displayName. Bottle/extras flows are
+ * at the page level, not in the form.
  */
 
 import { describe, it, expect, vi } from "vitest";

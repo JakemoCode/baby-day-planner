@@ -1,14 +1,8 @@
 /**
- * V3 Day defensive defaults.
- *
- * Fills `suppressedRecurringIds` (default `[]`) and
- * `suppressedDaycareDay` (default `false`) on read. The engine reads
- * these directly; if undefined, rules crash on `.includes` / boolean
- * checks.
- *
- * Applied in `v3DayConverter.fromFirestore` so all read paths
- * (`getDay`, `getDayByDate`, `listArchivedDays`, `watchActiveDay`)
- * receive a fully-shaped Day.
+ * V3 Day defensive defaults. Fills `suppressedRecurringIds` (default `[]`)
+ * and `suppressedDaycareDay` (default `false`) on read — engine rules crash on
+ * `.includes`/boolean checks if these are undefined. Applied in
+ * `v3DayConverter.fromFirestore` so all read paths receive a fully-shaped Day.
  */
 
 import type { Day } from "../schemas";
