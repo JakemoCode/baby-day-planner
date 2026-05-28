@@ -20,7 +20,12 @@ export type FormState = {
   label: string;
 };
 
-export function formToEvent(form: FormState, source: Event, nowMinutes: TimeMin): Event {
+export function formToEvent(
+  form: FormState,
+  source: Event,
+  nowMinutes: TimeMin,
+  mode: "create" | "edit" = "edit",
+): Event {
   const timeChanged = form.startTime !== source.startTime || form.endTime !== source.endTime;
 
   // Custom events derive kind from the form: endTime present → block,
@@ -37,6 +42,8 @@ export function formToEvent(form: FormState, source: Event, nowMinutes: TimeMin)
     timeChanged,
     hasEndTime: form.endTime !== undefined,
     nowMinutes,
+    mode,
+    startTime: form.startTime,
   });
 
   const next: Event = {

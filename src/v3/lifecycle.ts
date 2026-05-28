@@ -153,6 +153,15 @@ export type LifecycleAction =
       timeChanged: boolean;
       hasEndTime: boolean;
       nowMinutes: TimeMin;
+      /**
+       * "create" when the drawer is saving a brand-new event (FAB →
+       * type picker), "edit" (or omitted) when annotating/editing an
+       * existing one. Drives the create-mode reality rule below.
+       */
+      mode?: "create" | "edit";
+      /** The event's startTime, needed in create mode to decide
+       * committed-reality (now-or-past) vs scheduled-future. */
+      startTime?: TimeMin;
     };
 
 export class LifecycleTransitionError extends Error {
@@ -204,7 +213,7 @@ export function reduceLifecycle(current: Lifecycle, action: LifecycleAction): Li
     }
 
     case "DRAWER_SAVE": {
-      const { eventType, eventKind, timeChanged, hasEndTime, nowMinutes } = action;
+      const { eventType, eventKind, timeChanged, hasEndTime, nowMinutes, mode, startTime } = action;
 
       // Completed stays frozen.
       if (current.state === "completed") {
@@ -212,6 +221,25 @@ export function reduceLifecycle(current: Lifecycle, action: LifecycleAction): Li
       }
 
       if (current.state === "projected") {
+        // Create mode: a brand-new event the user is asserting through
+        // the drawer, not an annotation of an existing projection. If
+        // its time is now-or-past it's committed reality → completed
+        // (and therefore deletable — the §F66 auto-promote-hide
+        // heuristic in drawerDeletePolicy only fires on `recorded` with
+        // annotatedAt === startTime, which a now-saved create would
+        // otherwise collide with). A future create is a scheduled event
+        // → recorded. Scheduling types (nap/bedtime/recurring) and
+        // started-but-open blocks keep the recorded handling below.
+        if (
+          mode === "create" &&
+          startTime !== undefined &&
+          !isSchedulingType(eventType) &&
+          !(eventKind === "block" && !hasEndTime)
+        ) {
+          return startTime <= nowMinutes
+            ? { state: "completed", committedAt: nowMinutes }
+            : { state: "recorded", annotatedAt: nowMinutes };
+        }
         if (!timeChanged) {
           // No time change: owner/amount/label only → annotate as recorded.
           return { state: "recorded", annotatedAt: nowMinutes };
