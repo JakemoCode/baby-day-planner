@@ -21,10 +21,17 @@ export function useV3Settings(childId: string): UseV3SettingsResult {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    return watchSettings(db, childId, (s) => {
+    // Stale-callback guard — see useV3User for the rationale.
+    let active = true;
+    const unsub = watchSettings(db, childId, (s) => {
+      if (!active) return;
       setSettings(s);
       setLoading(false);
     });
+    return () => {
+      active = false;
+      unsub();
+    };
   }, [childId]);
 
   return { settings, loading };

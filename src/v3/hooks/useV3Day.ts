@@ -19,10 +19,19 @@ export function useV3Day(childId: string): UseV3DayResult {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    return watchActiveDay(db, childId, (d) => {
+    // Stale-callback guard — see useV3User for the rationale. Without
+    // it, a late snapshot from the previous childId can write that
+    // child's day into the new child's state on child-switch.
+    let active = true;
+    const unsub = watchActiveDay(db, childId, (d) => {
+      if (!active) return;
       setDay(d);
       setLoading(false);
     });
+    return () => {
+      active = false;
+      unsub();
+    };
   }, [childId]);
 
   return { day, loading };
