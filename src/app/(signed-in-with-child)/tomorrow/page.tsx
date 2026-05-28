@@ -19,9 +19,7 @@ import { useTomorrowPlanState } from "@/v3/hooks/useTomorrowPlanState";
 import styles from "./page.module.css";
 import { useCurrentChild } from "@/v3/context/ChildProvider";
 
-// Anchor the Tomorrow page's "now" to noon so create-templates and
-// drawer constraints land in the middle of the planned day rather
-// than wherever the user happens to be browsing from.
+// Anchors "now" to noon so drawer constraints land mid-day regardless of wall-clock time.
 const TOMORROW_ANCHOR_MINUTES = 12 * 60;
 
 function tomorrowDateString(): string {
@@ -45,10 +43,7 @@ export default function TomorrowPage() {
   const [pickedEvent, setPickedEvent] = useState<Event | null>(null);
   const [clearConfirmOpen, setClearConfirmOpen] = useState(false);
 
-  // Plan state — load + autosave + actions. Settings must be present
-  // before this can be set up (we read defaultWakeTime as the baseline).
-  // Render the loading state path below before invoking the hook to
-  // satisfy that contract.
+  // Settings required before hook setup (reads defaultWakeTime as baseline).
   if (settingsLoading || !settings || templatesLoading) {
     return (
       <div className={styles.page}>
@@ -112,10 +107,7 @@ function TomorrowPageInner({
       suppressedDreamFeed: false,
     };
     if (planState.templateId) day.templateId = planState.templateId;
-    // §F12 PR 3 bugfix — the preview Day must carry ownerOverrides so
-    // the engine's R12.10 rule applies them when projecting; otherwise
-    // chip-tap → owner picker writes to plan state but the preview
-    // never re-renders with the assigned owner.
+    // Preview Day must carry ownerOverrides so the engine applies them when projecting.
     if (Object.keys(planState.ownerOverrides).length > 0) {
       day.ownerOverrides = planState.ownerOverrides;
     }
@@ -132,15 +124,8 @@ function TomorrowPageInner({
     await planState.clear();
   };
 
-  // §F12 PR 3 / F46 — chip tap → owner picker that writes to
-  // plan.ownerOverrides. Replaces the prior TemplateOwnerPicker path
-  // (which wrote to the underlying template, not the plan). Time
-  // edits on projected non-extras aren't supported yet — TomorrowPlan
-  // doesn't carry per-event time overrides; tracked as a follow-up.
+  // Chip-tap handler: writes to plan.ownerOverrides. undefined/NO_OWNER → null in the map (un-assigned).
   const handleOwnerOverrideChange = (event: Event, owner: OwnerRef | undefined) => {
-    // `undefined` from OwnerPickerV3 means "no selection" — treat as
-    // explicit NO_OWNER (the documented schema convention: `null` in
-    // the ownerOverrides map = the user un-assigned this slot).
     if (owner === undefined || isNoOwner(owner)) {
       planState.setOwnerOverride(event.eventKey, null);
     } else {
@@ -215,14 +200,10 @@ function TomorrowPageInner({
           extras={planState.extras}
           onEventTap={(event) => {
             if (event.type === "extra") {
-              // Extras get the full drawer — owner + time + label.
               openEdit(event);
               return;
             }
-            // §F46 — projected non-extras get an owner picker that
-            // writes to plan.ownerOverrides[eventKey]. Time edits on
-            // projected events aren't a thing on /tomorrow; the cascade
-            // owns event timing. No template-selected gating.
+            // Non-extras get the owner picker (writes to ownerOverrides); time edits unsupported.
             setPickedEvent(event);
           }}
         />

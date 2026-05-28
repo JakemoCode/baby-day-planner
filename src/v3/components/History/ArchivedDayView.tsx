@@ -39,10 +39,7 @@ export function ArchivedDayView({
       {events.length === 0 ? (
         <EmptyState title="No events recorded for this day." />
       ) : (
-        // Archived days are entirely past; nowMinutes omitted so dimPast is a
-        // no-op. Read-only view — no scroll-to-now, no NowBar. Recorded
-        // events bypass renderProjection — no putdown/dream-feed transforms
-        // apply (lifecycle is started/completed, not projected/recorded).
+        // Archived: nowMinutes omitted (dimPast no-op), no NowBar. Recorded events skip renderProjection.
         <TimelineV3
           events={events}
           owners={owners}

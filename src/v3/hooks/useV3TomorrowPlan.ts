@@ -10,13 +10,7 @@ export type UseV3TomorrowPlanResult = {
   loading: boolean;
 };
 
-/**
- * Subscribe to a single `TomorrowPlan` doc by (childId, date).
- *
- * Returns `null` for `plan` until the first snapshot resolves and
- * whenever the doc doesn't exist. `loading` flips to false after the
- * first snapshot regardless of doc existence.
- */
+/** Subscribe to a TomorrowPlan by (childId, date). `plan` is null until resolved or when absent. */
 export function useV3TomorrowPlan(childId: string, date: string): UseV3TomorrowPlanResult {
   const [plan, setPlan] = useState<TomorrowPlan | null>(null);
   const [loading, setLoading] = useState(true);

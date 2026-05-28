@@ -6,12 +6,8 @@ import { useAuth } from "@/lib/auth/useAuth";
 import { useChildResolution } from "@/v3/context/ChildProvider";
 
 /**
- * Gates the (signed-in-no-child) route group on auth-required-but-no-child:
- *   - Not authed                 → /sign-in
- *   - Authed + already has child → /  (no point revisiting welcome)
- *   - Authed + no child          → render children (welcome form)
- *
- * This is the inverse gate of `(signed-in-with-child)/layout.tsx`.
+ * Guards the no-child route group: unauthenticated → /sign-in, already has child → /.
+ * Inverse of (signed-in-with-child)/layout.tsx.
  */
 export default function SignedInNoChildLayout({ children }: { children: ReactNode }) {
   const { status } = useAuth();

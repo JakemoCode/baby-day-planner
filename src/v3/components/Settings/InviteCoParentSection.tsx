@@ -17,17 +17,7 @@ function buildInviteUrl(token: string): string {
   return `${window.location.origin}/invite/${token}`;
 }
 
-/**
- * §F3 PR #2: Settings affordance to mint a co-parent invite.
- *
- * Flow:
- *   1. Inviter clicks "Generate invite link" → mints /invites/{token} with
- *      7-day expiry, surfaces the shareable link.
- *   2. Inviter copies the link (clipboard) and shares however (iMessage,
- *      Slack, email). The `sendInviteEmail` no-op is a future hook gated
- *      on NEXT_PUBLIC_EMAIL_INVITES.
- *   3. Recipient clicks the link, signs in, consumes it via /invite/[token].
- */
+/** §F3: mints a 7-day co-parent invite token, surfaces the shareable link, and copies to clipboard. */
 export function InviteCoParentSection() {
   const { user } = useAuth();
   const child = useCurrentChild();
@@ -51,7 +41,7 @@ export function InviteCoParentSection() {
         expiresAt: now + INVITE_TTL_MS,
       });
       setToken(newToken);
-      // Fire-and-forget email stub (no-op unless flag flipped).
+      // Fire-and-forget email stub; no-op until NEXT_PUBLIC_EMAIL_INVITES is enabled.
       void sendInviteEmail({
         token: newToken,
         to: "",

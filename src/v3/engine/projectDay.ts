@@ -1,22 +1,11 @@
-/**
- * V3 public API: project a day into a sorted Event list.
- *
- * Signature mirrors V2's `projectDay` so cutover at the UI surface is a
- * one-line change (Phase 3).
- *
- * Source: docs/v3/ARCHITECTURE_V3.md §3.
- */
+/** Projects a day into a sorted Event list. */
 
 import type { Context, Event, ProjectInput } from "../schemas";
 import { MINUTES_PER_DAY } from "../ui/time";
 import { evaluate, type Rule } from "./evaluator";
 import { ALL_RULES } from "./rules";
 
-/**
- * Default `nowMinutes` when the caller doesn't pass one. End of day,
- * matching V2's "evaluate as if the day is over" semantics for batch
- * recompute.
- */
+/** End-of-day default — evaluate as if the day is complete. */
 const DEFAULT_NOW = MINUTES_PER_DAY;
 
 export type ProjectDayOptions = {

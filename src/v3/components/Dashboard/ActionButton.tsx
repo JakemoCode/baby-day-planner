@@ -21,10 +21,7 @@ const VARIANT_CLASS: Record<ActionButtonProps["variant"], string> = {
   danger: styles.danger ?? "",
 };
 
-/**
- * Shared dashboard action button. Always full-width, 56px tall, uses the
- * three accent variants from `ActionButton.module.css`.
- */
+/** Full-width 56px dashboard action button with primary/secondary/danger variants. */
 export function ActionButton({
   variant,
   onClick,

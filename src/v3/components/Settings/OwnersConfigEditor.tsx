@@ -9,12 +9,7 @@ export type OwnersConfigEditorProps = {
   onChange: (next: OwnersConfig) => void;
 };
 
-/**
- * §F4 (2026-05-20): the per-owner Color hex inputs were removed. Owner
- * colors are now fixed by slot (parent-1, parent-2, and the four
- * "other" positions in order) via tokens in `tokens.css`. Display
- * name is the only user-editable identity property here.
- */
+/** §F4: display name editor only; colors are fixed by slot via tokens.css. */
 export function OwnersConfigEditor({ value, onChange }: OwnersConfigEditorProps) {
   const updateParent = (slot: "parent1" | "parent2", patch: Partial<OwnersConfig["parent1"]>) => {
     onChange({ ...value, [slot]: { ...value[slot], ...patch } });

@@ -18,7 +18,7 @@ const DATE_FORMATTER = new Intl.DateTimeFormat("en-US", {
 });
 
 function formatDate(dateStr: string | undefined): string {
-  // Parse "YYYY-MM-DD" as a local date (not UTC, to avoid off-by-one).
+  // Parse as local date to avoid UTC off-by-one.
   const d = dateStr ? parseLocalDate(dateStr) : new Date();
   return DATE_FORMATTER.format(d);
 }
@@ -28,13 +28,7 @@ function parseLocalDate(yyyymmdd: string): Date {
   return new Date(y ?? 1970, (m ?? 1) - 1, day ?? 1);
 }
 
-/**
- * Parent-talk age formatting:
- *   < 14 days  → "N day(s)"
- *   < 12 weeks → "N weeks"
- *   < 24 months → "N months"   (using calendar-month math, not /30.4)
- *   else       → "N years"
- */
+/** Formats age in parent-talk units: days (<14d), weeks (<12w), months (<24m), years. */
 export function formatAge(dob: string, now: Date = new Date()): string {
   const birth = parseLocalDate(dob);
   const ms = now.getTime() - birth.getTime();

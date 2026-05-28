@@ -42,16 +42,8 @@ export type UseTomorrowPlanStateResult = {
 };
 
 /**
- * §F12 PR 3 — central state machine for /tomorrow.
- *
- * Loads the persisted TomorrowPlan, mirrors it into form state, and
- * autosaves form changes back as `status: "draft"`. Provides actions
- * for confirm / clear / promote-now. The /tomorrow page wraps this
- * hook and renders pure UI on top.
- *
- * Edit-revert (confirmed → draft on edit) is implicit: autosave always
- * writes with `status: "draft"`, so any edit-driven save reverts a
- * previously-confirmed doc.
+ * Central state machine for /tomorrow. Loads the persisted TomorrowPlan,
+ * mirrors it into form state, autosaves as draft, and provides confirm/clear/promote-now actions.
  */
 export function useTomorrowPlanState(
   childId: string,
@@ -60,29 +52,20 @@ export function useTomorrowPlanState(
 ): UseTomorrowPlanStateResult {
   const { plan, loading } = useV3TomorrowPlan(childId, date);
 
-  // Local edit buffer: fields, one-shot hydration, hasEdits, reset.
   const form = useTomorrowPlanForm(plan, loading, settings.defaultWakeTime);
   const { wakeTime, templateId, extras, ownerOverrides, hasEdits, hydrated } = form;
 
-  // True from the start of clear() until the delete has propagated
-  // (subscription emits null). Hard-suppresses autosave for that window
-  // so a clear can't be undone: after reset() the form is at defaults
-  // but the stale plan still lingers (plan !== null), which would
-  // otherwise pass the autosave gate and write a defaults `draft`,
-  // resurrecting the doc we just deleted.
+  // Suppresses autosave from clear() until the delete propagates (plan goes null).
+  // Without this, the blanked form would resurrect the deleted doc as a defaults draft.
   const [clearing, setClearing] = useState(false);
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
-    // The delete has landed (plan gone) — clear the flag so subsequent
-    // edits autosave normally again.
+    // Delete has propagated — re-arm autosave.
     if (clearing && plan === null) setClearing(false);
   }, [clearing, plan]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
-  // Autosave snapshot — null until hydrated (so we never persist the
-  // defaults ahead of the loaded plan), null while a clear is in flight,
-  // and null when the user hasn't touched anything AND there's no
-  // pre-existing plan (no empty docs).
+  // null until hydrated, while clearing, or when the form is at defaults with no existing plan.
   const autosaveInput: TomorrowPlanInput | null = useMemo(() => {
     if (!hydrated || clearing) return null;
     if (!hasEdits && plan === null) return null;
@@ -99,11 +82,8 @@ export function useTomorrowPlanState(
   const status: TomorrowPlanStatus = !plan ? "no-plan" : plan.status;
 
   const confirm = async () => {
-    // Write the FULL plan atomically with status=confirmed so the
-    // ~250ms debounced autosave can't race + revert us back to draft.
-    // (Reviewer-flagged 2026-05-21: confirmTomorrowPlan-via-updateDoc
-    // only flipped status; a pending autosave then overwrote with the
-    // newer form state at status=draft, silently undoing the confirm.)
+    // Write the full plan with status=confirmed so a pending autosave can't race and revert it.
+    // updateDoc-only confirm would be overwritten by the debounced autosave at status=draft.
     const plan: TomorrowPlan = {
       childId,
       date,
@@ -118,33 +98,24 @@ export function useTomorrowPlanState(
   };
 
   const clear = async () => {
-    // Suppress autosave for the whole delete→propagate window (cleared
-    // by the effect above once plan goes null), so neither the stale
-    // plan nor the blanked form can resurrect the doc.
+    // Suppress autosave until the delete propagates (see clearing flag above).
     setClearing(true);
     try {
       await deleteTomorrowPlan(db, childId, date);
     } catch (err) {
-      // Delete failed → the doc still exists and `plan` never goes null,
-      // so the effect would never clear the flag and autosave would stay
-      // disabled for the rest of the session. Restore it here and
-      // re-throw for the caller's error handling. form.reset() stays
-      // below the try so the form only blanks on a real delete.
+      // Delete failed: plan never goes null so the effect won't clear the flag.
+      // Restore autosave and re-throw; form.reset() only runs on a real delete.
       setClearing(false);
       throw err;
     }
-    // Blank the form to defaults. reset() stays hydrated, so the stale
-    // snapshot can't re-hydrate the values we just deleted.
+    // Blank form; reset() stays hydrated so a late snapshot can't re-hydrate deleted values.
     form.reset();
   };
 
   const promoteNow = async () => {
     if (!plan) return;
-    // The persisted plan's `date` is tomorrow's; promote-now applies
-    // its content to TODAY. Clone with today's date so promoteFromPlan
-    // creates/overrides today's day doc + the extras get the right
-    // dayId. The persisted tomorrow-dated plan is left alone — user
-    // may still want to keep it as a draft for tomorrow.
+    // Clone with today's date so promoteFromPlan targets today's Day doc.
+    // The tomorrow-dated plan is left in place.
     const todayPlan: TomorrowPlan = { ...plan, date: currentLocalDate() };
     await promoteFromPlan(db, childId, todayPlan, settings.defaultWakeTime);
   };

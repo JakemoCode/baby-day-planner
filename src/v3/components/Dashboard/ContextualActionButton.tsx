@@ -27,13 +27,7 @@ const MODE_LABEL: Record<Exclude<ContextMode["kind"], "hidden">, string> = {
 };
 
 const LOGGED_LABEL = "✓ Bottle logged";
-/**
- * How long the "✓ Bottle logged" affordance stays visible after a
- * successful log before the button auto-hides. Without a timeout the
- * label sticks for the full ±15min log-bottle window — masking any
- * subsequent end-nap mode that would have shown up when the projected
- * nap auto-promotes a moment later. (Jake 2026-05-27 dogfood.)
- */
+// Auto-hide after 4s so a subsequent end-nap mode isn't masked by the lingering logged label.
 const LOGGED_AFFORDANCE_MS = 4000;
 
 /**
@@ -54,11 +48,7 @@ function buildLoggedBottle(
   defaultBottleAmountOz: number,
   startTime: TimeMin,
 ): Event {
-  // §F59/§F60: promote the projected bottle's eventKey so dedupBySlotKey
-  // collapses the projected/recorded pair into one chip, and downstream
-  // cascade re-anchors off this bottle's startTime. The deterministic
-  // `recorded_${eventKey}` id makes subsequent drawer edits / re-taps
-  // overwrite the same Firestore doc.
+  // §F59/§F60: same eventKey collapses projected/recorded pair; deterministic id lets re-taps overwrite same doc.
   return {
     id: recordedIdFor(projected.eventKey),
     dayId,
@@ -93,18 +83,13 @@ export function ContextualActionButton({
   });
 
   const [confirmOpen, setConfirmOpen] = useState(false);
-  // Track when the "✓ Bottle logged" affordance entered, by the
-  // recorded bottle's id. A new id (or no affordance) means "not
-  // currently showing the logged affordance" — see <AffordanceTimer/>.
+  // Keyed by recorded bottle id; null or changed id = affordance not active.
   const isLoggedAffordance = mode.kind === "log-bottle" && mode.alreadyLogged;
   const loggedKey = isLoggedAffordance ? mode.projected.id : null;
   const [expiredKey, setExpiredKey] = useState<string | null>(null);
 
   if (mode.kind === "hidden") return null;
-  // After the affordance window, hide so end-nap (or whatever fires
-  // next) can take over. decideMode is bedtime > nap > bottle, so if
-  // an in-progress event existed the button would already have switched
-  // away — only the "between log and next event" gap reaches here.
+  // Hide after affordance expires so the next mode (end-nap etc.) can take over.
   if (isLoggedAffordance && expiredKey === loggedKey) return null;
 
   const performLog = (projected: Event) => {
@@ -123,8 +108,7 @@ export function ContextualActionButton({
         void onEndNap(mode.nap, nowMin);
         return;
       case "log-bottle": {
-        // Re-tap on an already-logged slot surfaces a confirm dialog
-        // ("change the recorded time?") rather than a silent overwrite.
+        // Re-tap on already-logged slot: confirm dialog instead of silent overwrite.
         if (mode.alreadyLogged) {
           setConfirmOpen(true);
           return;

@@ -1,10 +1,6 @@
 /**
- * V3 Invite repository — §F3 PR #2 co-parent invite flow.
- *
- * /invites/{token} is the single source of truth for a pending invitation.
- * `consumeInvite` runs as a transaction so the invite-mark-consumed and the
- * consumer's `users/{uid}.childIds` append succeed or fail together; partial
- * failure can never leave a "marked consumed but not joined" zombie.
+ * V3 Invite repository. `consumeInvite` is transactional so mark-consumed
+ * and childIds-append never partially succeed.
  */
 
 import {

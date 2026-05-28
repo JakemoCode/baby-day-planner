@@ -1,12 +1,8 @@
 /**
  * R6.x — Putdown rules.
  *
- * Putdown is a render-only flag (R6.1). Engine sets `hasPutdown: true` on
- * projected naps and bedtime that are still in the future relative to
- * `nowMinutes`. The renderer prepends a virtual putdown block; nothing
- * is persisted.
- *
- * Tests-first per CLAUDE.md TDD protocol.
+ * R6.1: engine sets `hasPutdown: true` on projected naps/bedtime; renderer prepends a virtual
+ * putdown block. Nothing is persisted.
  */
 
 import { describe, expect, it } from "vitest";
@@ -43,9 +39,7 @@ describe("R6 — hasPutdown flag on projected naps and bedtime", () => {
   });
 
   it("projected nap whose start is in the past still gets hasPutdown=true (renderer gates by time)", () => {
-    // R6.1's "is this still future" decision moved out of the engine and
-    // into the renderer (expandPutdownBlocks). The engine just asks "does
-    // this lifecycle still point to a future intent?" Projected qualifies.
+    // "Is this still future?" is a renderer concern; engine sets hasPutdown on all projected events.
     const ctx = aContext({
       day: aDay({ wakeTime: 7 * 60 }),
       settings: aSettings({ wakeWindowsMinutes: [120] }),

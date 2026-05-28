@@ -1,14 +1,8 @@
 "use client";
 
 /**
- * Composite hook bundling the active-day data wiring used by both the
- * dashboard and timeline pages. Pre-extraction, the two pages
- * duplicated the same useV3Day + useV3Settings + useV3Events +
- * useV3Templates + useV3Projection + useDrawer + useDayDrawerSuppressions
- * block verbatim. Anything that's truly per-page (auto-promote
- * persistence, reconcileActiveDay, the wake-confirm sheet) stays in
- * the page so this hook keeps its single responsibility: "give me
- * everything I need to render today's day."
+ * Composite hook for active-day data wiring shared by dashboard and timeline.
+ * Per-page concerns (auto-promote, reconcileActiveDay, wake-confirm) stay in each page.
  */
 
 import { useMemo } from "react";

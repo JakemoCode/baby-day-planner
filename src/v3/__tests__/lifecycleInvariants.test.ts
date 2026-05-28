@@ -1,27 +1,6 @@
 /**
- * Engine output invariants per (event type, lifecycle state).
- *
- * Locks down what the engine MUST emit for every combination of event
- * type and lifecycle state seeded in `ctx.actuals`. Prevents regressions
- * of the class that PR #117 fixed: a write-path bug encoded "drawer
- * time-edit on projected nap" as `lifecycle.state: 'completed'`, which
- * the engine then correctly read as "already recorded" and silently
- * dropped putdown. Unit tests of `formToEvent` and the engine in
- * isolation both passed; the seam between them had no coverage.
- *
- * This file IS that seam coverage. When a new event type or lifecycle
- * state is added, the grid below forces an explicit answer for each
- * combination — extending the rows is now a TDD obligation, not an
- * afterthought.
- *
- * Invariants asserted per cell:
- *   1. Reality-wins (§0): the engine never mutates a seeded actual's
- *      lifecycle. The event in the output carries the SAME lifecycle
- *      state it had on input.
- *   2. hasPutdown derivation (R6.1): the engine's emitted hasPutdown
- *      matches `deriveHasPutdown` for the event's (type, state).
- *      Specifically: `true` iff type ∈ {nap, bedtime} AND state ∈
- *      {projected, recorded}; `false` otherwise.
+ * Seam coverage: engine output invariants per (event type, lifecycle state).
+ * §0 reality-wins (lifecycle never mutates) and R6.1 hasPutdown derivation.
  */
 
 import { describe, expect, it } from "vitest";
@@ -36,11 +15,7 @@ type Cell = {
   expectedHasPutdown: boolean;
 };
 
-// The grid: every event type × lifecycle state that the engine might
-// see in `ctx.actuals`. `wake_window` is omitted intentionally — the
-// schema guarantees wake_windows are always projected (synthesized by
-// R3.1; never recorded directly). Adding it would test an unreachable
-// state.
+// Every event type × lifecycle state. wake_window omitted — always projected (R3.1), never recorded.
 const CELLS: Cell[] = [
   // Naps: putdown applies to projected / recorded only.
   { type: "nap", state: "projected", expectedHasPutdown: true },
@@ -81,9 +56,7 @@ function buildEvent(type: EventType, state: Lifecycle["state"], when: number): E
     kind: isBlock ? "block" : "instant",
     startTime: when,
     label: `${type} ${state}`,
-    // hasPutdown is set by the engine; seed false to verify the rule
-    // actually fires (would fail if the engine just passed the input
-    // through with a defaulted value).
+    // Seed false so we verify the engine rule fires, not just passes input through.
     hasPutdown: false,
     owner: NO_OWNER,
     lifecycle: lifecycleOf(state, when),

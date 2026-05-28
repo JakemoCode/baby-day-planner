@@ -71,7 +71,6 @@ describe("withV3DayDefaults", () => {
     expect(out!.suppressedDaycareDay).toBe(true);
   });
 
-  // V2 ownershipTemplateId remap tests removed in PR-C1 (V2 surface deleted).
 
   it("does not invent templateId when neither field is present", () => {
     const out = withV3DayDefaults({

@@ -1,42 +1,7 @@
 /**
- * R5.x — Bottle rules.
- *
- * One sequential cascade rule + chronological renumber. See
- * `docs/v3/SIMPLIFICATION_SCOPE.md` for the design and
- * `DOMAIN.md` §2 for the user-facing domain model.
- *
- * Replaces the previous four-rule system (R5.1 cascade from latest
- * recorded, R5.6 move-out-of-nap, R5.7 fixed-point convergence,
- * R5.11 placeholder projection) with one unified rule. Each step
- * of the cascade computes its time from the PREVIOUS bottle's
- * actual rendered time (post-snap), so the chain stays coherent
- * regardless of which steps got snapped out of naps.
- *
- * Key behaviors (per DOMAIN.md + SIMPLIFICATION_SCOPE.md):
- *   - Anchor: latest non-projected bottle with `startTime >= wakeTime`,
- *     OR `wakeTime + bufferAfterWakeMinutes` when no anchor exists
- *     (cold-start seed). Overnight bottles (startTime < wakeTime) tally
- *     toward `bottlesPerDay` but do NOT anchor the cascade — the
- *     "midnight rule": morning rhythm is driven by wake-up, not by
- *     mid-night feeds.
- *   - Overnight-near-wake guard (§F54): if a non-projected overnight
- *     bottle exists and its `startTime + intervalForAmount(amountOz)`
- *     lands AFTER `wakeTime + bufferAfterWakeMinutes`, the cold-start
- *     seed shifts forward to that later time. Baby fed at 5am with
- *     6oz (240min interval) waking at 7am shouldn't be projected to
- *     eat again at 7:30am — the first morning bottle anchors at 9am.
- *   - Forward cascade walks from the anchor at
- *     `intervalForAmount(prev.amountOz, ...)`. Stops at midnight
- *     (1440) — past-midnight bottles belong to tomorrow's chain.
- *   - DOMAIN.md §2: "The moment a real recording exists, the cascade
- *     follows cadence to midnight." Forward-only; no backward backfill.
- *     A real recording PROJECTING earlier ghosts contradicts the
- *     forecast-from-reality principle.
- *   - No-feed region is the nap itself only — `[nap.start, nap.end]`,
- *     NOT extended through putdown. Wind-down is render-only; a
- *     bottle can land at or during the wind-down. A bottle landing
- *     STRICTLY inside `(nap.start, nap.end)` snaps to the nearest
- *     edge (with the "if-past-fallback" mirror).
+ * R5 — Bottle cascade: anchor → forward-walk → snap-out-of-nap, bedtime-capped.
+ * R5.4 — Chronological renumber of projected bottles.
+ * R5.5 — Dream-feed emission.
  */
 
 import type { Context, Event } from "../../schemas";
@@ -48,39 +13,16 @@ import { DREAM_FEED_EVENT_KEY, isDreamFeed } from "../../lib/eventConventions";
 
 const MIDNIGHT = MINUTES_PER_DAY;
 
-/**
- * Parse the integer index out of a numbered bottle eventKey
- * (`bottle_3` → 3). Returns null for non-numbered keys (e.g. the
- * dream-feed slot `bottle_dream`). Mirrors `indexFromKey` in owners.ts;
- * lives here because the bottle index format (`bottle_N`) is a
- * bottles-rule convention, used both for next-index allocation and the
- * R5.4 renumber pass.
- */
+/** Parse `bottle_N` → N; returns null for non-numbered keys (e.g. `bottle_dream`). */
 function bottleIndexFromKey(eventKey: string): number | null {
   const match = /^bottle_(\d+)$/.exec(eventKey);
   return match ? parseInt(match[1]!, 10) : null;
 }
 
 /**
- * Forward cap for the bottle cascade. The day's RHYTHM CHAIN is
- * `[wakeTime, forwardCap)`. Outside that window, bottles are passive
- * members of the day (overnight feeds, dream feeds, baby-wakes-hungry
- * recordings) — they're tallied for the calendar day but don't anchor
- * the cascade and aren't projected forward into.
- *
- * Per DOMAIN.md §1 + §3: baby's waking-and-eating cadence stops at
- * bedtime. Cascading bottle projections through the bedtime block
- * mechanically would predict feeds during sleep, which is wrong.
- *
- * Resolution: cap forward cascade at the projected bedtime's startTime
- * if present, falling back to midnight (the "midnight rule" boundary)
- * if no bedtime has been projected yet.
- *
- * Idempotency: bedtime is emitted by R3.1 (the sleep cascade) in the
- * same pass, so the bottle cascade sees it as soon as the sleep
- * cascade fires. Fallback to MIDNIGHT remains for the no-bedtime
- * case (e.g. wakeWindowsMinutes doesn't extend far enough to trigger
- * threshold substitution).
+ * Upper bound for the forward cascade: bedtime.startTime if present, else
+ * midnight. Bottles outside [wakeTime, cap) are day members but never
+ * anchor the cascade.
  */
 function forwardCapFor(events: Event[]): number {
   const bedtime = events.find(isBedtime);
@@ -88,12 +30,8 @@ function forwardCapFor(events: Event[]): number {
   return Math.min(MIDNIGHT, bedtime.startTime);
 }
 
-// ID is keyed to startTime, NOT slot number. Slot number changes when
-// R5.4 renumbers chronologically, so a slot-keyed id would be unstable
-// across passes — the same projection could end up with two different
-// ids on consecutive evaluator passes, which would defeat the
-// fixed-point check and risk convergence loops. startTime is what the
-// event IS; the eventKey/label are how we display it.
+// ID keyed to startTime so it stays stable across R5.4 renumber passes;
+// slot-keyed ids would change each pass and defeat the fixed-point check.
 function buildBottleProjection(
   ctx: Context,
   id: string,
@@ -123,12 +61,7 @@ function buildProjectedBottle(ctx: Context, n: number, startTime: number): Event
   );
 }
 
-/**
- * The dream-feed slot — a special projected bottle anchored to
- * `settings.dreamFeedTime` (post-bedtime). Distinct `eventKey` so the
- * cascade and dedup paths can identify it without time-window heuristics.
- * Subject to Now-cross auto-promote like any projected bottle (ADR-0001).
- */
+/** Projected dream-feed bottle; distinct eventKey keeps it out of cascade dedup logic. */
 function buildProjectedDreamFeed(ctx: Context, startTime: number): Event {
   return buildBottleProjection(
     ctx,
@@ -142,14 +75,9 @@ function buildProjectedDreamFeed(ctx: Context, startTime: number): Event {
 type Region = { start: number; end: number };
 
 /**
- * Nap regions for the bottle snap check. Per DOMAIN.md §4 and
- * SIMPLIFICATION_SCOPE.md §2.1, the no-feed region is the nap ITSELF
- * (`[nap.start, nap.end]`) — NOT extended backward through putdown.
- * Wind-down is render-only synthetic; a bottle can land during it.
- *
- * Overlapping naps are merged into one region — otherwise a bottle
- * could snap out of nap A only to land inside nap B (a real edge case
- * caught by the property test in `properties.test.ts`).
+ * Merged nap regions for snap checks. No-feed region is the nap itself;
+ * putdown/wind-down is render-only and not excluded. Overlapping naps are
+ * merged so a snap from nap A can't land inside nap B.
  */
 function napRegions(events: Event[]): Region[] {
   const raw = events
@@ -169,34 +97,9 @@ function napRegions(events: Event[]): Region[] {
 }
 
 /**
- * Putdown bottle-anchor rule (CONTEXT.md "putdown bottle-anchor rule"):
- * if `proposed` lands in the range
- * `[parent.startTime - putdownLeadMinutes, parent.startTime + napLen/2]`
- * for an adjacent nap or bedtime, snap to
- * `parent.startTime - putdownLeadMinutes` (the start of putdown). The
- * bottle wind-down IS the start of putdown, and per Jake's framing
- * "any projected bottle must snap to either the beginning of putdown
- * or the end of the nap" — snapping to nap.startTime itself would
- * misrepresent the bottle's start time (the bottle BEGINS at putdown
- * start, not at the moment the baby falls asleep).
- *
- * Applies to BOTH projected and recorded naps:
- * - Projected naps use `napLengthMinutes` (the default) for the
- *   first-half computation.
- * - Recorded naps use their actual `endTime - startTime`.
- * In both cases, ADR-0006 Concern B prevents retroactive shifts: if
- * the snap target is past `nowMinutes`, the snap is skipped. Past
- * recorded naps therefore never trigger a snap; only future naps
- * (projected or, rarely, future-recorded) attract bottles.
- *
- * For bedtime, "first half" doesn't apply — only the lead-in window
- * `[parent.startTime - putdownLeadMinutes, parent.startTime]`.
- *
- * ADR-0006 Concern B (no retroactive shift): if the snap target would
- * land at or before `nowMinutes`, the snap is SKIPPED and `proposed`
- * is returned unchanged.
- *
- * If no nap/bedtime in the range, returns `proposed` unchanged.
+ * If `proposed` falls in `[nap.start - lead, nap.start + napLen/2]`, snap
+ * to putdown start (`nap.start - lead`). Bedtime uses only the lead window.
+ * Skipped when the snap target is ≤ nowMinutes (no retroactive shift).
  */
 function snapToPutdown(
   proposed: number,
@@ -207,8 +110,7 @@ function snapToPutdown(
 ): number {
   for (const ev of events) {
     if (ev.type !== "nap" && ev.type !== "bedtime") continue;
-    // For nap: snap window extends to the midpoint of the nap's actual
-    // duration (recorded) or the default. Bedtime has no midpoint (half=0).
+    // Bedtime has no midpoint (half=0); nap uses actual or default duration.
     const napLen =
       ev.type !== "nap"
         ? 0
@@ -220,11 +122,7 @@ function snapToPutdown(
     const hi = ev.startTime + half;
     if (proposed < lo || proposed > hi) continue;
     const snapTarget = ev.startTime - putdownLeadMinutes;
-    // ADR-0006 Concern B: putdown anchor never snaps a bottle to a
-    // past time. If putdown.start is ≤ Now, the conceptual slot has
-    // passed — the bottle is no longer "about to happen at putdown."
-    // The forward-snap step (snapForwardToNapEnd) takes over and
-    // pushes the bottle to nap.endTime instead.
+    // No retroactive snap: if putdown start is past, snapForwardToNapEnd takes over.
     if (snapTarget <= nowMinutes) continue;
     return snapTarget;
   }
@@ -232,13 +130,9 @@ function snapToPutdown(
 }
 
 /**
- * If `proposed` lands STRICTLY inside any nap region, snap to whichever
- * edge is closer to `proposed`. Tie favors `region.start` (bottle
- * before nap is generally preferred — see DOMAIN.md §4: bottle CAN BE
- * the wind-down). If the chosen edge is in the past relative to
- * `nowMinutes`, use the other edge.
- *
- * If no overlap, returns `proposed` unchanged.
+ * Snaps `proposed` to the nearest nap edge when it falls strictly inside a
+ * nap region. Ties favor `region.start`. Falls back to the other edge if
+ * the chosen one is in the past.
  */
 function snapOutOfNap(proposed: number, regions: Region[], nowMinutes: number): number {
   const region = regions.find((r) => proposed > r.start && proposed < r.end);
@@ -247,11 +141,7 @@ function snapOutOfNap(proposed: number, regions: Region[], nowMinutes: number): 
   const distAfter = Math.abs(proposed - region.end);
   let chosen = distBefore <= distAfter ? region.start : region.end;
   if (chosen < nowMinutes) {
-    // Past-edge fallback: prefer the other edge ONLY if it's not also
-    // in the past. With both edges past (baby slept through the
-    // morning-buffer window in a property-test fixture), holding the
-    // closer choice avoids a snap-to-pre-wake time that would then
-    // get trimmed by the chain-range filter, looping the cascade.
+    // With both edges past, hold the closer choice to avoid a snap-to-pre-wake loop.
     const other = chosen === region.start ? region.end : region.start;
     if (other >= nowMinutes) chosen = other;
   }
@@ -259,26 +149,9 @@ function snapOutOfNap(proposed: number, regions: Region[], nowMinutes: number): 
 }
 
 /**
- * §F66 fast-follow B4: when a cascade-natural emit lands in some
- * nap's putdown-or-body range `[start - lead, end]` AND the putdown
- * era has already opened (`start - lead ≤ now`), snap forward to that
- * nap's `endTime`. Per Jake's framing:
- *
- *   - Putdown is a contiguous part of the nap. If we've already
- *     entered the putdown window (Now ≥ putdown.start), don't pin
- *     the bottle anywhere in `[putdown.start, nap.end)`: the bottle
- *     has been deferred past this nap; show it on the other side.
- *   - This gate fires for any proposed in-range — past, present
- *     (proposed === now), or barely-future — as long as the nap is
- *     "in progress relative to Now." The discriminator is the
- *     putdown era (`lo ≤ now`), not the proposed time's tense.
- *   - Future putdowns (`lo > now`) are handled by snapToPutdown
- *     (Concern B refuses past targets there; future targets pass).
- *     This function preserves that hand-off by skipping when
- *     `lo > now`.
- *
- * Self-gates by the proposed-in-range check — cold-start cascades
- * (bottle_1 at 7:10am with no nap in that vicinity) don't trigger.
+ * When `proposed` falls in `[nap.start - lead, nap.end]` and the putdown era
+ * has opened (`lo ≤ now`), snap to `nap.endTime`. Future putdowns (`lo > now`)
+ * are handled by snapToPutdown; this function skips them.
  */
 function snapForwardToNapEnd(
   proposed: number,
@@ -289,13 +162,8 @@ function snapForwardToNapEnd(
   for (const r of regions) {
     const lo = r.start - putdownLead;
     if (proposed < lo || proposed > r.end) continue;
-    // Don't snap across the Now line: if the block's end is already
-    // past, leave proposed alone (auto-promote claims it).
-    if (r.end <= nowMinutes) continue;
-    // Hand off to snapToPutdown for blocks whose putdown era hasn't
-    // opened yet (lo > now). Those want to anchor at lo, not skip
-    // ahead to end. Snap-forward only fires inside the active block.
-    if (lo > nowMinutes) continue;
+    if (r.end <= nowMinutes) continue; // block already past; auto-promote handles it
+    if (lo > nowMinutes) continue; // future putdown: handled by snapToPutdown
     return r.end;
   }
   return proposed;
@@ -309,10 +177,7 @@ const RuleSequentialBottleCascade: Rule = {
   id: "R5",
   description:
     "Sequential bottle cascade: anchor → propose → snap-out-of-nap → advance, bidirectional, midnight-capped",
-  // Naps may not be projected yet on the first pass; the evaluator's
-  // fixed-point loop re-runs this rule once R3.1 emits them. We don't
-  // declare R3.1 as a hard dependency because some bottle tests run
-  // without the nap rules and expect placeholders regardless.
+  // No hard dependsOn R3.1 — some bottle tests run without nap rules.
   matches: (events, ctx) => {
     if (ctx.day.wakeTime === undefined) return false;
     return canCascade(events, ctx);
@@ -321,25 +186,9 @@ const RuleSequentialBottleCascade: Rule = {
 };
 
 /**
- * Match-time predicate: is there any way this cascade could add more
- * bottles? Two cases:
- *
- *   1. Cold-start (no non-projected morning bottles): gate on
- *      `bottles.length < bottlesPerDay`. The setting defines how many
- *      placeholders to draw when there's no real data to cascade
- *      from.
- *
- *   2. Anchored (at least one non-projected morning bottle): no
- *      total-count cap. Predict-don't-prescribe (DOMAIN.md §2):
- *      forward cascade extends to midnight; `bottlesPerDay` is the
- *      *cold-start target*, not a hard upper bound on the day's
- *      predictions. Match returns true if the cascade could add
- *      forward, false once forward is saturated. (No backfill: per
- *      DOMAIN §2 "the moment a real recording exists, the cascade
- *      follows cadence to midnight" — forward only.)
- *
- * Idempotency: once `produces` has filled all addable slots, this
- * predicate returns false and the evaluator stops re-firing.
+ * True when the cascade could emit more bottles: cold-start (count < bottlesPerDay)
+ * or anchored (latest bottle's next interval fits before cap), or stale projections
+ * need trimming.
  */
 function canCascade(events: Event[], ctx: Context): boolean {
   const wakeTime = ctx.day.wakeTime;
@@ -347,20 +196,14 @@ function canCascade(events: Event[], ctx: Context): boolean {
   const bottles = events.filter(isBottle);
   const cap = forwardCapFor(events);
 
-  // Trimming check: any PROJECTED bottle outside the rhythm chain
-  // [wakeTime, cap) needs to be removed. Fires when bedtime appears
-  // mid-flight and pass-1's midnight-capped projections are now
-  // past-bedtime stragglers. Dream-feed slot lives outside the cap
-  // by design (see R5.5) and is preserved.
+  // Trimming: projected bottles outside [wakeTime, cap) are stale pass-1 results.
+  // Dream-feed lives outside cap by design and is preserved.
   const needsTrim = bottles.some(
     (b) => isProjected(b) && !isDreamFeed(b) && (b.startTime < wakeTime || b.startTime >= cap),
   );
   if (needsTrim) return true;
 
-  // Chain bottles: in-window for the day's rhythm chain. Dream-feed
-  // is sentinel, never a rhythm-chain member — even if dreamFeedTime
-  // falls inside [wakeTime, cap) by user misconfiguration, it must
-  // not anchor cascade or inflate the cold-start count.
+  // Chain bottles: in-window, excluding dream-feed (sentinel, not a rhythm member).
   const chainBottles = bottles
     .filter((b) => !isDreamFeed(b) && b.startTime >= wakeTime && b.startTime < cap)
     .sort((a, b) => a.startTime - b.startTime);
@@ -368,18 +211,11 @@ function canCascade(events: Event[], ctx: Context): boolean {
   const target = ctx.settings.bottleChain.bottlesPerDay;
 
   if (anchors.length === 0) {
-    // Cold-start case: gated on count. DOMAIN §2: bottlesPerDay is
-    // the cold-start target for the DAYTIME RHYTHM, not the day's
-    // total feed count. Overnight bottles tally toward the day but
-    // don't consume a daytime slot — a baby who ate overnight
-    // shouldn't get fewer morning/afternoon predictions than one
-    // who didn't. Compare against chainBottles, not bottles.
+    // Cold-start: compare against chain (not total) — overnight bottles don't consume daytime slots.
     return chainBottles.length < target;
   }
 
-  // Anchored case: check if cascade could extend forward. DOMAIN §2:
-  // "moment a real recording exists, the cascade follows cadence to
-  // midnight" — forward-only, no backward backfill.
+  // Anchored: check if cascade could extend forward (forward-only; no backfill).
   const defaultInterval = ctx.settings.defaultBottleIntervalMinutes;
   const rules = ctx.settings.bottleIntervalRules;
   const latest = chainBottles[chainBottles.length - 1]!;
@@ -397,36 +233,25 @@ function projectBottleChain(events: Event[], ctx: Context): Event[] {
   const defaultInterval = ctx.settings.defaultBottleIntervalMinutes;
   const rules = ctx.settings.bottleIntervalRules;
 
-  // Step 1: trim projected bottles outside the rhythm chain
-  // [wakeTime, cap). These are stale pass-1 projections that became
-  // past-bedtime (or overnight, defensively) once R7.6 emitted a
-  // bedtime event. Recorded / recorded bottles are NEVER trimmed —
-  // they're protected by the reality-wins axiom and represent passive
-  // members of the day (overnight feeds, dream feeds, etc.).
+  // Trim projected bottles outside [wakeTime, cap); recorded bottles are never trimmed.
   const trimmedEvents = events.filter((e) => {
     if (!isBottle(e)) return true;
     if (!isProjected(e)) return true;
-    // Dream-feed slot (R5.5) lives outside [wakeTime, cap) by design.
-    if (isDreamFeed(e)) return true;
+    if (isDreamFeed(e)) return true; // lives outside cap by design
     return e.startTime >= wakeTime && e.startTime < cap;
   });
 
   const bottles = trimmedEvents.filter(isBottle);
   const regions = napRegions(trimmedEvents);
 
-  // Chain bottles: in-window for the day's rhythm chain. Outside-window
-  // bottles (overnight, post-bedtime recordings) tally toward
-  // bottlesPerDay but do NOT anchor cascade or backfill (DOMAIN.md §1
-  // + §3: cascade follows the wake-to-bedtime rhythm). Dream-feed is
-  // also excluded — sentinel slot, not a rhythm-chain member.
+  // Chain bottles: in-window, excluding dream-feed.
   const chainBottles = bottles
     .filter((b) => !isDreamFeed(b) && b.startTime >= wakeTime && b.startTime < cap)
     .sort((a, b) => a.startTime - b.startTime);
   const anchors = chainBottles.filter((b) => !isProjected(b));
   const isAnchored = anchors.length > 0;
 
-  // Highest bottle eventKey index for new keys (R5.4 renumbers anyway,
-  // but stable keys per pass keep the fixed-point check from looping).
+  // Stable initial key index per pass; R5.4 renumbers the final set.
   const maxIndex = bottles.reduce((m, b) => {
     const idx = bottleIndexFromKey(b.eventKey);
     return idx !== null ? Math.max(m, idx) : m;
@@ -434,25 +259,9 @@ function projectBottleChain(events: Event[], ctx: Context): Event[] {
 
   let nextIndex = maxIndex + 1;
   const projections: Event[] = [];
-  // Count daytime-chain bottles only — `bottlesPerDay` is the
-  // cold-start target for the daytime rhythm, not the day's total
-  // feed count. Overnight bottles tally toward the day but don't
-  // consume a daytime slot (paired with canCascade's same fix).
-  let chainCount = chainBottles.length;
+  let chainCount = chainBottles.length; // count chain only; overnight bottles don't consume daytime slots
 
   const snap = (proposed: number) => {
-    // snapOutOfNap moves a bottle proposed strictly inside a nap to the
-    // nearer edge. snapToPutdown then applies the putdown-anchor rule
-    // (CONTEXT.md): bottles whose cascade-natural time lands in the
-    // putdown window or the first half of a projected nap snap to the
-    // start of putdown. ADR-0006 Concern B: putdown snap is skipped if
-    // the target would land in the past.
-    //
-    // Final snapOutOfNap pass: putdown-anchor moves the bottle to
-    // `nap.startTime - putdownLeadMinutes`. In pathological cases
-    // (e.g., the previous nap ends < putdownLead minutes before the
-    // next nap's start), that target can land strictly inside the
-    // previous nap. Re-applying snapOutOfNap moves it cleanly out.
     const noNap = snapOutOfNap(proposed, regions, ctx.nowMinutes);
     const withPutdown = snapToPutdown(
       noNap,
@@ -462,38 +271,15 @@ function projectBottleChain(events: Event[], ctx: Context): Event[] {
       ctx.nowMinutes,
     );
     const outOfNap = snapOutOfNap(withPutdown, regions, ctx.nowMinutes);
-    // §F66 fast-follow B4: if the cascade-natural emit is past Now AND
-    // it's in a nap's putdown-or-body range, snap to the nearest
-    // future edge of that nap. Catches both the in-progress-recorded-
-    // nap-edit case (snap to nap.endTime) AND the about-to-start-
-    // projected-nap case (snap to nap.startTime). Self-gates: a cold-
-    // start emit at 7:10am with no nap in that vicinity returns
-    // unchanged.
     return snapForwardToNapEnd(outOfNap, regions, ctx.settings.putdownLeadMinutes, ctx.nowMinutes);
   };
 
-  // The cold-start count cap (bottlesPerDay placeholders) ONLY applies
-  // when there are no non-projected morning anchors. Once a real
-  // recording exists, the cascade follows cadence to midnight — the
-  // setting is a TARGET for cold-start, not a HARD CAP on the day's
-  // predictions. Predict-don't-prescribe (DOMAIN.md §2): if baby has
-  // already had bottlesPerDay+ feeds (e.g., on a sick day), the engine
-  // should still predict the rest of the afternoon.
+  // Cold-start cap applies only when there are no morning anchors; once anchored,
+  // the cascade runs to bedtime/midnight regardless of bottlesPerDay.
   const reachedColdStartCap = () => !isAnchored && chainCount >= target;
 
-  // §F54 — Overnight-near-wake guard. If a non-projected overnight
-  // bottle (startTime < wakeTime) lands close enough to wake that its
-  // forward interval extends past wake+buffer, shift the cold-start
-  // seed forward. Without this, baby fed at 5am with 240min interval
-  // and waking at 7am would still get a projected morning bottle at
-  // 7:30am — but baby isn't hungry yet. DOMAIN §2: "interval-until-
-  // next-feed depends on what was actually consumed."
-  //
-  // Only matters when there's no in-chain anchor (cold start). An
-  // anchored chain already uses the latest in-chain bottle as prev
-  // for the forward walk; the overnight bottle is structurally
-  // outside the chain by the midnight rule (chainBottles filter at
-  // line ~261).
+  // §F54 — Overnight-near-wake guard: if an overnight bottle's forward interval
+  // extends past wake+buffer, seed the cold-start cascade from that later time.
   const overnightAnchors = bottles
     .filter((b) => !isProjected(b) && b.startTime < wakeTime)
     .sort((a, b) => a.startTime - b.startTime);
@@ -508,29 +294,17 @@ function projectBottleChain(events: Event[], ctx: Context): Event[] {
       ? overnightProposedSeed
       : wakeBuffer;
 
-  // === Forward cascade ===
-  // Uses the LATEST chain bottle (recorded, recorded, OR projected
-  // from a prior pass) as the walker's `prev`. Idempotency: subsequent
-  // evaluator passes extend the chain instead of re-emitting it.
-  // Cap = bedtime.startTime if a bedtime exists, else MIDNIGHT — the
-  // cascade stops at the boundary between today's rhythm chain and
-  // overnight / tomorrow.
+  // Forward cascade from the latest chain bottle; subsequent passes extend rather than re-emit.
   let prev: Event;
   if (chainBottles.length > 0) {
     prev = chainBottles[chainBottles.length - 1]!;
   } else {
-    // Cold start: seed the first bottle at `seedTime` — typically
-    // wake+buffer, shifted later by the §F54 overnight-near-wake
-    // guard above when an overnight feed is close to wake.
+    // Cold start: seed at seedTime (wake+buffer, shifted by §F54 overnight guard).
     if (reachedColdStartCap()) return [...trimmedEvents, ...projections];
     if (seedTime >= cap) return [...trimmedEvents, ...projections];
     const seed = snap(seedTime);
     if (seed >= cap) return [...trimmedEvents, ...projections];
-    // If snap pushed the seed before wakeTime, the cold-start slot
-    // can't be placed cleanly (a recorded nap straddles the
-    // wake-buffer window). Refuse to seed — the trim filter would
-    // remove it on the next pass anyway, causing a convergence
-    // loop.
+    // Snap pushed seed before wakeTime (nap straddles wake-buffer); refuse to avoid trim loop.
     if (seed < wakeTime) return [...trimmedEvents, ...projections];
     const firstProj = buildProjectedBottle(ctx, nextIndex++, seed);
     projections.push(firstProj);
@@ -539,18 +313,14 @@ function projectBottleChain(events: Event[], ctx: Context): Event[] {
   }
 
   while (true) {
-    if (reachedColdStartCap()) break; // cold-start: stop at bottlesPerDay
-    // Defensive: an interval ≤ 0 from malformed rules / fixtures would
-    // cause an infinite loop. Treat as "cascade exhausted."
+    if (reachedColdStartCap()) break;
     const interval = intervalForAmount(rules, prev.amountOz, defaultInterval);
-    if (interval <= 0) break;
+    if (interval <= 0) break; // malformed rules; guard against infinite loop
     const proposed = prev.startTime + interval;
     if (proposed >= cap) break; // bedtime / midnight cap
     const placed = snap(proposed);
     if (placed >= cap) break;
-    // Strict-monotonic guard: snap to a nap edge could in pathological
-    // cases land at or before prev.startTime, looping.
-    if (placed <= prev.startTime) break;
+    if (placed <= prev.startTime) break; // strict-monotonic guard against pathological snap loops
     const projection = buildProjectedBottle(ctx, nextIndex++, placed);
     projections.push(projection);
     chainCount++;
@@ -565,23 +335,8 @@ function projectBottleChain(events: Event[], ctx: Context): Event[] {
 // ---------------------------------------------------------------------------
 
 /**
- * R5.4 — Renumber PROJECTED bottles for display; recorded bottles keep
- * their pinned number.
- *
- * Recorded bottle eventKey/label is identity (set at the moment of
- * recording — auto-promote, manual log, or drawer save) and stays
- * frozen even when the user edits the time, deletes neighbors, or
- * reshuffles the chronological order. Per §F66 fast-follow B5 grill
- * 2026-05-27: "the bottle that was Bottle 3 should still be Bottle 3
- * after I edit its time."
- *
- * Projected bottles fill numbers AFTER the largest recorded number
- * (skipping any used recorded numbers below it). Cold-start days
- * (no recorded bottles) renumber projected from 1, preserving the
- * original chronological numbering.
- *
- * Engine-side only; Firestore docs keep their original eventKey
- * (persistence reads `id`, never eventKey).
+ * Renumbers projected bottles chronologically after the highest recorded number.
+ * Recorded bottles keep their pinned eventKey/label; engine-side only.
  */
 const RuleRenumberBottlesChronologically: Rule = {
   id: "R5.4",
@@ -601,11 +356,7 @@ const RuleRenumberBottlesChronologically: Rule = {
     const renamed = computeProjectedRenumber(events);
     return events.map((e) => {
       if (!isBottle(e)) return e;
-      // Dream-feed slot has its own stable eventKey + label; renumber
-      // would rename it to `bottle_N` and reset the label to `Bottle N`,
-      // breaking the dream-feed identity AND looping the cascade
-      // (R5.5's identity check keys on eventKey).
-      if (isDreamFeed(e)) return e;
+      if (isDreamFeed(e)) return e; // stable eventKey; renumber would break R5.5 identity check
       if (e.lifecycle.state !== "projected") return e; // recorded bottles are frozen
       const next = renamed.get(e.id);
       if (!next) return e;
@@ -615,12 +366,7 @@ const RuleRenumberBottlesChronologically: Rule = {
   },
 };
 
-/**
- * Returns a map from projected-bottle id → { eventKey, label } using
- * the smallest unused number starting from `max(recordedNumbers) + 1`,
- * skipping any numbers already used by recorded bottles. Projected
- * bottles are assigned in chronological order.
- */
+/** Maps projected-bottle id → { eventKey, label } in chronological order, skipping recorded numbers. */
 function computeProjectedRenumber(
   events: Event[],
 ): Map<string, { eventKey: string; label: string }> {
@@ -647,9 +393,7 @@ function computeProjectedRenumber(
 }
 
 function bottlesByStartTime(events: Event[]): Event[] {
-  // Exclude dream-feed from the chronological order — it's a sentinel
-  // slot, not a rhythm-chain bottle. Including it would shift its index
-  // when its position relative to rhythm bottles changes.
+  // Exclude dream-feed; including it would shift rhythm-chain indices when its position changes.
   return events
     .filter(isBottle)
     .filter((b) => !isDreamFeed(b))
@@ -660,40 +404,21 @@ function bottlesByStartTime(events: Event[]): Event[] {
 // R5.5 — Dream-feed emission
 // ---------------------------------------------------------------------------
 
-/**
- * Whether any non-projected bottle exists strictly after bedtime.
- * Per Jake's §F66 framing: if the user records a feed after bedtime
- * (e.g. 22:00 wake-feed), THAT recording IS the dream feed for the
- * night — the projected slot at `dreamFeedTime` should be suppressed
- * rather than rendered as a second post-bedtime bottle. The legacy
- * `applyDreamFeedLabel` render pass then relabels that recorded
- * bottle as "Dream Feed", so exactly one dream-feed chip appears.
- */
+/** True when a recorded post-bedtime bottle exists (suppresses the projected dream-feed slot). */
 function hasRecordedPostBedtimeBottle(events: Event[]): boolean {
   const bedtime = events.find(isBedtime);
   if (!bedtime) return false;
   return events.some((e) => isBottle(e) && !isProjected(e) && e.startTime > bedtime.startTime);
 }
 
-/**
- * Emits the projected dream-feed bottle at `settings.dreamFeedTime`
- * when enabled, idempotently. Runs after the rhythm cascade so it
- * doesn't interact with R5's trim/saturation logic. Subject to
- * Now-cross auto-promote like any projected bottle (ADR-0001).
- *
- * Suppression: when a recorded post-bedtime bottle already exists,
- * that recording IS the dream feed for the night and the projection
- * is skipped (avoids two "Dream Feed" chips on the timeline).
- */
+/** Emits the projected dream-feed slot; suppressed when a recorded post-bedtime bottle exists. */
 const RuleDreamFeedEmit: Rule = {
   id: "R5.5",
   description: "Emit projected dream-feed bottle at settings.dreamFeedTime",
   dependsOn: ["R5"],
   matches: (events, ctx) => {
     if (!ctx.settings.dreamFeedEnabled) return false;
-    // §F66 fast-follow: per-day skip via Day.suppressedDreamFeed
-    // (drawer "delete" on the dream-feed slot writes this field).
-    if (ctx.day.suppressedDreamFeed) return false;
+    if (ctx.day.suppressedDreamFeed) return false; // drawer "delete" writes this field
     if (events.some((e) => isBottle(e) && isDreamFeed(e))) return false;
     if (hasRecordedPostBedtimeBottle(events)) return false;
     return true;

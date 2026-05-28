@@ -1,12 +1,6 @@
 /**
- * V3 TomorrowPlan repository.
- *
- * One doc per (childId, date) at `children/{childId}/tomorrowPlans/{date}`.
- * The doc is only written when the user actually edits something on
- * `/tomorrow` (§F39 lock: materialize on first edit, never on page idle).
- *
- * Auto-promote happens elsewhere — the engine consumes this doc when the
- * first wake event is recorded for `date`.
+ * V3 TomorrowPlan repository. One doc per (childId, date).
+ * Materialized on first user edit only (never on page idle).
  */
 
 import {
@@ -41,11 +35,7 @@ export async function loadTomorrowPlan(
   return snap.exists() ? snap.data() : null;
 }
 
-/**
- * Subscribe to a single `TomorrowPlan` doc by (childId, date). Delivers
- * `null` when the doc doesn't exist. Mirrors `watchActiveDay` /
- * `watchSettings` so the hook layer never builds Firestore refs itself.
- */
+/** Subscribe to a single TomorrowPlan by (childId, date); delivers null when absent. */
 export function watchTomorrowPlan(
   db: Firestore,
   childId: string,
@@ -57,12 +47,7 @@ export function watchTomorrowPlan(
   });
 }
 
-/**
- * Subscribe to the count of unconfirmed (`status === "draft"`)
- * TomorrowPlan docs for this child. On subscription error, logs and
- * reports 0 (the Tomorrow tab's dot just disappears rather than
- * sticking on a stale count).
- */
+/** Subscribe to the count of draft TomorrowPlan docs; reports 0 on error. */
 export function watchTomorrowDraftCount(
   db: Firestore,
   childId: string,
@@ -100,9 +85,7 @@ export async function deleteTomorrowPlan(
 
 /**
  * Flip an existing plan to `confirmed` and stamp `confirmedAt`.
- * Caller supplies the TimeMin in local-day frame (use
- * `currentLocalMinutes()` in app code). Throws if the doc doesn't
- * exist — call sites must have autosaved a draft first.
+ * Throws if the doc doesn't exist — callers must have autosaved a draft first.
  */
 export async function confirmTomorrowPlan(
   db: Firestore,
@@ -113,16 +96,9 @@ export async function confirmTomorrowPlan(
   await updateDoc(planRef(db, childId, date), { status: "confirmed", confirmedAt });
 }
 
-/**
- * Revert a plan to `draft` and clear `confirmedAt`. Called whenever
- * the user edits a confirmed plan — they must explicitly re-confirm
- * to keep auto-promote eligibility.
- */
+/** Revert a plan to `draft` and clear `confirmedAt`. */
 export async function markPlanDraft(db: Firestore, childId: string, date: string): Promise<void> {
-  // Use deleteField for confirmedAt so the doc matches the schema
-  // (TimeMin | undefined) instead of storing a stray null that would
-  // surface to engine consumers as `confirmedAt = null` and break the
-  // `?: TimeMin` contract.
+  // deleteField removes confirmedAt entirely — avoids storing null, which violates the `?: TimeMin` schema contract.
   await updateDoc(planRef(db, childId, date), {
     status: "draft",
     confirmedAt: deleteField(),
@@ -130,13 +106,8 @@ export async function markPlanDraft(db: Firestore, childId: string, date: string
 }
 
 /**
- * Garbage-collect any TomorrowPlan docs whose `date` is strictly less
- * than `today`. Called during calendar-rollover reconciliation (§F17
- * scope §6) — once a plan's date has passed without being promoted,
- * it can never auto-promote again, so keeping it around just creates
- * stale state that surfaces in /tomorrow read paths.
- *
- * Best-effort: failures are swallowed at the caller (the hook logs).
+ * Delete TomorrowPlan docs whose `date` is before `today`. Best-effort;
+ * caller logs failures. Plans past their date can never auto-promote.
  */
 export async function deleteStaleTomorrowPlans(
   db: Firestore,

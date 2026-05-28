@@ -58,9 +58,7 @@ export default function SettingsPage() {
     );
   }
 
-  // First-run: no doc yet — start with conservative defaults so all editors
-  // render. The first save creates the doc; the watcher then keeps things
-  // in sync via the defaulter on read.
+  // Fall back to defaults before the first save creates the Firestore doc.
   const value: Settings = settings ?? makeDefaultSettings(CHILD_ID);
   const persist = (next: Settings) => {
     void saveSettings(db, CHILD_ID, next);
@@ -459,7 +457,7 @@ function PumpTimesRow({
     const next = value.map((s, j) => {
       if (j !== i) return s;
       if (raw === "") {
-        // Clear override — omit the key so the engine falls back to default.
+        // Omit the key so the engine falls back to default duration.
         const { durationMinutes: _omit, ...rest } = s;
         return rest;
       }
@@ -560,8 +558,7 @@ function BottleIntervalRulesRow({
                 );
                 return;
               }
-              // Clamp maxOz to be ≥ minOz so inverted-range rules (which
-              // could never match anything) can't be created via the UI.
+              // Clamp maxOz ≥ minOz so inverted-range rules can't be created.
               const next = Math.max(rule.minOz, Number(raw));
               onChange(value.map((r, j) => (j === i ? { ...rule, maxOz: next } : r)));
             }}
@@ -574,8 +571,7 @@ function BottleIntervalRulesRow({
             step={5}
             min={1}
             value={rule.intervalMinutes}
-            // Engine math would loop tight or cascade backwards on ≤0.
-            onChange={(e) => update(i, { intervalMinutes: Math.max(1, Number(e.target.value)) })}
+            onChange={(e) => update(i, { intervalMinutes: Math.max(1, Number(e.target.value)) })} // ≤0 would cause engine cascade loops
             aria-label={`Rule ${i + 1} interval minutes`}
             className={styles.repeaterInputMd}
           />

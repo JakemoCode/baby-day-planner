@@ -1,11 +1,4 @@
-/**
- * Skeleton placeholder for the dashboard while the active-day +
- * settings subscriptions are still warming up. Mirrors the rough block
- * layout of the real dashboard (NowBanner, NextEventCard, two panels,
- * action row) so the user sees the right SHAPE appear, then content
- * fills in, instead of a "Start first day" CTA flash → real dashboard
- * (which made the app look broken for ~500ms after onboarding).
- */
+/** Loading skeleton matching dashboard layout shape; prevents "Start first day" CTA flash during subscription warm-up. */
 import styles from "./DashboardSkeleton.module.css";
 
 export function DashboardSkeleton() {

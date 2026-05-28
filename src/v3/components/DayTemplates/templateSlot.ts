@@ -1,18 +1,4 @@
-/**
- * Shared dispatch from `Event` -> the slot it occupies inside an
- * OwnershipTemplate. Both TemplateOwnerPicker (read side) and
- * setOwnerInTemplate (write side) consume this so the eventKey regex
- * lives in one place.
- *
- * Slot kinds mirror the OwnershipTemplate shape:
- *   - bedtime              -> template.bedtimeOwner
- *   - nap[index]           -> template.napOwners[index]
- *   - wakeWindow[index]    -> template.wakeWindowOwners[index]
- *   - bottle[index]        -> template.bottleOwners[index]
- *
- * Events that don't map to a template slot (extras, pumps, malformed
- * eventKeys) return undefined.
- */
+/** Maps Event → OwnershipTemplate slot by eventKey; extras, pumps, and malformed keys return undefined. */
 
 import type { Event, OwnerRef, OwnerSlotEntry, OwnershipTemplate } from "../../schemas";
 
@@ -26,9 +12,7 @@ const INDEXED_PATTERNS = [
   ["bottle", /^bottle_(\d+)$/],
 ] as const;
 
-/** Returns undefined for events that don't map to a template slot
- * (e.g. extras, pumps, malformed eventKeys). Index is 0-based — the
- * 1-based suffix in the eventKey (`nap_1`) maps to index 0. */
+/** Returns the template slot for the event; undefined for unmapped types. eventKey suffix is 1-based → 0-based index. */
 export function templateSlotForEvent(event: Event): TemplateSlot | undefined {
   const { eventKey } = event;
   if (eventKey === "bedtime") return { kind: "bedtime" };
@@ -39,8 +23,7 @@ export function templateSlotForEvent(event: Event): TemplateSlot | undefined {
   return undefined;
 }
 
-/** Read the owner currently assigned to the slot in the template.
- * Returns undefined when the slot is empty or out of bounds. */
+/** Returns the owner at the given slot, or undefined if empty or out of bounds. */
 export function getOwnerAt(template: OwnershipTemplate, slot: TemplateSlot): OwnerRef | undefined {
   switch (slot.kind) {
     case "bedtime":
@@ -54,10 +37,7 @@ export function getOwnerAt(template: OwnershipTemplate, slot: TemplateSlot): Own
   }
 }
 
-/** Return a copy of `arr` with `owner` placed at index `i`, gap-filling
- * intermediate slots with `undefined`. The schema models owner-list slots
- * as `OwnerSlotEntry = OwnerRef | undefined`, so the gap-fill is honest
- * in the type — engine R12.x rules skip undefined entries at projection. */
+/** Places `owner` at index `i`, gap-filling with undefined; engine skips undefined entries at projection. */
 function placeAt(
   arr: ReadonlyArray<OwnerSlotEntry>,
   i: number,
@@ -69,11 +49,7 @@ function placeAt(
   return next;
 }
 
-/** Returns a new OwnershipTemplate with the slot's owner replaced.
- * Pure / immutable. Passing `undefined` clears the slot — for bedtime
- * the property is removed entirely (to satisfy
- * exactOptionalPropertyTypes); for indexed slots the entry becomes
- * undefined in place. */
+/** Returns a new template with the slot's owner replaced. `undefined` clears; bedtime clears by key removal (exactOptionalPropertyTypes). */
 export function setOwnerAt(
   template: OwnershipTemplate,
   slot: TemplateSlot,

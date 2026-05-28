@@ -5,11 +5,7 @@ import { db } from "@/lib/firebase/client";
 import { saveTomorrowPlan } from "../repositories/tomorrowPlans";
 import type { Event, OwnerRef, TimeMin, TomorrowPlan } from "../schemas";
 
-/**
- * The user-driven content of a TomorrowPlan — the parts the form
- * surface owns. `childId`, `date`, and `status` are managed by the
- * autosave hook itself.
- */
+/** User-editable plan fields. `childId`, `date`, and `status` are managed by the autosave hook. */
 export type TomorrowPlanInput = {
   wakeTime?: TimeMin;
   startTemplateId?: string;
@@ -23,21 +19,10 @@ export type UseAutosaveTomorrowPlanOptions = {
 };
 
 /**
- * §F12 PR 3 — autosave whatever the user has entered on /tomorrow as
- * a draft TomorrowPlan. Persists `status: "draft"` on every change
- * after a debounce. Caller passes `null` for "no input yet" so the
- * hook doesn't write the initial render's default form state.
- *
- * If `persistedPlan` is provided AND its content matches the current
- * input exactly, the autosave skips the write. This prevents two
- * races flagged by reviewer on 2026-05-21:
- *   - confirm() → setDoc(status: "confirmed") → debounced autosave
- *     fires later and overwrites with status: "draft", silently
- *     undoing the confirmation
- *   - hydration → form mirrors plan → autosave fires identical
- *     content as a noisy no-op write
- * Edit-revert (confirmed → draft on edit) survives because content
- * differs when the user has actually edited something.
+ * Debounced autosave of form state as a draft TomorrowPlan.
+ * Skips the write when `persistedPlan` already matches input (prevents
+ * a pending autosave from overwriting a confirm() or noisy hydration no-ops).
+ * Pass `null` for input to suppress autosave entirely.
  */
 export function useAutosaveTomorrowPlan(
   childId: string,
@@ -67,13 +52,7 @@ export function useAutosaveTomorrowPlan(
   }, [childId, date, input, persistedPlan, debounceMs]);
 }
 
-/**
- * Content-equality between a TomorrowPlanInput and a persisted plan.
- * Ignores `status` and `confirmedAt` (autosave never touches those
- * meaningfully — confirm/clear actions own them). Returns true when
- * the persisted plan already reflects everything in the input, so the
- * autosave can safely skip the write.
- */
+/** Content equality between input and persisted plan, ignoring `status`/`confirmedAt`. */
 function inputMatchesPlan(input: TomorrowPlanInput, plan: TomorrowPlan): boolean {
   if (plan.wakeTime !== input.wakeTime) return false;
   if (plan.startTemplateId !== input.startTemplateId) return false;
@@ -105,9 +84,7 @@ function shallowEqualOwnerMap(
 
 function shallowEqualExtras(a: Event[], b: Event[]): boolean {
   if (a.length !== b.length) return false;
-  // Extras are user-edited via the drawer; reference equality is
-  // sufficient for stable values and the failure mode of false-
-  // negative (writes when we don't need to) is harmless.
+  // Reference equality is sufficient; false-negative (extra write) is harmless.
   for (let i = 0; i < a.length; i++) {
     if (a[i] !== b[i]) return false;
   }

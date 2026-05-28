@@ -1,11 +1,7 @@
 // @vitest-environment jsdom
 /**
- * Integration test: useReconcileActiveDay hook (§F17 PR 2)
- *
- * Exercises the rollover seam end-to-end: real Firestore emulator → real
- * days + tomorrowPlans repos → useReconcileActiveDay hook → resulting
- * Day doc. No business-logic mocks; only the Firebase singleton is
- * swapped for the emulator-backed db (legitimate infra-boundary mock).
+ * Integration test: useReconcileActiveDay hook — rollover seam end-to-end.
+ * Real emulator + real repos; only db singleton is swapped (infra-boundary mock).
  */
 
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
@@ -89,7 +85,6 @@ describe("useReconcileActiveDay (emulator-backed)", () => {
     expect(created?.status).toBe("active");
     expect(created?.date).toBe(TODAY);
     expect(created?.wakeTime).toBe(DEFAULT_WAKE);
-    // No template, no overrides — pure defaults path
     expect(created?.templateId).toBeUndefined();
     expect(created?.ownerOverrides).toBeUndefined();
   });
@@ -137,12 +132,10 @@ describe("useReconcileActiveDay (emulator-backed)", () => {
       expect(result.current.done).toBe(true);
     });
 
-    // Defaults path was taken — draft was ignored
     const created = await getDay(testDb, "child-1", "day-child-1-2026-05-21");
     expect(created?.wakeTime).toBe(DEFAULT_WAKE);
     expect(created?.templateId).toBeUndefined();
 
-    // Plan still exists as draft for future re-confirm
     const plan = await loadTomorrowPlan(testDb, "child-1", TODAY);
     expect(plan?.status).toBe("draft");
   });
@@ -165,9 +158,7 @@ describe("useReconcileActiveDay (emulator-backed)", () => {
 
   // Slice J
   it("deletes stale TomorrowPlans (plan.date < today) during rollover", async () => {
-    // A plan dated for the past — should be garbage-collected
     await saveTomorrowPlan(testDb, "child-1", aPlan({ date: "2026-05-19", status: "confirmed" }));
-    // A plan dated for a future date — should be left alone
     await saveTomorrowPlan(testDb, "child-1", aPlan({ date: "2026-05-25", status: "draft" }));
 
     const { result } = renderHook(() => useReconcileActiveDay("child-1", TODAY, DEFAULT_WAKE));
@@ -192,7 +183,6 @@ describe("useReconcileActiveDay (emulator-backed)", () => {
       expect(result.current.done).toBe(true);
     });
 
-    // Same day still active; not re-written
     const stillToday = await getDay(testDb, "child-1", todaysActiveDay.id);
     expect(stillToday?.status).toBe("active");
     expect(stillToday?.date).toBe(TODAY);

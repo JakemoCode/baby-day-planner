@@ -64,8 +64,7 @@ describe("bottleTotals", () => {
     expect(bottleTotals([], END_OF_DAY)).toEqual({ count: 0, oz: 0 });
   });
 
-  // §F48b regression: a bottle back-edited to a future startTime must
-  // not inflate today's count or oz total.
+  // §F48b: back-edited future startTime must not inflate count or oz total.
   it("excludes bottles whose startTime is in the future relative to now", () => {
     const now = (14 * 60) as TimeMin;
     const events: Event[] = [
@@ -90,30 +89,23 @@ describe("napTotals", () => {
     expect(napTotals(events, END_OF_DAY)).toEqual({ count: 2, totalMinutes: 60 + 78 });
   });
 
-  // §F48d: an in-progress nap (startTime in past, endTime in future
-  // — typically a placeholder = startTime + defaultNapLen) contributes
-  // its ELAPSED time, not its placeholder duration. Excluding it
-  // outright would hide the fact that the baby is napping right now.
+  // §F48d: in-progress nap contributes elapsed time (not placeholder duration) to avoid hiding an active nap.
   it("clamps in-progress nap's contribution to elapsed time (now - startTime)", () => {
     const now = (14 * 60 + 30) as TimeMin; // 2:30pm
     const events: Event[] = [
-      // Completed: 1 hr.
+        // Completed 9:00–10:00.
       nap({ startTime: (9 * 60) as TimeMin, endTime: (10 * 60) as TimeMin }),
-      // In-progress: started 1:15pm, placeholder endTime 4:02pm.
-      // 75 min elapsed so far.
+      // In-progress 1:15pm, placeholder endTime 4:02pm → 75 min elapsed.
       nap({ startTime: (13 * 60 + 15) as TimeMin, endTime: (16 * 60 + 2) as TimeMin }),
     ];
     expect(napTotals(events, now)).toEqual({ count: 2, totalMinutes: 60 + 75 });
   });
 
-  // §F48c: a nap whose startTime is genuinely in the future (e.g. a
-  // fat-fingered next-day nap accidentally on today's doc) is fully
-  // excluded — it hasn't started yet.
+  // §F48c: future-startTime nap (e.g. fat-fingered next-day entry) is fully excluded.
   it("excludes naps whose startTime is in the future relative to now", () => {
     const now = (14 * 60) as TimeMin;
     const events: Event[] = [
       nap({ startTime: (9 * 60) as TimeMin, endTime: (10 * 60) as TimeMin }),
-      // Not-yet-started.
       nap({ startTime: (16 * 60) as TimeMin, endTime: (17 * 60) as TimeMin }),
     ];
     expect(napTotals(events, now)).toEqual({ count: 1, totalMinutes: 60 });
@@ -134,11 +126,7 @@ describe("lastBottle", () => {
     expect(lastBottle([bottle({ lifecycle: { state: "projected" } })], END_OF_DAY)).toBeUndefined();
   });
 
-  // §F48b regression: same shape as §F48 (lastCompletedNap) — a
-  // bottle back-edited to a future startTime must not be returned as
-  // "last bottle" or NextBottlePanel renders "Last: 4oz, 0 min ago
-  // (4:00p)" at 2:30pm (Math.max(0, now - future) clamps the delta
-  // while the clock string prints the future time).
+  // §F48b: back-edited future startTime must not appear as "last bottle" (renders "0 min ago" at a future time).
   it("excludes bottles whose startTime is in the future relative to now", () => {
     const now = (14 * 60) as TimeMin;
     const events: Event[] = [
@@ -164,14 +152,11 @@ describe("lastCompletedNap", () => {
     expect(lastCompletedNap(events, (15 * 60) as TimeMin)?.endTime).toBe(14 * 60);
   });
 
-  // §F48 regression: a nap back-edited to a future endTime must be
-  // excluded so the "Last nap" line doesn't render a future time
-  // clamped to "0 min ago".
+  // §F48: back-edited future endTime must not appear as "Last nap" (renders "0 min ago").
   it("excludes naps whose endTime is in the future relative to now", () => {
     const now = (14 * 60 + 30) as TimeMin; // 2:30pm
     const events: Event[] = [
       nap({ startTime: (9 * 60) as TimeMin, endTime: (10 * 60) as TimeMin }),
-      // User back-edited a nap's endTime to 4:02pm (in the future).
       nap({ startTime: (13 * 60 + 15) as TimeMin, endTime: (16 * 60 + 2) as TimeMin }),
     ];
     const result = lastCompletedNap(events, now);
@@ -214,8 +199,7 @@ describe("nextDashboardEvent", () => {
       startTime: (11 * 60) as TimeMin,
       endTime: (12 * 60) as TimeMin,
     });
-    // Synthetic putdown matches engine putdown shape: parent's type,
-    // sentinel eventKey, startTime = parent.startTime - leadMinutes.
+    // Synthetic putdown: parent type, PUTDOWN_KIND_TAG eventKey, startTime = parent.start - lead.
     const syntheticPutdown: Event = {
       id: `putdown:${realNap.id}`,
       dayId: "d1",

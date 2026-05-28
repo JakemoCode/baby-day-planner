@@ -51,11 +51,8 @@ const formFromEvent = (e: Event): FormState => ({
 });
 
 describe("formToEvent — lifecycle dispatch from projected", () => {
-  // Predict-don't-prescribe: editing a projected NAP or BEDTIME's time in the
-  // drawer is SCHEDULING INTENT, not a recording of reality. Only the action
-  // buttons (Start Nap, End Nap) promote a nap to recorded/completed. This
-  // preserves `hasPutdown` (which is gated to projected | recorded) across
-  // a drawer time-edit — fixing the "changing nap time removes putdown" bug.
+  // Predict-don't-prescribe: nap/bedtime time edits are scheduling intent, not reality.
+  // Keeps lifecycle in recorded so hasPutdown (gated to projected|recorded) is preserved.
   it("projected NAP + time changed + endTime present → recorded (predict-don't-prescribe)", () => {
     const source = projectedNap();
     const form: FormState = { ...formFromEvent(source), startTime: 9 * 60 + 5 };
@@ -78,10 +75,7 @@ describe("formToEvent — lifecycle dispatch from projected", () => {
   });
 
   it("projected DAILY_RECURRING block + time changed → recorded (no action buttons, drawer is scheduling)", () => {
-    // Recurring entries (Cook Dinner, etc.) project from settings every
-    // day. Editing today's time is a one-day reschedule; tomorrow still
-    // projects at the configured Settings time. See `isSchedulingType`
-    // caveat: not every daily_recurring is forecast — but the default is.
+    // One-day reschedule; tomorrow re-projects from Settings time.
     const source = projectedNap({
       eventKey: "cook_dinner",
       type: "daily_recurring",
@@ -95,9 +89,7 @@ describe("formToEvent — lifecycle dispatch from projected", () => {
   });
 
   it("extra template (kind=instant) + endTime filled in on save → upgrades to block + completed", () => {
-    // Template defaults to instant. If the user enters an endTime in
-    // the drawer, save derives kind="block". With endTime committed,
-    // the lifecycle is "completed".
+    // endTime present → kind promoted to block and lifecycle to completed.
     const source: Event = {
       id: "x-1",
       dayId: "d-1",
@@ -150,10 +142,7 @@ describe("formToEvent — lifecycle dispatch from projected", () => {
   });
 
   it("projected non-nap/bedtime block (e.g. extra) + time changed + endTime → completed (unchanged)", () => {
-    // Regression guard: the predict-don't-prescribe rule is targeted at nap
-    // and bedtime, NOT all block types. An "extra" event keeps the V2-style
-    // "time-edit = lock in time" semantic, because custom user events don't
-    // have action-button start/end ceremony.
+    // Predict-don't-prescribe only applies to nap/bedtime; extras lock in time on edit.
     const source = projectedNap({
       eventKey: "extra_1",
       type: "extra",
@@ -228,9 +217,7 @@ describe("formToEvent — already-recorded sources stay in their state", () => {
   });
 
   it("recorded NAP + time edit stays recorded (predict-don't-prescribe — re-scheduling is still scheduling)", () => {
-    // Same logic as the projected→recorded case above: drawer time-edits
-    // on naps are scheduling intent, never reality. The second time the
-    // user reschedules also doesn't lock anything in.
+    // Nap re-scheduling is still scheduling intent; stays recorded with updated annotatedAt.
     const source = projectedNap({
       lifecycle: { state: "recorded", annotatedAt: 8 * 60 },
     });
@@ -250,18 +237,10 @@ describe("formToEvent — already-recorded sources stay in their state", () => {
 });
 
 describe("formToEvent — putdown survives a drawer time-edit (integration)", () => {
-  // This is the regression test for the "changing nap time removes putdown"
-  // bug. It exercises the full chain: formToEvent → engine projection →
-  // hasPutdown gate. Without the predict-don't-prescribe carve-out, the
-  // edited nap's lifecycle would flip to `completed`, deriveHasPutdown
-  // (which only accepts `projected` | `recorded`) would return false,
-  // and the renderer would drop the putdown.
+  // Regression: without predict-don't-prescribe, edited nap would flip to completed,
+  // deriveHasPutdown would return false, and the renderer would drop the putdown chip.
   it("nap time edit → engine still emits the nap with hasPutdown=true", () => {
-    // Seed: user records yesterday's bedtime end (= today's wake at 7:00).
-    // The cascade emits a projected nap_1 around 9:00 with hasPutdown=true.
-    // ADR-0006: pin nowMinutes BEFORE the projected nap_1 (9:00) so the
-    // engine's Now-cross auto-promote doesn't flip it to recorded — the
-    // test specifically validates the projected-nap drawer-edit path.
+    // ADR-0006: pin nowMinutes before nap_1 (9:00) so engine auto-promote doesn't flip it to recorded.
     const ctx = aContext({
       day: aDay({ wakeTime: 7 * 60 }),
       settings: aSettings({
@@ -282,7 +261,7 @@ describe("formToEvent — putdown survives a drawer time-edit (integration)", ()
     expect(projectedNapEvent!.lifecycle.state).toBe("projected");
     expect(projectedNapEvent!.hasPutdown).toBe(true);
 
-    // User opens the drawer, shifts the nap start +5 minutes, saves.
+    // Drawer: shift nap start +5 min and save.
     const form: FormState = {
       startTime: projectedNapEvent!.startTime + 5,
       endTime: projectedNapEvent!.endTime,
@@ -293,8 +272,7 @@ describe("formToEvent — putdown survives a drawer time-edit (integration)", ()
     const persisted = formToEvent(form, projectedNapEvent!, NOW);
     expect(persisted.lifecycle.state).toBe("recorded");
 
-    // The persisted override flows back into ctx.actuals on next read; the
-    // engine projects again with this override seeded.
+    // Override flows into actuals; engine re-projects with it seeded.
     const reprojected = projectDay({
       day: ctx.day,
       settings: ctx.settings,
@@ -324,12 +302,8 @@ describe("formToEvent — exactOptionalPropertyTypes safety", () => {
 });
 
 describe("formToEvent — create mode (FAB-added events)", () => {
-  // A FAB-created bottle is a brand-new event the user is asserting, not
-  // an annotation of an existing projection. At-or-past now it's a
-  // committed real feed → `completed`; a future create is scheduled →
-  // `recorded`. (The pre-fix bug: create at exactly now produced
-  // `recorded` with annotatedAt === startTime, which collided with the
-  // §F66 auto-promote-hide heuristic and suppressed the Delete button.)
+  // FAB creates a real event (not annotation). At/past now → completed; future → recorded.
+  // Pre-fix: create at now produced recorded+annotatedAt===startTime, hiding the Delete button.
   it("bottle created at now → completed (committed reality)", () => {
     const source = projectedBottle({ startTime: NOW });
     const next = formToEvent(formFromEvent(source), source, NOW, "create");
@@ -349,17 +323,13 @@ describe("formToEvent — create mode (FAB-added events)", () => {
   });
 
   it("edit mode at now stays recorded (only create asserts reality)", () => {
-    // Same inputs but mode "edit" (the default): annotating a projection
-    // without a time change → recorded, as before. Guards the create
-    // branch from leaking into the edit path.
+    // Guards the create branch from leaking into the edit path.
     const source = projectedBottle({ startTime: NOW });
     const next = formToEvent(formFromEvent(source), source, NOW, "edit");
     expect(next.lifecycle).toEqual({ state: "recorded", annotatedAt: NOW });
   });
 
-  // Seam: the whole point of the fix. A bottle created at now must be
-  // deletable through the drawer. Pre-fix it saved as recorded with
-  // annotatedAt === startTime → canDeleteEvent returned false.
+  // Seam: bottle created at now must be deletable. Pre-fix: recorded+annotatedAt===startTime → canDeleteEvent false.
   it("a bottle created at now is deletable (the bug this fix closes)", () => {
     const source = projectedBottle({ startTime: NOW });
     const created = formToEvent(formFromEvent(source), source, NOW, "create");

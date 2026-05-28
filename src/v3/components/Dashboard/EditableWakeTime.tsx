@@ -19,34 +19,14 @@ export type EditableWakeTimeProps = {
   variant?: "plain" | "card";
 };
 
-/**
- * Display-and-edit affordance for the current day's wake time.
- *
- * Default state: a small inline button reading "Woke at 7:00 AM" with
- * a pencil icon. Tap to switch into edit mode (a `<input type="time">`
- * with Save/Cancel). Save invokes `onChange` with the parsed TimeMin;
- * Cancel reverts.
- *
- * Why this exists: `Day.wakeTime` was only ever set at day creation
- * time (onboarding, auto-rollover, or the wake-confirm sheet). If the
- * baby woke before the user got to the app, there was no way to
- * back-edit it. This is the smallest possible UI to close that gap.
- *
- * Edit happens inline rather than via a sheet because it's frequent
- * enough (esp. for new parents) that the extra tap is friction.
- */
+/** Inline wake-time back-edit affordance; tapping opens a time input with Save/Cancel. */
 export function EditableWakeTime({ wakeTime, onChange, variant = "plain" }: EditableWakeTimeProps) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
 
   function handleStartEdit() {
-    // Snapshot the current wakeTime into draft at the moment editing
-    // begins. Don't sync wakeTime → draft via useEffect: that would
-    // either clobber the user's in-flight input on external updates
-    // OR trip react-hooks/set-state-in-effect (React 19's "derive,
-    // don't sync" rule). The display branch already reads wakeTime
-    // directly, so no sync is needed while NOT editing.
+    // Snapshot at edit-open; no useEffect sync (would clobber in-flight input or violate React 19 derive rule).
     setDraft(formatHM24(wakeTime));
     setEditing(true);
     // Focus + open the time picker on next tick.

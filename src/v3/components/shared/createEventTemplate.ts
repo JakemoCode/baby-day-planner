@@ -1,14 +1,6 @@
 /**
- * V3 seed-event factory for the FAB-driven "add event" flow.
- *
- * Returns a fully-shaped V3 Event in `lifecycle: { state: "projected" }`
- * — the drawer's `formToEvent` transform decides the final lifecycle
- * state based on what the user changes (time edit → completed/started,
- * owner-only edit → recorded).
- *
- * Sequential `eventKey`s for chained types (`bottle_N`, `nap_N`)
- * anchor the engine's cascade so chained projections continue from
- * the new event.
+ * Seed-event factory for the FAB "add event" flow. Returns a projected Event;
+ * formToEvent decides the final lifecycle at save time.
  */
 
 import { newEventId } from "../../lib/newEventId";
@@ -25,16 +17,8 @@ export type BuildTemplateInput = {
   /** Current time as TimeMin so the form opens with a sensible default. */
   nowMinutes: TimeMin;
   /**
-   * Full engine projection for the day (includes engine-emitted
-   * `bottle_N` projections). Used to pick the next free slot index
-   * when numbering a new bottle so the template-builder agrees with
-   * the engine's chronological renumber. Without this, the builder
-   * would scan recorded events only and could claim an eventKey
-   * already occupied by a projection.
-   *
-   * Optional: the tomorrow page omits it (it plans against extras only,
-   * with no engine cascade to collide with). When omitted, slot
-   * numbering falls back to "count of recorded events + 1".
+   * Engine projections for slot collision avoidance. Without this, the builder could
+   * claim an eventKey already occupied by a projection. Omit on /tomorrow (no cascade).
    */
   projected?: Event[];
 };
@@ -76,14 +60,13 @@ export function buildCreateTemplate({
       startTime: nowMinutes,
       endTime: nowMinutes + settings.defaultPumpDurationMinutes,
       hasPutdown: false,
-      owner: NO_OWNER, // §F37: owner required; new events start unassigned
+      owner: NO_OWNER, // §F37: owner required
       lifecycle: { state: "projected" },
     };
   }
 
   if (type === "extra") {
-    // Custom (extra) events default to instant. If the user fills in an
-    // endTime in the drawer, formToEvent upgrades kind to "block" on save.
+    // Custom events default to instant; formToEvent upgrades to block if the user adds an endTime.
     const extraId = newEventId("extra");
     return {
       id: extraId,
@@ -94,31 +77,18 @@ export function buildCreateTemplate({
       label: "",
       startTime: nowMinutes,
       hasPutdown: false,
-      owner: NO_OWNER, // §F37: owner required; new events start unassigned
+      owner: NO_OWNER, // §F37: owner required
       lifecycle: { state: "projected" },
     };
   }
 
-  // CreatableType is exhaustive (bottle | pump | extra); this throw
-  // catches any stray caller passing an unsupported type — most
-  // notably a legacy "nap" callsite, removed under the physiology
-  // cascade per spec PR #146.
+  // CreatableType is exhaustive; this guards against stray callers passing an unsupported type.
   throw new Error(`buildCreateTemplate: unsupported type ${String(type)}`);
 }
 
 /**
- * Compute the next free slot index for `<type>_N` events, scanning
- * BOTH recorded actuals and (when provided) engine projections. The
- * eventKey shape is `${type}_N` (e.g., `nap_3`, `bottle_5`) — we look
- * for the highest existing N and return N+1.
- *
- * Why scan projections too: a manual nap creation inside the bedtime
- * block had no recorded sibling but the cascade had already emitted
- * `nap_1..nap_3`; counting recorded-only would return 1 and the new
- * doc would collide with the projected `nap_1` (§F25).
- *
- * When `projected` is undefined, falls back to "recorded count + 1"
- * for backwards compatibility with callers that don't pass it.
+ * Next free `<type>_N` slot index, scanning actuals and (when provided) projections.
+ * Must scan projections: recorded-only count can collide with an existing cascade slot.
  */
 function nextFreeSlot(type: EventType, actuals: Event[], projected?: Event[]): number {
   if (!projected) {

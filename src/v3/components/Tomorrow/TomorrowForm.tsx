@@ -1,10 +1,4 @@
-/**
- * V3 TomorrowForm — captures wakeTime (TimeMin) + optional templateId
- * for the Tomorrow plan. The HH:MM string in the time input is parsed
- * and emitted as a TimeMin so consumers stay on V3 types end-to-end.
- *
- * The form is pure: parent owns state, this component is value/onChange.
- */
+/** Pure controlled form for Tomorrow plan wakeTime + optional templateId. */
 
 "use client";
 

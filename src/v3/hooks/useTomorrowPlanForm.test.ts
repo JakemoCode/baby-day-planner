@@ -66,7 +66,6 @@ describe("useTomorrowPlanForm", () => {
     expect(result.current.templateId).toBe("tpl-sat");
     expect(result.current.extras).toEqual([anExtra()]);
     expect(result.current.ownerOverrides).toEqual({ nap_1: { slot: "parent1" } });
-    // Plan differs from defaults, so the hydrated form reads as edited.
     expect(result.current.hasEdits).toBe(true);
   });
 
@@ -77,8 +76,7 @@ describe("useTomorrowPlanForm", () => {
     act(() => result.current.setWakeTime(8 * 60)); // user edits
     expect(result.current.wakeTime).toBe(8 * 60);
 
-    // A new snapshot arrives (e.g. another tab wrote the doc). Already
-    // hydrated, so the form must keep the user's edit, not the snapshot.
+    // Snapshot from another tab — already hydrated, so user's edit is kept.
     rerender({ p: aPlan({ wakeTime: 5 * 60 }), l: false });
     expect(result.current.wakeTime).toBe(8 * 60);
   });
@@ -90,7 +88,7 @@ describe("useTomorrowPlanForm", () => {
     expect(result.current.extras[0]?.label).toBe("Walk");
 
     act(() => result.current.upsertExtra(anExtra({ id: "e1", label: "Long walk" })));
-    expect(result.current.extras.length).toBe(1); // updated in place, not duplicated
+    expect(result.current.extras.length).toBe(1); // updated in place
     expect(result.current.extras[0]?.label).toBe("Long walk");
 
     act(() => result.current.upsertExtra(anExtra({ id: "e2", label: "Visit" })));
@@ -126,11 +124,7 @@ describe("useTomorrowPlanForm", () => {
     expect(result.current.hydrated).toBe(true);
   });
 
-  // The crux of the clear() race fix: reset() must NOT re-arm hydration.
-  // If a stale (not-yet-deleted) plan is still in the subscription when
-  // reset runs, re-arming would re-hydrate the form back to those values
-  // (and autosave would resurrect the doc). Staying hydrated keeps the
-  // form blank regardless of the in-flight plan.
+  // reset() must NOT re-arm hydration — stale subscription snapshot would re-hydrate and resurrect the doc.
   it("reset() does not re-hydrate from a still-present (stale) plan", () => {
     const { result, rerender } = setup(aPlan({ wakeTime: 6 * 60 }), false);
     act(() => result.current.setWakeTime(8 * 60));
@@ -138,7 +132,7 @@ describe("useTomorrowPlanForm", () => {
     act(() => result.current.reset());
     expect(result.current.wakeTime).toBe(DWT); // blanked, not refilled to 6*60
 
-    // A stale snapshot for the old plan is still around — must be ignored.
+    // Stale snapshot must be ignored.
     rerender({ p: aPlan({ wakeTime: 6 * 60 }), l: false });
     expect(result.current.wakeTime).toBe(DWT);
     expect(result.current.hasEdits).toBe(false);

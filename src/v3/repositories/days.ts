@@ -1,14 +1,6 @@
 /**
- * V3 days repository.
- *
- * Path-compatible with V2 (`children/{childId}/days/{dayId}`). Wire
- * shape: V3 Day has TimeMin `wakeTime` (number, optional) plus
- * `suppressedRecurringIds` and `suppressedDaycareDay`.
- *
- * `archiveDay` does NOT carry an `archivedAt` like V2. The engine
- * doesn't read it, and `Day.date` already gives chronological history
- * sort. If a future feature needs it, extend the V3 Day type and the
- * archive call together.
+ * V3 days repository. Path-compatible with V2 (`children/{childId}/days/{dayId}`).
+ * Note: `archiveDay` omits `archivedAt` (V2 carried it); V3 uses `Day.date` for sorting.
  */
 
 import {
@@ -60,15 +52,8 @@ export async function getDayByDate(
 }
 
 /**
- * Get the day doc for the given calendar date, lazy-creating a
- * `planned` doc if none exists. Used by the bottle save-path to route
- * overnight feeds (§F22 + DOMAIN.md §2 "midnight rule") to the correct
- * calendar day without disturbing the active day.
- *
- * `planned` status (not `active`) so the caller's existing active-day
- * subscription isn't affected — the new doc only matters once the user
- * formally starts that day, at which point `startNewDay` flips it to
- * active. The lazy-created doc inherits `defaultWakeTime` from settings.
+ * Get the day doc for a calendar date, lazy-creating a `planned` doc if absent.
+ * Uses `planned` (not `active`) so existing active-day subscriptions are unaffected.
  */
 export async function getOrCreatePlannedDay(
   db: Firestore,
@@ -106,22 +91,9 @@ export async function updateDay(
 }
 
 /**
- * Annotate a single event slot's owner on the active day without
- * anchoring its time.
- *
- * Why: drawer owner-only edits on projected events previously
- * promoted lifecycle to "recorded", which the engine treats as an
- * anchor — the cascade then refused to re-project the event's time.
- * Symptom: a recorded nap from 4:35-5:20 with bedtime at 6:20 because
- * the user assigned an owner to projected nap_3 hours earlier and
- * the wake-window cascade was no longer free to push it.
- *
- * Fix: route owner-only edits to `Day.ownerOverrides[eventKey]`. The
- * engine's R12.10 rule applies these overrides at render time
- * without touching projected event times.
- *
- * Field-path update via Firestore's dot-notation so we merge into
- * the existing `ownerOverrides` map rather than replacing it.
+ * Write a single owner override to `Day.ownerOverrides[eventKey]` without anchoring the event's time.
+ * Owner-only edits on projected events must route here — writing a recorded doc would prevent cascade re-projection.
+ * Uses Firestore dot-notation to merge into the existing map.
  */
 export async function updateDayOwnerOverride(
   db: Firestore,
@@ -136,17 +108,8 @@ export async function updateDayOwnerOverride(
 }
 
 /**
- * §F65 — skip a daily-recurring entry for this single day without
- * touching the recurring template in Settings. R11.6 in
- * `engine/rules/dailyRecurring.ts` already honors
- * `Day.suppressedRecurringIds`, so the engine stops emitting that
- * recurring's projected event for the rest of the day; tomorrow's
- * fresh Day doc starts with an empty `suppressedRecurringIds` and the
- * recurring re-appears.
- *
- * Uses Firestore `arrayUnion` so duplicate suppressions are a no-op —
- * the drawer's "delete" handler can call this without first reading
- * the current array.
+ * Suppress a daily-recurring event for today only (R11.6). Uses arrayUnion so
+ * duplicate calls are safe. Resets automatically on the next day's fresh Doc.
  */
 export async function suppressRecurringForDay(
   db: Firestore,
@@ -159,13 +122,7 @@ export async function suppressRecurringForDay(
   });
 }
 
-/**
- * Set a boolean per-day suppression flag to `true`. The drawer's
- * "delete" handler routes here for the singleton opt-outs whose Day
- * field is a plain boolean (vs. the array-shaped suppressedRecurringIds,
- * which uses arrayUnion). Tomorrow's fresh Day doc starts these at
- * `false`, so the suppression is scoped to the current day.
- */
+/** Set a singleton boolean suppression flag for today. Resets on the next day's fresh doc. */
 function setDayBooleanFlag(
   db: Firestore,
   childId: string,
@@ -175,10 +132,7 @@ function setDayBooleanFlag(
   return updateDoc(dayRef(db, childId, dayId), { [field]: true });
 }
 
-/**
- * §F66 fast-follow: per-day daycare opt-out. The engine's daycare rule
- * (R21.5) already honors `Day.suppressedDaycareDay`.
- */
+/** Per-day daycare opt-out (R21.5). */
 export function suppressDaycareForDay(
   db: Firestore,
   childId: string,
@@ -187,10 +141,7 @@ export function suppressDaycareForDay(
   return setDayBooleanFlag(db, childId, dayId, "suppressedDaycareDay");
 }
 
-/**
- * §F66 fast-follow: per-day dream-feed opt-out. R5.5 honors
- * `Day.suppressedDreamFeed`.
- */
+/** Per-day dream-feed opt-out (R5.5). */
 export function suppressDreamFeedForDay(
   db: Firestore,
   childId: string,
@@ -200,23 +151,9 @@ export function suppressDreamFeedForDay(
 }
 
 /**
- * Edit today's wakeTime AND close any in-progress overnight bedtime
- * event in the same transaction.
- *
- * Without the bedtime trim, the dashboard's `inProgressBedtime` query
- * (`actuals.find(e => e.type === "bedtime" && e.lifecycle.state === "recorded")`
- * in `(signed-in-with-child)/page.tsx`) keeps treating yesterday's
- * bedtime as in-progress — the banner renders "Bedtime in progress —
- * 0m" and the primary CTA stays "End overnight sleep" even after the
- * user clearly indicated wake-up by editing today's wakeTime.
- *
- * Mirrors `startNewDay`'s bedtime-trim shape: `lifecycle` reduces via
- * TIME_EDIT (→ "completed"), `endTime = newWakeTime + 24*60` so the
- * value lands after the bedtime's startTime in the same cross-day
- * frame the engine expects.
- *
- * Idempotent: if no in-progress bedtime exists, only the Day write
- * runs.
+ * Update wakeTime AND close any in-progress overnight bedtime in a single transaction.
+ * Without the bedtime trim the dashboard treats yesterday's open bedtime as still in-progress.
+ * Idempotent: if no in-progress bedtime exists, only the Day write runs.
  */
 export async function editWakeTime(
   db: Firestore,
@@ -224,9 +161,7 @@ export async function editWakeTime(
   dayId: string,
   newWakeTime: TimeMin,
 ): Promise<void> {
-  // Read first (outside the tx) — runTransaction doesn't support
-  // queries, only direct doc fetches. The in-progress bedtime is
-  // discovered by enumerating today's events collection.
+  // runTransaction doesn't support collection queries; read events outside the transaction.
   const eventsSnap = await getDocs(
     collection(db, eventsCollectionPath(childId, dayId)).withConverter(v3EventConverter),
   );
@@ -256,15 +191,8 @@ export async function editWakeTime(
 }
 
 export async function listArchivedDays(db: Firestore, childId: string, max = 7): Promise<Day[]> {
-  // Fetch extra so we have headroom to collapse same-date duplicates
-  // without shrinking the result below `max`. `startNewDay` is
-  // deterministic-id now (`day-${childId}-${date}`), so a same-date
-  // repeat call lands on the same doc — dedupe is a no-op for the
-  // common case. The dedup is still here for two reasons: (1) legacy
-  // docs minted before deterministic ids carry a `Date.now()`-suffixed
-  // id and won't collapse at the Firestore-id layer, and (2) the
-  // /history page's invariant ("one row per calendar day") is a repo
-  // concern rather than a consumer concern.
+  // Fetch 3× max to have headroom for same-date dedup. Legacy docs (pre-deterministic-id)
+  // carry Date.now()-suffixed ids and won't collapse at the Firestore layer.
   const q = query(
     daysRef(db, childId),
     where("status", "==", "archived"),
@@ -276,9 +204,7 @@ export async function listArchivedDays(db: Firestore, childId: string, max = 7):
   for (const d of snap.docs) {
     const day = d.data();
     const existing = byDate.get(day.date);
-    // Keep the lexicographically-greatest id per date — legacy
-    // `Date.now()`-suffixed ids sort newest-last, and deterministic
-    // ids collide outright so the comparison short-circuits.
+    // Keep the lexicographically-greatest id: legacy Date.now()-suffixed ids sort newest-last.
     if (!existing || day.id > existing.id) {
       byDate.set(day.date, day);
     }
@@ -302,31 +228,16 @@ export function watchActiveDay(
 // ---------------------------------------------------------------------------
 
 export type StartNewDayInput = {
-  /**
-   * Optional. When omitted, `startNewDay` derives a deterministic id
-   * `day-${childId}-${newDate}` so concurrent rollover calls land on
-   * the same doc (idempotent setDoc). Existing call sites that supply
-   * an explicit id still work for backwards-compat; new callers should
-   * omit this field.
-   */
+  /** When omitted, `startNewDay` uses a deterministic id so concurrent rollover calls are idempotent. */
   newDayId?: string;
   newDate: string;
   newWakeTime: TimeMin;
   templateId?: string;
-  /**
-   * §F12/§F17 — per-event owner overrides copied from a confirmed
-   * TomorrowPlan at promote time. Persisted on the Day doc; the engine
-   * reads them during projection. Use `promoteFromPlan` to derive
-   * automatically from a TomorrowPlan.
-   */
+  /** Per-event owner overrides from a promoted TomorrowPlan; engine applies at projection time. */
   ownerOverrides?: Record<string, OwnerRef | null>;
 };
 
-/**
- * Deterministic id derivation for auto-rollover (§F17). `day-${childId}-${date}`
- * keeps concurrent parent-opens from racing into duplicate docs (see
- * docs/v3/F17_F12_SCOPE.md §2, decision #9).
- */
+/** Deterministic day id — prevents concurrent rollover calls from creating duplicate docs. */
 export function deterministicDayId(childId: string, date: string): string {
   return `day-${childId}-${date}`;
 }
@@ -337,17 +248,10 @@ export type StartNewDayResult = {
 };
 
 /**
- * Archives the current active day (if any) and creates a new one in
- * a Firestore transaction. The active-day query happens OUTSIDE the
- * transaction (Firestore can't run collection queries inside), so a
- * race between query and transaction-start is theoretically possible.
- * In a single-family deployment, the worst case is a second concurrent
- * call that briefly leaves two active days; the watcher resolves to
- * whichever wrote last. Acceptable; documented in ARCHITECTURE_V3.md.
- *
- * V3 day write deliberately omits `archivedAt` and `createdAt` (V2
- * carried these; V3 schema does not). Status is the only signal of
- * archive state; `Day.date` carries the date.
+ * Archive the current active day and create a new one in a Firestore transaction.
+ * Active-day query runs outside the transaction (Firestore doesn't support collection
+ * queries inside); a concurrent call briefly yields two active days — acceptable in
+ * a single-family deployment.
  */
 export async function startNewDay(
   db: Firestore,
@@ -358,13 +262,8 @@ export async function startNewDay(
   const activeSnap = await getDocs(activeQuery);
   const activeDoc = activeSnap.empty ? null : activeSnap.docs[0]!;
 
-  // If the day being archived has a recorded (in-progress) bedtime, trim
-  // its endTime to the new day's wakeTime so the overnight sleep block
-  // visually meets the wake event instead of overshooting to the
-  // placeholder endTime (R7.1 defaults bedtime.endTime to
-  // defaultWakeTime + 24h at start; the actual wake is the truth).
-  // Already-completed bedtimes (state="completed") have an
-  // explicit user-set endTime and are left alone.
+  // Trim any in-progress bedtime's endTime to the new wake so the overnight block
+  // doesn't overshoot. Already-completed bedtimes (user-set endTime) are left alone.
   let bedtimeToTrim: { ref: ReturnType<typeof doc>; current: Event } | null = null;
   if (activeDoc) {
     const eventsSnap = await getDocs(
@@ -379,10 +278,8 @@ export async function startNewDay(
     }
   }
 
-  // Bedtime endTime lives in the OLD day's TimeMin frame (cross-day, ≥1440).
-  // newWakeTime is the NEW day's wakeTime in its own frame (e.g. 450 for 7:30a).
-  // Shift by 24h so the trim writes a value that's after the bedtime's
-  // startTime in the same frame.
+  // Bedtime endTime is in the old day's cross-day frame (≥1440); shift +24h so the
+  // trim lands after the bedtime's startTime in the same frame.
   const trimEnd = input.newWakeTime + 24 * 60;
 
   const newDayId = input.newDayId ?? deterministicDayId(childId, input.newDate);
@@ -425,23 +322,9 @@ export async function startNewDay(
 // ---------------------------------------------------------------------------
 
 /**
- * Materialize a `TomorrowPlan` into an active `Day` for `plan.date`.
- * Facade over `startNewDay` that:
- *   - Uses `plan.wakeTime ?? defaultWakeTime` as the new day's wakeTime
- *   - Copies `plan.startTemplateId` and `plan.ownerOverrides` onto the Day
- *   - Archives any existing active day (inherited from `startNewDay`)
- *   - Persists `plan.extras` as projected Event docs on the new Day
- *     with their `dayId` rewritten to the real new day id
- *
- * `defaultWakeTime` is the settings fallback for when the plan didn't
- * pin a wakeTime. Caller passes it explicitly rather than fetching
- * inside the repo so this stays a pure write helper.
- *
- * Extras are written sequentially after the Day-create transaction
- * commits. Non-atomic by design — Firestore transactions can't span
- * the Day write + N event writes. If any extra fails the Day still
- * exists; logged loudly, user can re-add. This mirrors the existing
- * (pre-F12) /tomorrow page promote behavior.
+ * Promote a TomorrowPlan into an active Day for `plan.date`. Facade over `startNewDay`.
+ * Extras are written after the Day transaction (non-atomic — Firestore can't span
+ * Day + N event writes); failures are logged and the Day still exists.
  */
 export async function promoteFromPlan(
   db: Firestore,

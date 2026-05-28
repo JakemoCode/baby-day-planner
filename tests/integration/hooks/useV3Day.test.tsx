@@ -1,16 +1,7 @@
 // @vitest-environment jsdom
 /**
- * Integration test: useV3Day hook
- *
- * Exercises the seam: real Firestore emulator → real days repository →
- * useV3Day hook subscription. Previously mocked with
- * vi.mock("../repositories/days") which left the wiring silently untested.
- *
- * The hook imports `db` from "@/lib/firebase/client". We replace that
- * singleton with the emulator-backed db from startTestEnv() — this is a
- * legitimate infrastructure-boundary mock (analogous to mocking the network
- * transport), not a business-logic mock. The real repository and real
- * Firestore subscription run end-to-end.
+ * Integration test: useV3Day hook — real emulator → real days repo → real subscription.
+ * db singleton swapped for emulator-backed db (infra-boundary mock, not business-logic mock).
  */
 
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
@@ -22,26 +13,14 @@ import { createDay } from "../../../src/v3/repositories/days";
 import type { Day } from "../../../src/v3/schemas";
 import { useV3Day } from "../../../src/v3/hooks/useV3Day";
 
-// ---------------------------------------------------------------------------
-// Emulator db — populated in beforeAll, read by the module mock below.
-// ---------------------------------------------------------------------------
-
 let testDb: Firestore;
 
-// Replace the production Firebase singleton with the emulator-backed db.
-// vi.mock is hoisted above all imports by Vitest's transform, so the factory
-// runs before the hook module resolves. The getter pattern (get db()) defers
-// the actual value to call time, ensuring `testDb` is populated by beforeAll
-// before any test invokes the hook.
+// Getter defers testDb resolution to call time; vi.mock is hoisted above imports.
 vi.mock("@/lib/firebase/client", () => ({
   get db() {
     return testDb;
   },
 }));
-
-// ---------------------------------------------------------------------------
-// Emulator lifecycle
-// ---------------------------------------------------------------------------
 
 let env: RulesTestEnvironment;
 
@@ -59,10 +38,6 @@ beforeEach(async () => {
   const ctx = env.authenticatedContext(ALLOWED_USER.uid, { email: ALLOWED_USER.email });
   testDb = ctx.firestore() as unknown as Firestore;
 });
-
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
 
 const activeDay: Day = {
   id: "day-1",
@@ -101,8 +76,6 @@ describe("useV3Day (emulator-backed)", () => {
     const { result } = renderHook(() => useV3Day("child-1"));
 
     await waitFor(() => {
-      // After the initial snapshot resolves with an empty result, loading
-      // transitions to false and day stays null.
       expect(result.current.loading).toBe(false);
       expect(result.current.day).toBeNull();
     });

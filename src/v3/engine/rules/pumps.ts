@@ -1,19 +1,7 @@
 /**
- * R9.x — Pump rules.
- *
- * Source: docs/v3/ENGINE_SPEC.md §9.
- *
- * R9.1: emit a projected pump for each entry in `settings.pumpTimes`.
- * R9.2: eventKey is `pump_${HH:MM}` (time encoded for dedupe — R9.4).
- * R9.3: first entry is anchored to `day.wakeTime` (overriding the setting)
- *       so nursing parents don't have to update settings every morning.
- * R9.4: actuals with the same eventKey suppress the projection.
- * R9.5: kind = block; duration = settings.defaultPumpDurationMinutes.
- *       Pumping is a 20–30 min activity that blocks the owner from
- *       other concurrent tasks (e.g. mom pumping can't do dream feed),
- *       so render as a duration block in the right column.
- *
- * Owner default = `settings.pumpOwnerSlot`.
+ * R9.1 — Project a pump block for each settings.pumpTimes entry.
+ * First entry anchors to day.wakeTime (R9.3). Eventkey = pump_HH:MM (R9.2).
+ * Existing event with same key suppresses projection (R9.4).
  */
 
 import type { Context, Event, TimeMin } from "../../schemas";
@@ -40,31 +28,19 @@ const RuleProjectPumps: Rule = {
 type PumpTarget = { startTime: TimeMin; eventKey: string; durationMinutes?: number };
 
 /**
- * R9.3: first pump anchored to day.wakeTime when present. The remaining
- * settings entries flow through unchanged.
- *
- * R9.4: filter out targets whose eventKey already exists on a pump event
- * (recorded or projected) so we never emit duplicates.
- *
- * Targets are also internally deduped by eventKey: two settings entries
- * with the same time, or a wake-anchored first entry colliding with a
- * later setting (e.g. wakeTime equals pumpTimes[1]), would otherwise
- * project two events with identical ids.
+ * Builds candidate pump targets (R9.3 wake-anchor on first entry, R9.4 dedup by eventKey)
+ * then filters out any whose key already exists in the event pool.
  */
 function missingPumps(events: readonly Event[], ctx: Context): PumpTarget[] {
   const sessions = ctx.settings.pumpTimes;
   if (sessions.length === 0) return [];
-  // Anchor: if today's wakeTime is known, the first scheduled pump's TIME is
-  // replaced by wakeTime (its duration override, if any, is preserved).
   const anchored = sessions.map((s, i) => {
     if (i === 0 && ctx.day.wakeTime !== undefined) {
       return { ...s, time: ctx.day.wakeTime };
     }
     return s;
   });
-  // Internally dedup by eventKey: two settings entries with the same time,
-  // or a wake-anchored first entry colliding with a later setting, would
-  // otherwise produce duplicate ids (first occurrence wins).
+  // Dedup by eventKey (first occurrence wins) in case of time collision.
   const seen = new Set<string>();
   const candidates: PumpTarget[] = [];
   for (const s of anchored) {
@@ -77,7 +53,6 @@ function missingPumps(events: readonly Event[], ctx: Context): PumpTarget[] {
       ...(s.durationMinutes !== undefined ? { durationMinutes: s.durationMinutes } : {}),
     });
   }
-  // R9.4: filter out candidates whose eventKey already exists on a pump event.
   return missingScheduledEvents(candidates, events.filter(isPump));
 }
 

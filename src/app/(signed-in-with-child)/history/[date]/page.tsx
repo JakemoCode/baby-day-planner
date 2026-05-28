@@ -51,7 +51,6 @@ export default function ArchivedDayPage() {
     listEvents(db, CHILD_ID, day.id)
       .then((raw) => {
         if (cancelled) return;
-        // v3EventConverter.fromFirestore already applies withV3EventDefaults.
         setEvents(raw);
       })
       .catch((err) => {

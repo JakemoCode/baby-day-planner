@@ -1,25 +1,11 @@
-/**
- * Amount-conditional bottle interval lookup. Ported from V2
- * (`src/domain/bottleRules.ts` at commit 9ae6d1a) — silently dropped
- * during the V3 rewrite; restored 2026-05-11.
- *
- * Consumed by R5.1 and R5.11 in `src/v3/engine/rules/bottles.ts` to
- * compute the cascade interval based on the previous bottle's amount.
- */
+/** Amount-conditional bottle interval lookup, consumed by the R5 cascade. */
 
 import type { BottleIntervalRule } from "../schemas";
 
 /**
- * Look up the bottle-to-bottle interval for the given amount. Returns
- * the most-specific (narrowest range) matching rule's `intervalMinutes`,
- * or `fallbackMinutes` when amount is undefined or no rule matches.
- *
- * Range semantics:
- * - Bounded: `[minOz, maxOz]` — both inclusive.
- * - Open-ended: `[minOz, ∞)` — when `maxOz` is undefined.
- *
- * Specificity is span (`maxOz - minOz`); open-ended ranges count as
- * `Infinity` and lose to any bounded range that also matches.
+ * Returns the narrowest matching rule's intervalMinutes, or fallbackMinutes
+ * when amount is undefined or unmatched. Open-ended ranges (`maxOz` absent)
+ * lose to any bounded range that also matches.
  */
 export function intervalForAmount(
   rules: BottleIntervalRule[],

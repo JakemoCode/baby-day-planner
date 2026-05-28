@@ -1,10 +1,4 @@
-/**
- * R3.x — Nap rules.
- *
- * Tests-first per CLAUDE.md TDD protocol. Each rule's failing test lands
- * before the implementation; new behavior gets a new failing test before
- * any code change.
- */
+/** R3.x — Nap rules. */
 
 import { describe, expect, it } from "vitest";
 import {
@@ -41,16 +35,8 @@ describe("R3.1 — projected nap chain from wakeWindowsMinutes", () => {
       { rules: NAP_RULES },
     );
 
-    // Expected cascade for the first 2 slots (cadence-extension carries
-    // it past the configured array under the physiology cascade — we
-    // assert the relevant chain prefix here).
-    //   ww_1 : 7:00 → 9:00   (120 min)
-    //   nap_1: 9:00 → 10:00  (60 min)
-    //   ww_2 : 10:00 → 11:30 (90 min)
-    //   nap_2: 11:30 → 12:30 (60 min)
-    // ADR-0006: aContext() defaults nowMinutes=12:00; all four events
-    // here have startTime ≤ 12:00, so the engine auto-promotes them
-    // from "projected" to "recorded" before returning.
+    // ww_1 7:00-9:00, nap_1 9:00-10:00, ww_2 10:00-11:30, nap_2 11:30-12:30.
+    // ADR-0006: aContext() defaults nowMinutes=12:00; all four auto-promote to recorded.
     const ww1 = out.find((e) => e.eventKey === "wake_window_1");
     expect(ww1).toMatchObject({
       type: "wake_window",
@@ -91,8 +77,7 @@ describe("R3.1 — projected nap chain from wakeWindowsMinutes", () => {
 
 describe("R3.4 / R3.5 — wake window endTime tracks the next nap's start", () => {
   it("with a recorded nap_2 LATER than projected, ww_2 stretches to the recorded start", () => {
-    // Projected cascade (no actuals) would put nap_2 at 11:30.
-    // The recorded nap_2 actually started at 13:00 — ww_2 must stretch.
+    // Projected cascade puts nap_2 at 11:30; recorded nap_2 at 13:00 → ww_2 stretches.
     const recordedNap2 = aRecordedNap({
       id: "actual_nap_2",
       eventKey: "nap_2",
@@ -125,8 +110,7 @@ describe("R3.4 / R3.5 — wake window endTime tracks the next nap's start", () =
   });
 
   it("with a recorded nap_2 EARLIER than projected, ww_2 shrinks to the recorded start", () => {
-    // Projected cascade (no actuals) would put nap_2 at 11:30.
-    // The baby actually went down at 10:30 — ww_2 must shrink to that.
+    // Projected cascade puts nap_2 at 11:30; recorded nap_2 at 10:30 → ww_2 shrinks.
     const recordedNap2 = aRecordedNap({
       id: "actual_nap_2_early",
       eventKey: "nap_2",
@@ -160,21 +144,11 @@ describe("R3.4 / R3.5 — wake window endTime tracks the next nap's start", () =
 });
 
 describe("R3.4/R3.5 — wake_window(N).endTime always tracks nap(N).startTime", () => {
-  // Invariant (Jake 2026-05-12): the wake window before a nap ends
-  // where the nap starts. Period. Independent of how the nap got there
-  // — projected, started, completed, or overridden. The previous
-  // version of this file carved out an exception for `overridden`
-  // (treated as "owner-only annotation, don't pin time"), but that
-  // exception broke drawer time-edits after PR #117 made those edits
-  // produce `overridden`: WW2 stayed at its natural cascade tick and
-  // left a visible gap between WW2.end and the user-edited Nap 2.start.
-  // The simpler invariant beats the exception.
+  // WW geometry follows whatever nap occupies the slot, regardless of lifecycle.
+  // An earlier `overridden` exception caused a gap between WW2.end and user-edited Nap 2.start.
 
   it("user-edited (overridden) nap_2 at a LATER time → ww_2 stretches to meet it", () => {
-    // Cascade defaults: WW [120, 150], napLen 90, wake 7:00.
-    //   ww_1 7:00-9:00, nap_1 9:00-10:30, ww_2 10:30-13:00, nap_2 13:00-14:30.
-    // User drawer-edits Nap 2 to 14:00-15:30. Under the invariant,
-    // ww_2 must stretch from 10:30 to 14:00 — no gap.
+    // WW [120, 150], napLen 90: ww_2 10:30-13:00. User edits Nap 2 to 14:00 → ww_2 stretches to 14:00.
     const overriddenNap2 = aRecordedNap({
       id: "manual_nap_2",
       eventKey: "nap_2",
@@ -204,7 +178,7 @@ describe("R3.4/R3.5 — wake_window(N).endTime always tracks nap(N).startTime", 
 
     const ww1 = out.find((e) => e.eventKey === "wake_window_1");
     expect(ww1?.startTime).toBe(7 * 60);
-    expect(ww1?.endTime).toBe(9 * 60); // ends at nap_1's projected start
+    expect(ww1?.endTime).toBe(9 * 60); // ends at nap_1 start
 
     const ww2 = out.find((e) => e.eventKey === "wake_window_2");
     expect(ww2?.startTime).toBe(10 * 60 + 30); // starts at nap_1's end
@@ -212,12 +186,11 @@ describe("R3.4/R3.5 — wake_window(N).endTime always tracks nap(N).startTime", 
 
     const nap2 = out.find((e) => e.eventKey === "nap_2");
     expect(nap2?.startTime).toBe(14 * 60); // preserved from override
-    expect(nap2?.lifecycle.state).toBe("recorded"); // not promoted
+    expect(nap2?.lifecycle.state).toBe("recorded"); // override preserved, not re-promoted
   });
 
   it("overridden nap_1 at a NON-natural time → ww_1 ends at the override, ww_2 starts at the override's end", () => {
-    // The companion case: overridden time EARLIER than cascade default.
-    // Same invariant: WW geometry follows the nap, not the wakeWindowsMinutes.
+    // Overridden time earlier than cascade default: same invariant applies.
     const overriddenNap1 = aRecordedNap({
       id: "annotated_nap_1",
       eventKey: "nap_1",
@@ -253,28 +226,21 @@ describe("R3.4/R3.5 — wake_window(N).endTime always tracks nap(N).startTime", 
 
     const ww2 = out.find((e) => e.eventKey === "wake_window_2");
     expect(ww2?.startTime).toBe(9 * 60 + 50); // starts at the overridden nap_1's end
-    // ww_2 then runs its natural length until projected nap_2 starts.
+    // ww_2 runs its natural length (90min) — overridden duration doesn't trigger short-nap-adjust.
     expect(ww2!.endTime! - ww2!.startTime).toBe(90);
 
-    // The overridden event itself is preserved in events (carries owner forward).
     const napOne = out.find((e) => e.id === overriddenNap1.id);
     expect(napOne).toBeDefined();
     expect(napOne!.lifecycle.state).toBe("recorded");
 
-    // R3.8: overridden's apparent 20-min duration does NOT trigger
-    // short-nap-adjust on ww_2 (only RECORDED short naps do).
+    // Short-nap-adjust only fires for RECORDED short naps, not overridden.
     expect(ww2!.endTime! - ww2!.startTime).toBe(90);
   });
 });
 
 describe("R3.7 — short recorded nap shortens the FOLLOWING wake window", () => {
   it("with recorded nap_1 lasting 20 min (< shortNapThresholdMinutes=35), ww_2 length = default - adjustment", () => {
-    // settings: WW [120, 90], short threshold 35, adjustment 10, napLen 60
-    // Expected cascade after recorded nap_1 (9:00-9:20):
-    //   ww_1: 7:00-9:00
-    //   nap_1: 9:00-9:20  (recorded, 20 min — short)
-    //   ww_2: 9:20-10:40  (length = 90 - 10 = 80 min)
-    //   nap_2: 10:40-11:40
+    // WW [120, 90], short threshold 35, adjustment 10: ww_2 = 90-10 = 80min after 20min nap_1.
     const recordedNap1 = aRecordedNap({
       id: "actual_nap_1_short",
       eventKey: "nap_1",
@@ -308,7 +274,7 @@ describe("R3.7 — short recorded nap shortens the FOLLOWING wake window", () =>
     expect(ww2!.startTime).toBe(9 * 60 + 20);
     expect(ww2!.endTime).toBe(10 * 60 + 40);
 
-    // And nap_2 follows the shortened WW.
+    // nap_2 follows the shortened WW.
     const nap2 = out.find((e) => e.eventKey === "nap_2");
     expect(nap2?.startTime).toBe(10 * 60 + 40);
     expect(nap2?.endTime).toBe(11 * 60 + 40);
@@ -317,8 +283,7 @@ describe("R3.7 — short recorded nap shortens the FOLLOWING wake window", () =>
 
 describe("R3.6 — inverted nap data collapses the wake window to zero", () => {
   it("with a recorded nap_2 BEFORE the previous nap ended, ww_2 is zero-length (not inverted)", () => {
-    // Cascade: nap_1 projected ends at 10:00; recorded nap_2 starts at 9:30.
-    // ww_2 must NOT render with end < start. Clamp endTime to start.
+    // nap_1 ends at 10:00; recorded nap_2 starts at 9:30 → ww_2 clamped to zero-length.
     const recordedNap2 = aRecordedNap({
       id: "actual_nap_2_inverted",
       eventKey: "nap_2",
@@ -381,30 +346,24 @@ describe("R3.3 — recorded naps coexist with projected cascade", () => {
       { rules: NAP_RULES },
     );
 
-    // The first 4 events are ww_1, nap_1, ww_2, nap_2 (no duplicate
-    // nap_2). The cascade extends past wws.length under the physiology
-    // cascade; we assert the relevant chain prefix here.
+    // First 4 events: ww_1, nap_1, ww_2, nap_2 — no duplicate nap_2.
     const firstFourKeys = out
       .filter((e) => e.type === "wake_window" || e.type === "nap")
       .map((e) => e.eventKey)
       .slice(0, 4);
     expect(firstFourKeys).toEqual(["wake_window_1", "nap_1", "wake_window_2", "nap_2"]);
 
-    // The recorded nap_2 must be the one in the output (preserved per §0).
+    // Recorded nap_2 is the one in the output (§0 reality-wins).
     const napTwo = out.find((e) => e.eventKey === "nap_2");
     expect(napTwo?.id).toBe(recordedNap2.id);
     expect(napTwo?.lifecycle.state).toBe("completed");
   });
 });
 
-describe("Cascade invariant — wake_window/nap boundaries (Jake 2026-05-12)", () => {
-  // Invariant, asserted programmatically across multiple scenarios:
-  //   wake_window(N).startTime === nap(N-1).endTime    (Day.wakeTime for N=1)
-  //   wake_window(N).endTime   === nap(N).startTime
-  //
-  // Wake windows END because naps START; wake windows START because
-  // naps END. The cascade has NO special-casing on lifecycle state —
-  // the WW geometry follows whatever nap occupies the slot.
+describe("Cascade invariant — wake_window/nap boundaries", () => {
+  // wake_window(N).startTime === nap(N-1).endTime (wakeTime for N=1)
+  // wake_window(N).endTime   === nap(N).startTime
+  // No special-casing on lifecycle — WW geometry follows whatever nap occupies the slot.
 
   function assertInvariant(events: Event[], wakeTime: number) {
     const wws = events
@@ -415,8 +374,7 @@ describe("Cascade invariant — wake_window/nap boundaries (Jake 2026-05-12)", (
         return ai - bi;
       });
     for (const ww of wws) {
-      // wake_windows are always blocks with endTime; the optional type is
-      // a wire-compatibility artifact.
+      // Optional endTime type is wire-compatibility; wake_windows always have one.
       if (ww.endTime === undefined) throw new Error(`wake_window ${ww.eventKey} missing endTime`);
       const n = Number(ww.eventKey.split("_").pop());
       const napN = events.find((e) => e.eventKey === `nap_${n}`);
@@ -426,11 +384,11 @@ describe("Cascade invariant — wake_window/nap boundaries (Jake 2026-05-12)", (
       const expectedEnd = napN?.startTime ?? ww.endTime; // ww with no following nap is degenerate; skip
       expect({ ww: ww.eventKey, startTime: ww.startTime }).toEqual({
         ww: ww.eventKey,
-        startTime: Math.max(expectedStart, ww.startTime), // R3.6 inversion clamp at wwStart
+        startTime: Math.max(expectedStart, ww.startTime), // inversion clamp at wwStart
       });
       expect({ ww: ww.eventKey, endTime: ww.endTime }).toEqual({
         ww: ww.eventKey,
-        endTime: Math.max(ww.startTime, expectedEnd), // R3.6 inversion clamp
+        endTime: Math.max(ww.startTime, expectedEnd), // inversion clamp
       });
     }
   }
@@ -529,20 +487,10 @@ describe("Cascade invariant — wake_window/nap boundaries (Jake 2026-05-12)", (
   });
 });
 
-// ---------------------------------------------------------------------------
-// Bedtime substitution within the sleep cascade
-// (formerly R7.6 / R7.5 / R7.11 / R7.4 / R7.4b / R7.7, now inline in R3.1)
-// ---------------------------------------------------------------------------
-
 describe("R7.6 — bedtimeThreshold triggers bedtime substitution in the cascade", () => {
   it("the first projected nap whose endTime > threshold is dropped; bedtime at max(earliestBedtime, wwStart + WW)", () => {
-    // §F66 fast-follow B8: bedtime anchors at the END of the final
-    // wake window, not its start. The full configured WW gets to
-    // play out before bedtime lands.
-    //
-    // Cascade: WW [120, 135, 135, 150], napLen 60, wake 7:00 →
-    //   ww4: 16:30-?, nap_4 would start at 19:00, endTime=20:00 > threshold=19:00.
-    //   ADR-0002: drop nap_4. bedtimeStart = max(earliestBedtime=18:00, wwStart+WW=16:30+150=19:00) = 19:00.
+    // WW [120, 135, 135, 150], napLen 60: ww4 16:30-19:00, nap_4 endTime=20:00 > threshold=19:00.
+    // ADR-0002: drop nap_4; bedtime = max(earliestBedtime=18:00, 16:30+150=19:00) = 19:00.
     const ctx = aContext({
       day: aDay({ wakeTime: 7 * 60 }),
       settings: aSettings({
@@ -570,7 +518,7 @@ describe("R7.6 — bedtimeThreshold triggers bedtime substitution in the cascade
     expect(bedtime).toBeDefined();
     expect(bedtime!.type).toBe("bedtime");
     expect(bedtime!.kind).toBe("block");
-    expect(bedtime!.startTime).toBe(19 * 60); // wwStart 16:30 + WW 150min = 19:00
+    expect(bedtime!.startTime).toBe(19 * 60); // 16:30 + 150min = 19:00
     expect(bedtime!.lifecycle.state).toBe("projected");
   });
 });
@@ -606,13 +554,8 @@ describe("R7.1 — bedtime endTime defaults to settings.defaultWakeTime next day
 
 describe("R7.4 / R7.4b — no projected naps or wake_windows past bedtime", () => {
   it("with a 5-WW cascade that would project nap_5 at 22:00, only bedtime and earlier slots survive", () => {
-    // WW = [120, 120, 240, 60, 120], napLen 60, wake 7:00:
-    //   ww1: 7-9,   nap1: 9-10
-    //   ww2: 10-12, nap2: 12-13
-    //   ww3: 13-17, nap3: 17-18
-    //   ww4: 18-19 (60 min), nap4 would start 19:00, endTime=20:00 > threshold=19:00
-    //     → ADR-0002: drop. bedtime = max(earliestBedtime=18:00, wwStart+WW=18:00+60=19:00) = 19:00
-    //   ww5/nap5 are never emitted (cascade stops at bedtime).
+    // WW [120, 120, 240, 60, 120]: ww4 18-19, nap_4 endTime=20:00 > threshold=19:00 → drop.
+    // Bedtime = max(18:00, 18:00+60=19:00) = 19:00. ww5/nap5 never emitted.
     const ctx = aContext({
       day: aDay({ wakeTime: 7 * 60 }),
       settings: aSettings({
@@ -672,9 +615,8 @@ describe("R7.4 / R7.4b — no projected naps or wake_windows past bedtime", () =
 
 describe("R7.5 — projected nap CROSSING the threshold becomes bedtime", () => {
   it("nap_4 projected 18:30-19:30 crosses threshold 19:00 → bedtime at max(earliestBedtime=18:00, wwStart+WW=18:30)=18:30", () => {
-    // WW [120, 120, 240, 30], napLen 60, wake 7:00 →
-    //   ww4: 18-18:30 (30 min), nap4: 18:30-19:30 → endTime=19:30 > threshold=19:00
-    //   ADR-0002: drop. bedtimeStart = max(earliestBedtime=18:00, wwStart+WW=18:00+30=18:30) = 18:30
+    // WW [120, 120, 240, 30]: ww4 18:00-18:30, nap_4 endTime=19:30 > threshold=19:00 → drop.
+    // Bedtime = max(18:00, 18:00+30=18:30) = 18:30.
     const ctx = aContext({
       day: aDay({ wakeTime: 7 * 60 }),
       settings: aSettings({
@@ -699,24 +641,15 @@ describe("R7.5 — projected nap CROSSING the threshold becomes bedtime", () => 
     expect(out.find((e) => e.eventKey === "nap_4")).toBeUndefined();
     const bedtime = out.find((e) => e.type === "bedtime");
     expect(bedtime).toBeDefined();
-    expect(bedtime!.startTime).toBe(18 * 60 + 30); // 18:00 + 30min WW = 18:30
+    expect(bedtime!.startTime).toBe(18 * 60 + 30);
   });
 });
 
 describe("§F66 fast-follow B8 — bedtime anchors at end of full final wake window", () => {
   it("dropped nap leaves a full-WW gap before bedtime, not a stub at earliestBedtime", () => {
-    // Jake 2026-05-27 dogfood: nap_4 ends ~5:05pm, bedtime fixed at
-    // 6pm — final WW was only 55min. The full configured WW should
-    // play out before bedtime lands.
-    //
-    // Cascade: WW=[120], napLen=90, threshold=18:00, earliestBedtime=18:00.
-    //   ww1 7:00-9:00, nap1 9:00-10:30
-    //   ww2 10:30-12:30, nap2 12:30-14:00
-    //   ww3 14:00-16:00, nap3 16:00-17:30
-    //   ww4 17:30-19:30, nap4 candidate 19:30-21:00 → endTime=21:00 > 18:00 → DROP
-    //   terminateCascade: wwStart=17:30, wwMinutes=120.
-    //   Bedtime = max(earliestBedtime=18:00, 17:30+120=19:30) = 19:30.
-    //   ww_4 = 17:30-19:30 (FULL 120min, not stubbed to 18:00).
+    // Dogfood bug: final WW was only 55min because bedtime stubbed at earliestBedtime.
+    // WW=[120], napLen=90: ww4 17:30-19:30; nap4 endTime=21:00 > threshold=18:00 → drop.
+    // Bedtime = max(18:00, 17:30+120=19:30) = 19:30. ww_4 is full 120min.
     const ctx = aContext({
       day: aDay({ wakeTime: 7 * 60 }),
       settings: aSettings({
@@ -739,8 +672,8 @@ describe("§F66 fast-follow B8 — bedtime anchors at end of full final wake win
     );
     const bedtime = out.find((e) => e.type === "bedtime");
     expect(bedtime).toBeDefined();
-    expect(bedtime!.startTime).toBe(19 * 60 + 30); // 17:30 + 120 = 19:30
-    // The final wake window is the full 120min, not a stub at 18:00.
+    expect(bedtime!.startTime).toBe(19 * 60 + 30); // 17:30 + 120min = 19:30
+    // Final WW is full 120min, not stubbed at earliestBedtime.
     const lastWw = out
       .filter((e) => e.type === "wake_window")
       .sort((a, b) => b.startTime - a.startTime)[0];
@@ -790,13 +723,9 @@ describe("R7.7 — manual bedtime is the user's authoritative declaration", () =
   });
 });
 
-describe("Recorded bedtime gets putdown synth (regression: 2026-05-15 conversion-loses-putdown bug; post-#166 lifecycle rename)", () => {
-  // When the past-threshold "Change to bedtime?" prompt converts a
-  // nap to bedtime, the bedtime doc has lifecycle `overridden`. The
-  // putdown rule (R6.1) derives hasPutdown from {projected,overridden}
-  // — `overridden` IS in the set, so the putdown chip survives the
-  // conversion. (Earlier code used `started` lifecycle, which silently
-  // dropped the putdown chip.)
+describe("Recorded bedtime gets putdown synth", () => {
+  // When the past-threshold prompt converts a nap to bedtime, the doc lifecycle is `overridden`.
+  // R6.1 derives hasPutdown from {projected, overridden} — so the putdown chip survives.
 
   it("a manually-recorded bedtime with `overridden` lifecycle gets hasPutdown=true via R6.1", () => {
     const overriddenBedtime = aRecordedBedtime({
@@ -835,12 +764,7 @@ describe("Recorded bedtime gets putdown synth (regression: 2026-05-15 conversion
 });
 
 describe("Manual bedtime suppresses any projected nap that would extend INTO it", () => {
-  // Click-test bug 2026-05-15: user converted nap_5 to bedtime via the
-  // past-threshold prompt at 19:05; cascade kept projecting nap_5 from
-  // 18:50-19:35 (default 45-min duration), overlapping the manual
-  // bedtime visually. Per DOMAIN.md §3 ("once bedtime hits, it's all
-  // bedtime") any projected nap that would extend INTO the manual
-  // bedtime must be suppressed and the WW truncated at bedtime.
+  // A projected nap overlapping a manual bedtime must be suppressed; WW truncates at bedtime.
 
   it("projected nap_1 19:00-19:45 + manual bedtime 19:30 → ww_1 truncates at bedtime, no nap_1 emitted", () => {
     const manualBedtime = aRecordedBedtime({
@@ -871,17 +795,13 @@ describe("Manual bedtime suppresses any projected nap that would extend INTO it"
       { rules: NAP_RULES },
     );
 
-    // No projected nap_1 — it would have extended into bedtime.
     expect(out.find((e) => e.eventKey === "nap_1")).toBeUndefined();
 
-    // ww_1 truncates at the manual bedtime's startTime, not at the
-    // would-be projected nap's startTime.
     const ww1 = out.find((e) => e.eventKey === "wake_window_1");
     expect(ww1).toBeDefined();
     expect(ww1!.startTime).toBe(18 * 60);
-    expect(ww1!.endTime).toBe(19 * 60 + 30);
+    expect(ww1!.endTime).toBe(19 * 60 + 30); // truncated at bedtime, not projected nap start
 
-    // Manual bedtime preserved as-is.
     const bedtimes = out.filter((e) => e.type === "bedtime");
     expect(bedtimes).toHaveLength(1);
     expect(bedtimes[0]!.id).toBe(manualBedtime.id);
@@ -889,18 +809,10 @@ describe("Manual bedtime suppresses any projected nap that would extend INTO it"
 });
 
 describe("Cascade extends past wakeWindowsMinutes.length (physiology cascade)", () => {
-  // Per docs/superpowers/specs/2026-05-15-physiology-cascade-design.md:
-  // The wakeWindowsMinutes array is a CADENCE sequence, not a slot
-  // count. The cascade walks until the next projected nap would cross
-  // bedtimeThreshold, using the last WW value past the configured
-  // array.
+  // wakeWindowsMinutes is a cadence sequence; the last value repeats until bedtimeThreshold.
 
   it("with wws=[120], cascade emits nap_1, nap_2, nap_3, ... until threshold", () => {
-    // wakeTime 7:00, wws=[120], napLen 60, threshold 19:00.
-    // Each rhythm position uses WW=120 (repeats last):
-    //   ww_1 7-9, nap_1 9-10, ww_2 10-12, nap_2 12-13, ww_3 13-15,
-    //   nap_3 15-16, ww_4 16-18, nap_4 18-19 → threshold reached →
-    //   bedtime at 19:00 (nap_4 would cross threshold).
+    // wws=[120], napLen 60: repeats WW=120 → ww_4 16-18, nap_4 18-19 crosses threshold → bedtime.
     const ctx = aContext({
       day: aDay({ wakeTime: 7 * 60 }),
       settings: aSettings({
@@ -922,25 +834,18 @@ describe("Cascade extends past wakeWindowsMinutes.length (physiology cascade)", 
       { rules: NAP_RULES },
     );
 
-    // Multiple naps emitted past the single-element array.
     expect(out.find((e) => e.eventKey === "nap_1")).toBeDefined();
     expect(out.find((e) => e.eventKey === "nap_2")).toBeDefined();
     expect(out.find((e) => e.eventKey === "nap_3")).toBeDefined();
 
-    // Bedtime terminates the cascade.
     const bedtime = out.find((e) => e.type === "bedtime");
     expect(bedtime).toBeDefined();
     expect(bedtime!.startTime).toBeGreaterThanOrEqual(19 * 60);
   });
 
   it("with wws=[120, 90], cascade uses 90-min WW from position 2 onward", () => {
-    // wakeTime 7:00, wws=[120, 90], napLen 60, threshold 19:00.
-    //   ww_1 7-9, nap_1 9-10 (WW=120)
-    //   ww_2 10-11:30, nap_2 11:30-12:30 (WW=90)
-    //   ww_3 12:30-14, nap_3 14-15 (WW=90, repeated)
-    //   ww_4 15-16:30, nap_4 16:30-17:30 (WW=90)
-    //   ww_5 17:30-19, proj nap_5 19:00-20:00 → endTime=20:00 > threshold=19:00
-    //     ADR-0002: drop. bedtimeStart = max(earliestBedtime=18:00, wwStart+WW=17:30+90=19:00) = 19:00.
+    // wws=[120, 90]: WW=90 repeats; ww_5 17:30-19:00, nap_5 endTime=20:00 > threshold.
+    // ADR-0002: drop nap_5; bedtime = max(18:00, 17:30+90=19:00) = 19:00.
     const ctx = aContext({
       day: aDay({ wakeTime: 7 * 60 }),
       settings: aSettings({
@@ -973,15 +878,12 @@ describe("Cascade extends past wakeWindowsMinutes.length (physiology cascade)", 
 
     const bedtime = out.find((e) => e.type === "bedtime");
     expect(bedtime).toBeDefined();
-    expect(bedtime!.startTime).toBe(19 * 60); // wwStart 17:30 + WW 90min = 19:00
+    expect(bedtime!.startTime).toBe(19 * 60);
   });
 
   it("slot-keyed recorded nap_5 anchors slot 5 even when wws.length=1", () => {
-    // wws=[60] (single-element cadence), napLen=60, threshold=19:00,
-    // recorded nap_5 at 16:00-17:00. Cascade walks slots 1-4 with the
-    // repeated 60-min WW (nap_1 8-9, nap_2 10-11, nap_3 12-13, nap_4
-    // 14-15), then at slot 5 finds the recorded nap_5 and anchors:
-    // ww_5 = 15:00 → 16:00 (recorded nap_5 starts).
+    // wws=[60], napLen=60: slots 1-4 cascade at 60min; slot 5 anchors at recorded nap_5 (16:00).
+    // ww_5 = 15:00-16:00 (ends at recorded nap_5 start).
     const recordedNap5 = aRecordedNap({
       id: "actual_nap_5",
       eventKey: "nap_5",
@@ -1014,7 +916,7 @@ describe("Cascade extends past wakeWindowsMinutes.length (physiology cascade)", 
     expect(napFive).toBeDefined();
     expect(napFive!.startTime).toBe(16 * 60);
 
-    // Wake window 5 ends at the recorded nap_5's start.
+    // ww_5 ends at the recorded nap_5's start.
     const ww5 = out.find((e) => e.eventKey === "wake_window_5");
     expect(ww5).toBeDefined();
     expect(ww5!.endTime).toBe(16 * 60);
@@ -1022,33 +924,13 @@ describe("Cascade extends past wakeWindowsMinutes.length (physiology cascade)", 
 });
 
 describe("§F66 bedtime cascade — ADR-0002", () => {
-  // ADR-0002 redefines the bedtime cascade rule:
-  //
-  //   NEW: bedtimeThreshold = latest endTime a PROJECTED nap may have.
-  //        Drop any projected nap with nap.endTime > bedtimeThreshold.
-  //        bedtime.startTime = max(earliestBedtime, lastNapEnd + WW)
-  //
-  //   OLD (naps.ts:121): napStart >= threshold || napStart + napLen > threshold
-  //        → substitute the nap with bedtime at napStart.
-  //        This caused §F64: a nap projecting to e.g. 16:46-17:31 with
-  //        threshold=17:30 produced "bedtime at 16:46", before
-  //        earliestBedtime=18:00.
-  //
-  // All three tests FAIL against the current naps.ts:121 rule.
-  // They pass once Task 2.2 ships the new implementation.
+  // ADR-0002: drop projected naps with endTime > bedtimeThreshold;
+  // bedtime.startTime = max(earliestBedtime, lastNapEnd + WW).
+  // Fixes §F64: old rule placed bedtime at napStart, which could be < earliestBedtime.
 
   it("drop projected nap whose endTime > bedtimeThreshold; bedtime lands at earliestBedtime floor", () => {
-    // Settings: bedtimeThreshold=17:30, earliestBedtime=18:00, WW=120, napLen=45.
-    // No actuals. Wake at 7:00. Cascade walks:
-    //   ww_1 7-9, nap_1 9-9:45
-    //   ww_2 9:45-11:45, nap_2 11:45-12:30
-    //   ww_3 12:30-14:30, nap_3 14:30-15:15
-    //   ww_4 15:15-17:15, proj nap_4 17:15-18:00
-    //     nap_4.endTime=18:00 > 17:30 → NEW: drop, bedtime=max(18:00,17:15)=18:00
-    //     OLD: 17:15+45=18:00>17:30 → bedtime at napStart=17:15 < 18:00 ← BUG
-    //
-    // Assert: no projected nap has endTime > 17:30.
-    // Assert: bedtime.startTime === 18:00 (floor applies).
+    // threshold=17:30, earliestBedtime=18:00, WW=120, napLen=45:
+    // nap_4 endTime=18:00 > 17:30 → drop; bedtime = max(18:00, 17:15) = 18:00.
     const ctx = aContext({
       day: aDay({ wakeTime: 7 * 60 }),
       settings: aSettings({
@@ -1083,12 +965,8 @@ describe("§F66 bedtime cascade — ADR-0002", () => {
   });
 
   it("bedtime floor: startTime = max(earliestBedtime, lastNapEnd + WW) when cascade-natural time < floor", () => {
-    // Settings: bedtimeThreshold=17:30, earliestBedtime=18:00, WW=120, napLen=60.
-    // Recorded nap_1: 13:30-15:00. After nap_1:
-    //   ww_2: 15:00-17:00 (120 min)
-    //   proj nap_2: 17:00-18:00 → endTime=18:00 > 17:30
-    //     NEW: drop. Bedtime = max(18:00, 15:00+120) = max(18:00, 17:00) = 18:00
-    //     OLD: 17:00+60=18:00>17:30 → bedtime at napStart=17:00 < 18:00 ← BUG
+    // threshold=17:30, earliestBedtime=18:00, WW=120: recorded nap_1 13:30-15:00 →
+    // ww_2 15:00-17:00, nap_2 endTime=18:00 > 17:30 → drop; bedtime = max(18:00, 17:00) = 18:00.
     const recordedNap1 = aRecordedNap({
       eventKey: "nap_1",
       start: 13 * 60 + 30,
@@ -1123,15 +1001,8 @@ describe("§F66 bedtime cascade — ADR-0002", () => {
   });
 
   it("§F64 regression: bedtime.startTime >= earliestBedtime; no projected nap past threshold", () => {
-    // Settings: bedtimeThreshold=17:30, earliestBedtime=18:00, WW=120, napLen=45.
-    // Recorded nap ending at 13:14. Cascade after that:
-    //   ww 13:14-15:14, proj nap_? 15:14-15:59 (endTime 15:59 ≤ 17:30 → keep)
-    //   ww 15:59-17:59, proj nap 17:59-18:44 (endTime 18:44 > 17:30 → drop)
-    //     NEW: bedtime = max(18:00, 17:59) = 18:00
-    //     OLD: napStart=17:59>=17:30 → bedtime at 17:59 < 18:00 ← §F64 bug
-    //
-    // Assert: bedtime.startTime >= 18:00.
-    // Assert: no projected nap has endTime > 17:30.
+    // threshold=17:30, earliestBedtime=18:00: recorded nap ends 13:14 →
+    // nap at 17:59-18:44 → endTime > 17:30 → drop; bedtime = max(18:00, 17:59) = 18:00.
     const recordedNap1 = aRecordedNap({
       eventKey: "nap_1",
       start: 12 * 60 + 30,
@@ -1172,20 +1043,9 @@ describe("§F66 bedtime cascade — ADR-0002", () => {
   });
 });
 
-describe("Start Nap Now mid-window — recorded nap absorbs the slot (Jake 2026-05-22)", () => {
-  // Bug report: at 15:35 (inside wake_window_4 14:20–16:20), tapping
-  // "Start Nap Now" produced TWO nap_4 events: the recorded one at
-  // 15:35–16:20 AND the originally-projected one at 16:20–17:05.
-  //
-  // The NapActionButton writes the started nap with:
-  //   { eventKey: <projected nap_N's eventKey>,
-  //     lifecycle: { state: "recorded", annotatedAt: nowMin },
-  //     startTime: nowMin,
-  //     endTime: undefined }
-  //
-  // The cascade should see eventKey "nap_4" in existing, absorb the slot,
-  // emit wake_window_4 ending at the recorded start, and NOT emit a
-  // projected nap_4. We assert exactly that.
+describe("Start Nap Now mid-window — recorded nap absorbs the slot", () => {
+  // Tapping "Start Nap Now" produced two nap_4 events: the recorded one and the still-projected one.
+  // Cascade should absorb the slot on the recorded eventKey and not emit a projected duplicate.
   it("a 'recorded' (in-progress, no endTime) nap_4 produces exactly one nap_4 and shrinks ww_4", () => {
     const startedNap4: Event = {
       id: "nap_4",
@@ -1198,14 +1058,13 @@ describe("Start Nap Now mid-window — recorded nap absorbs the slot (Jake 2026-
       hasPutdown: false,
       owner: NO_OWNER,
       lifecycle: { state: "recorded", annotatedAt: 15 * 60 + 35 },
-      // No endTime: "in progress" — render-time effectiveEndOf auto-extends.
+      // No endTime: in-progress nap; effectiveEndOf auto-extends at render time.
     };
 
     const ctx = aContext({
       day: aDay({ wakeTime: 7 * 60 }),
       settings: aSettings({
-        // Five 2h wake windows lay out: nap_1 9:00, nap_2 11:45, nap_3 14:20,
-        // nap_4 (projected) 16:20 — matching the screenshot's "Nap 4 4:20-5:05p".
+        // Five 2h wake windows: nap_1 9:00, nap_2 11:45, nap_3 14:20, nap_4 (projected) 16:20.
         wakeWindowsMinutes: [120, 120, 120, 120, 120],
         defaultNapLengthMinutes: 45,
         bedtimeThreshold: 19 * 60,
@@ -1225,15 +1084,13 @@ describe("Start Nap Now mid-window — recorded nap absorbs the slot (Jake 2026-
       { rules: ALL_RULES },
     );
 
-    // Exactly one nap_4 — the recorded one. No projected duplicate.
     const nap4s = out.filter((e) => e.type === "nap" && e.eventKey === "nap_4");
     expect(nap4s).toHaveLength(1);
     expect(nap4s[0]!.id).toBe(startedNap4.id);
     expect(nap4s[0]!.lifecycle.state).toBe("recorded");
     expect(nap4s[0]!.startTime).toBe(15 * 60 + 35);
 
-    // wake_window_4 ends at the recorded nap's startTime (15:35),
-    // NOT at the projected start (16:20).
+    // ww_4 ends at the recorded nap start (15:35), not the projected start (16:20).
     const ww4 = out.find((e) => e.eventKey === "wake_window_4");
     expect(ww4?.endTime).toBe(15 * 60 + 35);
   });

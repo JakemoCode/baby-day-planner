@@ -1,18 +1,9 @@
 /**
  * R4.2 — Wake window owner override.
  *
- * V2 had `applyWakeWindowOverrides` (silently dropped in the V3 cutover).
- * Restored 2026-05-12 per Jake: "wake window owners should absolutely be
- * retained when the day recalculates."
- *
- * V3-native shape: the user picks an owner on a projected wake_window;
- * the UI persists an Event doc with `lifecycle.state: 'overridden'` and
- * `type: 'wake_window'`. The engine reads that doc from `ctx.actuals`,
- * merges metadata (owner, label) onto the cascade-derived projection,
- * then drops the override doc so a single wake_window renders per slot.
- *
- * Time stays from R3.1 (predict-don't-prescribe) — a stale override's
- * timestamp does not pin geometry. Owner-only stickiness is the point.
+ * Merges owner/label from a recorded wake_window doc onto the cascade-derived projection;
+ * drops the override doc so a single wake_window renders per slot. Time always comes from
+ * the cascade (predict-don't-prescribe).
  */
 
 import { describe, expect, it } from "vitest";
@@ -66,10 +57,7 @@ describe("R4.2 — wake_window owner overrides survive recompute", () => {
     // Exactly one wake_window_2 in output (override doc dropped, projection kept).
     expect(ww2).toHaveLength(1);
     expect(ww2[0]!.owner).toEqual(PARENT1);
-    // ADR-0006: wake_window_2 starts in the morning (before default
-    // nowMinutes=12:00), so engine auto-promotes to recorded. The test's
-    // intent — "override-derived projection survives recompute and
-    // carries the override's owner" — is unchanged.
+    // ww_2 may be past nowMinutes=12:00 → auto-promoted; lifecycle follows time-vs-now rule.
     expect(
       ww2[0]!.startTime <= ctx.nowMinutes
         ? ww2[0]!.lifecycle.state === "recorded"
@@ -91,10 +79,8 @@ describe("R4.2 — wake_window owner overrides survive recompute", () => {
     const ww2 = out.find((e) => e.eventKey === "wake_window_2");
     const ww3 = out.find((e) => e.eventKey === "wake_window_3");
 
-    // Template applies where there's no override.
-    expect(ww1?.owner).toEqual(PARENT2);
-    // Override wins for wake_window_2.
-    expect(ww2?.owner).toEqual(PARENT1);
+    expect(ww1?.owner).toEqual(PARENT2); // template where no override
+    expect(ww2?.owner).toEqual(PARENT1); // override wins
     expect(ww3?.owner).toEqual(PARENT2);
   });
 
@@ -112,8 +98,7 @@ describe("R4.2 — wake_window owner overrides survive recompute", () => {
   });
 
   it("override time is IGNORED — cascade-derived time wins (predict-don't-prescribe)", () => {
-    // The override doc carries startTime: 0 / endTime: 0, intentionally
-    // bogus. R3.1's cascade should compute real times anchored at wakeTime.
+    // Override doc has startTime=0/endTime=0; R3.1 computes real times from wakeTime.
     const ctx = aContext({
       day: aDay({ wakeTime: 7 * 60 }),
       settings: aSettings({ wakeWindowsMinutes: [120] }),
@@ -128,9 +113,7 @@ describe("R4.2 — wake_window owner overrides survive recompute", () => {
   });
 
   it("override for a non-existent wake_window slot is dropped silently", () => {
-    // wakeWindowsMinutes has 2 entries → projection emits wake_window_1, _2.
-    // Override for wake_window_99 has no matching projection; should not
-    // appear in output and should not crash.
+    // wake_window_99 has no matching cascade projection; must be dropped without crashing.
     const ctx = aContext({
       day: aDay({ wakeTime: 7 * 60 }),
       settings: aSettings({ wakeWindowsMinutes: [120, 150] }),
@@ -141,15 +124,12 @@ describe("R4.2 — wake_window owner overrides survive recompute", () => {
 
     const stray = out.find((e) => e.eventKey === "wake_window_99");
     expect(stray).toBeUndefined();
-    // Cascade still produces wake_window_1 and wake_window_2.
     expect(out.find((e) => e.eventKey === "wake_window_1")).toBeDefined();
     expect(out.find((e) => e.eventKey === "wake_window_2")).toBeDefined();
   });
 
   it("assertAfter fires when a recorded wake_window survives R4.2 (regression guard)", () => {
-    // Simulate a scenario where a recorded wake_window somehow ends up in the
-    // output (e.g., a future bug in produces or a rule ordering change).
-    // assertAfter should catch it immediately rather than letting it corrupt R3.1.
+    // If a bug lets a recorded wake_window leak into output, assertAfter catches it before R3.1 is corrupted.
     const orphan: Event = {
       id: "orphan_ww",
       dayId: "day_test",
@@ -200,10 +180,6 @@ describe("R4.2 — wake_window owner overrides survive recompute", () => {
 
     const out = run(ctx);
 
-    // Under the physiology cascade, the cascade extends past wws.length
-    // via cadence-extension; we assert the first 2 wake windows (covering
-    // the configured array) — none have an owner since no overrides
-    // were passed.
     const wakeWindows = out.filter((e) => e.type === "wake_window");
     expect(wakeWindows.length).toBeGreaterThanOrEqual(2);
     expect(wakeWindows.every((e) => e.owner.slot === "none")).toBe(true);

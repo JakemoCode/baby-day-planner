@@ -48,12 +48,7 @@ const AXIS_W = 28;
 const GUTTER_W = 124;
 const BLOCK_LEFT_INSET = AXIS_W + 8;
 const BLOCK_RIGHT_INSET = GUTTER_W + 24;
-// Putdown stops ~30px before the chip column for a comfortable
-// right-shoulder gap. Chip column's inner-left edge sits at
-// (BLOCK_RIGHT_INSET - 4) from the container's right (chip is
-// `right: BLOCK_RIGHT_INSET - GUTTER_W + 4; width: GUTTER_W - 8`).
-// Putdown no longer renders an owner name — the owner stripe
-// inherits from the parent nap — so the freed space pushes the gap.
+// Putdown stops before the chip column; owner name not rendered (stripe inherits from parent nap).
 const PUTDOWN_RIGHT_INSET = BLOCK_RIGHT_INSET + 26;
 const CUSTOM_LEFT_EXTRA = 110;
 const LEADER_LINE_W = 8;
@@ -62,11 +57,7 @@ const DEFAULT_VIEWPORT = { start: 5 * 60, end: 21 * 60 };
 const DEFAULT_VIEWPORT_END_CAP = 24 * 60; // midnight
 const SCROLL_TOP_PADDING_PX = 80;
 const DEFAULT_PX_PER_HOUR = 120;
-// §F55 — chip + breathing room. Two instant clusters whose vertical
-// pixel ranges fall within this window collapse into a single "N events"
-// chip. 38 px ≈ wrapped chip height; 4 px ≈ leader-line breathing room.
-// If the chip's padding/font in CollapsedInstantCluster.module.css
-// changes, recompute COLLAPSE_CHIP_HEIGHT_PX here.
+// §F55 — collision threshold: 38 px ≈ wrapped chip height + 4 px gap. Update if chip CSS changes.
 const COLLAPSE_CHIP_HEIGHT_PX = 38;
 const COLLAPSE_VERTICAL_GAP_PX = 4;
 
@@ -91,22 +82,14 @@ function blockGeometry(event: Event): { leftPx: number; rightPx: number } {
   if (event.eventKey === PUTDOWN_KIND_TAG) {
     return { leftPx: BLOCK_LEFT_INSET, rightPx: PUTDOWN_RIGHT_INSET };
   }
-  // Right-column duration blocks: extras and pumps. Both are
-  // parent-side activities that coexist with the main schedule
-  // (naps / bedtime), so they get their own narrow column on the
-  // right rather than spanning the full block lane.
+  // Extra and pump share the right-column so they coexist with naps/bedtime.
   if (event.type === "extra" || event.type === "pump") {
     return { leftPx: BLOCK_LEFT_INSET + CUSTOM_LEFT_EXTRA, rightPx: BLOCK_RIGHT_INSET };
   }
   return { leftPx: BLOCK_LEFT_INSET, rightPx: BLOCK_RIGHT_INSET };
 }
 
-/**
- * Z-order via render order (later siblings paint over earlier).
- * wake_window < nap/bedtime < putdown < extra. Naps win against
- * wake_windows so a tiny / 0-minute nap (clamped to a 24px min-height)
- * still shows above an adjacent wake_window starting at the same y.
- */
+/** Paint order: wake_window < nap/bedtime < putdown < extra. Naps beat wake_windows at same y. */
 function zOrder(e: Event): number {
   if (e.type === "extra") return 4;
   if (e.eventKey === PUTDOWN_KIND_TAG) return 3;
@@ -143,11 +126,7 @@ export function TimelineV3({
 
     const starts = events.map((e) => e.startTime);
     const ends = events.map((e) => e.endTime ?? e.startTime);
-    // Clamp-to-events mode: viewport is just the events' range plus
-    // padding, capped at midnight on the bottom. Default mode keeps
-    // the 5A-9P canonical floor/ceiling so the timeline reads as a
-    // full day even when most slots are empty — but still caps at
-    // midnight so overnight bedtime blocks don't paint past it.
+    // clampToEvents uses the events' range; default keeps 5A–9P floor/ceiling. Both cap at midnight.
     const minMin = clampToEvents
       ? Math.min(...starts)
       : Math.min(...starts, DEFAULT_VIEWPORT.start);
@@ -167,7 +146,7 @@ export function TimelineV3({
     };
   }, [events, pxPerMin, viewportPaddingMin, clampToEvents]);
 
-  // §F55 sheet state — populated when the user taps a collapsed cluster.
+  // §F55: populated when user taps a collapsed cluster.
   const [groupedSheet, setGroupedSheet] = useState<InstantGroup | null>(null);
 
   useEffect(() => {
@@ -175,10 +154,7 @@ export function TimelineV3({
     if (!scrollToNowOnMount || nowMinutes === undefined || events.length === 0) return;
     const root = rootRef.current;
     if (!root) return;
-    // §F52: AppShell's <main> is now the scroll container (overflow-y:
-    // auto) instead of the window, so the now-bar scroll needs to
-    // walk up to find the actual scrolling ancestor. Falls back to
-    // window for any caller that mounts TimelineV3 outside AppShell.
+    // §F52: AppShell's <main> is the scroll container; walk up to find it, fall back to window.
     const scrollParent = findScrollParent(root);
     const targetTopWithinList = (nowMinutes - originMinutes) * pxPerMin;
     if (scrollParent instanceof HTMLElement) {
@@ -249,23 +225,10 @@ export function TimelineV3({
             const { leftPx, rightPx } = blockGeometry(event);
             const top = yOf(event.startTime);
             const end = event.endTime ?? event.startTime;
-            // Putdown synthetics are not user-tappable in V3 — the
-            // parent event is what gets edited. Tap the parent instead.
+            // Putdowns are not tappable; parent event is what gets edited.
             const isPutdown = event.eventKey === PUTDOWN_KIND_TAG;
-            // Min height differs by event type:
-            // - Tappable blocks: 24px floor so a 1-minute accidental nap
-            //   still gets a thumb-sized target.
-            // - Putdown synthetics: not tappable, but need a 20px
-            //   legibility floor (17px content area = clears
-            //   `--text-sm` × 1.2 line-height = 16.8px) to ensure the
-            //   single-row label `Putdown · 8:08p · Kelly` doesn't clip.
-            //   The matching `padding: 0 6px` lives in Block.module.css.
-            // Clamp the bottom edge to the viewport so overnight events
-            // (bedtime: 7pm → next-day wake at +24h) don't extend past
-            // the rendered container. Without this, the block paints
-            // past the midnight axis line and bleeds into the page
-            // below — most visible on preview surfaces where
-            // clampToEvents caps the viewport at midnight.
+            // Tappable blocks: 24px thumb floor. Putdown: 20px legibility floor (single-row label).
+            // Clamp bottom edge to viewport — overnight blocks otherwise bleed past midnight axis.
             const clampedEnd = Math.min(end, endMinutes);
             const naturalH = (clampedEnd - event.startTime) * pxPerMin;
             const minH = isPutdown ? 20 : 24;
@@ -290,8 +253,7 @@ export function TimelineV3({
         {groups.map((g) => {
           const topPx = yOf(g.startMinutes);
           const past = isPast(g.startMinutes);
-          // §F55: clusters with 2+ events render collapsed; tap opens
-          // a sheet that lists each event with its own tap target.
+          // §F55: 2+ events collapse to a single chip; tap opens listing sheet.
           if (g.items.length >= 2) {
             return (
               <CollapsedInstantCluster
@@ -312,7 +274,7 @@ export function TimelineV3({
             <InstantCluster
               key={g.key}
               items={g.items}
-              topPx={topPx} /* §F2b: cluster self-centers via translateY(-50%) */
+              topPx={topPx} /* §F2b: self-centers via translateY(-50%) */
               rightPx={4}
               widthPx={140}
               leaderWidthPx={LEADER_LINE_W}

@@ -1,22 +1,6 @@
 /**
- * Seam test for the 2026-05-20 bug Jake hit:
- *
- *   1. Nap 1 is projected at 8:35–9:20 (45min, default napLen).
- *   2. Daycare dropoff projected at 8:30 (no nap conflict yet).
- *   3. User opens nap drawer, slides start to 8:25.
- *      Drawer preserves duration → endTime = 9:10. Drawer always sets
- *      endTime (the form has start + end fields), distinguishing this
- *      case from "Start Nap Now" (which omits endTime to signal
- *      in-progress / auto-extend).
- *   4. Engine sees the recorded nap [8:25, 9:10] in actuals.
- *      R21.2 detects daycare at 8:30 falls inside → shifts to 9:10.
- *   5. Renderer asks effectiveEndOf for the nap's visual end → 9:10
- *      (recorded WITH endTime bypasses auto-extend; recorded WITHOUT
- *      endTime is the only path that auto-extends past placeholder).
- *
- * Exercises the whole chain so a regression in any of the three
- * components (NapActionButton's no-endTime convention, effectiveEndOf's
- * gate, R21.2's shift) gets caught.
+ * Seam test: drawer nap edit (with endTime) + R21.2 daycare overlap shift.
+ * Covers NapActionButton no-endTime convention, effectiveEndOf gate, and R21.2 shift.
  */
 
 import { describe, expect, it } from "vitest";
@@ -56,10 +40,7 @@ describe("drawer-edit nap + daycare overlap (2026-05-20 Jake bug)", () => {
   const napSettings = aSettings({ defaultNapLengthMinutes: napLen });
 
   it("drawer save of a nap keeps lifecycle = recorded (scheduling intent preserves hasPutdown)", () => {
-    // The lifecycle reducer keeps scheduling-type drawer saves in
-    // `recorded` so deriveHasPutdown still emits putdown markers. The
-    // bug fix is NOT here — it's in effectiveEndOf, which now gates
-    // auto-extend on `endTime === undefined` instead of lifecycle state.
+    // Fix lives in effectiveEndOf (gates auto-extend on endTime===undefined, not lifecycle).
     const next = reduceLifecycle(
       { state: "projected" },
       {
@@ -75,15 +56,8 @@ describe("drawer-edit nap + daycare overlap (2026-05-20 Jake bug)", () => {
   });
 
   it("a RECORDED nap WITH endTime does NOT auto-extend past it (the actual fix)", () => {
-    // Pre-fix: resolvedEnd auto-extended any recorded nap whose endTime
-    // was past `now`, capping at startTime+4×napLen. For Jake's nap edit
-    // (8:25 start, 9:10 endTime, now 11:00), this returned 11:25 (cap),
-    // visually swallowing the daycare chip R21.2 had shifted to 9:10.
-    //
-    // Post-fix: recorded WITH endTime → return endTime directly. Recorded
-    // WITHOUT endTime ("Start Nap Now, waiting for End Nap") is the ONLY
-    // path that still auto-extends. NapActionButton.Start omits endTime;
-    // drawer save always sets it.
+    // Pre-fix: resolvedEnd auto-extended, returning 11:25 cap and swallowing R21.2's daycare shift.
+    // Post-fix: recorded WITH endTime returns endTime directly; only recorded WITHOUT endTime auto-extends.
     const editedNap: Event = {
       id: "rec_nap_1",
       dayId: "d1",
@@ -112,8 +86,7 @@ describe("drawer-edit nap + daycare overlap (2026-05-20 Jake bug)", () => {
       endTime: 9 * 60 + 10,
       hasPutdown: false,
       owner: NO_OWNER,
-      // Drawer-saved nap: recorded + endTime set. resolvedEnd
-      // returns endTime (no auto-extend) because endTime is present.
+      // Drawer-saved: recorded + endTime set → resolvedEnd returns endTime directly.
       lifecycle: { state: "recorded", annotatedAt: NOW },
     };
     const ctx = aContext({
@@ -136,8 +109,7 @@ describe("drawer-edit nap + daycare overlap (2026-05-20 Jake bug)", () => {
     const dropoff = out.find((e) => e.type === "daycare_dropoff");
     expect(dropoff?.startTime).toBe(9 * 60 + 10);
 
-    // And the rendered visual extent of the nap is its raw endTime —
-    // the renderer should match what the engine used to shift daycare.
+    // Rendered visual extent must match what the engine used to shift daycare.
     expect(resolvedEnd(editedNap, ctx.settings, NOW)).toBe(9 * 60 + 10);
   });
 });

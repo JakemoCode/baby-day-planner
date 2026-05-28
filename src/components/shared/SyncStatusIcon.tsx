@@ -19,10 +19,9 @@ function relativeTime(ms: number): string {
 
 export function SyncStatusIcon({ onRefresh }: SyncStatusIconProps) {
   const { online, lastSyncedAt } = useSyncStatus();
-  // Lazy initialiser — Date.now() runs once on mount, not on every render.
   const [now, setNow] = useState<number>(() => Date.now());
 
-  // Tick every 30s so the relative-time label refreshes ("just now" → "1m ago" → ...).
+  // Ticks every 30s to refresh the relative-time label.
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 30_000);
     return () => clearInterval(id);

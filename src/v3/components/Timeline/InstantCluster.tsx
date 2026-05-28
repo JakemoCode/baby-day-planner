@@ -16,11 +16,7 @@ export type InstantClusterProps = {
   onEventTap?: (event: Event) => void;
 };
 
-/**
- * Time-of-day cluster: row of InstantChips with a leader line back to
- * the block lane. Same fan-vs-stack invariant as V2 — chips at the
- * same time MUST fan horizontally and MUST NOT stack vertically.
- */
+/** Row of InstantChips for a single time, with a leader line to the block lane. Chips fan horizontally, never stack. */
 export function InstantCluster({
   items,
   topPx,

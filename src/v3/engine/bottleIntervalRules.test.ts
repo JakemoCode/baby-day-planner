@@ -1,12 +1,4 @@
-/**
- * Tests for `intervalForAmount`. Ported from V2's
- * `src/domain/bottleRules.test.ts` (commit 9ae6d1a). Same semantics:
- * - within-range matches return their rule's interval
- * - open-ended ranges (no maxOz) match anything ≥ minOz
- * - undefined amount returns fallback (no last-bottle info to consult)
- * - no matching rule returns fallback
- * - most-specific (narrowest range) rule wins on overlap
- */
+/** Tests for `intervalForAmount` — range matching, open-ended ranges, fallback, and overlap resolution. */
 
 import { describe, it, expect } from "vitest";
 import type { BottleIntervalRule } from "../schemas";

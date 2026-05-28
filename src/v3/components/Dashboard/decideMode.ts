@@ -5,14 +5,7 @@ export const LOG_BOTTLE_WINDOW_MIN = 15;
 export type ContextMode =
   | { kind: "end-bedtime"; bedtime: Event }
   | { kind: "end-nap"; nap: Event }
-  /**
-   * Log-bottle mode. `alreadyLogged` distinguishes "user can tap to
-   * log/confirm this slot" (projected or auto-promoted to recorded
-   * via Now-cross) vs "user has explicitly committed it via Log Bottle
-   * Now" (lifecycle.state === "completed"). The committed state shows
-   * the success label and re-taps surface a confirm dialog rather
-   * than firing a silent overwrite.
-   */
+  /** `alreadyLogged` true = lifecycle "completed"; re-tap shows confirm dialog instead of silent overwrite. */
   | { kind: "log-bottle"; projected: Event; alreadyLogged: boolean }
   | { kind: "hidden" };
 
@@ -33,9 +26,7 @@ export function decideMode(args: DecideModeArgs): ContextMode {
   const { inProgressBedtime, inProgressNap, nextProjectedBottle, nowMinutes } = args;
   const inWindow = bottleInWindow(nextProjectedBottle, nowMinutes);
 
-  // End-bedtime mode auto-sunsets once any projected bottle's Log Bottle
-  // window opens — prevents the "stays as End overnight sleep all day"
-  // bug. Late closure of an unclosed bedtime falls through to the drawer.
+  // End-bedtime auto-sunsets when a bottle window opens; prevents "stuck as End overnight sleep" bug.
   if (inProgressBedtime && !inWindow) {
     return { kind: "end-bedtime", bedtime: inProgressBedtime };
   }

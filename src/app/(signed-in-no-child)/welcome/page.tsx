@@ -25,9 +25,7 @@ import styles from "./page.module.css";
 type Step = 1 | 2 | 3;
 
 function minutesFromTimeInput(value: string): number {
-  // "07:00" → 420. `<input type="time" required>` enforces HH:MM, but parseInt
-  // can still yield NaN on Safari edge cases — guard with isFinite so we never
-  // persist `defaultWakeTime: NaN` and corrupt every downstream projection.
+  // Guard against NaN from Safari edge cases — `defaultWakeTime: NaN` corrupts downstream projections.
   const [hRaw, mRaw] = value.split(":");
   const h = Number.parseInt(hRaw ?? "", 10);
   const m = Number.parseInt(mRaw ?? "", 10);
@@ -35,26 +33,8 @@ function minutesFromTimeInput(value: string): number {
 }
 
 /**
- * §F3 + §F10 + §F17/§F12 PR 3 onboarding flow.
- *
- * Step 1 — child identity (displayName + DOB)
- * Step 2 — co-parent identity (parent1/parent2 names) + defaultWakeTime
- * Step 3 — First day preview: render the projected day for today using
- *          the just-collected defaultWakeTime + owner names. Each chip
- *          is tap-to-assign; tapping "Start tracking" commits Day 1
- *          with whatever the user chose (owner assignments persisted
- *          as `Day.ownerOverrides`).
- *
- * Submit writes four docs in a single writeBatch:
- *   1. /children/{newId}                    (Child doc)
- *   2. /children/{newId}/settings/current   (Settings)
- *   3. /users/{uid}                          (User with childIds: [newId])
- *   4. /children/{newId}/days/{newDayId}    (Day 1 with ownerOverrides)
- *
- * Then router.replace("/") — the (signed-in-with-child) layout's
- * resolution picks up the new docs and renders the dashboard. The
- * useReconcileActiveDay hook on the dashboard sees `active.date === today`
- * and no-ops; nothing else needs changing.
+ * Three-step onboarding flow: (1) child identity, (2) owner names + wake time, (3) first-day preview with owner assignment.
+ * Commits a 4-doc writeBatch (Child, Settings, User, Day 1) then redirects to /.
  */
 export default function WelcomePage() {
   const { user } = useAuth();
@@ -83,9 +63,7 @@ export default function WelcomePage() {
     setStep(3);
   }
 
-  // Settings projection used by the Step-3 preview. Computed from form
-  // state so the user can see ownership names appear as soon as they
-  // typed them in Step 2.
+  // Settings projection for the Step-3 preview — reflects form state so owner names appear live.
   const previewSettings: Settings | null = useMemo(() => {
     if (step !== 3) return null;
     const wakeMin = minutesFromTimeInput(wakeTimeStr);
@@ -165,9 +143,7 @@ export default function WelcomePage() {
         ...(Object.keys(ownerOverrides).length > 0 ? { ownerOverrides } : {}),
       };
 
-      // Atomic 4-doc write — Child + Settings + User + Day 1 — so a
-      // partial failure can never leave orphans or land the user on
-      // an empty dashboard with no day to act on.
+      // Atomic write — partial failure cannot leave orphans or an empty dashboard.
       const batch = writeBatch(db);
       batch.set(doc(db, childPath(newId)).withConverter(v3ChildConverter), {
         id: newId,
@@ -291,9 +267,7 @@ export default function WelcomePage() {
             timeline.
           </p>
 
-          {/* Actions ABOVE the preview so the primary CTA is visible
-              without scrolling past the bedtime block, which by
-              definition fills the lower half of the day. */}
+          {/* Actions above the preview so the primary CTA is visible without scrolling. */}
           {error && (
             <p role="alert" className={styles.error}>
               {error}

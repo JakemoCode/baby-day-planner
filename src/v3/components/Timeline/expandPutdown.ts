@@ -1,11 +1,6 @@
 /**
- * Putdown is a render-only flag in V3 (R6.1). The engine never emits a
- * putdown event; parent events (nap / bedtime) carry `hasPutdown: true`
- * and the renderer prepends a synthetic block.
- *
- * The synthetic events stay inside the renderer. They share a marker
- * `eventKey` so block geometry / styling can branch on "is this a
- * putdown" without sniffing types.
+ * Putdown is render-only (R6.1). Parent events carry `hasPutdown: true`;
+ * synthetic blocks share PUTDOWN_KIND_TAG so geometry can branch without sniffing types.
  */
 
 import type { Event, EventType, TimeMin } from "../../schemas";
@@ -30,12 +25,9 @@ export type ExpandPutdownOptions = {
 
 export function expandPutdownBlocks(events: Event[], options: ExpandPutdownOptions): Event[] {
   const { putdownLeadMinutes, defaultNapLengthMinutes, nowMinutes } = options;
-  // `EffectiveEndConfig` is just `Pick<Settings, "defaultNapLengthMinutes">`,
-  // so the object literal satisfies the type structurally — no cast needed.
+  // EffectiveEndConfig = Pick<Settings, "defaultNapLengthMinutes">; object literal satisfies structurally.
   const napConfig: EffectiveEndConfig = { defaultNapLengthMinutes };
-  // In-progress sleeps are identified time-based (not by `started` state).
-  // When nowMinutes is undefined (archived-day path), this list is empty
-  // and the overlap gate is a no-op — every hasPutdown event passes.
+  // In-progress identified time-based. Empty when nowMinutes is undefined (archived-day path).
   const inProgressSleeps =
     nowMinutes !== undefined
       ? events.filter((e) => isInProgressSleep(e, napConfig, nowMinutes))
@@ -60,17 +52,13 @@ export function expandPutdownBlocks(events: Event[], options: ExpandPutdownOptio
   return out;
 }
 
-// R6.7 — suppress the synthetic putdown when the parent's moment has
-// passed. `nowMinutes` undefined means "no clock provided, render every
-// hasPutdown event" — that's the read-only archived-day path.
+// R6.7: suppress when the parent's moment has passed. Undefined = archived-day (always render).
 function isStillFuture(parent: Event, nowMinutes: TimeMin | undefined): boolean {
   if (nowMinutes === undefined) return true;
   return parent.startTime > nowMinutes;
 }
 
-// R6.8 — suppress a putdown chip whose window overlaps any in-progress
-// sleep block. "In progress" is a time property: lifecycle.state === "recorded"
-// AND startTime <= now AND now < resolvedEnd.
+// R6.8: suppress when the putdown window overlaps any in-progress sleep.
 function isInProgressSleep(e: Event, config: EffectiveEndConfig, now: TimeMin): boolean {
   return (e.type === "nap" || e.type === "bedtime") && isInProgress(e, config, now);
 }
@@ -82,8 +70,7 @@ function windowOverlapsInProgressSleep(
   config: EffectiveEndConfig,
   now: TimeMin | undefined,
 ): boolean {
-  // No now → inProgressSleeps is already [] (see expandPutdownBlocks), so
-  // .some never iterates. The `now` arg is unused in that case.
+  // nowMinutes undefined → inProgressSleeps is already []; .some is a no-op.
   if (inProgressSleeps.length === 0 || now === undefined) return false;
   return inProgressSleeps.some((s) => {
     const sStart = s.startTime;
@@ -93,11 +80,9 @@ function windowOverlapsInProgressSleep(
 }
 
 function syntheticPutdown(parent: Event, lead: TimeMin): Event {
-  // Use the parent's type so block geometry rules can stay typed; the
-  // PUTDOWN_KIND_TAG eventKey is what the timeline branches on for
-  // putdown-specific rendering.
+  // Parent type preserved so geometry rules stay typed; PUTDOWN_KIND_TAG eventKey drives render branching.
   const type: EventType = parent.type;
-  // §F37: owner is required; pass parent's owner through directly.
+  // §F37: owner required.
   const synthetic: Event = {
     id: `putdown:${parent.id}`,
     dayId: parent.dayId,

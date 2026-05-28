@@ -76,11 +76,7 @@ const TABS: Tab[] = [
 ];
 
 export type BottomTabsProps = {
-  /**
-   * Optional child id. When provided, BottomTabs subscribes to the
-   * child's TomorrowPlan drafts and renders a notification dot on the
-   * Tomorrow tab when any unconfirmed plan exists.
-   */
+  /** When provided, subscribes to TomorrowPlan drafts and shows a notification dot on the Tomorrow tab. */
   childId?: string;
 };
 

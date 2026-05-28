@@ -1,12 +1,6 @@
 /**
- * V3 User repository.
- *
- * One doc per auth user at `users/{uid}`. Created on first sign-in (or
- * on onboarding submit — see ChildProvider). `childIds` is the list of
- * children this uid can access; an empty array means "signed in but
- * hasn't onboarded yet" and gates the welcome flow.
- *
- * Co-parent invites (PR #2) append childIds via `addChildToUser`.
+ * V3 User repository. One doc per auth user at `users/{uid}`.
+ * Empty `childIds` means signed in but not yet onboarded.
  */
 
 import {

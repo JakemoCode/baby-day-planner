@@ -10,18 +10,13 @@ export type UseV3SettingsResult = {
   loading: boolean;
 };
 
-/**
- * Subscribes to the V3 settings doc. The `v3SettingsConverter` in
- * `converters.ts` applies `normalizeSettingsDoc` on every read, so
- * the hook delivers a fully-defaulted Settings without an extra call here.
- * Mirrors the post-PR-#155 shape of `useV3Events`.
- */
+/** Subscribes to the V3 settings doc. Converter applies `normalizeSettingsDoc` on read. */
 export function useV3Settings(childId: string): UseV3SettingsResult {
   const [settings, setSettings] = useState<Settings | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Stale-callback guard — see useV3User for the rationale.
+    // Stale-callback guard: prevents in-flight snapshot from prior childId.
     let active = true;
     const unsub = watchSettings(db, childId, (s) => {
       if (!active) return;

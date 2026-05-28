@@ -1,24 +1,5 @@
 /**
  * R12.x — Template-driven owner inheritance.
- *
- * Tests-first per CLAUDE.md TDD protocol.
- *
- * Coverage in this file:
- *   R12.1 — recorded events keep their owner (delegated to §0 reality-wins
- *           guard; we verify a recorded nap with its own owner is unchanged
- *           by an opposing template entry)
- *   R12.2 — projected naps inherit template.napOwners[N-1]
- *   R12.3 — projected wake windows inherit template.wakeWindowOwners[N-1]
- *           (NOT from same-index nap)
- *   R12.5 — projected bedtime inherits template.bedtimeOwner
- *   R12.6 — projected bottles inherit template.bottleOwners[N-1] in
- *           chronological order
- *
- * Out of scope here (covered elsewhere):
- *   R12.4 — putdown owner = parent's owner (render-only via hasPutdown)
- *   R12.7 — drawer "no owner" omits field (UI concern)
- *   R12.8 — pump owner = pumpOwnerSlot (R9), dream feed = opposite-of-bedtime (R8)
- *   R12.9 — explicit non-inheritors
  */
 
 import { describe, expect, it } from "vitest";
@@ -39,12 +20,7 @@ import { ALL_RULES } from "./index";
 
 const ALL: Rule[] = [...ALL_RULES];
 
-/**
- * `Context.template` is optional; the spread into a ProjectInput must use
- * conditional inclusion (rather than `template: ctx.template`) so the
- * `exactOptionalPropertyTypes: true` setting accepts the call. Encapsulating
- * the call once keeps each test focused on the assertion.
- */
+// Conditional spread required for exactOptionalPropertyTypes: true.
 function run(ctx: Context): Event[] {
   return projectDay(
     {
@@ -105,11 +81,7 @@ describe("R12.2 — projected naps inherit template.napOwners[N-1]", () => {
   });
 
   it("sparse napOwners (undefined slot in middle) → that nap has no owner; neighbors do", () => {
-    // Templates can carry sparse owner lists when a user assigns
-    // nap_3's owner before nap_2's. Since cleanup §1.6, the schema
-    // models this honestly as `(OwnerRef | undefined)[]` and the
-    // engine must skip undefined slots without stamping `undefined`
-    // onto the event.
+    // Schema allows sparse lists (e.g. user assigns nap_3 before nap_2); engine skips undefined slots.
     const ctx = aContext({
       day: aDay({ wakeTime: 7 * 60 }),
       settings: aSettings({
@@ -150,9 +122,7 @@ describe("R12.2 — projected naps inherit template.napOwners[N-1]", () => {
 
 describe("R12.1 — clearing is deliberate: cleared owner is not re-stamped", () => {
   it("recorded nap with no owner + template entry → owner stays undefined", () => {
-    // Per R12.1: "If the user explicitly cleared owner (the field is
-    // omitted), the template still does NOT re-stamp." A recorded
-    // (completed) event with no owner is the user's deliberate clear.
+    // A recorded event with no owner is a deliberate clear; template must not re-stamp it.
     const recordedClearedOwner = aRecordedNap({
       id: "actual_nap_2_cleared",
       eventKey: "nap_2",
@@ -180,9 +150,7 @@ describe("R12.1 — clearing is deliberate: cleared owner is not re-stamped", ()
   });
 
   it("overridden projection is NOT re-stamped (deliberate user-edit choice persists)", () => {
-    // An `recorded` lifecycle is a user owner-edit on a still-future
-    // projection. If the user explicitly cleared owner on a projection
-    // (recorded + owner: undefined), the template must not re-stamp.
+    // A recorded lifecycle on a future nap is a user-edit; template must not re-stamp the cleared owner.
     const overriddenNap2: Event = {
       id: "overridden_nap_2",
       dayId: "day_test",
@@ -194,7 +162,7 @@ describe("R12.1 — clearing is deliberate: cleared owner is not re-stamped", ()
       label: "Nap 2",
       hasPutdown: false,
       lifecycle: { state: "recorded", annotatedAt: 11 * 60 },
-      owner: NO_OWNER, // §F37: user explicitly cleared via drawer
+      owner: NO_OWNER, // user explicitly cleared via drawer
     };
 
     const ctx = aContext({
@@ -219,8 +187,7 @@ describe("R12.1 — clearing is deliberate: cleared owner is not re-stamped", ()
 
 describe("R12.x — eventKey index parsing rejects malformed keys", () => {
   it("an event with eventKey 'nap_1abc' (non-strict numeric suffix) gets no template owner", () => {
-    // Defensive: parseInt('1abc', 10) returns 1, which would otherwise
-    // map to napOwners[0]. Strict parser rejects mixed-suffix keys.
+    // parseInt('1abc') returns 1 and would falsely map to napOwners[0]; strict parser rejects mixed-suffix keys.
     const malformedNap: Event = {
       id: "weird_id",
       dayId: "day_test",
@@ -278,7 +245,6 @@ describe("R12.1 — recorded events keep their owner; template doesn't override"
     const napTwo = out.find((e) => e.id === recorded.id);
     expect(napTwo).toBeDefined();
     expect(napTwo!.owner).toEqual(PARENT1); // recorded owner preserved
-    // The other naps (1, 3, 4) all inherit PARENT2 from the template.
     const others = out.filter((e) => e.type === "nap" && e.id !== recorded.id);
     expect(others.every((n) => n.owner.slot === "parent2")).toBe(true);
   });
@@ -286,8 +252,7 @@ describe("R12.1 — recorded events keep their owner; template doesn't override"
 
 describe("R12.3 — projected wake_windows inherit template.wakeWindowOwners[N-1] only", () => {
   it("wake_windows take their owner from the template list, NOT from same-index nap", () => {
-    // napOwners and wakeWindowOwners diverge intentionally — a future
-    // bug would silently substitute napOwners for missing WW entries.
+    // Lists intentionally diverge to guard against napOwners bleeding into WW slots.
     const ctx = aContext({
       day: aDay({ wakeTime: 7 * 60 }),
       settings: aSettings({
@@ -304,18 +269,13 @@ describe("R12.3 — projected wake_windows inherit template.wakeWindowOwners[N-1
 
     const out = run(ctx);
 
-    // Under the physiology cascade, additional wake windows emit past
-    // wws.length via cadence-extension. We assert the first 4 (the
-    // ones the template covers) carry the template owner; cadence-
-    // extended WWs beyond the template list naturally have no owner.
+    // First 4 WWs covered by template; cadence-extended WWs beyond the list have no owner.
     const wws = out
       .filter((e) => e.type === "wake_window")
       .sort((a, b) => a.startTime - b.startTime)
       .slice(0, 4);
     expect(wws).toHaveLength(4);
     expect(wws.every((w) => w.owner.slot === "parent2")).toBe(true);
-    // Sanity: naps in the template-covered slots did NOT bleed into
-    // the WW owner choice.
     const naps = out.filter((e) => e.type === "nap").slice(0, 4);
     expect(naps.every((n) => n.owner.slot === "parent1")).toBe(true);
   });
@@ -429,15 +389,7 @@ describe("R12.6 — projected bottles inherit template.bottleOwners[N-1] (chrono
   });
 });
 
-// ---------------------------------------------------------------------------
-// R12.10 — Day.ownerOverrides (§F12 + §F17 PR 2)
-// ---------------------------------------------------------------------------
-//
-// Per docs/v3/F17_F12_SCOPE.md §4: at projection time, for each projected
-// event whose eventKey matches a key in `day.ownerOverrides`, replace its
-// owner with the override value. `null` in the map = explicit NO_OWNER.
-// Beats template defaults; never touches recorded events (reality-wins).
-
+// R12.10 — Day.ownerOverrides: beats template defaults; null = NO_OWNER; never touches recorded events.
 describe("R12.10 — Day.ownerOverrides applies to projected events", () => {
   it("override on a projected nap eventKey beats the template default", () => {
     const ctx = aContext({
@@ -457,17 +409,11 @@ describe("R12.10 — Day.ownerOverrides applies to projected events", () => {
     const out = run(ctx);
     const naps = out.filter((e) => e.type === "nap").sort((a, b) => a.startTime - b.startTime);
     expect(naps[0]!.owner).toEqual(PARENT2);
-    // nap_2 has no override → still inherits template default
-    expect(naps[1]!.owner).toEqual(PARENT1);
+    expect(naps[1]!.owner).toEqual(PARENT1); // no override → template default
   });
 
-  // §F63: an ownerOverride is a render-time annotation, NOT an anchor.
-  // The cascade must be free to re-project the event's time. Without
-  // this guarantee, owner-only drawer edits would behave like recorded
-  // anchors (the bug Jake hit 2026-05-24 — projected nap with assigned
-  // owner stuck at original time as wake-window math pushed bedtime
-  // close).
   it("§F63 — ownerOverride does NOT anchor the event's time or lifecycle", () => {
+    // ownerOverride is annotation-only; the cascade must re-project time freely (not anchor like a recorded event).
     const baseSettings = aSettings({
       wakeWindowsMinutes: [120, 135],
       defaultNapLengthMinutes: 60,
@@ -502,12 +448,6 @@ describe("R12.10 — Day.ownerOverrides applies to projected events", () => {
       .filter((e) => e.type === "nap")
       .sort((a, b) => a.startTime - b.startTime);
 
-    // Owner applied AND time identical to baseline AND lifecycle matches
-    // baseline's lifecycle (ownerOverride must not change lifecycle —
-    // whatever the baseline produced, override should match).
-    // ADR-0006 Now-cross auto-promote sets baseline's lifecycle based on
-    // time vs nowMinutes, not based on overrides; this test verifies the
-    // override path produces the same lifecycle outcome.
     expect(naps[0]!.owner).toEqual(PARENT2);
     expect(naps[0]!.startTime).toBe(baselineNap1Start);
     expect(naps[0]!.lifecycle.state).toBe(baselineNap1Lifecycle);
@@ -538,12 +478,12 @@ describe("R12.10 — Day.ownerOverrides applies to projected events", () => {
       eventKey: "nap_1",
       startTime: 9 * 60,
       endTime: 10 * 60,
-      owner: PARENT1, // user recorded with PARENT1
+      owner: PARENT1,
     });
     const ctx = aContext({
       day: aDay({
         wakeTime: 7 * 60,
-        ownerOverrides: { nap_1: PARENT2 }, // override would be PARENT2
+        ownerOverrides: { nap_1: PARENT2 },
       }),
       settings: aSettings({
         wakeWindowsMinutes: [120, 135],
@@ -556,8 +496,7 @@ describe("R12.10 — Day.ownerOverrides applies to projected events", () => {
 
     const out = run(ctx);
     const nap1 = out.find((e) => e.eventKey === "nap_1");
-    // Recorded events keep their owner; override doesn't touch them
-    expect(nap1?.owner).toEqual(PARENT1);
+    expect(nap1?.owner).toEqual(PARENT1); // recorded owner untouched
   });
 
   it("no-ops when Day.ownerOverrides is undefined", () => {
@@ -573,9 +512,6 @@ describe("R12.10 — Day.ownerOverrides applies to projected events", () => {
     });
 
     const out = run(ctx);
-    // Assert specifically on nap_1 and nap_2 (the slots template covers).
-    // Beyond that the cascade emits more naps that have no template entry,
-    // which is unrelated to R12.10's behavior.
     const nap1 = out.find((e) => e.eventKey === "nap_1");
     const nap2 = out.find((e) => e.eventKey === "nap_2");
     expect(nap1?.owner).toEqual(PARENT1);

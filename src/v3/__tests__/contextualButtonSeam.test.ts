@@ -1,11 +1,6 @@
 /**
- * Seam test: projectDay → renderProjection → selectors → decideMode.
- *
- * Verifies the contextual dashboard button (ADR-0003) lights up correctly
- * when wired through the REAL engine + render passes. Each layer runs with
- * its actual implementation — no mocks — so any wiring drift between
- * cascade output, render passes, and the dashboard's mode-selection
- * surfaces here.
+ * Seam test: projectDay → renderProjection → selectors → decideMode (ADR-0003).
+ * All layers run real implementations; wiring bugs surface here.
  */
 
 import { describe, expect, it } from "vitest";
@@ -97,9 +92,7 @@ describe("Contextual button — seam (engine + render + decideMode)", () => {
   });
 
   it("still lights up Log bottle now +10min after a projected bottle has passed", () => {
-    // Engine projects bottle at 11:00. At 11:10 (after Now-cross + engine
-    // auto-promote), Jake still wants the button visible so he can tap to
-    // confirm an actual log at 11:10 — overwriting the auto-promoted slot.
+    // Button stays visible +15min past the slot so the user can confirm a late log.
     const now = hm(11, 10);
     const events = project(now, [recordedBottle("bottle_1", hm(8))]);
     const nb = nearestBottleInWindow(events, now, LOG_BOTTLE_WINDOW_MIN);
@@ -121,10 +114,8 @@ describe("Contextual button — seam (engine + render + decideMode)", () => {
       recordedBottle("bottle_1", hm(8)),
       recordedInProgressNap(hm(10, 45)),
     ]);
-    // §F66 audit fix: derive inProgressNap from the engine OUTPUT, not the
-    // fixture. Otherwise the engine's actual handling of an in-progress
-    // recorded nap (lifecycle bookkeeping, annotation passes) isn't verified
-    // end-to-end — the test would pass even if the engine corrupted the nap.
+    // Derive inProgressNap from engine output, not the fixture, so lifecycle
+    // bookkeeping is verified end-to-end.
     const inProgressNap = events.find(
       (e) =>
         e.type === "nap" &&
@@ -146,25 +137,19 @@ describe("Contextual button — seam (engine + render + decideMode)", () => {
   });
 
   it("§F66 audit: round-trip — clicking Log Bottle flips alreadyLogged to true", () => {
-    // Action-chain seam: the most consequential §F66 transition is "user
-    // taps Log Bottle Now → mode becomes 'logged' so re-taps don't silently
-    // overwrite." Component tests cover the click handler with mocks; this
-    // round-trip pins that the projected → completed lifecycle transition
-    // is what flips decideMode's `alreadyLogged` flag.
+    // Pins that projected → completed lifecycle transition is what flips alreadyLogged.
     const now = hm(11, 0);
     const initialEvents = project(now, [recordedBottle("bottle_1", hm(8))]);
     const projectedBottle = nearestBottleInWindow(initialEvents, now, LOG_BOTTLE_WINDOW_MIN);
     expect(projectedBottle?.startTime).toBe(hm(11));
-    // Engine auto-promotes the projected bottle to lifecycle.recorded
-    // (Now-cross, ADR-0006), NOT completed — alreadyLogged stays false.
+    // ADR-0006 auto-promotes to recorded (not completed) — alreadyLogged stays false.
     const initialMode = decideMode({
       ...(projectedBottle ? { nextProjectedBottle: projectedBottle } : {}),
       nowMinutes: now,
     });
     expect(initialMode).toMatchObject({ kind: "log-bottle", alreadyLogged: false });
 
-    // Simulate ContextualActionButton's onLogBottle: a `completed` bottle
-    // overlaid at the projected slot's eventKey. Re-project + re-decide.
+    // onLogBottle overlays a completed bottle at the projected slot's eventKey.
     const loggedBottle: Event = {
       id: "recorded_bottle_2",
       dayId: "day_test",
@@ -188,11 +173,7 @@ describe("Contextual button — seam (engine + render + decideMode)", () => {
   });
 
   it("§F66 fast-follow B2: with recorded Bottle 1 @ 8am and projected Bottle 2 in window, the selector targets Bottle 2 (not Bottle 1)", () => {
-    // Jake's pre-merge dogfood: bottle 1 recorded @ 8am, projected
-    // bottle 2 in window, Now near bottle 2. Click Log Bottle Now
-    // should promote the bottle_2 slot, NOT move bottle 1 to Now.
-    // Engine cascades bottle 2 at 8:00 + 180min = 11:00. Now = 10:54
-    // puts bottle 2 in window (delta = 6min).
+    // Selector must target bottle_2 (the cascade slot), not bottle_1 (already logged).
     const now = hm(10, 54);
     const events = project(now, [recordedBottle("bottle_1", hm(8))]);
     const nb = nearestBottleInWindow(events, now, LOG_BOTTLE_WINDOW_MIN);
