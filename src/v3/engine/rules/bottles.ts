@@ -81,23 +81,39 @@ function forwardCapFor(events: Event[]): number {
   return Math.min(MIDNIGHT, bedtime.startTime);
 }
 
-function buildProjectedBottle(ctx: Context, n: number, startTime: number): Event {
-  // ID is keyed to startTime, NOT slot number. Slot number changes when
-  // R5.4 renumbers chronologically, so a slot-keyed id would be unstable
-  // across passes — the same projection could end up with two different
-  // ids on consecutive evaluator passes, which would defeat the
-  // fixed-point check and risk convergence loops. startTime is what the
-  // event IS; the eventKey/label are how we display it.
+// ID is keyed to startTime, NOT slot number. Slot number changes when
+// R5.4 renumbers chronologically, so a slot-keyed id would be unstable
+// across passes — the same projection could end up with two different
+// ids on consecutive evaluator passes, which would defeat the
+// fixed-point check and risk convergence loops. startTime is what the
+// event IS; the eventKey/label are how we display it.
+function buildBottleProjection(
+  ctx: Context,
+  id: string,
+  eventKey: string,
+  label: string,
+  startTime: number,
+): Event {
   return projectedEvent({
     ctx,
-    id: `proj_bottle_t${startTime}`,
-    eventKey: `bottle_${n}`,
+    id,
+    eventKey,
     type: "bottle",
     kind: "instant",
     startTime,
-    label: `Bottle ${n}`,
+    label,
     amountOz: ctx.settings.defaultBottleAmountOz,
   });
+}
+
+function buildProjectedBottle(ctx: Context, n: number, startTime: number): Event {
+  return buildBottleProjection(
+    ctx,
+    `proj_bottle_t${startTime}`,
+    `bottle_${n}`,
+    `Bottle ${n}`,
+    startTime,
+  );
 }
 
 const DREAM_FEED_EVENT_KEY = "bottle_dream";
@@ -119,16 +135,13 @@ function isDreamFeed(e: Event): boolean {
  * Subject to Now-cross auto-promote like any projected bottle (ADR-0001).
  */
 function buildProjectedDreamFeed(ctx: Context, startTime: number): Event {
-  return projectedEvent({
+  return buildBottleProjection(
     ctx,
-    id: `proj_${DREAM_FEED_EVENT_KEY}`,
-    eventKey: DREAM_FEED_EVENT_KEY,
-    type: "bottle",
-    kind: "instant",
+    `proj_${DREAM_FEED_EVENT_KEY}`,
+    DREAM_FEED_EVENT_KEY,
+    "Dream Feed",
     startTime,
-    label: "Dream Feed",
-    amountOz: ctx.settings.defaultBottleAmountOz,
-  });
+  );
 }
 
 type Region = { start: number; end: number };

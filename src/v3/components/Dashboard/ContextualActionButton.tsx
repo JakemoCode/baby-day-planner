@@ -137,13 +137,13 @@ export function ContextualActionButton({
   const label =
     mode.kind === "log-bottle" && mode.alreadyLogged ? LOGGED_LABEL : MODE_LABEL[mode.kind];
 
-  // Wall-clock minutes since the recorded bottle's startTime — drives
-  // the "logged X minutes ago" text in the confirm dialog. Only used
-  // when mode is log-bottle + alreadyLogged.
-  const minutesAgo =
+  const confirmBody =
     mode.kind === "log-bottle" && mode.alreadyLogged
-      ? Math.max(0, nowMinutes - mode.projected.startTime)
-      : 0;
+      ? (() => {
+          const m = Math.max(0, nowMinutes - mode.projected.startTime);
+          return `Last bottle logged ${m} minute${m === 1 ? "" : "s"} ago. Tap Confirm to update to now.`;
+        })()
+      : "";
 
   return (
     <>
@@ -160,7 +160,7 @@ export function ContextualActionButton({
       <ConfirmDialog
         open={confirmOpen}
         title="Change the recorded time?"
-        body={`Last bottle logged ${minutesAgo} minute${minutesAgo === 1 ? "" : "s"} ago. Tap Confirm to update to now.`}
+        body={confirmBody}
         confirmLabel="Confirm"
         cancelLabel="Cancel"
         onCancel={() => setConfirmOpen(false)}

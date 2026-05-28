@@ -221,20 +221,19 @@ export function EventEditDrawerV3({
   //   - dream-feed slot (→ Day.suppressedDreamFeed, §F66 fast-follow)
   // useDrawer routes each path.
   const isDreamFeedSlot = type === "bottle" && sourceEvent.eventKey === "bottle_dream";
+  const hasSuppressionPath =
+    type === "daily_recurring" ||
+    type === "daycare_dropoff" ||
+    type === "daycare_pickup" ||
+    isDreamFeedSlot;
   // §F66 fast-follow B11: hide Delete when the cascade owns the slot.
-  //
-  // Auto-promoted nap/bedtime: lifecycle "recorded" but no Firestore
-  // doc — engine output only. Detection: id starts with "proj_".
-  //
-  // Auto-promoted bottle: useAutoPromotePersistence wrote a doc with
-  // id `recorded_bottle_N` and lifecycle {state:"recorded",
-  // annotatedAt:startTime}. Manual logs (ContextualActionButton) use
-  // "completed"; drawer saves bump annotatedAt to nowMinutes. So
-  // `recorded && annotatedAt === startTime` uniquely identifies the
-  // auto-promote ghost — for those, the cascade re-emits on the next
-  // pass and the hook re-writes the doc (loop). Delete would visibly
-  // do nothing. The dream-feed slot uses its own suppression and
-  // is exempt.
+  // Auto-promoted nap/bedtime live only in engine output (no Firestore
+  // doc). Auto-promoted bottles are persisted by
+  // useAutoPromotePersistence but the cascade re-emits + the hook
+  // re-writes on the next pass — Delete would visibly do nothing.
+  // Signature for the bottle case: lifecycle "recorded" with
+  // annotatedAt === startTime. Manual logs use "completed" and drawer
+  // saves bump annotatedAt to nowMinutes, so neither collides.
   const isAutoPromotedSleep =
     (type === "nap" || type === "bedtime") && sourceEvent.id.startsWith("proj_");
   const isAutoPromotedBottle =
@@ -247,11 +246,7 @@ export function EventEditDrawerV3({
     onDelete !== undefined &&
     !isAutoPromotedSleep &&
     !isAutoPromotedBottle &&
-    (isRecorded(sourceEvent.lifecycle) ||
-      type === "daily_recurring" ||
-      type === "daycare_dropoff" ||
-      type === "daycare_pickup" ||
-      isDreamFeedSlot);
+    (isRecorded(sourceEvent.lifecycle) || hasSuppressionPath);
 
   const confirmCopy =
     type === "daily_recurring"

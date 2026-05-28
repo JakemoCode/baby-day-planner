@@ -27,39 +27,24 @@ import { isRenderSynthetic } from "./lib/syntheticEvents";
 // ---------------------------------------------------------------------------
 
 /**
- * True iff `event` is a rhythm-cascade projected event that is strictly
- * in the future:
- *
- *   - lifecycle is `projected`
- *   - `startTime > nowMinutes`
- *   - type is `nap` or `bottle` (the cascade-anchoring types)
- *   - NOT the dream-feed slot (`bottle_dream`) — that's explicit-
- *     schedule, not rhythm-cascade
- *
- * Used as the shared entry-point for both {@link isFutureProjected} and
- * {@link isNextProjectedOfType}.
- */
-function isRhythmCascadeProjected(event: Event, nowMinutes: TimeMin): boolean {
-  if (event.lifecycle.state !== "projected") return false;
-  if (event.startTime <= nowMinutes) return false;
-  if (event.type !== "nap" && event.type !== "bottle") return false;
-  if (event.type === "bottle" && event.eventKey === "bottle_dream") return false;
-  // Render-synthetic putdown chips inherit type="nap" + parent's
-  // lifecycle ("projected"), so without this filter they'd claim the
-  // chronologically-next nap slot in isNextProjectedOfType (their
-  // startTime = nap.startTime - putdownLead, earlier than the real
-  // nap) and lock the real nap's drawer inputs.
-  if (isRenderSynthetic(event)) return false;
-  return true;
-}
-
-/**
  * §F66 future-event drawer rule (ADR-0001 + CONTEXT.md "future-event
  * drawer rule"): the time/amount inputs on the drawer are locked only
  * for rhythm-cascade events (`nap`, non-dream-feed `bottle`) that are
  * strictly in the future. Daycare, daily-recurring, dream-feed, and
  * `extra` events are fixed-time / explicit-slot — the user can move
  * them per-day without breaking the cascade.
+ *
+ * Conditions:
+ *   - lifecycle is `projected`
+ *   - `startTime > nowMinutes`
+ *   - type is `nap` or `bottle` (the cascade-anchoring types)
+ *   - NOT the dream-feed slot (`bottle_dream`) — that's explicit-
+ *     schedule, not rhythm-cascade
+ *   - NOT a render-synthetic putdown chip (these inherit type="nap"
+ *     and the parent's projected lifecycle for timeline geometry;
+ *     without the filter they'd claim the next-nap slot in
+ *     {@link isNextProjectedOfType} via their earlier startTime and
+ *     lock the real nap's drawer inputs)
  *
  * **Pure-event predicate**: does NOT know whether this event is the
  * chronologically-next of its type. The drawer combines this with
@@ -68,7 +53,12 @@ function isRhythmCascadeProjected(event: Event, nowMinutes: TimeMin): boolean {
  *   `lockTimeInputs = isFutureProjected(e, now) && !isNextProjectedOfType(e, allEvents, now)`
  */
 export function isFutureProjected(event: Event, nowMinutes: TimeMin): boolean {
-  return isRhythmCascadeProjected(event, nowMinutes);
+  if (event.lifecycle.state !== "projected") return false;
+  if (event.startTime <= nowMinutes) return false;
+  if (event.type !== "nap" && event.type !== "bottle") return false;
+  if (event.type === "bottle" && event.eventKey === "bottle_dream") return false;
+  if (isRenderSynthetic(event)) return false;
+  return true;
 }
 
 /**
@@ -89,11 +79,11 @@ export function isNextProjectedOfType(
   allEvents: Event[],
   nowMinutes: TimeMin,
 ): boolean {
-  if (!isRhythmCascadeProjected(event, nowMinutes)) return false;
+  if (!isFutureProjected(event, nowMinutes)) return false;
   let earliest: Event | undefined;
   for (const e of allEvents) {
     if (e.type !== event.type) continue;
-    if (!isRhythmCascadeProjected(e, nowMinutes)) continue;
+    if (!isFutureProjected(e, nowMinutes)) continue;
     if (earliest === undefined || e.startTime < earliest.startTime) earliest = e;
   }
   return earliest !== undefined && earliest.id === event.id;
