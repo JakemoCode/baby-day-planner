@@ -248,6 +248,7 @@ function TomorrowPageInner({
         actuals={planState.extras}
         settings={settings}
         nowMinutes={TOMORROW_ANCHOR_MINUTES}
+        types={["extra"]}
         onCreate={openCreate}
       />
 

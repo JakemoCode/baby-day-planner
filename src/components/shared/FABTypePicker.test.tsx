@@ -45,4 +45,11 @@ describe("FABTypePicker", () => {
     await userEvent.click(screen.getByRole("button", { name: /custom/i }));
     expect(onSelect).toHaveBeenCalledWith("extra");
   });
+
+  it("restricts options to `types` when provided (/tomorrow: Custom only)", () => {
+    render(<FABTypePicker open onSelect={() => {}} onCancel={() => {}} types={["extra"]} />);
+    expect(screen.getByRole("button", { name: /custom/i })).toBeVisible();
+    expect(screen.queryByRole("button", { name: /bottle/i })).toBeNull();
+    expect(screen.queryByRole("button", { name: /pump/i })).toBeNull();
+  });
 });

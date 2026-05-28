@@ -8,6 +8,8 @@ export type FABTypePickerProps = {
   open: boolean;
   onSelect: (type: CreatableType) => void;
   onCancel: () => void;
+  /** Restrict which options are shown (order preserved). Defaults to all. */
+  types?: readonly CreatableType[];
 };
 
 type Option = { type: CreatableType; label: string; sub: string };
@@ -18,11 +20,12 @@ const OPTIONS: ReadonlyArray<Option> = [
   { type: "extra", label: "Custom", sub: "Anything else" },
 ];
 
-export function FABTypePicker({ open, onSelect, onCancel }: FABTypePickerProps) {
+export function FABTypePicker({ open, onSelect, onCancel, types }: FABTypePickerProps) {
+  const options = types ? OPTIONS.filter((o) => types.includes(o.type)) : OPTIONS;
   return (
     <BottomSheet open={open} title="Add an event" onCancel={onCancel}>
       <div className={styles.options} role="group">
-        {OPTIONS.map((opt) => (
+        {options.map((opt) => (
           <button
             key={opt.type}
             type="button"
