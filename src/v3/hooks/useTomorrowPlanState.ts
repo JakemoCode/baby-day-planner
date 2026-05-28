@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { db } from "@/lib/firebase/client";
-import type { Firestore } from "firebase/firestore";
 import { promoteFromPlan } from "../repositories/days";
 import { deleteTomorrowPlan, saveTomorrowPlan } from "../repositories/tomorrowPlans";
 import type { Event, OwnerRef, Settings, TimeMin, TomorrowPlan } from "../schemas";
@@ -147,11 +146,11 @@ export function useTomorrowPlanState(
       ...(wakeTime !== undefined ? { wakeTime } : {}),
       ...(templateId !== undefined ? { startTemplateId: templateId } : {}),
     };
-    await saveTomorrowPlan(db as Firestore, childId, plan);
+    await saveTomorrowPlan(db, childId, plan);
   };
 
   const clear = async () => {
-    await deleteTomorrowPlan(db as Firestore, childId, date);
+    await deleteTomorrowPlan(db, childId, date);
     setWakeTime(settings.defaultWakeTime);
     setTemplateId(undefined);
     setExtras([]);
@@ -168,7 +167,7 @@ export function useTomorrowPlanState(
     // dayId. The persisted tomorrow-dated plan is left alone — user
     // may still want to keep it as a draft for tomorrow.
     const todayPlan: TomorrowPlan = { ...plan, date: currentLocalDate() };
-    await promoteFromPlan(db as Firestore, childId, todayPlan, settings.defaultWakeTime);
+    await promoteFromPlan(db, childId, todayPlan, settings.defaultWakeTime);
   };
 
   return {

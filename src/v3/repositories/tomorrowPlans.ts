@@ -16,6 +16,7 @@ import {
   doc,
   getDoc,
   getDocs,
+  onSnapshot,
   query,
   setDoc,
   updateDoc,
@@ -38,6 +39,47 @@ export async function loadTomorrowPlan(
 ): Promise<TomorrowPlan | null> {
   const snap = await getDoc(planRef(db, childId, date));
   return snap.exists() ? snap.data() : null;
+}
+
+/**
+ * Subscribe to a single `TomorrowPlan` doc by (childId, date). Delivers
+ * `null` when the doc doesn't exist. Mirrors `watchActiveDay` /
+ * `watchSettings` so the hook layer never builds Firestore refs itself.
+ */
+export function watchTomorrowPlan(
+  db: Firestore,
+  childId: string,
+  date: string,
+  cb: (plan: TomorrowPlan | null) => void,
+): () => void {
+  return onSnapshot(planRef(db, childId, date), (snap) => {
+    cb(snap.exists() ? snap.data() : null);
+  });
+}
+
+/**
+ * Subscribe to the count of unconfirmed (`status === "draft"`)
+ * TomorrowPlan docs for this child. On subscription error, logs and
+ * reports 0 (the Tomorrow tab's dot just disappears rather than
+ * sticking on a stale count).
+ */
+export function watchTomorrowDraftCount(
+  db: Firestore,
+  childId: string,
+  cb: (count: number) => void,
+): () => void {
+  const plansRef = collection(db, tomorrowPlansCollectionPath(childId)).withConverter(
+    v3TomorrowPlanConverter,
+  );
+  const draftsQuery = query(plansRef, where("status", "==", "draft"));
+  return onSnapshot(
+    draftsQuery,
+    (snap) => cb(snap.size),
+    (err) => {
+      console.error("[watchTomorrowDraftCount] subscription error", err);
+      cb(0);
+    },
+  );
 }
 
 export async function saveTomorrowPlan(

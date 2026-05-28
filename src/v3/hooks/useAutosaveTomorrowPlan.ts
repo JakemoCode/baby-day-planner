@@ -2,7 +2,6 @@
 
 import { useEffect } from "react";
 import { db } from "@/lib/firebase/client";
-import type { Firestore } from "firebase/firestore";
 import { saveTomorrowPlan } from "../repositories/tomorrowPlans";
 import type { Event, OwnerRef, TimeMin, TomorrowPlan } from "../schemas";
 
@@ -52,7 +51,6 @@ export function useAutosaveTomorrowPlan(
   useEffect(() => {
     if (!input) return;
     if (persistedPlan && inputMatchesPlan(input, persistedPlan)) return;
-    const database = db as Firestore;
     const handle = setTimeout(() => {
       const plan: TomorrowPlan = {
         childId,
@@ -63,7 +61,7 @@ export function useAutosaveTomorrowPlan(
         ...(input.wakeTime !== undefined ? { wakeTime: input.wakeTime } : {}),
         ...(input.startTemplateId !== undefined ? { startTemplateId: input.startTemplateId } : {}),
       };
-      void saveTomorrowPlan(database, childId, plan);
+      void saveTomorrowPlan(db, childId, plan);
     }, debounceMs);
     return () => clearTimeout(handle);
   }, [childId, date, input, persistedPlan, debounceMs]);

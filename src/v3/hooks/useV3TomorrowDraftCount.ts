@@ -1,10 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { collection, onSnapshot, query, where, type Firestore } from "firebase/firestore";
 import { db } from "@/lib/firebase/client";
-import { tomorrowPlansCollectionPath } from "@/lib/firestore/paths";
-import { v3TomorrowPlanConverter } from "../firestore/converters";
+import { watchTomorrowDraftCount } from "../repositories/tomorrowPlans";
 
 /**
  * Count of unconfirmed (`status === "draft"`) TomorrowPlan docs for
@@ -19,19 +17,7 @@ export function useV3TomorrowDraftCount(childId: string): number {
   const [count, setCount] = useState(0);
 
   useEffect(() => {
-    const database = db as Firestore;
-    const plansRef = collection(database, tomorrowPlansCollectionPath(childId)).withConverter(
-      v3TomorrowPlanConverter,
-    );
-    const draftsQuery = query(plansRef, where("status", "==", "draft"));
-    return onSnapshot(
-      draftsQuery,
-      (snap) => setCount(snap.size),
-      (err) => {
-        console.error("[useV3TomorrowDraftCount] subscription error", err);
-        setCount(0);
-      },
-    );
+    return watchTomorrowDraftCount(db, childId, setCount);
   }, [childId]);
 
   return count;
