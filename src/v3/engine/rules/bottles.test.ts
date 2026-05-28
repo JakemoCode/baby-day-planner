@@ -1448,9 +1448,11 @@ describe("Sequential bottle cascade — caps forward at bedtime (DOMAIN.md §1 +
       expect(b.startTime).toBeLessThan(19 * 60);
     }
     // Bedtime event projected.
-    // ADR-0002: bedtimeStart = max(earliestBedtime=18:00, wwStart=16:30) = 18:00.
+    // §F66 fast-follow B8: bedtimeStart = max(earliestBedtime=18:00,
+    // wwStart+WW=16:30+150=19:00) = 19:00. Full wake window plays
+    // out before bedtime lands.
     const bedtime = out.find((e) => e.type === "bedtime");
-    expect(bedtime?.startTime).toBe(18 * 60);
+    expect(bedtime?.startTime).toBe(19 * 60);
   });
 
   it("recorded bottle past bedtime is preserved but does NOT cascade forward from there", () => {

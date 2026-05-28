@@ -116,12 +116,14 @@ function projectSleepCascade(ctx: Context, existing: Event[]): Event[] {
     // Bedtime substitution (ADR-0002): if no manual bedtime exists AND
     // this slot's PROJECTED nap would have endTime > bedtimeThreshold,
     // drop the nap. Emit a wake-window from wwStart to bedtimeStart
-    // (bedtimeStart = max(earliestBedtime, wwStart)) and project bedtime
-    // at bedtimeStart. Reality wins: a recorded nap at this slot is NOT
-    // dropped — it stays as a nap and the cascade continues.
+    // (bedtimeStart = max(earliestBedtime, wwStart + wwMinutes) — the
+    // final wake window gets its full configured length before bedtime,
+    // per DOMAIN §3 "bedtime is a fuzzy emergent thing"). Reality
+    // wins: a recorded nap at this slot is NOT dropped — it stays as
+    // a nap and the cascade continues.
     const projectedNapEnd = napStart + napLen;
     if (!manualBedtime && !existingNap && projectedNapEnd > threshold) {
-      projected.push(...terminateCascade(ctx, n, wwStart, undefined));
+      projected.push(...terminateCascade(ctx, n, wwStart, wwMinutes, undefined));
       break;
     }
 
@@ -133,7 +135,7 @@ function projectSleepCascade(ctx: Context, existing: Event[]): Event[] {
     const projectedExtendsIntoBedtime =
       manualBedtime && !existingNap && napStart + napLen > manualBedtime.startTime;
     if (manualBedtime && (napStart >= manualBedtime.startTime || projectedExtendsIntoBedtime)) {
-      projected.push(...terminateCascade(ctx, n, wwStart, manualBedtime));
+      projected.push(...terminateCascade(ctx, n, wwStart, wwMinutes, manualBedtime));
       break;
     }
 
@@ -168,20 +170,29 @@ function projectSleepCascade(ctx: Context, existing: Event[]): Event[] {
 
 /**
  * Terminates the cascade with a closing wake-window + (optional) projected
- * bedtime. The anchor is `manualBedtime.startTime` if one exists, else the
- * ADR-0002 floor `max(earliestBedtime, wwStart)`. The wake-window always
- * emits; the projected bedtime emits only when no manualBedtime is present
- * (otherwise the manual one is the day's authoritative terminator).
+ * bedtime. The anchor is `manualBedtime.startTime` if one exists, else
+ * `max(earliestBedtime, wwStart + wwMinutes)` — the final wake window
+ * gets its full configured length before bedtime lands. Per DOMAIN §3:
+ * "bedtime is a fuzzy emergent thing, not a clock time" — it floats
+ * with the day's last wake-window. earliestBedtime is just the floor,
+ * not the default. (§F66 fast-follow B8: previously this anchored at
+ * max(earliestBedtime, wwStart), producing a stub 55-min wake window
+ * when wwStart < earliestBedtime < wwStart + wwMinutes.)
+ *
+ * The wake-window always emits; the projected bedtime emits only when
+ * no manualBedtime is present (otherwise the manual one is the day's
+ * authoritative terminator).
  */
 function terminateCascade(
   ctx: Context,
   n: number,
   wwStart: number,
+  wwMinutes: number,
   manualBedtime: Event | undefined,
 ): Event[] {
   const anchor = manualBedtime
     ? manualBedtime.startTime
-    : Math.max(ctx.settings.earliestBedtime, wwStart);
+    : Math.max(ctx.settings.earliestBedtime, wwStart + wwMinutes);
   const out: Event[] = [buildWakeWindow(ctx, n, wwStart, anchor)];
   if (!manualBedtime) {
     out.push(buildProjectedBedtime(ctx, anchor, ctx.settings));
