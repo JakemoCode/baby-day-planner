@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import { db } from "@/lib/firebase/client";
 import { promoteFromPlan } from "../repositories/days";
 import { deleteTomorrowPlan, saveTomorrowPlan } from "../repositories/tomorrowPlans";
 import type { Event, OwnerRef, Settings, TimeMin, TomorrowPlan } from "../schemas";
 import { currentLocalDate, currentLocalMinutes } from "../ui/time";
 import { useV3TomorrowPlan } from "./useV3TomorrowPlan";
+import { useTomorrowPlanForm } from "./useTomorrowPlanForm";
 import { useAutosaveTomorrowPlan, type TomorrowPlanInput } from "./useAutosaveTomorrowPlan";
 
 export type TomorrowPlanStatus = "no-plan" | "draft" | "confirmed";
@@ -59,62 +60,13 @@ export function useTomorrowPlanState(
 ): UseTomorrowPlanStateResult {
   const { plan, loading } = useV3TomorrowPlan(childId, date);
 
-  // Local form state. Hydrates from the loaded plan when one exists,
-  // or from settings defaults when not.
-  const [wakeTime, setWakeTime] = useState<TimeMin>(settings.defaultWakeTime);
-  const [templateId, setTemplateId] = useState<string | undefined>(undefined);
-  const [extras, setExtras] = useState<Event[]>([]);
-  const [ownerOverrides, setOwnerOverrides] = useState<Record<string, OwnerRef | null>>({});
-  // Tracks whether we've hydrated from the loaded plan yet — avoids
-  // overwriting user edits with the late-arriving snapshot.
-  const [hydrated, setHydrated] = useState(false);
+  // Local edit buffer: fields, one-shot hydration, hasEdits, reset.
+  const form = useTomorrowPlanForm(plan, loading, settings.defaultWakeTime);
+  const { wakeTime, templateId, extras, ownerOverrides, hasEdits, hydrated } = form;
 
-  // One-shot hydration from the loaded plan — runs exactly once when
-  // the snapshot first resolves (the `hydrated` flag clamps it). The
-  // multiple setState calls here are intentional: each form field
-  // mirrors a different plan field so subsequent user edits are
-  // independent. React-hooks linter flags setState-in-effect but
-  // hydration of async-loaded server state is the canonical exception.
-  /* eslint-disable react-hooks/set-state-in-effect */
-  useEffect(() => {
-    if (loading || hydrated) return;
-    if (plan) {
-      setWakeTime(plan.wakeTime ?? settings.defaultWakeTime);
-      setTemplateId(plan.startTemplateId);
-      setExtras(plan.extras);
-      setOwnerOverrides(plan.ownerOverrides);
-    }
-    setHydrated(true);
-  }, [loading, hydrated, plan, settings.defaultWakeTime]);
-  /* eslint-enable react-hooks/set-state-in-effect */
-
-  const upsertExtra = (event: Event) => {
-    setExtras((prev) => {
-      if (prev.some((e) => e.id === event.id)) {
-        return prev.map((e) => (e.id === event.id ? event : e));
-      }
-      return [...prev, event];
-    });
-  };
-
-  const removeExtra = (eventId: string) => {
-    setExtras((prev) => prev.filter((e) => e.id !== eventId));
-  };
-
-  const setOwnerOverride = (eventKey: string, owner: OwnerRef | null) => {
-    setOwnerOverrides((prev) => ({ ...prev, [eventKey]: owner }));
-  };
-
-  const hasEdits = useMemo(() => {
-    if (wakeTime !== settings.defaultWakeTime) return true;
-    if (templateId !== undefined) return true;
-    if (extras.length > 0) return true;
-    if (Object.keys(ownerOverrides).length > 0) return true;
-    return false;
-  }, [wakeTime, templateId, extras, ownerOverrides, settings.defaultWakeTime]);
-
-  // Autosave snapshot — null when the user hasn't touched anything yet
-  // AND there's no pre-existing plan, so we don't materialize empty docs.
+  // Autosave snapshot — null until hydrated (so we never persist the
+  // defaults ahead of the loaded plan), and null when the user hasn't
+  // touched anything AND there's no pre-existing plan (no empty docs).
   const autosaveInput: TomorrowPlanInput | null = useMemo(() => {
     if (!hydrated) return null;
     if (!hasEdits && plan === null) return null;
@@ -151,12 +103,9 @@ export function useTomorrowPlanState(
 
   const clear = async () => {
     await deleteTomorrowPlan(db, childId, date);
-    setWakeTime(settings.defaultWakeTime);
-    setTemplateId(undefined);
-    setExtras([]);
-    setOwnerOverrides({});
-    // Reset hydration so any future loaded plan re-hydrates cleanly.
-    setHydrated(false);
+    // Reset fields to defaults and re-arm hydration. The doc is already
+    // deleted, so the re-armed hydration folds in a null plan → defaults.
+    form.reset();
   };
 
   const promoteNow = async () => {
@@ -178,11 +127,11 @@ export function useTomorrowPlanState(
     templateId,
     extras,
     ownerOverrides,
-    setWakeTime,
-    setTemplateId,
-    upsertExtra,
-    removeExtra,
-    setOwnerOverride,
+    setWakeTime: form.setWakeTime,
+    setTemplateId: form.setTemplateId,
+    upsertExtra: form.upsertExtra,
+    removeExtra: form.removeExtra,
+    setOwnerOverride: form.setOwnerOverride,
     confirm,
     clear,
     promoteNow,
