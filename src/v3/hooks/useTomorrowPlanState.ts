@@ -103,8 +103,9 @@ export function useTomorrowPlanState(
 
   const clear = async () => {
     await deleteTomorrowPlan(db, childId, date);
-    // Reset fields to defaults and re-arm hydration. The doc is already
-    // deleted, so the re-armed hydration folds in a null plan → defaults.
+    // Blank the form to defaults. reset() stays hydrated, so the
+    // not-yet-propagated (stale) plan snapshot can't re-hydrate the
+    // values we just deleted — which autosave would otherwise resurrect.
     form.reset();
   };
 

@@ -36,7 +36,14 @@ export type UseTomorrowPlanFormResult = {
    * persist the default values ahead of the real loaded plan.
    */
   hydrated: boolean;
-  /** Reset fields to defaults and re-arm hydration (used by clear()). */
+  /**
+   * Blank the fields back to defaults. Used by clear() after the plan
+   * doc is deleted. Deliberately leaves `hydrated` TRUE: re-arming it
+   * would let the still-in-flight (not-yet-null) plan snapshot
+   * re-hydrate the form with the values being deleted — and autosave
+   * would then resurrect the doc. Staying hydrated keeps the form
+   * blank; the subscription's null arrives and changes nothing.
+   */
   reset: () => void;
 };
 
@@ -101,7 +108,10 @@ export function useTomorrowPlanForm(
     setTemplateId(undefined);
     setExtras([]);
     setOwnerOverrides({});
-    setHydrated(false);
+    // Stay hydrated — see the `reset` doc on UseTomorrowPlanFormResult.
+    // Re-arming (setHydrated(false)) would re-hydrate from the stale,
+    // not-yet-deleted plan and autosave would resurrect the doc.
+    setHydrated(true);
   };
 
   return {

@@ -114,34 +114,33 @@ describe("useTomorrowPlanForm", () => {
     expect(result.current.hasEdits).toBe(true);
   });
 
-  // Models the real clear() ordering: the doc is deleted first (plan →
-  // null) and THEN reset() runs. reset() re-arms the one-shot hydration,
-  // which folds in the now-null plan — so the form lands on defaults.
-  it("reset() returns to defaults once the plan is gone (clear() flow)", () => {
-    const { result, rerender } = setup(aPlan({ wakeTime: 6 * 60 }), false);
+  it("reset() blanks the form to defaults and stays hydrated", () => {
+    const { result } = setup(aPlan({ wakeTime: 6 * 60 }), false);
     act(() => result.current.setTemplateId("tpl-x"));
     expect(result.current.hasEdits).toBe(true);
 
-    // Doc deleted: the snapshot goes null. Already hydrated, so the form
-    // keeps its values until reset re-arms hydration.
-    rerender({ p: null, l: false });
     act(() => result.current.reset());
-
     expect(result.current.wakeTime).toBe(DWT);
     expect(result.current.templateId).toBeUndefined();
     expect(result.current.hasEdits).toBe(false);
-    // Re-hydration folded in the null plan and re-armed back to ready.
     expect(result.current.hydrated).toBe(true);
   });
 
-  // The flip side of the one-shot clamp: reset re-arms hydration, so if a
-  // plan is still present it re-hydrates from it (rather than staying
-  // blank). Documents the timing the clear() flow deliberately avoids.
-  it("reset() with a plan still present re-hydrates from that plan", () => {
-    const { result } = setup(aPlan({ wakeTime: 6 * 60 }), false);
+  // The crux of the clear() race fix: reset() must NOT re-arm hydration.
+  // If a stale (not-yet-deleted) plan is still in the subscription when
+  // reset runs, re-arming would re-hydrate the form back to those values
+  // (and autosave would resurrect the doc). Staying hydrated keeps the
+  // form blank regardless of the in-flight plan.
+  it("reset() does not re-hydrate from a still-present (stale) plan", () => {
+    const { result, rerender } = setup(aPlan({ wakeTime: 6 * 60 }), false);
     act(() => result.current.setWakeTime(8 * 60));
+
     act(() => result.current.reset());
-    expect(result.current.hydrated).toBe(true);
-    expect(result.current.wakeTime).toBe(6 * 60);
+    expect(result.current.wakeTime).toBe(DWT); // blanked, not refilled to 6*60
+
+    // A stale snapshot for the old plan is still around — must be ignored.
+    rerender({ p: aPlan({ wakeTime: 6 * 60 }), l: false });
+    expect(result.current.wakeTime).toBe(DWT);
+    expect(result.current.hasEdits).toBe(false);
   });
 });
