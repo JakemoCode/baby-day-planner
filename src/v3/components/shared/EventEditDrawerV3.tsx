@@ -59,6 +59,7 @@ type FormErrors = { startTime?: string; endTime?: string };
 
 function validateForm(
   type: EventType,
+  eventKey: string,
   startTime: TimeMin | undefined,
   endTime: TimeMin | undefined,
   editingId: string | undefined,
@@ -67,10 +68,18 @@ function validateForm(
 ): FormErrors {
   const errors: FormErrors = {};
   // §F66 fast-follow B7: pre-wake guard. AM/PM picker mistakes (12:30
-  // intending pm but stored as 0:30am) anchor a nap or bottle before
-  // wakeTime and wreck the cascade. Catch it at validation time so the
-  // user gets an explainable error instead of a chaotic timeline.
-  if (dayWakeTime !== undefined && startTime !== undefined && startTime < dayWakeTime) {
+  // intending pm but stored as 0:30am) anchor a nap or rhythm bottle
+  // before wakeTime and wreck the cascade. Catch it at validation
+  // time. Scope to cascade-anchoring types only — daily_recurring,
+  // daycare, dream-feed, pump, and extras are fixed-time / explicit-
+  // slot events that the user may legitimately schedule pre-wake.
+  const isCascadeAnchoring = type === "nap" || (type === "bottle" && eventKey !== "bottle_dream");
+  if (
+    isCascadeAnchoring &&
+    dayWakeTime !== undefined &&
+    startTime !== undefined &&
+    startTime < dayWakeTime
+  ) {
     const wakeStr = formatTimeForDisplay(dayWakeTime);
     errors.startTime = `Before today's wake time (${wakeStr}).`;
   }
@@ -276,6 +285,7 @@ export function EventEditDrawerV3({
 
   const errors = validateForm(
     type,
+    sourceEvent.eventKey,
     form.startTime,
     form.endTime,
     sourceEvent.id,

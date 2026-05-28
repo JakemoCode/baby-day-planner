@@ -296,6 +296,41 @@ describe("EventEditDrawerV3", () => {
     expect(onSave).not.toHaveBeenCalled();
   });
 
+  it("§F66 review: B7 pre-wake guard does NOT block a pre-wake daily_recurring (review-found false positive)", async () => {
+    // The B7 rationale (AM/PM mistake wrecks cascade) is
+    // cascade-specific. daily_recurring is fixed-time / explicit-slot
+    // and the user may legitimately schedule it pre-wake (e.g., 5am
+    // medication). Validator must NOT block.
+    const preWakeRecurring: Event = {
+      id: "proj_recurring:rec-medication",
+      dayId: "d-1",
+      eventKey: "recurring:rec-medication",
+      type: "daily_recurring",
+      kind: "instant",
+      startTime: 5 * 60 + 30, // 5:30am, before wakeTime 7:00
+      label: "Medication",
+      hasPutdown: false,
+      owner: NO_OWNER,
+      lifecycle: { state: "projected" },
+    };
+    render(
+      <EventEditDrawerV3
+        open
+        mode="edit"
+        event={preWakeRecurring}
+        owners={owners}
+        nowMinutes={NOW}
+        bedtimeThreshold={THRESHOLD}
+        defaultWakeTime={DEFAULT_WAKE_TIME}
+        dayWakeTime={7 * 60}
+        onSave={() => {}}
+        onCancel={() => {}}
+      />,
+    );
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(screen.getByRole("button", { name: "Save" })).toBeEnabled();
+  });
+
   it("§F66 fast-follow B1: does not flag overlap against a render-synthetic putdown chip", async () => {
     // §F66 dogfood: tapping a nap's end-time edit would surface
     // "Overlaps Putdown" because the synthetic putdown chip carries

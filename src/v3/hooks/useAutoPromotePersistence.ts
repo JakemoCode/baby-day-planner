@@ -57,15 +57,26 @@ export function useAutoPromotePersistence(input: UseAutoPromotePersistenceInput)
       // Naps / bedtime have explicit confirmation flows (End nap,
       // wake-confirm sheet) that own their own write paths.
       if (e.type !== "bottle") continue;
+      // Dream-feed has its own per-day suppression path
+      // (Day.suppressedDreamFeed). Auto-persisting it would create a
+      // second write path that bypasses the suppression-from-emission
+      // model the rest of the dream-feed code uses.
+      if (e.eventKey === "bottle_dream") continue;
       if (e.lifecycle.state === "projected") continue;
       // Already-persisted events have non-"proj_" ids — their
       // lifecycle came from Firestore, not from auto-promote.
       if (!e.id.startsWith("proj_")) continue;
       const recordedId = `recorded_${e.eventKey}`;
       if (actualIds.has(recordedId)) continue;
-      if (writtenIds.current.has(recordedId)) continue;
+      // §F66 review: cache key MUST include dayId. The Firestore path
+      // is dayId-scoped but recordedId alone collides across days,
+      // so Day B's bottle_1 was silently skipped after Day A persisted
+      // its bottle_1 (dev StartDayButton wipes events but the hook
+      // stays mounted with stale writtenIds).
+      const cacheKey = `${e.dayId}:${recordedId}`;
+      if (writtenIds.current.has(cacheKey)) continue;
 
-      writtenIds.current.add(recordedId);
+      writtenIds.current.add(cacheKey);
       const toWrite: Event = { ...e, id: recordedId };
       const childIdForWrite = childId;
       const dayIdForWrite = e.dayId;
@@ -83,7 +94,7 @@ export function useAutoPromotePersistence(input: UseAutoPromotePersistenceInput)
         // Transaction failed (offline, permissions, races outside the
         // transaction's view). Remove from session cache so the next
         // render retries.
-        writtenIds.current.delete(recordedId);
+        writtenIds.current.delete(cacheKey);
         console.warn("[auto-promote] persist failed", recordedId, err);
       });
     }
