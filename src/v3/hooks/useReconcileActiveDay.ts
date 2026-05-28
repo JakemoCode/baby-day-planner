@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { collection, getDocs, limit, query, where, type Firestore } from "firebase/firestore";
+import { collection, getDocs, limit, query, where } from "firebase/firestore";
 import { db } from "@/lib/firebase/client";
 import { daysCollectionPath } from "@/lib/firestore/paths";
 import { v3DayConverter } from "../firestore/converters";
@@ -55,10 +55,7 @@ export function useReconcileActiveDay(
     let cancelled = false;
 
     async function reconcile() {
-      const database = db as Firestore;
-      const daysRef = collection(database, daysCollectionPath(childId)).withConverter(
-        v3DayConverter,
-      );
+      const daysRef = collection(db, daysCollectionPath(childId)).withConverter(v3DayConverter);
       const activeQuery = query(daysRef, where("status", "==", "active"), limit(1));
       const activeSnap = await getDocs(activeQuery);
       const active = activeSnap.empty ? null : activeSnap.docs[0]!.data();
@@ -67,7 +64,7 @@ export function useReconcileActiveDay(
       // alongside the active-day check so stale state never accumulates.
       // Errors here don't block promote — they just leave shadow docs
       // that the next reconcile will catch.
-      deleteStaleTomorrowPlans(database, childId, today).catch((err) => {
+      deleteStaleTomorrowPlans(db, childId, today).catch((err) => {
         console.error("[useReconcileActiveDay] stale-plan GC failed", err);
       });
 
@@ -78,11 +75,11 @@ export function useReconcileActiveDay(
 
       // Active is stale or missing. Look for a confirmed plan for today;
       // fall back to settings defaults.
-      const plan = await loadTomorrowPlan(database, childId, today);
+      const plan = await loadTomorrowPlan(db, childId, today);
       if (plan?.status === "confirmed") {
-        await promoteFromPlan(database, childId, plan, wakeTimeRef.current);
+        await promoteFromPlan(db, childId, plan, wakeTimeRef.current);
       } else {
-        await startNewDay(database, childId, {
+        await startNewDay(db, childId, {
           newDate: today,
           newWakeTime: wakeTimeRef.current,
         });
