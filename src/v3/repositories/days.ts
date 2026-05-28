@@ -160,35 +160,43 @@ export async function suppressRecurringForDay(
 }
 
 /**
- * §F66 fast-follow: per-day daycare opt-out. The engine's daycare rule
- * (R21.5) already honors `Day.suppressedDaycareDay`; this writes the
- * field from the drawer's "delete" handler on a daycare event.
- * Tomorrow's fresh Day doc starts with `false`.
+ * Set a boolean per-day suppression flag to `true`. The drawer's
+ * "delete" handler routes here for the singleton opt-outs whose Day
+ * field is a plain boolean (vs. the array-shaped suppressedRecurringIds,
+ * which uses arrayUnion). Tomorrow's fresh Day doc starts these at
+ * `false`, so the suppression is scoped to the current day.
  */
-export async function suppressDaycareForDay(
+function setDayBooleanFlag(
+  db: Firestore,
+  childId: string,
+  dayId: string,
+  field: "suppressedDaycareDay" | "suppressedDreamFeed",
+): Promise<void> {
+  return updateDoc(dayRef(db, childId, dayId), { [field]: true });
+}
+
+/**
+ * §F66 fast-follow: per-day daycare opt-out. The engine's daycare rule
+ * (R21.5) already honors `Day.suppressedDaycareDay`.
+ */
+export function suppressDaycareForDay(
   db: Firestore,
   childId: string,
   dayId: string,
 ): Promise<void> {
-  await updateDoc(dayRef(db, childId, dayId), {
-    suppressedDaycareDay: true,
-  });
+  return setDayBooleanFlag(db, childId, dayId, "suppressedDaycareDay");
 }
 
 /**
  * §F66 fast-follow: per-day dream-feed opt-out. R5.5 honors
- * `Day.suppressedDreamFeed`; this writes the field from the drawer's
- * "delete" handler on the dream-feed slot. Tomorrow's fresh Day doc
- * starts with `false`.
+ * `Day.suppressedDreamFeed`.
  */
-export async function suppressDreamFeedForDay(
+export function suppressDreamFeedForDay(
   db: Firestore,
   childId: string,
   dayId: string,
 ): Promise<void> {
-  await updateDoc(dayRef(db, childId, dayId), {
-    suppressedDreamFeed: true,
-  });
+  return setDayBooleanFlag(db, childId, dayId, "suppressedDreamFeed");
 }
 
 /**

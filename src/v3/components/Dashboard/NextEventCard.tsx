@@ -1,5 +1,5 @@
 import type { Event, OwnersConfig, TimeMin } from "@/v3/schemas";
-import { formatHoursMinutes, formatTimeForDisplay } from "@/v3/ui/time";
+import { formatStartDelta, formatTimeForDisplay } from "@/v3/ui/time";
 import { OwnerPill } from "./OwnerPill";
 import styles from "./NextEventCard.module.css";
 
@@ -9,11 +9,6 @@ export type NextEventCardProps = {
   owners: OwnersConfig;
   putdownLeadMinutes: number;
 };
-
-function formatDelta(deltaMinutes: number): { text: string; isNow: boolean } {
-  if (deltaMinutes <= 0) return { text: "now", isNow: true };
-  return { text: `in ${formatHoursMinutes(deltaMinutes)}`, isNow: false };
-}
 
 export function NextEventCard({
   event,
@@ -29,7 +24,7 @@ export function NextEventCard({
     );
   }
 
-  const delta = formatDelta(event.startTime - nowMinutes);
+  const delta = formatStartDelta(event.startTime - nowMinutes);
   const showPutdown = event.type === "nap" || event.type === "bedtime";
   const putdownTime = Math.max(0, event.startTime - putdownLeadMinutes) as TimeMin;
 

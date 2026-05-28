@@ -1,5 +1,10 @@
 import type { Event, OwnersConfig, TimeMin } from "@/v3/schemas";
-import { formatHoursMinutes, formatTimeForDisplay, formatTimeShort } from "@/v3/ui/time";
+import {
+  formatHoursMinutes,
+  formatStartDelta,
+  formatTimeForDisplay,
+  formatTimeShort,
+} from "@/v3/ui/time";
 import { OwnerPill } from "./OwnerPill";
 import { lastCompletedNap, napTotals } from "./dashboardStats";
 import styles from "./NextSleepPanel.module.css";
@@ -17,11 +22,6 @@ function pluralNaps(n: number): string {
   return n === 1 ? "nap" : "naps";
 }
 
-function formatDelta(deltaMinutes: number): string {
-  if (deltaMinutes <= 0) return "now";
-  return `in ${formatHoursMinutes(deltaMinutes)}`;
-}
-
 export function NextSleepPanel({
   nextNap,
   bedtime,
@@ -33,15 +33,16 @@ export function NextSleepPanel({
   const last = lastCompletedNap(actuals, nowMinutes);
   const totals = napTotals(actuals, nowMinutes);
   const putdownTime = nextNap && (Math.max(0, nextNap.startTime - putdownLeadMinutes) as TimeMin);
+  const delta = nextNap ? formatStartDelta(nextNap.startTime - nowMinutes) : null;
 
   return (
     <section className={styles.card} aria-label="Sleep stats">
       <p className={styles.heading}>Next sleep</p>
-      {nextNap && (
+      {nextNap && delta && (
         <>
           <div className={styles.timeRow}>
             <span className={styles.time}>{formatTimeForDisplay(nextNap.startTime)}</span>
-            <span className={styles.delta}>{formatDelta(nextNap.startTime - nowMinutes)}</span>
+            <span className={styles.delta}>{delta.text}</span>
             {nextNap.owner && <OwnerPill owner={nextNap.owner} owners={owners} />}
           </div>
           {putdownTime !== undefined && (
