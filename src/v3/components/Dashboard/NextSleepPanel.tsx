@@ -33,17 +33,16 @@ export function NextSleepPanel({
   const last = lastCompletedNap(actuals, nowMinutes);
   const totals = napTotals(actuals, nowMinutes);
   const putdownTime = nextNap && (Math.max(0, nextNap.startTime - putdownLeadMinutes) as TimeMin);
+  const delta = nextNap ? formatStartDelta(nextNap.startTime - nowMinutes) : null;
 
   return (
     <section className={styles.card} aria-label="Sleep stats">
       <p className={styles.heading}>Next sleep</p>
-      {nextNap && (
+      {nextNap && delta && (
         <>
           <div className={styles.timeRow}>
             <span className={styles.time}>{formatTimeForDisplay(nextNap.startTime)}</span>
-            <span className={styles.delta}>
-              {formatStartDelta(nextNap.startTime - nowMinutes).text}
-            </span>
+            <span className={styles.delta}>{delta.text}</span>
             {nextNap.owner && <OwnerPill owner={nextNap.owner} owners={owners} />}
           </div>
           {putdownTime !== undefined && (

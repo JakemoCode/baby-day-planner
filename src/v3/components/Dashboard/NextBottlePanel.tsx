@@ -18,16 +18,15 @@ function pluralBottles(n: number): string {
 export function NextBottlePanel({ nextBottle, actuals, nowMinutes, owners }: NextBottlePanelProps) {
   const last = lastBottle(actuals, nowMinutes);
   const totals = bottleTotals(actuals, nowMinutes);
+  const delta = nextBottle ? formatStartDelta(nextBottle.startTime - nowMinutes) : null;
 
   return (
     <section className={styles.card} aria-label="Bottle stats">
       <p className={styles.heading}>Next bottle</p>
-      {nextBottle && (
+      {nextBottle && delta && (
         <div className={styles.timeRow}>
           <span className={styles.time}>{formatTimeForDisplay(nextBottle.startTime)}</span>
-          <span className={styles.delta}>
-            {formatStartDelta(nextBottle.startTime - nowMinutes).text}
-          </span>
+          <span className={styles.delta}>{delta.text}</span>
           {nextBottle.owner && <OwnerPill owner={nextBottle.owner} owners={owners} />}
         </div>
       )}
