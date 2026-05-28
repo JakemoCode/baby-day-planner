@@ -40,7 +40,7 @@ const ev = (overrides: Partial<Event>): Event => ({
 describe("TimelineV3", () => {
   it("renders the empty state when no events", () => {
     render(<TimelineV3 events={[]} owners={owners} />);
-    expect(screen.getByText("Nothing scheduled yet.")).toBeInTheDocument();
+    expect(screen.getByText("Nothing scheduled yet.")).toBeVisible();
   });
 
   it("renders block events and instant chips", () => {

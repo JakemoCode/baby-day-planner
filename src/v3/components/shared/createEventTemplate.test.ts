@@ -90,6 +90,66 @@ describe("buildCreateTemplate (V3)", () => {
     expect(tpl.label).toBe("Bottle 2");
   });
 
+  it("with projected[] passed, picks max(eventKey N) + 1 across actuals + projected", () => {
+    // When the engine has emitted bottle_5 as a projection and only
+    // bottle_1 is recorded, a new template must claim bottle_6 —
+    // NOT bottle_2 (which would collide with the engine's projection).
+    const projectedAhead: Event = {
+      id: "b-proj-5",
+      dayId: "d-1",
+      eventKey: "bottle_5",
+      type: "bottle",
+      kind: "instant",
+      startTime: 16 * 60,
+      label: "Bottle 5",
+      amountOz: 5,
+      hasPutdown: false,
+      owner: NO_OWNER,
+      lifecycle: { state: "projected" },
+    };
+    const tpl = buildCreateTemplate({
+      type: "bottle",
+      dayId: "d-1",
+      actuals: [recordedBottle(1, 7 * 60)],
+      projected: [projectedAhead],
+      settings: settings(),
+      nowMinutes: NOW,
+    });
+    expect(tpl.eventKey).toBe("bottle_6");
+    expect(tpl.label).toBe("Bottle 6");
+  });
+
+  it("with empty projected[] passed, still scans actual eventKeys (regex path)", () => {
+    // Exercises the projected-branch when projected[] is present but
+    // empty — must still take max(actuals' eventKey N) + 1, not the
+    // length-based count of the no-projected branch.
+    const tpl = buildCreateTemplate({
+      type: "bottle",
+      dayId: "d-1",
+      actuals: [recordedBottle(3, 7 * 60)],
+      projected: [],
+      settings: settings(),
+      nowMinutes: NOW,
+    });
+    expect(tpl.eventKey).toBe("bottle_4");
+  });
+
+  it("with a gap in recorded ordinals, picks max + 1 — NOT first-free", () => {
+    // bottle_1 + bottle_4 (no _2 or _3) must yield bottle_5, not bottle_2.
+    // The cascade depends on monotonic eventKey ordinals, so filling a
+    // gap would collide with any future engine projection that re-uses
+    // the missing slot.
+    const tpl = buildCreateTemplate({
+      type: "bottle",
+      dayId: "d-1",
+      actuals: [recordedBottle(1, 7 * 60), recordedBottle(4, 14 * 60)],
+      projected: [],
+      settings: settings(),
+      nowMinutes: NOW,
+    });
+    expect(tpl.eventKey).toBe("bottle_5");
+  });
+
   // Per spec PR #146: parents adjust by editing existing projected
   // nap chips, never by adding new naps via FAB. The "nap" branch in
   // buildCreateTemplate is removed; the picker no longer offers it.
