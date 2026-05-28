@@ -28,10 +28,7 @@ import {
 } from "@/v3/repositories/events";
 import { db } from "@/lib/firebase/client";
 import { DashboardSkeleton } from "@/v3/components/Dashboard/DashboardSkeleton";
-import { FAB } from "@/components/shared/FAB";
-import { FABTypePicker } from "@/components/shared/FABTypePicker";
-import type { CreatableType } from "@/v3/components/shared/createEventTemplate";
-import { buildCreateTemplate } from "@/v3/components/shared/createEventTemplate";
+import { AddEventFAB } from "@/v3/components/shared/AddEventFAB";
 import { DrawerShell } from "@/v3/components/shared/DrawerShell";
 import { NowBanner } from "@/v3/components/Dashboard/NowBanner";
 import { ContextualActionButton } from "@/v3/components/Dashboard/ContextualActionButton";
@@ -85,7 +82,6 @@ export default function DashboardPage() {
   // re-promote from the plan vs defaults during dogfood iteration.
   const { plan: todaysPlan } = useV3TomorrowPlan(CHILD_ID, todayDate());
   const hasTomorrowPlan = todaysPlan?.status === "confirmed";
-  const [pickerOpen, setPickerOpen] = useState(false);
   const [wakeSheetOpen, setWakeSheetOpen] = useState(false);
 
   // §F66 fast-follow B5: persist engine-auto-promoted bottles to
@@ -282,23 +278,13 @@ export default function DashboardPage() {
         )}
       </div>
 
-      <FAB label="Add an event" onClick={() => setPickerOpen(true)} />
-
-      <FABTypePicker
-        open={pickerOpen}
-        onSelect={(type: CreatableType) => {
-          setPickerOpen(false);
-          const tpl = buildCreateTemplate({
-            type,
-            dayId: day.id,
-            actuals,
-            settings,
-            nowMinutes,
-            projected,
-          });
-          openCreate(tpl);
-        }}
-        onCancel={() => setPickerOpen(false)}
+      <AddEventFAB
+        dayId={day.id}
+        actuals={actuals}
+        settings={settings}
+        nowMinutes={nowMinutes}
+        projected={projected}
+        onCreate={openCreate}
       />
 
       <DrawerShell
