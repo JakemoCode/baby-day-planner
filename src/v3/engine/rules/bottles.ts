@@ -383,13 +383,12 @@ const RuleRenumberBottlesChronologically: Rule = {
  */
 function computeRenumber(events: Event[]): Map<string, { eventKey: string; label: string }> {
   const all = bottlesByStartTime(events);
-  const recordedNums = new Set<number>();
+  let maxRecorded = 0;
   for (const b of all) {
     if (b.lifecycle.state === "projected") continue;
     const idx = bottleIndexFromKey(b.eventKey);
-    if (idx !== null) recordedNums.add(idx);
+    if (idx !== null && idx > maxRecorded) maxRecorded = idx;
   }
-  const maxRecorded = recordedNums.size > 0 ? Math.max(...recordedNums) : 0;
   let slot = maxRecorded + 1; // projected eventKeys start above every recorded number
   const result = new Map<string, { eventKey: string; label: string }>();
   let position = 1;

@@ -195,10 +195,10 @@
 - **Source**: b1ef541 (2026-05-07)
 
 ### EC-B4: Renumber doesn't change Firestore eventKeys
-- **Given**: bottle_4 manual at 12:00, bottle_3 actual at 14:00
+- **Given**: bottle_4 manual at 12:00, bottle_3 actual at 14:00 (only two bottles that day)
 - **When**: projection completes
-- **Then**: in-memory display shows them as Bottle 3 / Bottle 4; Firestore docs still have original eventKeys
-- **Rule(s)**: R5.5
+- **Then**: in-memory display labels them by clock order — 12:00 → "Bottle 1", 14:00 → "Bottle 2"; Firestore docs keep their original eventKeys (bottle_4, bottle_3)
+- **Rule(s)**: R5.4
 - **Source**: b1ef541 (2026-05-07)
 
 ### EC-B5: Bottle inside nap moves to nearer edge

@@ -103,18 +103,15 @@ describe("R5.8 — cascade stops at midnight (the 'midnight rule', DOMAIN.md §2
 });
 
 describe("R5.4 — labels renumber chronologically (all bottles); recorded eventKeys frozen", () => {
-  it("recorded bottles with non-chronological eventKeys get chronological LABELS; eventKeys stay frozen", () => {
-    // FAB-inserted bottle at 7:30 carries eventKey 'bottle_2' (later slot); the
-    // earlier-logged bottle at 9:00 carries 'bottle_1'. Display labels follow
-    // clock order; the persisted eventKeys do not change (EC-B4).
-    const lateInserted = aRecordedBottle({
-      id: "b_late_insert",
+  it("labels two recorded bottles by clock order while their non-chronological eventKeys stay frozen", () => {
+    const recordedAt0730WithLaterKey = aRecordedBottle({
+      id: "b_0730",
       eventKey: "bottle_2",
       label: "Bottle 2",
       start: 7 * 60 + 30,
     });
-    const firstLogged = aRecordedBottle({
-      id: "b_first_logged",
+    const recordedAt0900WithEarlierKey = aRecordedBottle({
+      id: "b_0900",
       eventKey: "bottle_1",
       label: "Bottle 1",
       start: 9 * 60,
@@ -126,8 +123,8 @@ describe("R5.4 — labels renumber chronologically (all bottles); recorded event
         bottleChain: { bottlesPerDay: 2, bufferAfterWakeMinutes: 10 },
         defaultBottleIntervalMinutes: 180,
       }),
-      actuals: [lateInserted, firstLogged],
-      nowMinutes: 10 * 60, // before cascade-natural emit to avoid auto-promote interference
+      actuals: [recordedAt0730WithLaterKey, recordedAt0900WithEarlierKey],
+      nowMinutes: 10 * 60,
     });
 
     const out = projectDay(
@@ -144,25 +141,21 @@ describe("R5.4 — labels renumber chronologically (all bottles); recorded event
       .filter((e) => e.type === "bottle")
       .sort((a, b) => a.startTime - b.startTime);
 
-    // eventKeys frozen: 7:30 stays bottle_2, 9:00 stays bottle_1.
-    expect(bottles[0]!.id).toBe("b_late_insert"); // 7:30 one
+    expect(bottles[0]!.id).toBe("b_0730");
     expect(bottles[0]!.eventKey).toBe("bottle_2");
-    expect(bottles[1]!.id).toBe("b_first_logged"); // 9:00 one
+    expect(bottles[1]!.id).toBe("b_0900");
     expect(bottles[1]!.eventKey).toBe("bottle_1");
-    // Labels are chronological for ALL bottles: 7:30 → "Bottle 1", 9:00 → "Bottle 2", …
     bottles.forEach((b, i) => expect(b.label).toBe(`Bottle ${i + 1}`));
-    // Projected bottles still fill eventKeys from max(recorded)+1 = bottle_3 onward.
-    const projected = bottles.filter((b) => b.lifecycle.state === "projected");
-    expect(projected.length).toBeGreaterThan(0);
-    expect(projected[0]!.eventKey).toBe("bottle_3");
+    const firstProjected = bottles.find((b) => b.lifecycle.state === "projected");
+    expect(firstProjected!.eventKey).toBe("bottle_3");
   });
 
-  it("a time-edited recorded bottle keeps its eventKey but its label tracks its new position", () => {
+  it("relabels a time-edited recorded bottle to its new chronological position, keeping its eventKey", () => {
     const recorded = aRecordedBottle({
       id: "b_recorded",
       eventKey: "bottle_3",
       label: "Bottle 3",
-      start: 12 * 60 + 30, // moved from 13:10 → 12:30
+      start: 12 * 60 + 30,
     });
     const ctx = aContext({
       day: aDay({ wakeTime: 7 * 60 }),
@@ -186,15 +179,11 @@ describe("R5.4 — labels renumber chronologically (all bottles); recorded event
       .filter((e) => e.type === "bottle")
       .sort((a, b) => a.startTime - b.startTime);
     const rec = bottles.find((b) => b.id === "b_recorded")!;
-    expect(rec.eventKey).toBe("bottle_3"); // frozen Firestore identity
-    // Label = the recorded bottle's chronological rank among all bottles.
+    expect(rec.eventKey).toBe("bottle_3");
     expect(rec.label).toBe(`Bottle ${bottles.indexOf(rec) + 1}`);
-    // Every bottle's label matches its chronological position (EC-B3 invariant).
     bottles.forEach((b, i) => expect(b.label).toBe(`Bottle ${i + 1}`));
-    // Subsequent projected bottles still start at bottle_4 (max recorded + 1).
-    const projected = bottles.filter((b) => b.lifecycle.state === "projected");
-    expect(projected.length).toBeGreaterThan(0);
-    expect(projected[0]!.eventKey).toBe("bottle_4");
+    const firstProjected = bottles.find((b) => b.lifecycle.state === "projected");
+    expect(firstProjected!.eventKey).toBe("bottle_4");
   });
 });
 
