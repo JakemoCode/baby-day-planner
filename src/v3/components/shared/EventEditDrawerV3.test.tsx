@@ -344,6 +344,39 @@ describe("EventEditDrawerV3", () => {
     expect(screen.getByRole("button", { name: "Save" })).toBeEnabled();
   });
 
+  it("B7 pre-wake guard does NOT block an overnight bottle (DOMAIN.md §overnight-bottles)", async () => {
+    // Babies wake overnight to feed. Per DOMAIN.md, an overnight bottle
+    // (startTime < wakeTime) is normal and does NOT anchor the cascade —
+    // the engine already filters anchors to startTime >= wakeTime. The
+    // B7 guard's AM/PM rationale is nap-specific; for a bottle a pre-wake
+    // time is indistinguishable from (and usually IS) a real 4am feed, so
+    // the validator must not block it.
+    const recorded = projectedBottle({
+      lifecycle: { state: "recorded", annotatedAt: 7 * 60 + 30 },
+      startTime: 7 * 60 + 30,
+    });
+    const onSave = vi.fn();
+    render(
+      <EventEditDrawerV3
+        open
+        mode="edit"
+        event={recorded}
+        owners={owners}
+        nowMinutes={NOW}
+        bedtimeThreshold={THRESHOLD}
+        defaultWakeTime={DEFAULT_WAKE_TIME}
+        dayWakeTime={7 * 60}
+        onSave={onSave}
+        onCancel={() => {}}
+      />,
+    );
+    const start = screen.getByLabelText("Start time");
+    await userEvent.clear(start);
+    await userEvent.type(start, "04:07"); // 4:07am overnight feed
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(screen.getByRole("button", { name: "Save" })).toBeEnabled();
+  });
+
   it("does not flag overlap against a render-synthetic putdown chip", async () => {
     // Synthetic putdown carries type="nap" for layout; validator skips eventKey===PUTDOWN_KIND_TAG.
     const putdownSynthetic: Event = {

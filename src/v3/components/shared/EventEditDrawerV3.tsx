@@ -7,7 +7,7 @@ import type { Event, EventType, OwnerRef, OwnersConfig, TimeMin } from "../../sc
 import { isRecorded, NO_OWNER } from "../../schemas";
 import { isFutureProjected, isNextProjectedOfType } from "../../lifecycle";
 import { isRenderSynthetic } from "../../lib/syntheticEvents";
-import { DREAM_FEED_EVENT_KEY, recordedIdFor } from "../../lib/eventConventions";
+import { recordedIdFor } from "../../lib/eventConventions";
 import { formatHM24, formatTimeForDisplay, nextDayAt, parseHM24 } from "../../ui/time";
 import { OwnerPickerV3 } from "./OwnerPickerV3";
 import { formToEvent, type FormState } from "./formToEvent";
@@ -61,7 +61,6 @@ type FormErrors = { startTime?: string; endTime?: string };
 
 function validateForm(
   type: EventType,
-  eventKey: string,
   startTime: TimeMin | undefined,
   endTime: TimeMin | undefined,
   editingId: string | undefined,
@@ -69,10 +68,14 @@ function validateForm(
   dayWakeTime: TimeMin | undefined,
 ): FormErrors {
   const errors: FormErrors = {};
-  // Pre-wake guard: AM/PM picker mistakes can anchor a cascade event before wakeTime.
-  // Scope to cascade-anchoring types only (nap, rhythm bottle).
-  const isCascadeAnchoring =
-    type === "nap" || (type === "bottle" && eventKey !== DREAM_FEED_EVENT_KEY);
+  // Pre-wake guard: an AM/PM picker mistake (12:30pm stored as 0:30am)
+  // anchors a nap before wakeTime and silently wrecks the cascade. Naps
+  // only — a baby asleep overnight is the overnight sleep, not a nap.
+  // Bottles are exempt: per DOMAIN.md, overnight feeds are normal, do
+  // NOT anchor the cascade (the engine filters anchors to
+  // startTime >= wakeTime), and a pre-wake bottle time is
+  // indistinguishable from a real 4am feed.
+  const isCascadeAnchoring = type === "nap";
   if (
     isCascadeAnchoring &&
     dayWakeTime !== undefined &&
@@ -237,7 +240,6 @@ export function EventEditDrawerV3({
 
   const errors = validateForm(
     type,
-    sourceEvent.eventKey,
     form.startTime,
     form.endTime,
     sourceEvent.id,
