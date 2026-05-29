@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { renderWithAuth, screen, userEvent } from "@/test-utils";
+import { renderWithAuth, screen, userEvent, within } from "@/test-utils";
 import type { Day, Event, OwnersConfig, Settings } from "@/v3/schemas";
 import { NO_OWNER } from "@/v3/schemas";
 import { aSettings } from "@/v3/__tests__/factories";
@@ -210,6 +210,30 @@ describe("DashboardPage (V3)", () => {
     renderWithAuth(<DashboardPage />);
     expect(screen.queryByRole("button", { name: /Start first day/i })).toBeNull();
     expect(screen.getByRole("region", { name: /bottle stats/i })).toBeVisible();
+  });
+
+  it("§F67: Next bottle panel shows the next bottle even when it's >15min out", () => {
+    // The next projected bottle is 2h ahead — well outside the ±15min
+    // Log-Bottle-Time window (LOG_BOTTLE_WINDOW_MIN). The panel must
+    // still announce it; it was previously fed `nearestBottleInWindow`,
+    // which returned undefined here and left the "Next bottle" heading
+    // with no time. It should be fed `nextBottle` instead.
+    const futureBottle: Event = {
+      id: "b-future",
+      dayId: "day-1",
+      eventKey: "bottle_3",
+      type: "bottle",
+      kind: "instant",
+      label: "Bottle 3",
+      startTime: 11 * 60, // 11:00 AM, 2h after now
+      hasPutdown: false,
+      owner: NO_OWNER,
+      lifecycle: { state: "projected" },
+    };
+    setupHooks({ nowMinutes: 9 * 60, projected: [futureBottle] });
+    renderWithAuth(<DashboardPage />);
+    const panel = within(screen.getByRole("region", { name: /bottle stats/i }));
+    expect(panel.getByText("11:00 AM")).toBeVisible();
   });
 
   it("handleEndNap saves completed nap with endTime committed (TIME_EDIT action)", async () => {

@@ -8,6 +8,7 @@ import { isRenderSynthetic } from "@/v3/lib/syntheticEvents";
 import {
   currentWakeWindow,
   nearestBottleInWindow,
+  nextBottle,
   nextNap,
   projectedBedtime,
 } from "@/v3/selectors";
@@ -92,6 +93,10 @@ export default function DashboardPage() {
   const next = nextDashboardEvent(projected, nowMinutes);
 
   const nb = nearestBottleInWindow(projected, nowMinutes, LOG_BOTTLE_WINDOW_MIN);
+  // §F67: the panel announces the next upcoming bottle (any distance out),
+  // distinct from `nb`'s ±15min log-confirm window which the contextual
+  // button uses.
+  const upcomingBottle = nextBottle(projected, nowMinutes);
   const nn = nextNap(projected, nowMinutes);
   const cww = currentWakeWindow(projected, nowMinutes);
   // Use `projected` (not `actuals`) to surface engine-auto-promoted in-progress naps.
@@ -177,7 +182,7 @@ export default function DashboardPage() {
         putdownLeadMinutes={settings.putdownLeadMinutes}
       />
       <NextBottlePanel
-        nextBottle={nb}
+        nextBottle={upcomingBottle}
         actuals={actuals}
         nowMinutes={nowMinutes}
         owners={settings.owners}
