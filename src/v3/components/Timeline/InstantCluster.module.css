@@ -22,10 +22,14 @@
    * vertical midline locked to startMinutes regardless of chip height. */
   transform: translateY(-50%);
   transition: opacity var(--motion-fast) var(--easing-out);
+  /* §F53: now/future chips paint on top of the extra-duration band (z:1). */
+  z-index: 2;
 }
 
 .cluster[data-past="true"] {
   opacity: 0.45;
+  /* §F53: past chips recede behind the band (and other blocks). */
+  z-index: 0;
 }
 
 /* Leader line: thin neutral grey segment from the block lane's right edge

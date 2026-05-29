@@ -271,6 +271,70 @@ describe("TimelineV3", () => {
     expect(screen.queryAllByTestId("instant-chip")).toHaveLength(2);
   });
 
+  // §F53: a recurring event WITH a duration (kind: block) is a custom user
+  // event (e.g. a daily 3pm walk). It must share the right-hand custom column
+  // with extras/pumps — not paint full-gutter-width behind the sleep cascade.
+  it("recurring stays in the left custom column; extra-with-duration flips to the right band", () => {
+    const recurring = ev({
+      id: "walk",
+      type: "daily_recurring",
+      kind: "block",
+      eventKey: "recurring_walk",
+      startTime: 15 * 60,
+      endTime: 15 * 60 + 30,
+      label: "Walk",
+    });
+    const extra = ev({
+      id: "x",
+      type: "extra",
+      kind: "block",
+      eventKey: "extra_1",
+      startTime: 10 * 60,
+      endTime: 14 * 60,
+      label: "Anything",
+    });
+    const nap = ev({ id: "n", type: "nap", startTime: 13 * 60, endTime: 14 * 60 });
+    const { container } = render(<TimelineV3 events={[recurring, extra, nap]} owners={owners} />);
+    const el = (type: string) => container.querySelector(`[data-type="${type}"]`) as HTMLElement;
+    const leftOf = (type: string) => parseInt(el(type).style.left || "0", 10);
+    // Recurring is inset to the custom column, well past the nap's full-gutter left.
+    expect(leftOf("daily_recurring")).toBeGreaterThan(leftOf("nap"));
+    // Extra-with-duration is a fixed-width band, right-anchored so its left
+    // edge lands on the column break (no left edge set; width = 80px).
+    expect(el("extra").style.left).toBe("");
+    expect(el("extra").style.right).not.toBe("");
+    expect(el("extra").style.width).toBe("80px");
+  });
+
+  // §F53: recurring duration blocks fell to the default z-tier (wake_window),
+  // painting behind everything. They must paint above the wake-window background.
+  it("paints a recurring duration block above an overlapping wake window", () => {
+    const wake = ev({
+      id: "ww",
+      type: "wake_window",
+      kind: "block",
+      eventKey: "wake_window_1",
+      startTime: 15 * 60,
+      endTime: 16 * 60,
+      label: "Wake Window",
+    });
+    const recurring = ev({
+      id: "walk",
+      type: "daily_recurring",
+      kind: "block",
+      eventKey: "recurring_walk",
+      startTime: 15 * 60,
+      endTime: 15 * 60 + 30,
+      label: "Walk",
+    });
+    // Recurring first in input order so a no-op zOrder would leave it painted first (behind).
+    const { container } = render(<TimelineV3 events={[recurring, wake]} owners={owners} />);
+    const blocks = Array.from(container.querySelectorAll('[data-testid="timeline-block"]'));
+    const idx = (type: string) => blocks.findIndex((b) => b.getAttribute("data-type") === type);
+    // Later in DOM = painted on top.
+    expect(idx("daily_recurring")).toBeGreaterThan(idx("wake_window"));
+  });
+
   // §11.A wake-instant deduplication: WAIVED. V3 EventType has no "wake" event;
   // wake is derived from Day.wakeTime, so the V2 conflict class cannot be constructed.
 });

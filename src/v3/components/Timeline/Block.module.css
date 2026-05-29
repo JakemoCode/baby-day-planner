@@ -45,24 +45,33 @@
 
 /* === Z-index ordering ========================================
  * Order (back to front):
- *   wake_window (1) → nap, bedtime (2) → putdown (3) → extra (4) → pump (5)
+ *   wake_window (1) → nap, bedtime, daily_recurring (2) → putdown (3)
+ *   → extra (4) → pump (5)
  *
  * Pumps must render in front of sleep blocks because they're a parallel
  * parent-schedule activity sized to max-content. Extras above nap/bedtime
  * so user content never hides behind a cascade-projected block.
+ *
+ * §F53: daily_recurring (a recurring event WITH a duration) sits at the
+ * sleep tier — on top of naps (DOM order breaks the z:2 tie) but under
+ * pumps. Without an explicit rule it fell to auto (~0) and hid behind
+ * everything regardless of paint order.
  */
 .block[data-type="wake_window"] {
   z-index: 1;
 }
 .block[data-type="nap"],
-.block[data-type="bedtime"] {
+.block[data-type="bedtime"],
+.block[data-type="daily_recurring"] {
   z-index: 2;
 }
 .block[data-type="putdown"] {
   z-index: 3;
 }
+/* §F53: extra-with-duration is a background band in the instant column at
+ * z:1 — future chips (z:2) paint on top of it, past chips (z:0) behind it. */
 .block[data-type="extra"] {
-  z-index: 4;
+  z-index: 1;
 }
 .block[data-type="pump"] {
   z-index: 5;
@@ -106,6 +115,15 @@
 .block[data-type="extra"][data-color-mode="type"] {
   background: var(--color-honey-soft);
   border-color: var(--color-honey);
+}
+
+/* §F53: recurring-with-duration gets its own light-rust tint so it reads as a
+ * distinct "recurring activity" class — not confused with honey extras or sage
+ * sleep blocks. Derived via color-mix (matching the file's tint convention; wider
+ * browser support than relative-color hsl). Border stays the default
+ * --color-border-strong (a rust border read as alarming). */
+.block[data-type="daily_recurring"][data-color-mode="type"] {
+  background: color-mix(in srgb, var(--color-rust) 18%, var(--color-surface-raised));
 }
 
 /* Pump: distinct dusty-lavender fill so pumps read as their own
