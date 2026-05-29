@@ -1,5 +1,6 @@
 "use client";
 
+import type { CSSProperties } from "react";
 import styles from "./Block.module.css";
 import type { Event, OwnersConfig } from "../../schemas";
 import { formatRangeShort, formatTimeForDisplay, formatTimeShort } from "../../ui/time";
@@ -67,11 +68,14 @@ export function Block({
   const isPump = event.type === "pump";
   // §F53: extra-with-duration is a fixed-width band right-aligned in the instant column.
   const isExtra = event.type === "extra";
-  const positionStyle = isPump
-    ? { right: `${rightPx}px`, width: "max-content" as const }
-    : isExtra
-      ? { right: `${rightPx}px`, width: `${EXTRA_BAND_WIDTH_PX}px` }
-      : { left: `${leftPx}px`, right: `${rightPx}px` };
+  let positionStyle: CSSProperties;
+  if (isPump) {
+    positionStyle = { right: `${rightPx}px`, width: "max-content" };
+  } else if (isExtra) {
+    positionStyle = { right: `${rightPx}px`, width: `${EXTRA_BAND_WIDTH_PX}px` };
+  } else {
+    positionStyle = { left: `${leftPx}px`, right: `${rightPx}px` };
+  }
   // "putdown" data-type reuses V2 stylesheet selectors; not a schema type.
   const dataType = isPutdown ? "putdown" : event.type;
 

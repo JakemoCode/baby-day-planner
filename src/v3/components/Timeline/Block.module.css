@@ -117,12 +117,13 @@
   border-color: var(--color-honey);
 }
 
-/* §F53: recurring-with-duration gets its own rust tint so it reads as a
- * distinct "recurring activity" class — not confused with honey extras or
- * sage sleep blocks. Lightened to 88% so dark label text stays legible.
- * Border stays the default --color-border-strong (a rust border read as alarming). */
+/* §F53: recurring-with-duration gets its own light-rust tint so it reads as a
+ * distinct "recurring activity" class — not confused with honey extras or sage
+ * sleep blocks. Derived via color-mix (matching the file's tint convention; wider
+ * browser support than relative-color hsl). Border stays the default
+ * --color-border-strong (a rust border read as alarming). */
 .block[data-type="daily_recurring"][data-color-mode="type"] {
-  background: hsl(from var(--color-rust) h s 88%);
+  background: color-mix(in srgb, var(--color-rust) 18%, var(--color-surface-raised));
 }
 
 /* Pump: distinct dusty-lavender fill so pumps read as their own
