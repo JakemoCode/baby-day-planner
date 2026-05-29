@@ -274,7 +274,7 @@ describe("TimelineV3", () => {
   // §F53: a recurring event WITH a duration (kind: block) is a custom user
   // event (e.g. a daily 3pm walk). It must share the right-hand custom column
   // with extras/pumps — not paint full-gutter-width behind the sleep cascade.
-  it("renders a recurring duration block indented like an extra, not full-gutter width", () => {
+  it("recurring stays in the left custom column; extra-with-duration flips to the right band", () => {
     const recurring = ev({
       id: "walk",
       type: "daily_recurring",
@@ -289,20 +289,21 @@ describe("TimelineV3", () => {
       type: "extra",
       kind: "block",
       eventKey: "extra_1",
-      startTime: 11 * 60,
-      endTime: 11 * 60 + 30,
-      label: "Tummy time",
+      startTime: 10 * 60,
+      endTime: 14 * 60,
+      label: "Anything",
     });
     const nap = ev({ id: "n", type: "nap", startTime: 13 * 60, endTime: 14 * 60 });
     const { container } = render(<TimelineV3 events={[recurring, extra, nap]} owners={owners} />);
-    const leftOf = (type: string) =>
-      parseInt(
-        (container.querySelector(`[data-type="${type}"]`) as HTMLElement).style.left || "0",
-        10,
-      );
-    // Recurring is inset to the custom column (same as extra), well past the nap's full-gutter left.
-    expect(leftOf("daily_recurring")).toBe(leftOf("extra"));
+    const el = (type: string) => container.querySelector(`[data-type="${type}"]`) as HTMLElement;
+    const leftOf = (type: string) => parseInt(el(type).style.left || "0", 10);
+    // Recurring is inset to the custom column, well past the nap's full-gutter left.
     expect(leftOf("daily_recurring")).toBeGreaterThan(leftOf("nap"));
+    // Extra-with-duration is a fixed-width band, right-anchored so its left
+    // edge lands on the column break (no left edge set; width = 80px).
+    expect(el("extra").style.left).toBe("");
+    expect(el("extra").style.right).not.toBe("");
+    expect(el("extra").style.width).toBe("80px");
   });
 
   // §F53: recurring duration blocks fell to the default z-tier (wake_window),

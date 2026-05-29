@@ -9,6 +9,11 @@ import { PUTDOWN_KIND_TAG } from "./expandPutdown";
 import { ownerSlotKey } from "./ownerSlotKey";
 
 const NAP_TWO_ROW_THRESHOLD_PX = 50;
+// §F53: extra-with-duration renders as a fixed-width band whose LEFT edge sits
+// on the column break (cascade blocks' right edge). TimelineV3 sets the right
+// offset so the left edge lands on the break; this width must match the
+// EXTRA_BAND_WIDTH_PX there (6px gutter + 68px body + 6px gutter).
+const EXTRA_BAND_WIDTH_PX = 80;
 
 export type BlockProps = {
   event: Event;
@@ -60,9 +65,13 @@ export function Block({
   const isPutdown = event.eventKey === PUTDOWN_KIND_TAG;
   // Pump owner conveyed by left-stripe color, not text; sized to max-content and inset from parent.
   const isPump = event.type === "pump";
+  // §F53: extra-with-duration is a fixed-width band right-aligned in the instant column.
+  const isExtra = event.type === "extra";
   const positionStyle = isPump
     ? { right: `${rightPx}px`, width: "max-content" as const }
-    : { left: `${leftPx}px`, right: `${rightPx}px` };
+    : isExtra
+      ? { right: `${rightPx}px`, width: `${EXTRA_BAND_WIDTH_PX}px` }
+      : { left: `${leftPx}px`, right: `${rightPx}px` };
   // "putdown" data-type reuses V2 stylesheet selectors; not a schema type.
   const dataType = isPutdown ? "putdown" : event.type;
 

@@ -51,7 +51,17 @@ const BLOCK_RIGHT_INSET = GUTTER_W + 24;
 // Putdown stops before the chip column; owner name not rendered (stripe inherits from parent nap).
 const PUTDOWN_RIGHT_INSET = BLOCK_RIGHT_INSET + 26;
 const CUSTOM_LEFT_EXTRA = 110;
-const LEADER_LINE_W = 8;
+// Right offset of the instant chip column.
+const INSTANT_COLUMN_RIGHT = 4;
+// §F53: extra-duration band width (must match EXTRA_BAND_WIDTH_PX in Block.tsx).
+// Its right offset is set so the band's LEFT edge lands on the column break
+// (BLOCK_RIGHT_INSET, where cascade blocks end).
+const EXTRA_BAND_WIDTH_PX = 80;
+// Leader bridges the chip cluster's left edge (INSTANT_COLUMN_RIGHT + 140 chip
+// width = 144 from right) to the block-lane edge / column break (BLOCK_RIGHT_INSET
+// = 148) — exactly 4px. Was 8px, overshooting 4px past the break (invisible until
+// the §F53 extra band drew an edge there; the tail bled into the duration column).
+const LEADER_LINE_W = 4;
 const VIEWPORT_PADDING_MIN = 30;
 const DEFAULT_VIEWPORT = { start: 5 * 60, end: 21 * 60 };
 const DEFAULT_VIEWPORT_END_CAP = 24 * 60; // midnight
@@ -82,16 +92,25 @@ function blockGeometry(event: Event): { leftPx: number; rightPx: number } {
   if (event.eventKey === PUTDOWN_KIND_TAG) {
     return { leftPx: BLOCK_LEFT_INSET, rightPx: PUTDOWN_RIGHT_INSET };
   }
-  // Custom user events (extra, pump, recurring-with-duration) share the
-  // right-hand column so they coexist with naps/bedtime instead of painting
-  // full-gutter-width behind the sleep cascade (§F53).
-  if (event.type === "extra" || event.type === "pump" || event.type === "daily_recurring") {
+  // §F53: extra-with-duration flips to the right INSTANT column as a
+  // fixed-width band, right-aligned under the chips (Block sizes the width).
+  // It layers with chips by time via CSS z-index: future chips on top, past
+  // chips behind. Pump + recurring stay in the left custom column, coexisting
+  // with naps/bedtime.
+  if (event.type === "extra") {
+    return { leftPx: BLOCK_LEFT_INSET, rightPx: BLOCK_RIGHT_INSET - EXTRA_BAND_WIDTH_PX };
+  }
+  if (event.type === "pump" || event.type === "daily_recurring") {
     return { leftPx: BLOCK_LEFT_INSET + CUSTOM_LEFT_EXTRA, rightPx: BLOCK_RIGHT_INSET };
   }
   return { leftPx: BLOCK_LEFT_INSET, rightPx: BLOCK_RIGHT_INSET };
 }
 
-/** Paint order: wake_window < nap/bedtime < putdown < extra/recurring. */
+/**
+ * DOM paint order — the tiebreaker when two blocks share a CSS z-index
+ * (Block.module.css). recurring shares the sleep tier (z:2) with naps, so it
+ * must sort AFTER naps here to win the tie and paint on top of them (§F53).
+ */
 function zOrder(e: Event): number {
   if (e.type === "extra" || e.type === "daily_recurring") return 4;
   if (e.eventKey === PUTDOWN_KIND_TAG) return 3;
@@ -264,7 +283,7 @@ export function TimelineV3({
                 startMinutes={g.startMinutes}
                 endMinutes={g.endMinutes}
                 topPx={topPx}
-                rightPx={4}
+                rightPx={INSTANT_COLUMN_RIGHT}
                 widthPx={140}
                 leaderWidthPx={LEADER_LINE_W}
                 past={past}
@@ -277,7 +296,7 @@ export function TimelineV3({
               key={g.key}
               items={g.items}
               topPx={topPx} /* self-centers via translateY(-50%) */
-              rightPx={4}
+              rightPx={INSTANT_COLUMN_RIGHT}
               widthPx={140}
               leaderWidthPx={LEADER_LINE_W}
               owners={owners}
