@@ -102,10 +102,11 @@ describe("R5.8 — cascade stops at midnight (the 'midnight rule', DOMAIN.md §2
   });
 });
 
-describe("R5.4 — recorded bottle identity frozen; projected fill after max recorded", () => {
-  it("two recorded bottles with non-chronological eventKeys KEEP their pinned numbers", () => {
-    // Recorded identity is frozen at recording time. FAB-inserted bottle at 7:30 with eventKey
-    // 'bottle_2' stays bottle_2 even though chronologically first.
+describe("R5.4 — labels renumber chronologically (all bottles); recorded eventKeys frozen", () => {
+  it("recorded bottles with non-chronological eventKeys get chronological LABELS; eventKeys stay frozen", () => {
+    // FAB-inserted bottle at 7:30 carries eventKey 'bottle_2' (later slot); the
+    // earlier-logged bottle at 9:00 carries 'bottle_1'. Display labels follow
+    // clock order; the persisted eventKeys do not change (EC-B4).
     const lateInserted = aRecordedBottle({
       id: "b_late_insert",
       eventKey: "bottle_2",
@@ -143,21 +144,20 @@ describe("R5.4 — recorded bottle identity frozen; projected fill after max rec
       .filter((e) => e.type === "bottle")
       .sort((a, b) => a.startTime - b.startTime);
 
-    // Identity frozen: 7:30 stays bottle_2, 9:00 stays bottle_1 (non-chronological).
+    // eventKeys frozen: 7:30 stays bottle_2, 9:00 stays bottle_1.
     expect(bottles[0]!.id).toBe("b_late_insert"); // 7:30 one
     expect(bottles[0]!.eventKey).toBe("bottle_2");
-    expect(bottles[0]!.label).toBe("Bottle 2");
     expect(bottles[1]!.id).toBe("b_first_logged"); // 9:00 one
     expect(bottles[1]!.eventKey).toBe("bottle_1");
-    expect(bottles[1]!.label).toBe("Bottle 1");
-    // Projected bottles fill from max(recorded)+1 = bottle_3 onward.
+    // Labels are chronological for ALL bottles: 7:30 → "Bottle 1", 9:00 → "Bottle 2", …
+    bottles.forEach((b, i) => expect(b.label).toBe(`Bottle ${i + 1}`));
+    // Projected bottles still fill eventKeys from max(recorded)+1 = bottle_3 onward.
     const projected = bottles.filter((b) => b.lifecycle.state === "projected");
     expect(projected.length).toBeGreaterThan(0);
     expect(projected[0]!.eventKey).toBe("bottle_3");
   });
 
-  it("recorded bottle keeps its number when time-edited into a new chronological position", () => {
-    // A time-edited recorded bottle retains its eventKey; identity is frozen at recording.
+  it("a time-edited recorded bottle keeps its eventKey but its label tracks its new position", () => {
     const recorded = aRecordedBottle({
       id: "b_recorded",
       eventKey: "bottle_3",
@@ -186,9 +186,12 @@ describe("R5.4 — recorded bottle identity frozen; projected fill after max rec
       .filter((e) => e.type === "bottle")
       .sort((a, b) => a.startTime - b.startTime);
     const rec = bottles.find((b) => b.id === "b_recorded")!;
-    expect(rec.eventKey).toBe("bottle_3");
-    expect(rec.label).toBe("Bottle 3");
-    // Subsequent projected bottles start at bottle_4 (max recorded + 1).
+    expect(rec.eventKey).toBe("bottle_3"); // frozen Firestore identity
+    // Label = the recorded bottle's chronological rank among all bottles.
+    expect(rec.label).toBe(`Bottle ${bottles.indexOf(rec) + 1}`);
+    // Every bottle's label matches its chronological position (EC-B3 invariant).
+    bottles.forEach((b, i) => expect(b.label).toBe(`Bottle ${i + 1}`));
+    // Subsequent projected bottles still start at bottle_4 (max recorded + 1).
     const projected = bottles.filter((b) => b.lifecycle.state === "projected");
     expect(projected.length).toBeGreaterThan(0);
     expect(projected[0]!.eventKey).toBe("bottle_4");

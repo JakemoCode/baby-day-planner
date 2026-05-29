@@ -1,6 +1,6 @@
 /**
  * R5 — Bottle cascade: anchor → forward-walk → snap-out-of-nap, bedtime-capped.
- * R5.4 — Chronological renumber of projected bottles.
+ * R5.4 — Chronological renumber of bottle labels (recorded + projected).
  * R5.5 — Dream-feed emission.
  */
 
@@ -335,41 +335,53 @@ function projectBottleChain(events: Event[], ctx: Context): Event[] {
 // ---------------------------------------------------------------------------
 
 /**
- * Renumbers projected bottles chronologically after the highest recorded number.
- * Recorded bottles keep their pinned eventKey/label; engine-side only.
+ * Renumbers bottle DISPLAY LABELS chronologically — the Nth bottle of the day
+ * (by startTime) is "Bottle N", whether recorded or projected (DOMAIN.md §2,
+ * EC-B3/EC-B4). Firestore eventKeys stay stable: recorded bottles keep their
+ * pinned eventKey; projected bottles fill the slots after the highest recorded
+ * number (so the owner-by-index mapping in R12.6 is unaffected). Engine-side
+ * only — the label is a render concept, the eventKey is the persisted identity.
  */
 const RuleRenumberBottlesChronologically: Rule = {
   id: "R5.4",
   description:
-    "Renumber projected bottle eventKey/label; recorded bottles keep their pinned number",
+    "Renumber bottle labels chronologically (all bottles); projected eventKeys fill after max recorded, recorded eventKeys frozen",
   dependsOn: ["R5"],
   matches: (events) => {
-    const target = computeProjectedRenumber(events);
+    const target = computeRenumber(events);
     for (const b of bottlesByStartTime(events)) {
-      if (b.lifecycle.state !== "projected") continue;
       const next = target.get(b.id);
-      if (next && b.eventKey !== next.eventKey) return true;
+      if (!next) continue;
+      if (b.label !== next.label) return true;
+      if (b.lifecycle.state === "projected" && b.eventKey !== next.eventKey) return true;
     }
     return false;
   },
   produces: (events) => {
-    const renamed = computeProjectedRenumber(events);
+    const target = computeRenumber(events);
     return events.map((e) => {
       if (!isBottle(e)) return e;
-      if (isDreamFeed(e)) return e; // stable eventKey; renumber would break R5.5 identity check
-      if (e.lifecycle.state !== "projected") return e; // recorded bottles are frozen
-      const next = renamed.get(e.id);
+      if (isDreamFeed(e)) return e; // stable eventKey/label; renumber would break R5.5 identity check
+      const next = target.get(e.id);
       if (!next) return e;
-      if (e.eventKey === next.eventKey && e.label === next.label) return e;
-      return { ...e, eventKey: next.eventKey, label: next.label };
+      if (e.lifecycle.state === "projected") {
+        if (e.eventKey === next.eventKey && e.label === next.label) return e;
+        return { ...e, eventKey: next.eventKey, label: next.label };
+      }
+      // Recorded: eventKey is the frozen Firestore identity; only the display label renumbers.
+      if (e.label === next.label) return e;
+      return { ...e, label: next.label };
     });
   },
 };
 
-/** Maps projected-bottle id → { eventKey, label } in chronological order, skipping recorded numbers. */
-function computeProjectedRenumber(
-  events: Event[],
-): Map<string, { eventKey: string; label: string }> {
+/**
+ * Maps bottle id → { eventKey, label }. Label is the 1-based chronological
+ * position for every bottle. eventKey is the projected slot (after the highest
+ * recorded number) for projected bottles, or the unchanged pinned key for
+ * recorded bottles.
+ */
+function computeRenumber(events: Event[]): Map<string, { eventKey: string; label: string }> {
   const all = bottlesByStartTime(events);
   const recordedNums = new Set<number>();
   for (const b of all) {
@@ -378,18 +390,20 @@ function computeProjectedRenumber(
     if (idx !== null) recordedNums.add(idx);
   }
   const maxRecorded = recordedNums.size > 0 ? Math.max(...recordedNums) : 0;
-  let n = maxRecorded + 1;
-  const skipUsed = () => {
-    while (recordedNums.has(n)) n++;
-  };
-  const renamed = new Map<string, { eventKey: string; label: string }>();
+  let slot = maxRecorded + 1; // projected eventKeys start above every recorded number
+  const result = new Map<string, { eventKey: string; label: string }>();
+  let position = 1;
   for (const b of all) {
-    if (b.lifecycle.state !== "projected") continue;
-    skipUsed();
-    renamed.set(b.id, { eventKey: `bottle_${n}`, label: `Bottle ${n}` });
-    n++;
+    const label = `Bottle ${position}`;
+    if (b.lifecycle.state === "projected") {
+      result.set(b.id, { eventKey: `bottle_${slot}`, label });
+      slot++;
+    } else {
+      result.set(b.id, { eventKey: b.eventKey, label });
+    }
+    position++;
   }
-  return renamed;
+  return result;
 }
 
 function bottlesByStartTime(events: Event[]): Event[] {
