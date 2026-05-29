@@ -5,7 +5,8 @@
 
 import type { ReactElement, ReactNode } from "react";
 import { render, type RenderOptions, type RenderResult } from "@testing-library/react";
-import { vi } from "vitest";
+import { expect, vi } from "vitest";
+import { configureAxe } from "jest-axe";
 import type { User } from "firebase/auth";
 import { AuthContext, type AuthContextValue } from "@/lib/auth/AuthProvider";
 import { ChildProvider } from "@/v3/context/ChildProvider";
@@ -67,6 +68,34 @@ export function renderWithAuth(
     ...renderOptions,
   });
   return { ...result, authValue };
+}
+
+/**
+ * Project-configured axe runner for component a11y tests.
+ *
+ * `color-contrast` is disabled: jsdom has no layout engine or canvas, so the
+ * rule cannot measure real contrast and would only produce noise. Visual
+ * contrast is covered by the browser-driven `/design-audit` flow. axe here
+ * asserts STRUCTURAL a11y — roles, accessible names, labels, alt text, aria
+ * state, heading order, list/table semantics.
+ */
+export const axe = configureAxe({
+  rules: {
+    "color-contrast": { enabled: false },
+  },
+});
+
+/**
+ * Render `ui` with the standard Auth + Child providers and assert axe finds no
+ * structural a11y violations. One-liner for the common case; for components
+ * that need data-hook mocks, set those up first then call this.
+ */
+export async function expectNoA11yViolations(
+  ui: ReactElement,
+  options?: RenderWithAuthOptions,
+): Promise<void> {
+  const { container } = renderWithAuth(ui, options);
+  expect(await axe(container)).toHaveNoViolations();
 }
 
 // Re-export common testing utilities so component tests have one import.
