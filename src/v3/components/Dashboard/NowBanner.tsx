@@ -1,20 +1,23 @@
 import type { Event, OwnersConfig, TimeMin } from "@/v3/schemas";
-import { formatHoursMinutes, formatTimeForDisplay } from "@/v3/ui/time";
-import { ownerColor, ownerDisplayName } from "@/v3/ui/owners";
+import { formatHoursMinutes } from "@/v3/ui/time";
+import { ownerColor } from "@/v3/ui/owners";
 import { ownerStyleVar } from "@/v3/ui/ownerStyle";
 import styles from "./NowBanner.module.css";
 
 export type NowBannerProps = {
-  wakeWindow?: Event;
   inProgressNap?: Event;
   inProgressBedtime?: Event;
   owners: OwnersConfig;
   nowMinutes: TimeMin;
 };
 
-/** Banner showing in-progress bedtime > nap > current wake window; mutually exclusive by engine cascade. */
+/**
+ * Sleep-only banner: in-progress bedtime > nap, mutually exclusive by the
+ * engine cascade. Shows elapsed sleep time, which appears nowhere else.
+ * Deliberately silent during a wake window — its end time only duplicated
+ * the next-nap time already shown in the Next sleep panel.
+ */
 export function NowBanner({
-  wakeWindow,
   inProgressNap,
   inProgressBedtime,
   owners,
@@ -40,25 +43,7 @@ export function NowBanner({
       />
     );
   }
-  if (!wakeWindow) return null;
-
-  const ownerName = ownerDisplayName(wakeWindow.owner, owners);
-  const endTime = wakeWindow.endTime !== undefined ? formatTimeForDisplay(wakeWindow.endTime) : "";
-
-  return (
-    <div
-      className={styles.pill}
-      style={ownerStyleVar(ownerColor(wakeWindow.owner, owners))}
-      aria-live="polite"
-    >
-      <span className={styles.dot} aria-hidden="true" />
-      <span>
-        In {wakeWindow.label}
-        {ownerName ? ` · ${ownerName}` : ""}
-        {endTime && <span className={styles.muted}> · ends {endTime}</span>}
-      </span>
-    </div>
-  );
+  return null;
 }
 
 function InProgressBanner({
