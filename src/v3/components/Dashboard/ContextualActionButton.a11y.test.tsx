@@ -19,7 +19,9 @@ const inProgressNap = (): Event => ({
   lifecycle: { state: "recorded", annotatedAt: hm(13) },
 });
 
-function makeProps(overrides: Partial<ContextualActionButtonProps> = {}): ContextualActionButtonProps {
+function makeProps(
+  overrides: Partial<ContextualActionButtonProps> = {},
+): ContextualActionButtonProps {
   return {
     inProgressNap: undefined,
     inProgressBedtime: undefined,

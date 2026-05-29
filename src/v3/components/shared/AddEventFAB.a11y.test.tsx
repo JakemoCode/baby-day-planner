@@ -13,9 +13,7 @@ const baseProps = {
 
 describe("AddEventFAB a11y", () => {
   it("has no structural a11y violations in closed state", async () => {
-    const { container } = render(
-      <AddEventFAB {...baseProps} onCreate={() => {}} />,
-    );
+    const { container } = render(<AddEventFAB {...baseProps} onCreate={() => {}} />);
     expect(await axe(container)).toHaveNoViolations();
   });
 });

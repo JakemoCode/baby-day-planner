@@ -12,9 +12,7 @@ const owners: OwnersConfig = {
 
 describe("OwnerPill a11y", () => {
   it("has no axe violations", async () => {
-    const { container } = render(
-      <OwnerPill owner={{ slot: "parent1" }} owners={owners} />,
-    );
+    const { container } = render(<OwnerPill owner={{ slot: "parent1" }} owners={owners} />);
     expect(await axe(container)).toHaveNoViolations();
   });
 });

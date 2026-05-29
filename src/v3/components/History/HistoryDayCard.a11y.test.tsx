@@ -16,7 +16,11 @@ const day: Day = {
 describe("HistoryDayCard a11y", () => {
   it("has no axe violations when rendering with a summary", async () => {
     await expectNoA11yViolations(
-      <HistoryDayCard day={day} onSelect={() => {}} summary={{ bottles: 5, naps: 4, totalOz: 26 }} />,
+      <HistoryDayCard
+        day={day}
+        onSelect={() => {}}
+        summary={{ bottles: 5, naps: 4, totalOz: 26 }}
+      />,
     );
   });
 });

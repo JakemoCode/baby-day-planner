@@ -27,12 +27,7 @@ const bottleEvent: Event = {
 describe("InstantChip a11y", () => {
   it("has no structural a11y violations (interactive chip)", async () => {
     const { container } = render(
-      <InstantChip
-        event={bottleEvent}
-        owners={owners}
-        colorMode="type"
-        onClick={() => {}}
-      />,
+      <InstantChip event={bottleEvent} owners={owners} colorMode="type" onClick={() => {}} />,
     );
     expect(await axe(container)).toHaveNoViolations();
   });
