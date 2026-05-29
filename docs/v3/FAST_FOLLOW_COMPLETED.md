@@ -1,7 +1,8 @@
 # V3 Fast-Follow — Completed
 
 > Compressed history of items that originated in `FAST_FOLLOW.md` and
-> have since shipped. Kept for audit trail and future reference.
+> have since shipped, been superseded, or been dropped. Kept for audit
+> trail and future reference. (See each file's `**Status**` for which.)
 >
 > Each item lives in its own file under `fast-follow/completed/` so
 > that parallel shipping PRs don't conflict on the index file. When
@@ -27,10 +28,14 @@
 - [§F24](./fast-follow/completed/f24-start-nap-action-creates-duplicate-nap.md)
 - [§F25](./fast-follow/completed/f25-manual-nap-recorded-inside-bedtime-block.md)
 - [§F26](./fast-follow/completed/f26-putdown-chip-synthesized-for-naps-inside.md)
+- [§F28](./fast-follow/completed/f28-multi-chip-collapse-instants.md) — superseded by §F55
 - [§F32](./fast-follow/completed/f32-retire-endofdaycard-dashboard-always-shows-stats.md)
 - [§F36](./fast-follow/completed/f36-owner-cannot-be-unassigned-from-blocks.md)
 - [§F39](./fast-follow/completed/f39-tomorrow-as-a-fully-editable-plan.md)
+- [§F42](./fast-follow/completed/f42-input-field-font.md) — dropped (irrelevant on mobile)
 - [§F46](./fast-follow/completed/f46-tomorrow-chip-tap-drawer-not-owner.md)
+- [§F47](./fast-follow/completed/f47-instantchip-focus-outline.md) — dropped
+- [§F48](./fast-follow/completed/f48-last-nap-future-time.md) — already fixed (§F48b/c/d)
 - [§F52](./fast-follow/completed/f52-dashboard-kill-scroll-wobble.md)
 - [§F55](./fast-follow/completed/f55-collapse-2-overlapping-instant-chips-into.md)
 - [§F56](./fast-follow/completed/f56-recurring-event-drawer-heading-shows-the.md)

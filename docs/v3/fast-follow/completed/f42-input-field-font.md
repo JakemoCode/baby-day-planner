@@ -2,7 +2,7 @@
 
 **Source**: Jake, 2026-05-19 — during §F3 welcome click-test. "Fast-follow on the font for input fields — it's too programmer-y."
 
-**Status**: `pending`
+**Status**: `dropped` (Jake, 2026-05-29) — irrelevant on mobile; the "programmer-y" input font isn't a problem on the target (mobile) form factor.
 
 **What**: the welcome form's `<input type="text">` / `<input type="date">` / `<input type="time">` fields render in the browser default monospace-ish font (likely inherited from a `body { font-family }` chain that doesn't reach inputs by default). The rest of the app uses a humanist sans (see `tokens.css` / globals.css). Align all `<input>` fonts to the app's body font.
 

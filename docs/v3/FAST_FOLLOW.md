@@ -28,13 +28,10 @@ Shipped items move to [`FAST_FOLLOW_COMPLETED.md`](./FAST_FOLLOW_COMPLETED.md) �
 - [§F8](./fast-follow/now/f08-dashboard-ux-polish.md)
 - [§F23](./fast-follow/now/f23-edit-drawer-title-event-number.md)
 - [§F27](./fast-follow/now/f27-delete-button-extra-drawer.md)
-- [§F28](./fast-follow/now/f28-multi-chip-collapse-instants.md)
 - [§F29](./fast-follow/now/f29-color-audit-terracotta-sage.md)
-- [§F42](./fast-follow/now/f42-input-field-font.md)
-- [§F47](./fast-follow/now/f47-instantchip-focus-outline.md)
-- [§F48](./fast-follow/now/f48-last-nap-future-time.md)
 - [§F49](./fast-follow/now/f49-sync-button-refresh-animation.md)
 - [§F53](./fast-follow/now/f53-recurring-duration-zindex.md)
+- [§F67](./fast-follow/now/f67-next-bottle-panel-blank.md)
 
 ## grill/
 
