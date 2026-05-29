@@ -55,6 +55,12 @@ export function useDrawer(
   setOwnerOverride?: (eventKey: string, owner: Event["owner"]) => Promise<void> | void,
   /** Per-day suppression rules; "delete" on these means "skip today". See {@link DrawerSuppression}. */
   suppressions: DrawerSuppression[] = [],
+  /**
+   * Create-mode override (DOMAIN §2 midnight rule). When provided, a NEW event
+   * routes here instead of `saveEvent` so it can land on the calendar day its
+   * clock time falls on. Edits always use `saveEvent` (they keep their day).
+   */
+  saveNewEvent?: (event: Event) => Promise<void> | void,
 ): UseDrawerResult {
   const [drawer, setDrawer] = useState<DrawerState>({ open: false });
 
@@ -95,7 +101,7 @@ export function useDrawer(
         await saveEvent(event);
       }
     } else {
-      await saveEvent(event);
+      await (saveNewEvent ?? saveEvent)(event);
     }
     setDrawer({ open: false });
   };

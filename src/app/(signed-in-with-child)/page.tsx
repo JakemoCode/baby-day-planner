@@ -27,14 +27,7 @@ import { StartDayButton } from "@/v3/components/Dashboard/StartDayButton";
 import { WakeConfirmSheet } from "@/v3/components/Dashboard/WakeConfirmSheet";
 import styles from "./page.module.css";
 import { useCurrentChild } from "@/v3/context/ChildProvider";
-
-function todayDate(): string {
-  const d = new Date();
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
+import { currentLocalDate as todayDate } from "@/v3/ui/time";
 
 export default function DashboardPage() {
   const CHILD_ID = useCurrentChild().id;
