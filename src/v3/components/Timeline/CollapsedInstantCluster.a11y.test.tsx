@@ -1,10 +1,9 @@
-import { describe, it } from "vitest";
+import { describe, it, expect } from "vitest";
 import { render } from "@testing-library/react";
 import type { Event } from "../../schemas";
 import { NO_OWNER } from "../../schemas";
 import { CollapsedInstantCluster } from "./CollapsedInstantCluster";
 import { axe } from "@/test-utils";
-import { expect } from "vitest";
 
 const ev = (overrides: Partial<Event>): Event => ({
   id: "e",

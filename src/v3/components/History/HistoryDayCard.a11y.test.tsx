@@ -1,5 +1,5 @@
 import { describe, it } from "vitest";
-import { axe, renderWithAuth } from "@/test-utils";
+import { expectNoA11yViolations } from "@/test-utils";
 import type { Day } from "@/v3/schemas";
 import { HistoryDayCard } from "./HistoryDayCard";
 
@@ -15,13 +15,8 @@ const day: Day = {
 
 describe("HistoryDayCard a11y", () => {
   it("has no axe violations when rendering with a summary", async () => {
-    const { container } = renderWithAuth(
-      <HistoryDayCard
-        day={day}
-        onSelect={() => {}}
-        summary={{ bottles: 5, naps: 4, totalOz: 26 }}
-      />,
+    await expectNoA11yViolations(
+      <HistoryDayCard day={day} onSelect={() => {}} summary={{ bottles: 5, naps: 4, totalOz: 26 }} />,
     );
-    expect(await axe(container)).toHaveNoViolations();
   });
 });

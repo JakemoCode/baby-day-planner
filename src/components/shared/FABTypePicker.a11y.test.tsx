@@ -1,7 +1,5 @@
-import { describe, it } from "vitest";
-import { render } from "@/test-utils";
-import { axe } from "@/test-utils";
-import { expect } from "vitest";
+import { describe, it, expect } from "vitest";
+import { render, axe } from "@/test-utils";
 import { FABTypePicker } from "./FABTypePicker";
 
 describe("FABTypePicker a11y", () => {

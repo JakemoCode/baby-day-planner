@@ -1,5 +1,5 @@
 import { describe, it } from "vitest";
-import { axe, renderWithAuth } from "@/test-utils";
+import { expectNoA11yViolations } from "@/test-utils";
 import type { Day, Event, OwnersConfig } from "@/v3/schemas";
 import { NO_OWNER } from "@/v3/schemas";
 import { ArchivedDayView } from "./ArchivedDayView";
@@ -36,9 +36,6 @@ const bottle: Event = {
 
 describe("ArchivedDayView a11y", () => {
   it("has no axe violations when rendering with events", async () => {
-    const { container } = renderWithAuth(
-      <ArchivedDayView day={day} events={[bottle]} owners={owners} />,
-    );
-    expect(await axe(container)).toHaveNoViolations();
+    await expectNoA11yViolations(<ArchivedDayView day={day} events={[bottle]} owners={owners} />);
   });
 });

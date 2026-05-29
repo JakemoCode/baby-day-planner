@@ -1,5 +1,5 @@
 import { describe, it } from "vitest";
-import { axe, renderWithAuth } from "@/test-utils";
+import { expectNoA11yViolations } from "@/test-utils";
 import type { Day } from "@/v3/schemas";
 import { HistoryList } from "./HistoryList";
 
@@ -26,7 +26,6 @@ const days: Day[] = [
 
 describe("HistoryList a11y", () => {
   it("has no axe violations when rendering a list of days", async () => {
-    const { container } = renderWithAuth(<HistoryList days={days} onSelect={() => {}} />);
-    expect(await axe(container)).toHaveNoViolations();
+    await expectNoA11yViolations(<HistoryList days={days} onSelect={() => {}} />);
   });
 });
