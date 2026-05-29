@@ -10,21 +10,6 @@ const owners: OwnersConfig = {
   other: [],
 };
 
-const ww = (overrides: Partial<Event> = {}): Event => ({
-  id: "ww1",
-  dayId: "d1",
-  eventKey: "wake_window_1",
-  type: "wake_window",
-  kind: "block",
-  label: "Wake Window 1",
-  startTime: (7 * 60) as TimeMin,
-  endTime: (9 * 60) as TimeMin,
-  hasPutdown: false,
-  owner: NO_OWNER,
-  lifecycle: { state: "projected" },
-  ...overrides,
-});
-
 const napEvent = (start: TimeMin): Event => ({
   id: "n1",
   dayId: "d1",
@@ -54,16 +39,9 @@ const bedtimeEvent = (start: TimeMin): Event => ({
 });
 
 describe("NowBanner", () => {
-  it("renders wake-window label and end time when only wake_window is active", () => {
-    render(<NowBanner wakeWindow={ww()} owners={owners} nowMinutes={(8 * 60) as TimeMin} />);
-    expect(screen.getByText(/in wake window 1/i)).toBeVisible();
-    expect(screen.getByText(/ends 9:00 AM/i)).toBeVisible();
-  });
-
   it("renders 'Nap in progress — Xm' when an in-progress nap is passed", () => {
     render(
       <NowBanner
-        wakeWindow={ww()}
         inProgressNap={napEvent((13 * 60) as TimeMin)}
         owners={owners}
         nowMinutes={(13 * 60 + 47) as TimeMin}
@@ -71,7 +49,6 @@ describe("NowBanner", () => {
     );
     expect(screen.getByText(/nap in progress/i)).toBeVisible();
     expect(screen.getByText(/47m/)).toBeVisible();
-    expect(screen.queryByText(/in wake window/i)).toBeNull();
   });
 
   it("renders 'Bedtime in progress — Xh Ym' when an in-progress bedtime is passed", () => {

@@ -5,13 +5,7 @@ import type { Event, TimeMin } from "@/v3/schemas";
 import { reduceLifecycle } from "@/v3/lifecycle";
 import { isInProgress } from "@/v3/lib/effectiveEnd";
 import { isRenderSynthetic } from "@/v3/lib/syntheticEvents";
-import {
-  currentWakeWindow,
-  nearestBottleInWindow,
-  nextBottle,
-  nextNap,
-  projectedBedtime,
-} from "@/v3/selectors";
+import { nearestBottleInWindow, nextBottle, nextNap, projectedBedtime } from "@/v3/selectors";
 import { LOG_BOTTLE_WINDOW_MIN } from "@/v3/components/Dashboard/decideMode";
 import { nextDashboardEvent } from "@/v3/components/Dashboard/dashboardStats";
 import { useNowMinutes } from "@/hooks/useNowMinutes";
@@ -98,7 +92,6 @@ export default function DashboardPage() {
   // button uses.
   const upcomingBottle = nextBottle(projected, nowMinutes);
   const nn = nextNap(projected, nowMinutes);
-  const cww = currentWakeWindow(projected, nowMinutes);
   // Use `projected` (not `actuals`) to surface engine-auto-promoted in-progress naps.
   // Filter out render-synthetic putdown chips — they inherit the parent's lifecycle
   // and would falsely trigger "End nap" before the real nap starts.
@@ -169,7 +162,6 @@ export default function DashboardPage() {
   return (
     <div className={styles.page}>
       <NowBanner
-        {...(cww ? { wakeWindow: cww } : {})}
         {...(inProgressNap ? { inProgressNap } : {})}
         {...(inProgressBedtime ? { inProgressBedtime } : {})}
         owners={settings.owners}

@@ -236,6 +236,29 @@ describe("DashboardPage (V3)", () => {
     expect(panel.getByText("11:00 AM")).toBeVisible();
   });
 
+  it("shows no NowBanner during a wake window — the 'ends' time duplicates Next sleep", () => {
+    // The thin banner is sleep-only: it announces in-progress nap/bedtime
+    // (elapsed time, shown nowhere else). During a wake window its end time
+    // just duplicates the next-nap time in the Next sleep panel, so no banner.
+    const wakeWindow: Event = {
+      id: "ww-1",
+      dayId: "day-1",
+      eventKey: "wake_window_1",
+      type: "wake_window",
+      kind: "block",
+      label: "Wake Window 1",
+      startTime: 7 * 60,
+      endTime: 9 * 60,
+      hasPutdown: false,
+      owner: NO_OWNER,
+      lifecycle: { state: "projected" },
+    };
+    setupHooks({ nowMinutes: 8 * 60, projected: [wakeWindow] });
+    renderWithAuth(<DashboardPage />);
+    expect(screen.queryByText(/in wake window/i)).toBeNull();
+    expect(screen.queryByText(/in progress/i)).toBeNull();
+  });
+
   it("handleEndNap saves completed nap with endTime committed (TIME_EDIT action)", async () => {
     // Nap is in-progress: recorded lifecycle, startTime <= nowMinutes < effectiveEnd
     const inProgressNap: Event = {
