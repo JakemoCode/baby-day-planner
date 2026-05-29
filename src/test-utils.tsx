@@ -73,11 +73,11 @@ export function renderWithAuth(
 /**
  * Project-configured axe runner for component a11y tests.
  *
- * `color-contrast` is disabled: jsdom has no layout engine or canvas, so the
- * rule cannot measure real contrast and would only produce noise. Visual
- * contrast is covered by the browser-driven `/design-audit` flow. axe here
- * asserts STRUCTURAL a11y — roles, accessible names, labels, alt text, aria
- * state, heading order, list/table semantics.
+ * Only `color-contrast` is disabled: jsdom has no layout engine or canvas, so
+ * the rule cannot measure real contrast and produces only noise. Visual
+ * contrast is covered by the browser-driven `/design-audit` flow. (Other
+ * geometry-dependent rules like `target-size` aren't in the default tag set
+ * jest-axe runs, so they don't fire here.)
  */
 export const axe = configureAxe({
   rules: {
