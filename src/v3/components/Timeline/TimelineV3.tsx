@@ -82,16 +82,18 @@ function blockGeometry(event: Event): { leftPx: number; rightPx: number } {
   if (event.eventKey === PUTDOWN_KIND_TAG) {
     return { leftPx: BLOCK_LEFT_INSET, rightPx: PUTDOWN_RIGHT_INSET };
   }
-  // Extra and pump share the right-column so they coexist with naps/bedtime.
-  if (event.type === "extra" || event.type === "pump") {
+  // Custom user events (extra, pump, recurring-with-duration) share the
+  // right-hand column so they coexist with naps/bedtime instead of painting
+  // full-gutter-width behind the sleep cascade (§F53).
+  if (event.type === "extra" || event.type === "pump" || event.type === "daily_recurring") {
     return { leftPx: BLOCK_LEFT_INSET + CUSTOM_LEFT_EXTRA, rightPx: BLOCK_RIGHT_INSET };
   }
   return { leftPx: BLOCK_LEFT_INSET, rightPx: BLOCK_RIGHT_INSET };
 }
 
-/** Paint order: wake_window < nap/bedtime < putdown < extra. Naps beat wake_windows at same y. */
+/** Paint order: wake_window < nap/bedtime < putdown < extra/recurring. */
 function zOrder(e: Event): number {
-  if (e.type === "extra") return 4;
+  if (e.type === "extra" || e.type === "daily_recurring") return 4;
   if (e.eventKey === PUTDOWN_KIND_TAG) return 3;
   if (e.type === "nap" || e.type === "bedtime") return 2;
   return 1;
