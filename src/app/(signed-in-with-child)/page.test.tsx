@@ -17,8 +17,6 @@ const useV3TemplatesMock = vi.fn();
 const useV3ProjectionMock = vi.fn();
 const useNowMinutesMock = vi.fn();
 const startNewDayMock = vi.fn();
-const getOrCreatePlannedDayMock = vi.fn();
-const createEventMock = vi.fn();
 const saveSettingsMock = vi.fn();
 const saveEventMock = vi.fn().mockResolvedValue(undefined);
 
@@ -42,7 +40,6 @@ vi.mock("@/hooks/useNowMinutes", () => ({
 }));
 vi.mock("@/v3/repositories/days", () => ({
   startNewDay: (...args: unknown[]) => startNewDayMock(...args),
-  getOrCreatePlannedDay: (...args: unknown[]) => getOrCreatePlannedDayMock(...args),
   promoteFromPlan: (...args: unknown[]) => promoteFromPlanMock(...args),
 }));
 // Mocked to keep this test focused on dashboard rendering; rollover seam
@@ -54,7 +51,6 @@ vi.mock("@/v3/hooks/useV3TomorrowPlan", () => ({
   useV3TomorrowPlan: () => ({ plan: null, loading: false }),
 }));
 vi.mock("@/v3/repositories/events", () => ({
-  createEvent: (...args: unknown[]) => createEventMock(...args),
   // fire-and-forget on mount; no-op so tests don't hit Firestore.
   reconcileDuplicateEventDocs: vi.fn().mockResolvedValue({ deleted: [] }),
 }));
