@@ -12,7 +12,7 @@ import { NO_OWNER } from "@/v3/schemas";
 import { aDay, aSettings } from "@/v3/__tests__/factories";
 import { projectDay } from "@/v3/engine/projectDay";
 import { isInProgress } from "@/v3/lib/effectiveEnd";
-import { currentWakeWindow, projectedBedtime, nextBottle, nextNap } from "@/v3/selectors";
+import { projectedBedtime, nextBottle, nextNap } from "@/v3/selectors";
 import { nextDashboardEvent, bottleTotals, napTotals } from "./dashboardStats";
 import { NowBanner } from "./NowBanner";
 import { NextEventCard } from "./NextEventCard";
@@ -118,7 +118,6 @@ describe("Dashboard seam — real projectDay + new panels", () => {
     // -- Selectors over projected output --
     const next = nextDashboardEvent(projected, now);
     const inProgressNap = actuals.find((e) => e.type === "nap" && isInProgress(e, settings, now));
-    const cww = currentWakeWindow(projected, now);
     const bedtime = projectedBedtime(projected);
     const nb = nextBottle(projected, now);
     const nn = nextNap(projected, now);
@@ -127,7 +126,6 @@ describe("Dashboard seam — real projectDay + new panels", () => {
     render(
       <>
         <NowBanner
-          {...(cww !== undefined ? { wakeWindow: cww } : {})}
           {...(inProgressNap !== undefined ? { inProgressNap } : {})}
           owners={owners}
           nowMinutes={now}
@@ -150,7 +148,7 @@ describe("Dashboard seam — real projectDay + new panels", () => {
       </>,
     );
 
-    // NowBanner: in-progress nap wins over wake window.
+    // NowBanner: an in-progress nap shows the sleep banner.
     expect(screen.getByText(/nap in progress/i)).toBeVisible();
 
     // NextEventCard: must NOT be the in-progress nap itself.
