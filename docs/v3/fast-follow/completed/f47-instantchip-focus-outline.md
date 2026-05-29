@@ -2,7 +2,7 @@
 
 **Source**: Jake, 2026-05-21.
 
-**Status**: `pending`
+**Status**: `dropped` (Jake, 2026-05-29) — not worth the effort; square focus outline at chip size is acceptable.
 
 **What**: focus-visible outlines on Block (`src/v3/components/Timeline/Block.module.css`) appear with rounded corners, but the same-shape rule on InstantChip (`src/v3/components/Timeline/InstantChip.module.css`) looks square. Both use identical `outline: 2px solid var(--color-accent); outline-offset: 1px;` with `border-radius` set.
 

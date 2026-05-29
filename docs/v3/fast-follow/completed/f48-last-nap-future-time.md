@@ -2,7 +2,9 @@
 
 **Source**: Jake, 2026-05-22.
 
-**Status**: `pending`
+**Status**: `fixed` (Jake, 2026-05-29)
+
+> Already fixed by the **§F48b/c/d** guards in `src/v3/components/Dashboard/dashboardStats.ts`. `lastCompletedNap()` now skips any recorded nap whose `endTime > now`, so a back-edited future end-time can no longer surface as "Last nap" with a future clock / "0 min ago" clamp. `NextSleepPanel` renders via that guarded selector.
 
 **What**: Manually edited the most recent nap on /timeline. The dashboard's "Last nap" line then read `"45m, 0 min ago (4:02p)"` — but it was ~2:30pm at the time, so 4:02p was ~2.5 hrs in the *future*. Two related symptoms:
 1. Display string says "0 min ago" but the time shown is in the future.

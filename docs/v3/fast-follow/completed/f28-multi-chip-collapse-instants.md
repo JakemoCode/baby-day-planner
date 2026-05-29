@@ -2,7 +2,9 @@
 
 **Source**: Jake, 2026-05-14 click-test of PR #139. Edge case caused by stacked custom events at 4:03p / 4:20p / 4:20p visibly overlapping in the chip column.
 
-**Status**: `pending`
+**Status**: `superseded-by-§F55` (Jake, 2026-05-29)
+
+> Solved by **§F55** — `mergeNearbyGroups()` in `groupInstants.ts` + `CollapsedInstantCluster`. §F55 collapses overlapping instant chips into an "N events" cluster via a render-geometry collision test (chip height × `pxPerMin`) rather than this doc's fixed 5-min window. The visual breakage is gone; closing without separate work.
 
 **What**: collapse instant chips that crowd the same vertical space on the timeline into a single "multi chip" so they don't overlap.
 
