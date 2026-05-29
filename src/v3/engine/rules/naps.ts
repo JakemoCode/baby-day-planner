@@ -66,19 +66,23 @@ function projectSleepCascade(ctx: Context, existing: Event[]): Event[] {
     // Clamp recorded nap start to wwStart (R3.6 inversion guard: user may have shifted nap before WW end).
     const napStart = existingNap ? Math.max(wwStart, existingNap.startTime) : wwStart + wwMinutes;
 
-    // Bedtime substitution: drop projected nap if its end would exceed threshold; recorded naps pass.
+    // Cascade terminator (DOMAIN §1/§3): a PROJECTED nap ends the day —
+    // becoming bedtime — when it would either end after bedtimeThreshold
+    // (the next sleep IS bedtime), or leave no room for a proper wake
+    // window before an authoritative manual bedtime (gap < the following
+    // WW's configured length; subsumes the old "extends INTO bedtime"
+    // suppression). Both run whether bedtime is projected or manual — a
+    // manual bedtime only changes WHERE the terminator lands. Recorded
+    // naps pass through (reality wins).
     const projectedNapEnd = napStart + napLen;
-    if (!manualBedtime && !existingNap && projectedNapEnd > threshold) {
-      projected.push(...terminateCascade(ctx, n, wwStart, wwMinutes, undefined));
-      break;
-    }
-
-    // Suppress projected nap extending into recorded bedtime; recorded naps pass through.
-    const projectedExtendsIntoBedtime =
-      manualBedtime && !existingNap && napStart + napLen > manualBedtime.startTime;
-    if (manualBedtime && (napStart >= manualBedtime.startTime || projectedExtendsIntoBedtime)) {
-      projected.push(...terminateCascade(ctx, n, wwStart, wwMinutes, manualBedtime));
-      break;
+    if (!existingNap) {
+      const followingWw = wws[Math.min(n, wws.length - 1)]!;
+      const crowdsManualBedtime =
+        manualBedtime !== undefined && manualBedtime.startTime - projectedNapEnd < followingWw;
+      if (projectedNapEnd > threshold || crowdsManualBedtime) {
+        projected.push(...terminateCascade(ctx, n, wwStart, wwMinutes, manualBedtime));
+        break;
+      }
     }
 
     projected.push(buildWakeWindow(ctx, n, wwStart, napStart));

@@ -808,6 +808,135 @@ describe("Manual bedtime suppresses any projected nap that would extend INTO it"
   });
 });
 
+describe("Manual bedtime: threshold + proper-wake-window guards (regression 2026-05-28)", () => {
+  // Editing bedtime (projected → manual) re-admitted a projected terminal
+  // nap the threshold path had correctly dropped. A manual bedtime must
+  // NOT weaken the cascade terminator — it only changes WHERE the
+  // terminating bedtime lands. DOMAIN §1/§3.
+
+  it("projected nap ending after threshold is dropped even when it fits before a LATER manual bedtime", () => {
+    // wake 7:00, one 580-min WW → projected nap_1 16:40-17:25.
+    // threshold 17:00: nap end 17:25 > threshold → drop. Manual bedtime
+    // 18:00 is later than the nap end, so the old "extends INTO bedtime"
+    // suppression missed it; the threshold check must catch it.
+    const manualBedtime = aRecordedBedtime({
+      id: "manual_bedtime",
+      eventKey: "bedtime",
+      start: 18 * 60,
+      end: 30 * 60,
+    });
+    const ctx = aContext({
+      day: aDay({ wakeTime: 7 * 60 }),
+      settings: aSettings({
+        wakeWindowsMinutes: [580],
+        defaultNapLengthMinutes: 45,
+        bedtimeThreshold: 17 * 60,
+        earliestBedtime: 18 * 60,
+        defaultWakeTime: 7 * 60,
+      }),
+      actuals: [manualBedtime],
+    });
+
+    const out = projectDay(
+      {
+        day: ctx.day,
+        settings: ctx.settings,
+        actuals: ctx.actuals,
+        nowMinutes: ctx.nowMinutes,
+      },
+      { rules: NAP_RULES },
+    );
+
+    expect(out.find((e) => e.eventKey === "nap_1")).toBeUndefined();
+    const ww1 = out.find((e) => e.eventKey === "wake_window_1");
+    expect(ww1).toBeDefined();
+    expect(ww1!.startTime).toBe(7 * 60);
+    expect(ww1!.endTime).toBe(18 * 60); // extends to bedtime; no short stub
+    const bedtimes = out.filter((e) => e.type === "bedtime");
+    expect(bedtimes).toHaveLength(1);
+    expect(bedtimes[0]!.id).toBe(manualBedtime.id);
+  });
+
+  it("projected nap ending BEFORE threshold is dropped when it leaves no room for a proper wake window before the manual bedtime", () => {
+    // wake 7:00, one 495-min WW → projected nap_1 15:15-16:00 (before
+    // the 18:00 threshold, so the threshold check is inert). Manual
+    // bedtime 16:30: only a 30-min gap to the nap end, less than the
+    // following WW's configured length (495) → drop.
+    const manualBedtime = aRecordedBedtime({
+      id: "manual_bedtime",
+      eventKey: "bedtime",
+      start: 16 * 60 + 30,
+      end: 30 * 60,
+    });
+    const ctx = aContext({
+      day: aDay({ wakeTime: 7 * 60 }),
+      settings: aSettings({
+        wakeWindowsMinutes: [495],
+        defaultNapLengthMinutes: 45,
+        bedtimeThreshold: 18 * 60,
+        earliestBedtime: 18 * 60,
+        defaultWakeTime: 7 * 60,
+      }),
+      actuals: [manualBedtime],
+    });
+
+    const out = projectDay(
+      {
+        day: ctx.day,
+        settings: ctx.settings,
+        actuals: ctx.actuals,
+        nowMinutes: ctx.nowMinutes,
+      },
+      { rules: NAP_RULES },
+    );
+
+    expect(out.find((e) => e.eventKey === "nap_1")).toBeUndefined();
+    const ww1 = out.find((e) => e.eventKey === "wake_window_1");
+    expect(ww1).toBeDefined();
+    expect(ww1!.endTime).toBe(16 * 60 + 30);
+    const bedtimes = out.filter((e) => e.type === "bedtime");
+    expect(bedtimes).toHaveLength(1);
+    expect(bedtimes[0]!.id).toBe(manualBedtime.id);
+  });
+
+  it("recorded nap ending after threshold is NOT dropped — reality wins over the terminator", () => {
+    const recordedNap = aRecordedNap({
+      eventKey: "nap_1",
+      start: 16 * 60,
+      end: 17 * 60 + 30, // ends after the 17:00 threshold
+    });
+    const manualBedtime = aRecordedBedtime({
+      id: "manual_bedtime",
+      eventKey: "bedtime",
+      start: 19 * 60,
+      end: 30 * 60,
+    });
+    const ctx = aContext({
+      day: aDay({ wakeTime: 7 * 60 }),
+      settings: aSettings({
+        wakeWindowsMinutes: [540],
+        defaultNapLengthMinutes: 45,
+        bedtimeThreshold: 17 * 60,
+        earliestBedtime: 18 * 60,
+        defaultWakeTime: 7 * 60,
+      }),
+      actuals: [recordedNap, manualBedtime],
+    });
+
+    const out = projectDay(
+      {
+        day: ctx.day,
+        settings: ctx.settings,
+        actuals: ctx.actuals,
+        nowMinutes: ctx.nowMinutes,
+      },
+      { rules: NAP_RULES },
+    );
+
+    expect(out.find((e) => e.eventKey === "nap_1")?.startTime).toBe(16 * 60);
+  });
+});
+
 describe("Cascade extends past wakeWindowsMinutes.length (physiology cascade)", () => {
   // wakeWindowsMinutes is a cadence sequence; the last value repeats until bedtimeThreshold.
 
