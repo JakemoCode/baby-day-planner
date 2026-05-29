@@ -1,9 +1,8 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { render } from "@testing-library/react";
 import { NO_OWNER, type Event, type TimeMin } from "@/v3/schemas";
 import { axe } from "@/test-utils";
 import { ContextualActionButton, type ContextualActionButtonProps } from "./ContextualActionButton";
-import * as timeModule from "@/v3/ui/time";
 
 const hm = (h: number, m = 0): TimeMin => h * 60 + m;
 
@@ -24,23 +23,13 @@ function makeProps(overrides: Partial<ContextualActionButtonProps> = {}): Contex
   return {
     inProgressNap: undefined,
     inProgressBedtime: undefined,
-    nextProjectedBottle: undefined,
-    dayId: "d1",
-    defaultBottleAmountOz: 6,
-    nowMinutes: hm(10),
     onEndNap: vi.fn().mockResolvedValue(undefined),
     onWakeRequest: vi.fn(),
-    onLogBottle: vi.fn().mockResolvedValue(undefined),
     ...overrides,
   };
 }
 
 describe("ContextualActionButton a11y", () => {
-  beforeEach(() => {
-    vi.spyOn(timeModule, "currentLocalMinutes").mockReturnValue(hm(13, 30));
-  });
-  afterEach(() => vi.restoreAllMocks());
-
   it("has no axe violations when showing End Nap button", async () => {
     const { container } = render(
       <ContextualActionButton {...makeProps({ inProgressNap: inProgressNap() })} />,
