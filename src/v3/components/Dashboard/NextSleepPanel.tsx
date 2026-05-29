@@ -53,7 +53,8 @@ export function NextSleepPanel({
       {last && last.endTime !== undefined && (
         <p className={styles.line}>
           Last nap: {formatHoursMinutes(last.endTime - last.startTime)},{" "}
-          {Math.max(0, nowMinutes - last.endTime)} min ago ({formatTimeShort(last.endTime)})
+          {formatHoursMinutes(Math.max(0, nowMinutes - last.endTime))} ago (
+          {formatTimeShort(last.endTime)})
         </p>
       )}
       <p className={styles.footer}>

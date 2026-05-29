@@ -86,7 +86,7 @@ describe("NextSleepPanel", () => {
       />,
     );
     expect(screen.queryByText(/putdown/i)).toBeNull();
-    expect(screen.getByText(/last nap: 1h 18m, 47 min ago \(2:18p\)/i)).toBeVisible();
+    expect(screen.getByText(/last nap: 1h 18m, 47m ago \(2:18p\)/i)).toBeVisible();
     expect(screen.getByText(/today: 2 naps · 2h 18m/i)).toBeVisible();
     expect(screen.getByText(/bedtime 7:30 PM/i)).toBeVisible();
   });
