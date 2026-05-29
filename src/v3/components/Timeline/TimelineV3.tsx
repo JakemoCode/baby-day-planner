@@ -44,31 +44,37 @@ export type TimelineV3Props = {
   clampToEvents?: boolean;
 };
 
+// Width of the left time-axis (hour labels) in px.
 const AXIS_W = 28;
+// Width of the right gutter reserved for the instant chip column, in px.
 const GUTTER_W = 124;
+// Left edge of a full-width block, in px from the timeline's left edge.
 const BLOCK_LEFT_INSET = AXIS_W + 8;
+// Right edge of a full-width block, in px from the timeline's right edge (the "column break").
 const BLOCK_RIGHT_INSET = GUTTER_W + 24;
-// Putdown stops before the chip column; owner name not rendered (stripe inherits from parent nap).
+// Right edge of a putdown block, in px from the right (stops short of the chip column).
 const PUTDOWN_RIGHT_INSET = BLOCK_RIGHT_INSET + 26;
+// Extra left indent for left custom-column blocks (pump, recurring), in px.
 const CUSTOM_LEFT_EXTRA = 110;
-// Right offset of the instant chip column.
+// Right edge of the instant chip column, in px from the right.
 const INSTANT_COLUMN_RIGHT = 4;
-// §F53: extra-duration band width (must match EXTRA_BAND_WIDTH_PX in Block.tsx).
-// Its right offset is set so the band's LEFT edge lands on the column break
-// (BLOCK_RIGHT_INSET, where cascade blocks end).
+// Width of the extra-duration band, in px (must match EXTRA_BAND_WIDTH_PX in Block.tsx).
 const EXTRA_BAND_WIDTH_PX = 80;
-// Leader bridges the chip cluster's left edge (INSTANT_COLUMN_RIGHT + 140 chip
-// width = 144 from right) to the block-lane edge / column break (BLOCK_RIGHT_INSET
-// = 148) — exactly 4px. Was 8px, overshooting 4px past the break (invisible until
-// the §F53 extra band drew an edge there; the tail bled into the duration column).
+// Width of the leader line connecting a chip to the block-lane edge, in px.
 const LEADER_LINE_W = 4;
+// Empty minutes padded before the first and after the last event.
 const VIEWPORT_PADDING_MIN = 30;
+// Default visible time range (minutes since midnight) when not clamping to events.
 const DEFAULT_VIEWPORT = { start: 5 * 60, end: 21 * 60 };
-const DEFAULT_VIEWPORT_END_CAP = 24 * 60; // midnight
+// Hard bottom of the viewport (minutes) — caps overnight blocks at midnight.
+const DEFAULT_VIEWPORT_END_CAP = 24 * 60;
+// Px of padding left above "now" when auto-scrolling the timeline into view.
 const SCROLL_TOP_PADDING_PX = 80;
+// Default vertical scale of the timeline, in px per hour.
 const DEFAULT_PX_PER_HOUR = 120;
-// Collision threshold: 38 px ≈ wrapped chip height + 4 px gap. Update if chip CSS changes.
+// Approx wrapped-chip height (px) used to detect vertically-colliding chips.
 const COLLAPSE_CHIP_HEIGHT_PX = 38;
+// Min vertical gap (px) between chips before they're collapsed into a cluster.
 const COLLAPSE_VERTICAL_GAP_PX = 4;
 
 function findScrollParent(el: HTMLElement): HTMLElement | Window {
