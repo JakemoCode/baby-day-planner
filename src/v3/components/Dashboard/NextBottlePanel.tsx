@@ -1,5 +1,10 @@
 import type { Event, OwnersConfig, TimeMin } from "@/v3/schemas";
-import { formatStartDelta, formatTimeForDisplay, formatTimeShort } from "@/v3/ui/time";
+import {
+  formatHoursMinutes,
+  formatStartDelta,
+  formatTimeForDisplay,
+  formatTimeShort,
+} from "@/v3/ui/time";
 import { OwnerPill } from "./OwnerPill";
 import { bottleTotals, lastBottle } from "./dashboardStats";
 import styles from "./NextBottlePanel.module.css";
@@ -32,7 +37,8 @@ export function NextBottlePanel({ nextBottle, actuals, nowMinutes, owners }: Nex
       )}
       {last && (
         <p className={styles.line}>
-          Last: {last.amountOz ?? 0}oz, {Math.max(0, nowMinutes - last.startTime)} min ago (
+          Last: {last.amountOz ?? 0}oz,{" "}
+          {formatHoursMinutes(Math.max(0, nowMinutes - last.startTime))} ago (
           {formatTimeShort(last.startTime)})
         </p>
       )}

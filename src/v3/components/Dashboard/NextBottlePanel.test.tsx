@@ -56,7 +56,7 @@ describe("NextBottlePanel", () => {
     expect(screen.getByLabelText("Bottle stats")).toBeVisible();
     expect(screen.getByText("1:00 PM")).toBeVisible();
     expect(screen.getByText(/in 2h/i)).toBeVisible();
-    expect(screen.getByText(/last: 5oz, 60 min ago \(10a\)/i)).toBeVisible();
+    expect(screen.getByText(/last: 5oz, 1h ago \(10a\)/i)).toBeVisible();
     expect(screen.getByText(/today: 2 bottles · 9oz/i)).toBeVisible();
   });
 
