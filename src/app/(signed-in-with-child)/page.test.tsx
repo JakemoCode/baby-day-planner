@@ -17,8 +17,6 @@ const useV3TemplatesMock = vi.fn();
 const useV3ProjectionMock = vi.fn();
 const useNowMinutesMock = vi.fn();
 const startNewDayMock = vi.fn();
-const getOrCreatePlannedDayMock = vi.fn();
-const createEventMock = vi.fn();
 const saveSettingsMock = vi.fn();
 const saveEventMock = vi.fn().mockResolvedValue(undefined);
 
@@ -42,7 +40,6 @@ vi.mock("@/hooks/useNowMinutes", () => ({
 }));
 vi.mock("@/v3/repositories/days", () => ({
   startNewDay: (...args: unknown[]) => startNewDayMock(...args),
-  getOrCreatePlannedDay: (...args: unknown[]) => getOrCreatePlannedDayMock(...args),
   promoteFromPlan: (...args: unknown[]) => promoteFromPlanMock(...args),
 }));
 // Mocked to keep this test focused on dashboard rendering; rollover seam
@@ -54,7 +51,6 @@ vi.mock("@/v3/hooks/useV3TomorrowPlan", () => ({
   useV3TomorrowPlan: () => ({ plan: null, loading: false }),
 }));
 vi.mock("@/v3/repositories/events", () => ({
-  createEvent: (...args: unknown[]) => createEventMock(...args),
   // fire-and-forget on mount; no-op so tests don't hit Firestore.
   reconcileDuplicateEventDocs: vi.fn().mockResolvedValue({ deleted: [] }),
 }));
@@ -363,118 +359,5 @@ describe("DashboardPage (V3)", () => {
       // Sheet is gone from the DOM.
       expect(screen.queryByLabelText(/wake time/i)).toBeNull();
     });
-  });
-
-  it("uniqueRecordedKeys counts distinct eventKey across recorded actuals only", () => {
-    // Pin clock to active day's date so handleLogBottle takes the same-day path.
-    vi.useFakeTimers({ shouldAdvanceTime: true });
-    vi.setSystemTime(new Date("2026-05-10T09:00:00"));
-    // Two recorded docs with the SAME eventKey + one projected (ignored).
-    // nextNumber should be 2, not 3.
-    const recordedBottle: Event = {
-      id: "b1",
-      dayId: "day-1",
-      eventKey: "bottle_1",
-      type: "bottle",
-      kind: "instant",
-      label: "Bottle 1",
-      startTime: 8 * 60,
-      hasPutdown: false,
-      owner: NO_OWNER,
-      lifecycle: { state: "completed", committedAt: 8 * 60 },
-    };
-    const recordedBottleDup: Event = {
-      ...recordedBottle,
-      id: "b1-update",
-      // same eventKey — should NOT bump ordinal
-    };
-    // Projected bottle within ±15min of nowMinutes so the Log Bottle
-    // Time window is open and the contextual button renders.
-    const projectedBottle: Event = {
-      id: "b-proj",
-      dayId: "day-1",
-      eventKey: "bottle_2",
-      type: "bottle",
-      kind: "instant",
-      label: "Bottle 2",
-      startTime: 9 * 60 + 5,
-      hasPutdown: false,
-      owner: NO_OWNER,
-      lifecycle: { state: "projected" },
-    };
-
-    const { saveEvent } = setupHooks({
-      actuals: [recordedBottle, recordedBottleDup, projectedBottle],
-      projected: [projectedBottle],
-      nowMinutes: 9 * 60,
-    });
-    renderWithAuth(<DashboardPage />);
-
-    // Log bottle now → eventKey should be bottle_2 (1 unique recorded + 1).
-    const btn = screen.getByRole("button", { name: /Log bottle now/i });
-    btn.click();
-
-    expect(saveEvent).toHaveBeenCalledTimes(1);
-    expect(saveEvent).toHaveBeenCalledWith(
-      expect.objectContaining({ eventKey: "bottle_2", label: "Bottle 2" }),
-    );
-  });
-
-  it("bottle recorded at 2 AM next-day routes to a freshly-created planned day, not the active day", async () => {
-    // Wall clock = 2026-05-11 02:00 (day after active day.date = "2026-05-10").
-    vi.useFakeTimers({ shouldAdvanceTime: true });
-    vi.setSystemTime(new Date("2026-05-11T02:00:00"));
-
-    const plannedTomorrow = makeDay({
-      id: "day-tomorrow-id",
-      date: "2026-05-11",
-      status: "planned",
-    });
-    getOrCreatePlannedDayMock.mockResolvedValue(plannedTomorrow);
-    createEventMock.mockResolvedValue(undefined);
-
-    // Projected bottle at 2 AM next-day frame so the Log bottle now
-    // window is open at nowMinutes=2:00.
-    const projectedBottle: Event = {
-      id: "b-proj-2am",
-      dayId: "day-1",
-      eventKey: "bottle_dream",
-      type: "bottle",
-      kind: "instant",
-      label: "Dream Feed",
-      startTime: 2 * 60,
-      hasPutdown: false,
-      owner: NO_OWNER,
-      lifecycle: { state: "projected" },
-    };
-    const { saveEvent } = setupHooks({
-      nowMinutes: 2 * 60,
-      projected: [projectedBottle],
-    });
-    renderWithAuth(<DashboardPage />);
-
-    const btn = screen.getByRole("button", { name: /Log bottle now/i });
-    btn.click();
-
-    // Wait for async handler.
-    await Promise.resolve();
-    await Promise.resolve();
-
-    // Cross-day path: saveEvent must NOT be called (would land on active day).
-    // createEvent must use tomorrow's dayId.
-    expect(saveEvent).not.toHaveBeenCalled();
-    expect(getOrCreatePlannedDayMock).toHaveBeenCalledTimes(1);
-    expect(getOrCreatePlannedDayMock).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.anything(),
-      "2026-05-11",
-      expect.anything(),
-    );
-    expect(createEventMock).toHaveBeenCalledTimes(1);
-    expect(createEventMock).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.anything(),
-      expect.objectContaining({ type: "bottle", dayId: "day-tomorrow-id" }),
-    );
   });
 });

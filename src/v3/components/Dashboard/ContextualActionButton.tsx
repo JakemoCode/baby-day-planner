@@ -1,159 +1,46 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { NO_OWNER, type Event, type TimeMin } from "@/v3/schemas";
-import { recordedIdFor } from "@/v3/lib/eventConventions";
+import { type Event, type TimeMin } from "@/v3/schemas";
 import { currentLocalMinutes } from "@/v3/ui/time";
-import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { ActionButton } from "./ActionButton";
 import { decideMode, type ContextMode } from "./decideMode";
 
 export type ContextualActionButtonProps = {
   inProgressNap: Event | undefined;
   inProgressBedtime: Event | undefined;
-  nextProjectedBottle: Event | undefined;
-  dayId: string;
-  defaultBottleAmountOz: number;
-  nowMinutes: TimeMin;
   onEndNap: (nap: Event, endTime: TimeMin) => Promise<void> | void;
   onWakeRequest: () => void;
-  onLogBottle: (bottle: Event) => Promise<void> | void;
 };
 
 const MODE_LABEL: Record<Exclude<ContextMode["kind"], "hidden">, string> = {
   "end-bedtime": "End overnight sleep",
   "end-nap": "End nap",
-  "log-bottle": "Log bottle now",
 };
-
-const LOGGED_LABEL = "✓ Bottle logged";
-// Auto-hide after 4s so a subsequent end-nap mode isn't masked by the lingering logged label.
-const LOGGED_AFFORDANCE_MS = 4000;
-
-/**
- * Renders nothing; fires `onExpire` after `ms`. Mount with a unique
- * key for each affordance instance — unmounting clears the timer.
- */
-function AffordanceTimer({ ms, onExpire }: { ms: number; onExpire: () => void }) {
-  useEffect(() => {
-    const t = setTimeout(onExpire, ms);
-    return () => clearTimeout(t);
-  }, [ms, onExpire]);
-  return null;
-}
-
-function buildLoggedBottle(
-  projected: Event,
-  dayId: string,
-  defaultBottleAmountOz: number,
-  startTime: TimeMin,
-): Event {
-  // Same eventKey collapses projected/recorded pair; deterministic id lets re-taps overwrite same doc.
-  return {
-    id: recordedIdFor(projected.eventKey),
-    dayId,
-    eventKey: projected.eventKey,
-    type: "bottle",
-    kind: "instant",
-    label: projected.label,
-    startTime,
-    amountOz: defaultBottleAmountOz,
-    hasPutdown: false,
-    owner: projected.owner ?? NO_OWNER,
-    lifecycle: { state: "completed", committedAt: startTime },
-  };
-}
 
 export function ContextualActionButton({
   inProgressNap,
   inProgressBedtime,
-  nextProjectedBottle,
-  dayId,
-  defaultBottleAmountOz,
-  nowMinutes,
   onEndNap,
   onWakeRequest,
-  onLogBottle,
 }: ContextualActionButtonProps) {
-  const mode = decideMode({
-    inProgressBedtime,
-    inProgressNap,
-    nextProjectedBottle,
-    nowMinutes,
-  });
-
-  const [confirmOpen, setConfirmOpen] = useState(false);
-  // Keyed by recorded bottle id; null or changed id = affordance not active.
-  const isLoggedAffordance = mode.kind === "log-bottle" && mode.alreadyLogged;
-  const loggedKey = isLoggedAffordance ? mode.projected.id : null;
-  const [expiredKey, setExpiredKey] = useState<string | null>(null);
+  const mode = decideMode({ inProgressBedtime, inProgressNap });
 
   if (mode.kind === "hidden") return null;
-  // Hide after affordance expires so the next mode (end-nap etc.) can take over.
-  if (isLoggedAffordance && expiredKey === loggedKey) return null;
-
-  const performLog = (projected: Event) => {
-    const nowMin = currentLocalMinutes();
-    const bottle = buildLoggedBottle(projected, dayId, defaultBottleAmountOz, nowMin);
-    void onLogBottle(bottle);
-  };
 
   const handleClick = () => {
-    const nowMin = currentLocalMinutes();
     switch (mode.kind) {
       case "end-bedtime":
         onWakeRequest();
         return;
       case "end-nap":
-        void onEndNap(mode.nap, nowMin);
+        void onEndNap(mode.nap, currentLocalMinutes());
         return;
-      case "log-bottle": {
-        // Re-tap on already-logged slot: confirm dialog instead of silent overwrite.
-        if (mode.alreadyLogged) {
-          setConfirmOpen(true);
-          return;
-        }
-        performLog(mode.projected);
-        return;
-      }
     }
   };
 
-  const label =
-    mode.kind === "log-bottle" && mode.alreadyLogged ? LOGGED_LABEL : MODE_LABEL[mode.kind];
-
-  const confirmBody =
-    mode.kind === "log-bottle" && mode.alreadyLogged
-      ? (() => {
-          const m = Math.max(0, nowMinutes - mode.projected.startTime);
-          return `Last bottle logged ${m} minute${m === 1 ? "" : "s"} ago. Tap Confirm to update to now.`;
-        })()
-      : "";
-
   return (
-    <>
-      <ActionButton variant="primary" onClick={handleClick} aria-live="polite">
-        {label}
-      </ActionButton>
-      {loggedKey !== null && expiredKey !== loggedKey && (
-        <AffordanceTimer
-          key={loggedKey}
-          ms={LOGGED_AFFORDANCE_MS}
-          onExpire={() => setExpiredKey(loggedKey)}
-        />
-      )}
-      <ConfirmDialog
-        open={confirmOpen}
-        title="Change the recorded time?"
-        body={confirmBody}
-        confirmLabel="Confirm"
-        cancelLabel="Cancel"
-        onCancel={() => setConfirmOpen(false)}
-        onConfirm={() => {
-          setConfirmOpen(false);
-          if (mode.kind === "log-bottle") performLog(mode.projected);
-        }}
-      />
-    </>
+    <ActionButton variant="primary" onClick={handleClick} aria-live="polite">
+      {MODE_LABEL[mode.kind]}
+    </ActionButton>
   );
 }

@@ -5,8 +5,7 @@ import type { Event, TimeMin } from "@/v3/schemas";
 import { reduceLifecycle } from "@/v3/lifecycle";
 import { isInProgress } from "@/v3/lib/effectiveEnd";
 import { isRenderSynthetic } from "@/v3/lib/syntheticEvents";
-import { nearestBottleInWindow, nextBottle, nextNap, projectedBedtime } from "@/v3/selectors";
-import { LOG_BOTTLE_WINDOW_MIN } from "@/v3/components/Dashboard/decideMode";
+import { nextBottle, nextNap, projectedBedtime } from "@/v3/selectors";
 import { nextDashboardEvent } from "@/v3/components/Dashboard/dashboardStats";
 import { useNowMinutes } from "@/hooks/useNowMinutes";
 import { useAutoPromotePersistence } from "@/v3/hooks/useAutoPromotePersistence";
@@ -14,13 +13,8 @@ import { useV3TomorrowPlan } from "@/v3/hooks/useV3TomorrowPlan";
 import { useReconcileActiveDay } from "@/v3/hooks/useReconcileActiveDay";
 import { useDayPageState } from "@/v3/hooks/useDayPageState";
 import { isEngineEmittedId, recordedIdFor } from "@/v3/lib/eventConventions";
-import { getOrCreatePlannedDay, promoteFromPlan, startNewDay } from "@/v3/repositories/days";
-import {
-  createEvent,
-  deleteEvent,
-  listEvents,
-  reconcileDuplicateEventDocs,
-} from "@/v3/repositories/events";
+import { promoteFromPlan, startNewDay } from "@/v3/repositories/days";
+import { deleteEvent, listEvents, reconcileDuplicateEventDocs } from "@/v3/repositories/events";
 import { db } from "@/lib/firebase/client";
 import { DashboardSkeleton } from "@/v3/components/Dashboard/DashboardSkeleton";
 import { DrawerShell } from "@/v3/components/shared/DrawerShell";
@@ -86,10 +80,7 @@ export default function DashboardPage() {
 
   const next = nextDashboardEvent(projected, nowMinutes);
 
-  const nb = nearestBottleInWindow(projected, nowMinutes, LOG_BOTTLE_WINDOW_MIN);
-  // §F67: the panel announces the next upcoming bottle (any distance out),
-  // distinct from `nb`'s ±15min log-confirm window which the contextual
-  // button uses.
+  // §F67: the panel announces the next upcoming bottle (any distance out).
   const upcomingBottle = nextBottle(projected, nowMinutes);
   const nn = nextNap(projected, nowMinutes);
   // Use `projected` (not `actuals`) to surface engine-auto-promoted in-progress naps.
@@ -105,21 +96,6 @@ export default function DashboardPage() {
   );
   const bedtime = projectedBedtime(projected);
 
-  const handleLogBottle = async (bottle: Event) => {
-    // Midnight rule: a 2 AM bottle belongs to the calendar date, not the still-active prior day.
-    const bottleDate = todayDate();
-    if (bottleDate !== day.date) {
-      const target = await getOrCreatePlannedDay(
-        db,
-        CHILD_ID,
-        bottleDate,
-        settings.defaultWakeTime,
-      );
-      await createEvent(db, CHILD_ID, { ...bottle, dayId: target.id });
-      return;
-    }
-    await saveEvent(bottle);
-  };
   // Only rewrite to the deterministic id when the source is an engine projection —
   // never overwrite an actual's original doc id (would orphan legacy docs).
   const handleEndNap = async (event: Event, endTime: number) => {
@@ -192,13 +168,8 @@ export default function DashboardPage() {
         <ContextualActionButton
           inProgressNap={inProgressNap}
           inProgressBedtime={inProgressBedtime}
-          nextProjectedBottle={nb}
-          dayId={day.id}
-          defaultBottleAmountOz={settings.defaultBottleAmountOz}
-          nowMinutes={nowMinutes}
           onEndNap={handleEndNap}
           onWakeRequest={() => setWakeSheetOpen(true)}
-          onLogBottle={handleLogBottle}
         />
         {process.env.NODE_ENV === "development" && (
           <div className={styles.actionsRow}>
