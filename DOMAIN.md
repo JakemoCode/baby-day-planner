@@ -118,6 +118,17 @@ regardless of count. Sick days, growth spurts, and other
 high-feed-count days don't suddenly leave the afternoon
 unpredicted just because the cap was reached by noon.
 
+**Bottles are numbered by when they happen, not when they were
+logged.** The Nth bottle of the day is simply whatever bottle
+happened Nth by the clock — counting recorded and
+still-projected bottles together. "Bottle 1" is the earliest of
+the day, "Bottle 2" the next, and so on. Editing a bottle's time,
+or inserting an earlier one (a forgotten overnight feed, say),
+re-sorts these display numbers so they always read in order. This
+numbering is **purely a display label** — the app keeps a stable
+internal identity for each logged bottle that does *not* change
+when the labels re-sort.
+
 ---
 
 ## §3 Bedtime — a fuzzy emergent thing, not a clock time

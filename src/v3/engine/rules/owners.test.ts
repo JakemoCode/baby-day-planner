@@ -8,6 +8,7 @@ import {
   PARENT2,
   aContext,
   aDay,
+  aRecordedBottle,
   aRecordedNap,
   aSettings,
   aTemplate,
@@ -368,6 +369,34 @@ describe("R12.6 — projected bottles inherit template.bottleOwners[N-1] (chrono
     expect(bottles[1]!.owner).toEqual(PARENT2);
     expect(bottles[2]!.owner).toEqual(PARENT1);
     expect(bottles[3]!.owner).toEqual(PARENT2);
+  });
+
+  it("stamps bottleOwners by eventKey index onto projected bottles when recorded keys are non-chronological", () => {
+    const bottleOwners = [PARENT1, PARENT2, PARENT1, PARENT2];
+    const ctx = aContext({
+      day: aDay({ wakeTime: 7 * 60 }),
+      settings: aSettings({
+        bottleChain: { bottlesPerDay: 4, bufferAfterWakeMinutes: 10 },
+        defaultBottleIntervalMinutes: 180,
+        wakeWindowsMinutes: [],
+      }),
+      template: aTemplate({ bottleOwners }),
+      actuals: [
+        aRecordedBottle({ id: "b_a", eventKey: "bottle_2", start: 7 * 60 + 30 }),
+        aRecordedBottle({ id: "b_b", eventKey: "bottle_1", start: 9 * 60 }),
+      ],
+      nowMinutes: 10 * 60,
+    });
+
+    const out = run(ctx);
+    const bottles = out
+      .filter((e) => e.type === "bottle")
+      .sort((a, b) => a.startTime - b.startTime);
+
+    bottles.forEach((b, i) => expect(b.label).toBe(`Bottle ${i + 1}`));
+    const ownerOf = (eventKey: string) => bottles.find((b) => b.eventKey === eventKey)!.owner;
+    expect(ownerOf("bottle_3")).toEqual(bottleOwners[2]);
+    expect(ownerOf("bottle_4")).toEqual(bottleOwners[3]);
   });
 
   it("no template.bottleOwners → bottles have no owner (default cleared)", () => {
