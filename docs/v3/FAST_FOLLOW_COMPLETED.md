@@ -37,6 +37,7 @@
 - [§F47](./fast-follow/completed/f47-instantchip-focus-outline.md) — dropped
 - [§F48](./fast-follow/completed/f48-last-nap-future-time.md) — already fixed (§F48b/c/d)
 - [§F52](./fast-follow/completed/f52-dashboard-kill-scroll-wobble.md)
+- [§F53](./fast-follow/completed/f53-recurring-duration-zindex.md)
 - [§F55](./fast-follow/completed/f55-collapse-2-overlapping-instant-chips-into.md)
 - [§F56](./fast-follow/completed/f56-recurring-event-drawer-heading-shows-the.md)
 - [§F65](./fast-follow/completed/f65-delete-recurring-event-from-todays-timeline.md)
