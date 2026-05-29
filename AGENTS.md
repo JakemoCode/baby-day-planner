@@ -4,6 +4,13 @@
 This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` before writing any code. Heed deprecation notices.
 <!-- END:nextjs-agent-rules -->
 
+## Where things live — CHECK THE SOURCEMAP FIRST
+
+`SOURCEMAP.md` at the repo root is a directory-level map of the codebase
+(layers, entry points, "where does this live?"). Consult it before
+grep-walking or bulk-reading files. It is intentionally NOT file-by-file —
+for exact files, query live with `Glob`/`Grep`.
+
 ## Domain model — READ THIS FIRST
 
 `DOMAIN.md` at the repo root is the authoritative plain-English description of how babies actually behave. It is **not** a spec, **not** requirements, and **not** rules for the engine — it is the domain the implementation is supposed to fit.
