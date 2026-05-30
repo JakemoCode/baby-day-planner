@@ -1167,3 +1167,124 @@ describe("Past-threshold prompt when editing a nap (physiology cascade)", () => 
     });
   });
 });
+
+describe("Drawer now-shortcut buttons", () => {
+  const NAP_MIN = 20;
+
+  function renderNapDrawer(event: Event, siblings: Event[], now: TimeMin) {
+    return render(
+      <EventEditDrawerV3
+        open
+        mode="edit"
+        event={event}
+        owners={owners}
+        nowMinutes={now}
+        bedtimeThreshold={THRESHOLD}
+        defaultWakeTime={DEFAULT_WAKE_TIME}
+        napDurationMin={NAP_MIN}
+        existingEvents={siblings}
+        onSave={vi.fn()}
+        onCancel={vi.fn()}
+      />,
+    );
+  }
+
+  const hm = (min: number) =>
+    `${String(Math.floor(min / 60)).padStart(2, "0")}:${String(min % 60).padStart(2, "0")}`;
+
+  describe("Start now (nap, preserves duration)", () => {
+    it("fills startTime with Now and shifts endTime to keep the existing duration", async () => {
+      const now = 8 * 60 + 30;
+      const nap = projectedNap({ startTime: 9 * 60, endTime: 10 * 60 }); // next-upcoming, 60-min
+      renderNapDrawer(nap, [nap], now);
+
+      await userEvent.click(screen.getByRole("button", { name: "Start now" }));
+
+      expect(screen.getByLabelText("Start time")).toHaveValue(hm(now));
+      expect(screen.getByLabelText("End time")).toHaveValue(hm(now + 60));
+    });
+
+    it("is hidden on a past nap (manual edit only)", () => {
+      const now = 14 * 60;
+      const past = projectedNap({ startTime: 9 * 60, endTime: 10 * 60 });
+      renderNapDrawer(past, [past], now);
+
+      expect(screen.queryByRole("button", { name: "Start now" })).toBeNull();
+    });
+  });
+
+  describe("End now (nap)", () => {
+    it("fills endTime with Now when the nap is long enough (no confirm)", async () => {
+      const now = 9 * 60 + 30; // 30 min in, > NAP_MIN
+      const inProgress = projectedNap({ startTime: 9 * 60, endTime: 10 * 60 });
+      renderNapDrawer(inProgress, [inProgress], now);
+
+      await userEvent.click(screen.getByRole("button", { name: "End now" }));
+
+      expect(screen.getByLabelText("End time")).toHaveValue(hm(now));
+    });
+
+    it("is hidden on the next-upcoming nap that hasn't started", () => {
+      const now = 8 * 60 + 30;
+      const upcoming = projectedNap({ startTime: 9 * 60, endTime: 10 * 60 });
+      renderNapDrawer(upcoming, [upcoming], now);
+
+      expect(screen.queryByRole("button", { name: "End now" })).toBeNull();
+      expect(screen.getByRole("button", { name: "Start now" })).toBeVisible();
+    });
+
+    it("prompts before ending a nap shorter than the minimum, and fills only on confirm", async () => {
+      const now = 9 * 60 + 10; // 10 min in, < NAP_MIN (20)
+      const inProgress = projectedNap({ startTime: 9 * 60, endTime: 10 * 60 });
+      renderNapDrawer(inProgress, [inProgress], now);
+
+      await userEvent.click(screen.getByRole("button", { name: "End now" }));
+
+      expect(
+        screen.getByText(/shorter than your minimum nap setting of 20 minutes/i),
+      ).toBeVisible();
+      expect(screen.getByLabelText("End time")).toHaveValue("10:00"); // unchanged until confirm
+
+      await userEvent.click(screen.getByRole("button", { name: "Confirm" }));
+      expect(screen.getByLabelText("End time")).toHaveValue(hm(now));
+    });
+
+    it("leaves endTime unchanged when the short-nap prompt is cancelled", async () => {
+      const now = 9 * 60 + 10;
+      const inProgress = projectedNap({ startTime: 9 * 60, endTime: 10 * 60 });
+      renderNapDrawer(inProgress, [inProgress], now);
+
+      await userEvent.click(screen.getByRole("button", { name: "End now" }));
+      const dialog = screen.getByRole("dialog", { name: "Are you sure?" });
+      await userEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+
+      expect(screen.getByLabelText("End time")).toHaveValue("10:00");
+    });
+  });
+
+  describe("Log now (bottle)", () => {
+    it("fills the bottle startTime with Now, leaving amount untouched", async () => {
+      const now = 8 * 60 + 30;
+      const bottle = projectedBottle({ startTime: 7 * 60 + 30, amountOz: 4 });
+      render(
+        <EventEditDrawerV3
+          open
+          mode="edit"
+          event={bottle}
+          owners={owners}
+          nowMinutes={now}
+          bedtimeThreshold={THRESHOLD}
+          defaultWakeTime={DEFAULT_WAKE_TIME}
+          existingEvents={[bottle]}
+          onSave={vi.fn()}
+          onCancel={vi.fn()}
+        />,
+      );
+
+      await userEvent.click(screen.getByRole("button", { name: "Log now" }));
+
+      expect(screen.getByLabelText("Start time")).toHaveValue(hm(now));
+      expect(screen.getByLabelText("Amount (oz)")).toHaveValue(4);
+    });
+  });
+});

@@ -67,6 +67,68 @@ export function isNextProjectedOfType(
   return earliest !== undefined && earliest.id === event.id;
 }
 
+/**
+ * Grace minutes the "End now" drawer shortcut survives past a nap's projected end.
+ * Naps run long unpredictably (DOMAIN §1 — length variance), so the shortcut stays
+ * tappable briefly after Now crosses the projected end to record the true, later end.
+ */
+export const NAP_END_GRACE_MIN: TimeMin = 15;
+
+/**
+ * True iff this nap is the one straddling the Now line: it has begun and Now hasn't
+ * yet passed its end plus the {@link NAP_END_GRACE_MIN} grace. Naps don't overlap, so
+ * at most one nap is active. Drives both drawer "now" shortcuts on an in-progress nap.
+ */
+export function isActiveNap(event: Event, nowMinutes: TimeMin): boolean {
+  if (event.type !== "nap") return false;
+  if (isRenderSynthetic(event)) return false;
+  if (event.startTime > nowMinutes) return false;
+  if (event.endTime === undefined) return true; // open nap: in progress, no end yet
+  return nowMinutes < event.endTime + NAP_END_GRACE_MIN;
+}
+
+/**
+ * The single nap nearest the Now line that earns the drawer "now" shortcuts: the
+ * {@link isActiveNap active} one if any exists, otherwise the next-upcoming nap
+ * (earliest `startTime > now`). Returns false for every other nap — past naps and
+ * naps beyond the next keep manual edit only. Render-synthetic putdowns are excluded.
+ *
+ * Drives the **Start now** button. **End now** additionally requires {@link isActiveNap}
+ * (a not-yet-started focus nap can't be ended).
+ */
+export function isFocusNap(event: Event, allEvents: Event[], nowMinutes: TimeMin): boolean {
+  if (event.type !== "nap" || isRenderSynthetic(event)) return false;
+  const naps = allEvents.filter((e) => e.type === "nap" && !isRenderSynthetic(e));
+  const active = naps.find((e) => isActiveNap(e, nowMinutes));
+  if (active) return active.id === event.id;
+  let next: Event | undefined;
+  for (const e of naps) {
+    if (e.startTime <= nowMinutes) continue;
+    if (next === undefined || e.startTime < next.startTime) next = e;
+  }
+  return next !== undefined && next.id === event.id;
+}
+
+/**
+ * True iff this is the real bottle closest to Now in either direction (min
+ * `|startTime - now|`). Dream-feed (explicit-schedule) and render-synthetic bottles are
+ * excluded. Drives the **Log now** shortcut — at most one bottle carries it.
+ */
+export function isNearestBottle(event: Event, allEvents: Event[], nowMinutes: TimeMin): boolean {
+  if (event.type !== "bottle" || isDreamFeed(event) || isRenderSynthetic(event)) return false;
+  let nearest: Event | undefined;
+  let bestDist = Infinity;
+  for (const e of allEvents) {
+    if (e.type !== "bottle" || isDreamFeed(e) || isRenderSynthetic(e)) continue;
+    const dist = Math.abs(e.startTime - nowMinutes);
+    if (dist < bestDist) {
+      bestDist = dist;
+      nearest = e;
+    }
+  }
+  return nearest !== undefined && nearest.id === event.id;
+}
+
 // ---------------------------------------------------------------------------
 // Legacy lifecycle migration
 // ---------------------------------------------------------------------------

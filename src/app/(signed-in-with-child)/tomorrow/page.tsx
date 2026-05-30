@@ -245,6 +245,7 @@ function TomorrowPageInner({
         nowMinutes={TOMORROW_ANCHOR_MINUTES}
         bedtimeThreshold={settings.bedtimeThreshold}
         defaultWakeTime={settings.defaultWakeTime}
+        napDurationMin={settings.napDurationMin}
         existingEvents={planState.extras}
         open={drawer.open}
         event={drawer.open ? (drawer.mode === "edit" ? drawer.event : drawer.template) : null}

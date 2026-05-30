@@ -110,6 +110,11 @@ Replaces every "Start X Now" dashboard button removed under
 [[Now-cross promotion]]. Drawer remains the manual path for any
 bottle outside the ±15min window.
 
+The drawer's time fields additionally offer a [[drawer "now" shortcut]]
+— a button that fills a time input with Now. This is distinct from the
+removed dashboard CTAs: it mutates *form* state only, never persisted
+state, so it cannot trigger a cascade. Save still gates intention.
+
 Established 2026-05-26 (§F66 button-design grill).
 
 ## putdown bottle-anchor rule
@@ -273,6 +278,52 @@ window heuristics.
 Resolves §F58 / §F66 dogfood issue #1.
 
 Established 2026-05-25 (§F66 grill). Implemented in §F66 PR 6.
+
+## drawer "now" shortcut
+
+A button beside a drawer time input that fills that single field with
+Now, as a less-fiddly alternative to typing the time. A convenience on
+the existing manual-edit path — NOT a revived "Start X Now" CTA.
+
+- Mutates **form** state only. The user still hits **Save** to commit,
+  so the button cannot, by itself, promote a lifecycle or trigger a
+  cascade. Intention stays gated by Save.
+- Same lifecycle outcome as typing the value: a past/present time saved
+  on a nap/bottle is a [[happened-fact]] and records normally.
+- Shapes today: nap **Start now** (preserves duration — shifts endTime
+  to keep the existing gap), nap **End now** (sets endTime only; never
+  touches startTime), bottle **Log now** (sets startTime only; amount
+  untouched). Naps + bottles only — "projected baby events." Pumps,
+  recurring, and custom/extra events get no shortcuts.
+- Edit-mode only. Create templates already seed `startTime = Now`
+  (createEventTemplate.ts), and naps aren't creatable at all, so the
+  shortcuts would be no-ops on create.
+- **Visibility is a Now-window, not lifecycle.** Buttons appear only on
+  the single event nearest the Now line — never on past naps or naps
+  beyond the next. Manual edit stays available everywhere; the shortcut
+  is just absent off-window. Predicates: `isFocusNap` / `isActiveNap` /
+  `isNearestBottle` in `lifecycle.ts`.
+  - **Nap in progress** (`start ≤ Now < end + 15min` grace) → BOTH
+    Start now + End now. Naps rarely start on the projected dot, so
+    correcting either edge is in-band. The grace lets End now record a
+    true, later end when a nap runs long (DOMAIN §1 variance) — this is
+    the "ran longer → edit time forward" honesty mechanic.
+  - **Next-upcoming nap** (no nap active) → Start now only (can't end
+    what hasn't started). End now = focus nap AND `isActiveNap`.
+  - **Bottle** → the single bottle with min `|startTime − Now|` (either
+    side) shows Log now; dream-feed excluded.
+- **End now short-nap guard**: if the resulting duration would be
+  `< settings.napDurationMin` ("Min nap duration"), End now opens a
+  confirm ("Are you sure?") before filling the field. Bound to
+  `napDurationMin` (the user-facing soft floor), NOT
+  `shortNapThresholdMinutes` (an engine cascade knob) — keeps the UI
+  guard decoupled from physiology tuning. Strict `<`; equal-to-min
+  saves clean. Fires on button press, not Save.
+- Start now (green / `--color-accent`) and End now (terracotta /
+  `--color-warning`) are color-distinguished.
+
+Established 2026-05-30 (§F69-adjacent inline-buttons grill). Implemented
+in `feat/drawer-now-buttons`.
 
 ## happened-fact
 

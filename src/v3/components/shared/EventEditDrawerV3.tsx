@@ -5,7 +5,13 @@ import styles from "./EventEditDrawer.module.css";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import type { Event, EventType, OwnerRef, OwnersConfig, TimeMin } from "../../schemas";
 import { isRecorded, NO_OWNER } from "../../schemas";
-import { isFutureProjected, isNextProjectedOfType } from "../../lifecycle";
+import {
+  isFutureProjected,
+  isNextProjectedOfType,
+  isActiveNap,
+  isFocusNap,
+  isNearestBottle,
+} from "../../lifecycle";
 import { isRenderSynthetic } from "../../lib/syntheticEvents";
 import { recordedIdFor } from "../../lib/eventConventions";
 import { formatHM24, formatTimeForDisplay, nextDayAt, parseHM24 } from "../../ui/time";
@@ -46,6 +52,13 @@ export type EventEditDrawerV3Props = {
    * (Tomorrow page) that don't have a live wakeTime.
    */
   dayWakeTime?: TimeMin;
+  /**
+   * Settings.napDurationMin — the "Min nap duration" soft floor. Drives the End-now
+   * short-nap confirm: ending a nap shorter than this prompts before filling the field.
+   * Optional; call sites without baby-event editing (e.g. /tomorrow) may omit it,
+   * which disables the guard (End now fills directly).
+   */
+  napDurationMin?: TimeMin;
   onSave: (event: Event) => void | Promise<void>;
   onCancel: () => void;
   onDelete?: (event: Event) => void | Promise<void>;
@@ -177,6 +190,7 @@ export function EventEditDrawerV3({
   bedtimeThreshold,
   defaultWakeTime,
   dayWakeTime,
+  napDurationMin,
   onSave,
   onCancel,
   onDelete,
@@ -187,7 +201,11 @@ export function EventEditDrawerV3({
   const [confirmOpen, setConfirmOpen] = useState(false);
   // Holds a nap that crossed bedtimeThreshold pending "Change to bedtime?" confirmation.
   const [pendingPastThresholdNap, setPendingPastThresholdNap] = useState<Event | null>(null);
+  // True while the End-now short-nap confirm is open (fires on button press, not Save).
+  const [shortNapConfirmOpen, setShortNapConfirmOpen] = useState(false);
   const titleId = useId();
+  const startTimeId = useId();
+  const endTimeId = useId();
 
   useEffect(() => {
     if (!open) return;
@@ -238,6 +256,19 @@ export function EventEditDrawerV3({
   const futureProjected =
     mode === "edit" && isFutureProjected(sourceEvent, nowMinutes) && !isNextOfType;
 
+  // "Now" shortcuts: nap+bottle only, edit mode only, on the event nearest the Now line.
+  // Start now rides the focus nap; End now additionally needs the nap to have started.
+  const siblings = existingEvents ?? [];
+  const showStartNow =
+    mode === "edit" && type === "nap" && isFocusNap(sourceEvent, siblings, nowMinutes);
+  const showEndNow =
+    mode === "edit" &&
+    type === "nap" &&
+    isFocusNap(sourceEvent, siblings, nowMinutes) &&
+    isActiveNap(sourceEvent, nowMinutes);
+  const showLogNow =
+    mode === "edit" && type === "bottle" && isNearestBottle(sourceEvent, siblings, nowMinutes);
+
   const errors = validateForm(
     type,
     form.startTime,
@@ -247,8 +278,7 @@ export function EventEditDrawerV3({
     dayWakeTime,
   );
 
-  const handleStartTimeChange = (raw: string) => {
-    const next = parseHM24(raw);
+  const applyStartTime = (next: TimeMin | undefined) => {
     // Naps and pumps preserve duration on startTime nudge. Extras don't auto-fill endTime.
     const preservesDuration = type === "nap" || type === "pump";
     if (!preservesDuration || next === undefined) {
@@ -261,6 +291,26 @@ export function EventEditDrawerV3({
       if (prevDur > 0) durMin = prevDur;
     }
     setForm((prev) => ({ ...prev, startTime: next, endTime: next + durMin }));
+  };
+
+  const handleStartTimeChange = (raw: string) => applyStartTime(parseHM24(raw));
+
+  // "Now" shortcuts: populate a single time field with Now. Form-state only — Save still
+  // commits, so these can't trigger a cascade on their own. See CONTEXT.md "drawer now shortcut".
+  const handleStartNow = () => applyStartTime(nowMinutes);
+
+  const setEndNow = () => setForm((prev) => ({ ...prev, endTime: nowMinutes }));
+
+  const handleEndNow = () => {
+    const isShort =
+      napDurationMin !== undefined &&
+      form.startTime !== undefined &&
+      nowMinutes - form.startTime < napDurationMin;
+    if (isShort) {
+      setShortNapConfirmOpen(true);
+      return;
+    }
+    setEndNow();
   };
 
   const handleSave = () => {
@@ -339,6 +389,11 @@ export function EventEditDrawerV3({
     setPendingPastThresholdNap(null);
   };
 
+  const handleConfirmShortNap = () => {
+    setShortNapConfirmOpen(false);
+    setEndNow();
+  };
+
   return (
     <div
       className={styles.backdrop}
@@ -381,42 +436,81 @@ export function EventEditDrawerV3({
         )}
 
         {showStartTime && (
-          <label className={styles.field}>
-            <span className={styles.label}>Start time</span>
-            <input
-              type="time"
-              className={styles.input}
-              value={timeInputValue(form.startTime)}
-              onChange={(e) => handleStartTimeChange(e.target.value)}
-              required
-              disabled={futureProjected}
-              {...(errors.startTime ? { "aria-invalid": true } : {})}
-            />
+          <div className={styles.field}>
+            <label className={styles.label} htmlFor={startTimeId}>
+              Start time
+            </label>
+            <div className={styles.fieldRow}>
+              <input
+                id={startTimeId}
+                type="time"
+                className={styles.input}
+                value={timeInputValue(form.startTime)}
+                onChange={(e) => handleStartTimeChange(e.target.value)}
+                required
+                disabled={futureProjected}
+                {...(errors.startTime ? { "aria-invalid": true } : {})}
+              />
+              {showStartNow && (
+                <button
+                  type="button"
+                  className={`${styles.nowButton} ${styles.nowStart}`}
+                  onClick={handleStartNow}
+                >
+                  Start now
+                </button>
+              )}
+              {showLogNow && (
+                <button
+                  type="button"
+                  className={`${styles.nowButton} ${styles.nowStart}`}
+                  onClick={handleStartNow}
+                >
+                  Log now
+                </button>
+              )}
+            </div>
             {errors.startTime && (
               <span className={styles.fieldError} role="alert">
                 {errors.startTime}
               </span>
             )}
-          </label>
+          </div>
         )}
 
         {showEndTime && (
-          <label className={styles.field}>
-            <span className={styles.label}>End time</span>
-            <input
-              type="time"
-              className={styles.input}
-              value={timeInputValue(form.endTime)}
-              onChange={(e) => setForm((prev) => ({ ...prev, endTime: parseHM24(e.target.value) }))}
-              disabled={futureProjected}
-              {...(errors.endTime ? { "aria-invalid": true } : {})}
-            />
+          <div className={styles.field}>
+            <label className={styles.label} htmlFor={endTimeId}>
+              End time
+            </label>
+            <div className={styles.fieldRow}>
+              <input
+                id={endTimeId}
+                type="time"
+                className={styles.input}
+                value={timeInputValue(form.endTime)}
+                onChange={(e) =>
+                  setForm((prev) => ({ ...prev, endTime: parseHM24(e.target.value) }))
+                }
+                disabled={futureProjected}
+                {...(errors.endTime ? { "aria-invalid": true } : {})}
+              />
+              {showEndNow && (
+                <button
+                  type="button"
+                  className={`${styles.nowButton} ${styles.nowEnd}`}
+                  onClick={handleEndNow}
+                >
+                  End now
+                </button>
+              )}
+            </div>
             {errors.endTime && (
               <span className={styles.fieldError} role="alert">
                 {errors.endTime}
               </span>
             )}
-          </label>
+          </div>
         )}
 
         {showAmount && (
@@ -493,6 +587,17 @@ export function EventEditDrawerV3({
           void handleConfirmChangeToBedtime();
         }}
         onDismiss={handleDismissPrompt}
+      />
+
+      <ConfirmDialog
+        open={shortNapConfirmOpen}
+        title="Are you sure?"
+        body={`This nap is shorter than your minimum nap setting of ${napDurationMin} minutes.`}
+        confirmLabel="Confirm"
+        cancelLabel="Cancel"
+        onCancel={() => setShortNapConfirmOpen(false)}
+        onConfirm={handleConfirmShortNap}
+        onDismiss={() => setShortNapConfirmOpen(false)}
       />
     </div>
   );
