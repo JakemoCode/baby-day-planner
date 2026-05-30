@@ -41,27 +41,36 @@ export type UseDrawerResult = {
 // Hook
 // ---------------------------------------------------------------------------
 
-/**
- * @param actuals          Persisted events for today; determines projected vs actual routing.
- * @param saveEvent        Write a single event (create or update).
- * @param deleteOptimistic Delete by id; only called for confirmed actuals.
- * @param setOwnerOverride When provided, owner-only edits on projected events route here
- *                         instead of saveEvent, keeping the cascade free to re-project times.
- */
-export function useDrawer(
-  actuals: Event[],
-  saveEvent: (event: Event) => Promise<void> | void,
-  deleteOptimistic: (eventId: string) => Promise<void> | void,
-  setOwnerOverride?: (eventKey: string, owner: Event["owner"]) => Promise<void> | void,
+type UseDrawerOptions = {
+  /** Persisted events for today; determines projected vs actual routing. */
+  actuals: Event[];
+  /** Write a single event (create or update). */
+  saveEvent: (event: Event) => Promise<void> | void;
+  /** Delete by id; only called for confirmed actuals. */
+  deleteOptimistic: (eventId: string) => Promise<void> | void;
+  /**
+   * When provided, owner-only edits on projected events route here instead of
+   * saveEvent, keeping the cascade free to re-project times.
+   */
+  setOwnerOverride?: (eventKey: string, owner: Event["owner"]) => Promise<void> | void;
   /** Per-day suppression rules; "delete" on these means "skip today". See {@link DrawerSuppression}. */
-  suppressions: DrawerSuppression[] = [],
+  suppressions?: DrawerSuppression[];
   /**
    * Create-mode override (DOMAIN §2 midnight rule). When provided, a NEW event
    * routes here instead of `saveEvent` so it can land on the calendar day its
    * clock time falls on. Edits always use `saveEvent` (they keep their day).
    */
-  saveNewEvent?: (event: Event) => Promise<void> | void,
-): UseDrawerResult {
+  saveNewEvent?: (event: Event) => Promise<void> | void;
+};
+
+export function useDrawer({
+  actuals,
+  saveEvent,
+  deleteOptimistic,
+  setOwnerOverride,
+  suppressions = [],
+  saveNewEvent,
+}: UseDrawerOptions): UseDrawerResult {
   const [drawer, setDrawer] = useState<DrawerState>({ open: false });
 
   const openCreate = (template: Event) => {

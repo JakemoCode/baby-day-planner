@@ -89,11 +89,11 @@ function TomorrowPageInner({
 }: TomorrowPageInnerProps) {
   const planState = useTomorrowPlanState(childId, tomorrowDate, settings);
 
-  const { drawer, openCreate, openEdit, close, onSave, onDelete } = useDrawer(
-    planState.extras,
-    (event) => planState.upsertExtra(event),
-    (eventId) => planState.removeExtra(eventId),
-  );
+  const { drawer, openCreate, openEdit, close, onSave, onDelete } = useDrawer({
+    actuals: planState.extras,
+    saveEvent: (event) => planState.upsertExtra(event),
+    deleteOptimistic: (eventId) => planState.removeExtra(eventId),
+  });
 
   const tomorrowDay = useMemo<Day>(() => {
     const day: Day = {

@@ -98,7 +98,14 @@ function setup({
       ]
     : [];
   const result = renderHook(() =>
-    useDrawer(actuals, saveEvent, deleteOptimistic, setOwnerOverride, suppressions, saveNewEvent),
+    useDrawer({
+      actuals,
+      saveEvent,
+      deleteOptimistic,
+      suppressions,
+      ...(setOwnerOverride ? { setOwnerOverride } : {}),
+      ...(saveNewEvent ? { saveNewEvent } : {}),
+    }),
   );
   return {
     ...result,

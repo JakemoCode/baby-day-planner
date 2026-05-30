@@ -59,16 +59,19 @@ export function useDayPageState(db: Firestore, childId: string): UseDayPageState
     [db, childId, day, settings, saveEvent],
   );
 
-  const { drawer, openCreate, openEdit, close, onSave, onDelete } = useDrawer(
+  const { drawer, openCreate, openEdit, close, onSave, onDelete } = useDrawer({
     actuals,
     saveEvent,
     deleteOptimistic,
-    day?.id
-      ? (eventKey, owner) => updateDayOwnerOverride(db, childId, day.id, eventKey, owner)
-      : undefined,
-    drawerSuppressions,
+    ...(day?.id
+      ? {
+          setOwnerOverride: (eventKey, owner) =>
+            updateDayOwnerOverride(db, childId, day.id, eventKey, owner),
+        }
+      : {}),
+    suppressions: drawerSuppressions,
     saveNewEvent,
-  );
+  });
 
   const template = useMemo<OwnershipTemplate | undefined>(() => {
     if (!day?.templateId) return undefined;

@@ -1128,12 +1128,12 @@ describe("Past-threshold prompt when editing a nap (physiology cascade)", () => 
       const deleteOptimistic = vi.fn().mockResolvedValue(undefined);
 
       function Harness() {
-        const { drawer, openEdit, onSave } = useDrawer(
-          [], // empty actuals → source is projected
+        const { drawer, openEdit, onSave } = useDrawer({
+          actuals: [], // empty actuals → source is projected
           saveEvent,
           deleteOptimistic,
           setOwnerOverride,
-        );
+        });
         useEffect(() => {
           openEdit(source);
           // eslint-disable-next-line react-hooks/exhaustive-deps
