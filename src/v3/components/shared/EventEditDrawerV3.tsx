@@ -256,16 +256,10 @@ export function EventEditDrawerV3({
   const futureProjected =
     mode === "edit" && isFutureProjected(sourceEvent, nowMinutes) && !isNextOfType;
 
-  // "Now" shortcuts: nap+bottle only, edit mode only, on the event nearest the Now line.
-  // Start now rides the focus nap; End now additionally needs the nap to have started.
   const siblings = existingEvents ?? [];
   const showStartNow =
     mode === "edit" && type === "nap" && isFocusNap(sourceEvent, siblings, nowMinutes);
-  const showEndNow =
-    mode === "edit" &&
-    type === "nap" &&
-    isFocusNap(sourceEvent, siblings, nowMinutes) &&
-    isActiveNap(sourceEvent, nowMinutes);
+  const showEndNow = showStartNow && isActiveNap(sourceEvent, nowMinutes);
   const showLogNow =
     mode === "edit" && type === "bottle" && isNearestBottle(sourceEvent, siblings, nowMinutes);
 
@@ -295,8 +289,7 @@ export function EventEditDrawerV3({
 
   const handleStartTimeChange = (raw: string) => applyStartTime(parseHM24(raw));
 
-  // "Now" shortcuts: populate a single time field with Now. Form-state only — Save still
-  // commits, so these can't trigger a cascade on their own. See CONTEXT.md "drawer now shortcut".
+  // Form-state only — can't trigger a cascade. See CONTEXT.md "drawer now shortcut".
   const handleStartNow = () => applyStartTime(nowMinutes);
 
   const setEndNow = () => setForm((prev) => ({ ...prev, endTime: nowMinutes }));
@@ -451,22 +444,13 @@ export function EventEditDrawerV3({
                 disabled={futureProjected}
                 {...(errors.startTime ? { "aria-invalid": true } : {})}
               />
-              {showStartNow && (
+              {(showStartNow || showLogNow) && (
                 <button
                   type="button"
                   className={`${styles.nowButton} ${styles.nowStart}`}
                   onClick={handleStartNow}
                 >
-                  Start now
-                </button>
-              )}
-              {showLogNow && (
-                <button
-                  type="button"
-                  className={`${styles.nowButton} ${styles.nowStart}`}
-                  onClick={handleStartNow}
-                >
-                  Log now
+                  {showStartNow ? "Start now" : "Log now"}
                 </button>
               )}
             </div>
