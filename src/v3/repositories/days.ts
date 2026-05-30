@@ -54,6 +54,8 @@ export async function getDayByDate(
 /**
  * Get the day doc for a calendar date, lazy-creating a `planned` doc if absent.
  * Uses `planned` (not `active`) so existing active-day subscriptions are unaffected.
+ * A later `startNewDay`/`promoteFromPlan` for the same date overwrites this stub
+ * in place (same deterministic id) — planned→active, event subcollection intact.
  */
 export async function getOrCreatePlannedDay(
   db: Firestore,

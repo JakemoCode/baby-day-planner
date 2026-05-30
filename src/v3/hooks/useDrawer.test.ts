@@ -73,6 +73,7 @@ function setup({
   deleteOptimistic = makeDeleteFn(),
   setOwnerOverride,
   suppressRecurring,
+  saveNewEvent,
 }: {
   actuals?: Event[];
   saveEvent?: ((event: Event) => Promise<void>) & ReturnType<typeof vi.fn>;
@@ -80,6 +81,7 @@ function setup({
   setOwnerOverride?: ((eventKey: string, owner: Event["owner"]) => Promise<void>) &
     ReturnType<typeof vi.fn>;
   suppressRecurring?: ((recurringId: string) => Promise<void>) & ReturnType<typeof vi.fn>;
+  saveNewEvent?: ((event: Event) => Promise<void>) & ReturnType<typeof vi.fn>;
 } = {}) {
   // Build DrawerSuppression[] from the explicit suppressRecurring arg.
   const suppressions = suppressRecurring
@@ -96,9 +98,16 @@ function setup({
       ]
     : [];
   const result = renderHook(() =>
-    useDrawer(actuals, saveEvent, deleteOptimistic, setOwnerOverride, suppressions),
+    useDrawer(actuals, saveEvent, deleteOptimistic, setOwnerOverride, suppressions, saveNewEvent),
   );
-  return { ...result, saveEvent, deleteOptimistic, setOwnerOverride, suppressRecurring };
+  return {
+    ...result,
+    saveEvent,
+    deleteOptimistic,
+    setOwnerOverride,
+    suppressRecurring,
+    saveNewEvent,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -153,6 +162,36 @@ describe("useDrawer", () => {
     expect(saveEvent).toHaveBeenCalledTimes(1);
     expect(saveEvent).toHaveBeenCalledWith(template);
     expect(result.current.drawer).toEqual({ open: false });
+  });
+
+  it("onSave in create mode routes through saveNewEvent when provided, bypassing saveEvent", async () => {
+    const saveEvent = makeSaveEvent();
+    const saveNewEvent = makeSaveEvent();
+    const { result } = setup({ saveEvent, saveNewEvent });
+    const template = makeEvent({ id: "tpl-1", eventKey: "bottle_1" });
+
+    act(() => result.current.openCreate(template));
+    await act(async () => {
+      await result.current.onSave(template);
+    });
+
+    expect(saveNewEvent).toHaveBeenCalledWith(template);
+    expect(saveEvent).not.toHaveBeenCalled();
+  });
+
+  it("onSave in edit mode uses saveEvent even when saveNewEvent is provided", async () => {
+    const saveEvent = makeSaveEvent();
+    const saveNewEvent = makeSaveEvent();
+    const actual = makeActualEvent({ eventKey: "bottle_1" });
+    const { result } = setup({ actuals: [actual], saveEvent, saveNewEvent });
+
+    act(() => result.current.openEdit(actual));
+    await act(async () => {
+      await result.current.onSave({ ...actual, amountOz: 6 });
+    });
+
+    expect(saveEvent).toHaveBeenCalledTimes(1);
+    expect(saveNewEvent).not.toHaveBeenCalled();
   });
 
   // 5. onSave in edit mode where event IS in actuals — same id
