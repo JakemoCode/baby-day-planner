@@ -31,6 +31,7 @@ export function DrawerShell(props: DrawerShellProps): React.JSX.Element {
       nowMinutes={nowMinutes}
       bedtimeThreshold={settings.bedtimeThreshold}
       defaultWakeTime={settings.defaultWakeTime}
+      napDurationMin={settings.napDurationMin}
       {...(day.wakeTime !== undefined ? { dayWakeTime: day.wakeTime } : {})}
       existingEvents={projected}
       open={drawer.open}

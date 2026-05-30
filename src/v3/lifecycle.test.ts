@@ -2,6 +2,10 @@ import { describe, expect, it } from "vitest";
 import {
   isFutureProjected,
   isNextProjectedOfType,
+  isActiveNap,
+  isFocusNap,
+  isNearestBottle,
+  NAP_END_GRACE_MIN,
   isSchedulingType,
   migrateLegacyLifecycle,
   reduceLifecycle,
@@ -190,6 +194,104 @@ describe("isNextProjectedOfType (sick-day carve-out)", () => {
     expect(isNextProjectedOfType(putdownSynthetic, [realNap, putdownSynthetic], 12 * 60)).toBe(
       false,
     );
+  });
+});
+
+function nap(id: string, startTime: number, endTime: number, life: Lifecycle = projected): Event {
+  return {
+    id,
+    dayId: "d1",
+    eventKey: id,
+    type: "nap",
+    kind: "block",
+    label: id,
+    startTime,
+    endTime,
+    hasPutdown: false,
+    owner: NO_OWNER,
+    lifecycle: life,
+  };
+}
+
+function bottle(id: string, startTime: number, life: Lifecycle = projected): Event {
+  return {
+    id,
+    dayId: "d1",
+    eventKey: id,
+    type: "bottle",
+    kind: "instant",
+    label: id,
+    startTime,
+    hasPutdown: false,
+    owner: NO_OWNER,
+    lifecycle: life,
+  };
+}
+
+describe("isActiveNap", () => {
+  it("true while start ≤ now < end", () => {
+    expect(isActiveNap(nap("n", 13 * 60, 14 * 60), 13 * 60 + 30)).toBe(true);
+  });
+
+  it("true within the post-end grace window", () => {
+    const n = nap("n", 13 * 60, 14 * 60);
+    expect(isActiveNap(n, 14 * 60 + NAP_END_GRACE_MIN - 1)).toBe(true);
+  });
+
+  it("false once past end + grace", () => {
+    const n = nap("n", 13 * 60, 14 * 60);
+    expect(isActiveNap(n, 14 * 60 + NAP_END_GRACE_MIN)).toBe(false);
+  });
+
+  it("false before it starts", () => {
+    expect(isActiveNap(nap("n", 14 * 60, 15 * 60), 13 * 60)).toBe(false);
+  });
+});
+
+describe("isFocusNap", () => {
+  it("the in-progress nap is the focus nap, not the upcoming one", () => {
+    const inProgress = nap("n2", 13 * 60, 14 * 60);
+    const upcoming = nap("n3", 15 * 60, 16 * 60);
+    const all = [inProgress, upcoming];
+    expect(isFocusNap(inProgress, all, 13 * 60 + 30)).toBe(true);
+    expect(isFocusNap(upcoming, all, 13 * 60 + 30)).toBe(false);
+  });
+
+  it("with no active nap, the next-upcoming nap is the focus", () => {
+    const past = nap("n1", 9 * 60, 10 * 60);
+    const next = nap("n2", 14 * 60, 15 * 60);
+    const later = nap("n3", 16 * 60, 17 * 60);
+    const all = [past, next, later];
+    expect(isFocusNap(next, all, 12 * 60)).toBe(true);
+    expect(isFocusNap(later, all, 12 * 60)).toBe(false);
+    expect(isFocusNap(past, all, 12 * 60)).toBe(false);
+  });
+
+  it("a just-ended nap stays the focus through the grace window (blocks the upcoming one)", () => {
+    const justEnded = nap("n2", 13 * 60, 14 * 60);
+    const upcoming = nap("n3", 15 * 60, 16 * 60);
+    const all = [justEnded, upcoming];
+    const now = 14 * 60 + 5;
+    expect(isFocusNap(justEnded, all, now)).toBe(true);
+    expect(isFocusNap(upcoming, all, now)).toBe(false);
+  });
+});
+
+describe("isNearestBottle", () => {
+  it("picks the bottle closest to now in either direction", () => {
+    const past = bottle("b1", 11 * 60);
+    const future = bottle("b2", 14 * 60);
+    const all = [past, future];
+    expect(isNearestBottle(past, all, 11 * 60 + 40)).toBe(true);
+    expect(isNearestBottle(future, all, 11 * 60 + 40)).toBe(false);
+  });
+
+  it("excludes dream feed from nearest consideration", () => {
+    const dream: Event = { ...bottle("bottle_dream", 23 * 60), eventKey: "bottle_dream" };
+    const real = bottle("b2", 14 * 60);
+    const all = [dream, real];
+    expect(isNearestBottle(real, all, 22 * 60)).toBe(true);
+    expect(isNearestBottle(dream, all, 22 * 60)).toBe(false);
   });
 });
 
