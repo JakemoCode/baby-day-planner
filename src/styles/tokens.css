@@ -62,8 +62,8 @@
   --color-owner-parent-2: #ce8e7e; /* soft terracotta (pre-2026-05-19 default, restored) */
   --color-owner-3: #9a8e82; /* warm gray (was --color-owner-daycare) */
   --color-owner-4: #7d8a5f; /* olive sage */
-  --color-owner-5: #b7869c; /* dusty mauve */
-  --color-owner-6: #b8943f; /* muted ochre */
+  --color-mauve: #b7869c; /* dusty mauve */
+  --color-ochre: #b8943f; /* muted ochre */
 
   /* ─────── Spacing (4 px base) ─────── */
   --space-1: 0.25rem;
@@ -147,8 +147,8 @@
     --color-owner-parent-2: #e0a695;
     --color-owner-3: #aea295;
     --color-owner-4: #9da895;
-    --color-owner-5: #c8a3b3;
-    --color-owner-6: #cfb275;
+    --color-mauve: #c8a3b3;
+    --color-ochre: #cfb275;
 
     --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
     --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.35), 0 2px 8px rgba(0, 0, 0, 0.25);
@@ -180,6 +180,6 @@
   --color-owner-parent-2: #e0a695;
   --color-owner-3: #aea295;
   --color-owner-4: #9da895;
-  --color-owner-5: #c8a3b3;
-  --color-owner-6: #cfb275;
+  --color-mauve: #c8a3b3;
+  --color-ochre: #cfb275;
 }

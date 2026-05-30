@@ -1,8 +1,8 @@
 /**
  * Render-time owner display-name + color lookup from OwnerRef slot identity.
  * Missing/stale refs return ""/null deliberately so a deleted "other" owner
- * doesn't crash the timeline. `ownerColor` maps "other" owners to slot tokens
- * `--color-owner-3..6` by index, cycling if more than four are configured.
+ * doesn't crash the timeline. `ownerColor` maps "other" owners to the tokens
+ * in `OTHER_SLOT_TOKENS` by index, cycling if more than four are configured.
  */
 
 import type { OwnerRef, OwnersConfig } from "../schemas";
@@ -10,8 +10,8 @@ import type { OwnerRef, OwnersConfig } from "../schemas";
 const OTHER_SLOT_TOKENS = [
   "var(--color-owner-3)",
   "var(--color-owner-4)",
-  "var(--color-owner-5)",
-  "var(--color-owner-6)",
+  "var(--color-mauve)",
+  "var(--color-ochre)",
 ] as const;
 
 export function ownerDisplayName(ref: OwnerRef | undefined, owners: OwnersConfig): string {

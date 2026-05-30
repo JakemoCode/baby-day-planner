@@ -106,7 +106,7 @@
   font-weight: var(--weight-medium);
   cursor: pointer;
   background: transparent;
-  border: 1px solid transparent;
+  border: 2px solid transparent;
   transition: background var(--motion-fast) var(--easing-out);
 }
 
@@ -116,12 +116,17 @@
 }
 
 .nowEnd {
-  border-color: var(--color-warning);
-  color: var(--color-warning);
+  border-color: var(--color-mauve);
+  color: var(--color-mauve);
 }
 
+/* Hover/active fill follows each button's own hue (currentColor = its text). */
 .nowButton:hover {
-  background: var(--color-bg);
+  background: color-mix(in srgb, currentColor 10%, transparent);
+}
+
+.nowButton:active {
+  background: color-mix(in srgb, currentColor 18%, transparent);
 }
 
 .nowButton:focus-visible {
