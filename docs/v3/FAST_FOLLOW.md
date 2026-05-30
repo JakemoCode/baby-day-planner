@@ -64,6 +64,8 @@ Shipped items move to [`FAST_FOLLOW_COMPLETED.md`](./FAST_FOLLOW_COMPLETED.md) �
 - [§F50](./fast-follow/backlog/f50-display-settings-font-size.md)
 - [§F51](./fast-follow/backlog/f51-overnight-bedtime-stitch.md)
 - [§F59](./fast-follow/backlog/f59-write-path-id-conventions.md)
+- [§F68](./fast-follow/backlog/f68-post-midnight-create-vanishes-from-timeline.md)
+- [§F69](./fast-follow/backlog/f69-usedrawer-options-object.md)
 
 ---
 
