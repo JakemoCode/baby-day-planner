@@ -81,4 +81,18 @@ describe("withV3EventDefaults", () => {
     expect(out.amountOz).toBe(5);
     expect(out.owner).toEqual({ slot: "parent1" });
   });
+
+  it("preserves pumpVolumeOz when present and leaves it undefined otherwise", () => {
+    const withVol = withV3EventDefaults({
+      type: "pump",
+      kind: "block",
+      startTime: 8 * 60,
+      endTime: 8 * 60 + 20,
+      pumpVolumeOz: { left: 2.5, right: 3.25 },
+    });
+    expect(withVol.pumpVolumeOz).toEqual({ left: 2.5, right: 3.25 });
+
+    const without = withV3EventDefaults({ type: "pump", kind: "block", startTime: 8 * 60 });
+    expect(without.pumpVolumeOz).toBeUndefined();
+  });
 });

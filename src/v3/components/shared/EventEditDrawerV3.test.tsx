@@ -51,6 +51,21 @@ const projectedBottle = (overrides: Partial<Event> = {}): Event => ({
   ...overrides,
 });
 
+const projectedPump = (overrides: Partial<Event> = {}): Event => ({
+  id: "pump-1",
+  dayId: "d-1",
+  eventKey: "pump_1",
+  type: "pump",
+  kind: "block",
+  startTime: 8 * 60,
+  endTime: 8 * 60 + 20,
+  label: "Pump",
+  hasPutdown: false,
+  owner: NO_OWNER,
+  lifecycle: { state: "projected" },
+  ...overrides,
+});
+
 describe("EventEditDrawerV3", () => {
   it("returns null when closed", () => {
     const { container } = render(
@@ -1225,6 +1240,68 @@ describe("Past-threshold prompt when editing a nap (physiology cascade)", () => 
       expect(setOwnerOverride).toHaveBeenCalledWith(source.eventKey, { slot: "parent1" });
       expect(saveEvent).not.toHaveBeenCalled();
     });
+  });
+});
+
+describe("Pump volume", () => {
+  function renderPump(event: Event, onSave = vi.fn()) {
+    render(
+      <EventEditDrawerV3
+        open
+        mode="edit"
+        event={event}
+        owners={owners}
+        nowMinutes={NOW}
+        bedtimeThreshold={THRESHOLD}
+        defaultWakeTime={DEFAULT_WAKE_TIME}
+        onSave={onSave}
+        onCancel={() => {}}
+      />,
+    );
+    return onSave;
+  }
+
+  it("shows a Volumes section with Left and Right inputs defaulting to 0", () => {
+    renderPump(projectedPump());
+    expect(screen.getByText("Volumes")).toBeVisible();
+    expect(screen.getByLabelText("Left")).toHaveValue(0);
+    expect(screen.getByLabelText("Right")).toHaveValue(0);
+  });
+
+  it("populates the inputs from an existing recorded volume", () => {
+    renderPump(projectedPump({ pumpVolumeOz: { left: 2.5, right: 3.25 } }));
+    expect(screen.getByLabelText("Left")).toHaveValue(2.5);
+    expect(screen.getByLabelText("Right")).toHaveValue(3.25);
+  });
+
+  it("saves entered volumes as pumpVolumeOz", async () => {
+    const onSave = renderPump(projectedPump());
+    const left = screen.getByLabelText("Left");
+    const right = screen.getByLabelText("Right");
+    await userEvent.clear(left);
+    await userEvent.type(left, "2.5");
+    await userEvent.clear(right);
+    await userEvent.type(right, "3");
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+    expect(onSave).toHaveBeenCalledTimes(1);
+    expect(onSave.mock.calls[0]![0].pumpVolumeOz).toEqual({ left: 2.5, right: 3 });
+  });
+
+  it("does not show a Volumes section for a bottle", () => {
+    render(
+      <EventEditDrawerV3
+        open
+        mode="edit"
+        event={projectedBottle()}
+        owners={owners}
+        nowMinutes={NOW}
+        bedtimeThreshold={THRESHOLD}
+        defaultWakeTime={DEFAULT_WAKE_TIME}
+        onSave={() => {}}
+        onCancel={() => {}}
+      />,
+    );
+    expect(screen.queryByText("Volumes")).toBeNull();
   });
 });
 

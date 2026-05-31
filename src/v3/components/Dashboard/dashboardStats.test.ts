@@ -7,6 +7,7 @@ import {
   lastBottle,
   lastCompletedNap,
   nextDashboardEvent,
+  pumpTotalOz,
 } from "./dashboardStats";
 
 const bottle = (overrides: Partial<Event> = {}): Event => ({
@@ -36,6 +37,21 @@ const nap = (overrides: Partial<Event> = {}): Event => ({
   hasPutdown: false,
   owner: NO_OWNER,
   lifecycle: { state: "recorded", annotatedAt: (overrides.startTime ?? 9 * 60) as TimeMin },
+  ...overrides,
+});
+
+const pump = (overrides: Partial<Event> = {}): Event => ({
+  id: `p-${overrides.startTime ?? 0}`,
+  dayId: "d1",
+  eventKey: `pump_${overrides.startTime ?? 0}`,
+  type: "pump",
+  kind: "block",
+  label: "Pump",
+  startTime: (overrides.startTime ?? 8 * 60) as TimeMin,
+  endTime: ((overrides.startTime ?? 8 * 60) + 20) as TimeMin,
+  hasPutdown: false,
+  owner: NO_OWNER,
+  lifecycle: { state: "recorded", annotatedAt: (overrides.startTime ?? 8 * 60) as TimeMin },
   ...overrides,
 });
 
@@ -72,6 +88,36 @@ describe("bottleTotals", () => {
       bottle({ startTime: (16 * 60) as TimeMin, amountOz: 6 }), // future
     ];
     expect(bottleTotals(events, now)).toEqual({ count: 1, oz: 4 });
+  });
+});
+
+describe("pumpTotalOz", () => {
+  it("sums left + right across pumps with a recorded volume", () => {
+    const events: Event[] = [
+      pump({ startTime: (8 * 60) as TimeMin, pumpVolumeOz: { left: 2.5, right: 3.25 } }),
+      pump({ startTime: (12 * 60) as TimeMin, pumpVolumeOz: { left: 1.75, right: 2 } }),
+    ];
+    expect(pumpTotalOz(events)).toBe(9.5);
+  });
+
+  it("ignores pumps with no recorded volume and non-pump events", () => {
+    const events: Event[] = [
+      pump({ startTime: (8 * 60) as TimeMin, pumpVolumeOz: { left: 3, right: 3 } }),
+      pump({ startTime: (12 * 60) as TimeMin }), // projected, no volume
+      bottle({ startTime: (9 * 60) as TimeMin, amountOz: 5 }),
+    ];
+    expect(pumpTotalOz(events)).toBe(6);
+  });
+
+  it("rounds float-accumulation noise to 2 decimals", () => {
+    const events: Event[] = [
+      pump({ startTime: (8 * 60) as TimeMin, pumpVolumeOz: { left: 0.1, right: 0.2 } }),
+    ];
+    expect(pumpTotalOz(events)).toBe(0.3);
+  });
+
+  it("is 0 with no pumps", () => {
+    expect(pumpTotalOz([])).toBe(0);
   });
 });
 

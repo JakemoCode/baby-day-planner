@@ -42,12 +42,45 @@ const projectedBottle = (overrides: Partial<Event> = {}): Event => ({
   ...overrides,
 });
 
+const projectedPump = (overrides: Partial<Event> = {}): Event => ({
+  id: "pump-1",
+  dayId: "d-1",
+  eventKey: "pump_1",
+  type: "pump",
+  kind: "block",
+  startTime: 8 * 60,
+  endTime: 8 * 60 + 20,
+  label: "Pump",
+  hasPutdown: false,
+  owner: NO_OWNER,
+  lifecycle: { state: "projected" },
+  ...overrides,
+});
+
 const formFromEvent = (e: Event): FormState => ({
   startTime: e.startTime,
   endTime: e.endTime,
   amountOz: e.amountOz,
   owner: e.owner,
   label: e.label,
+  ...(e.pumpVolumeOz !== undefined ? { pumpVolumeOz: e.pumpVolumeOz } : {}),
+});
+
+describe("formToEvent — pump volume", () => {
+  it("carries pumpVolumeOz onto the event and records the pump (volume-only save)", () => {
+    const source = projectedPump();
+    const form: FormState = { ...formFromEvent(source), pumpVolumeOz: { left: 2.5, right: 3 } };
+    const next = formToEvent(form, source, NOW);
+    expect(next.pumpVolumeOz).toEqual({ left: 2.5, right: 3 });
+    // No time change → recorded (a happened-fact), not completed.
+    expect(next.lifecycle).toEqual({ state: "recorded", annotatedAt: NOW });
+  });
+
+  it("omits pumpVolumeOz when the form has none", () => {
+    const source = projectedPump();
+    const next = formToEvent(formFromEvent(source), source, NOW);
+    expect(next.pumpVolumeOz).toBeUndefined();
+  });
 });
 
 describe("formToEvent — lifecycle dispatch from projected", () => {

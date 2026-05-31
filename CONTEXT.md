@@ -325,6 +325,29 @@ the existing manual-edit path — NOT a revived "Start X Now" CTA.
 Established 2026-05-30 (§F69-adjacent inline-buttons grill). Implemented
 in `feat/drawer-now-buttons`.
 
+## pump volume
+
+Per-side recorded output of a pump session, in ounces — `pumpVolumeOz:
+{ left, right }` on the pump Event (pump-only, mirroring how `amountOz`
+is bottle-only). A session's volume is `left + right`.
+
+- Undefined on untouched/projected pumps; set when the user saves the
+  drawer (inputs default to 0, no other default). Saving a volume
+  records the pump (a [[happened-fact]] → `recorded_pump_N` doc), the
+  same persistence path as a pump time-edit. Pumps anchor no cascade,
+  so there are no engine side effects.
+- **Total pump volume today** = Σ `(left + right)` over pump events in
+  the current calendar day (12:00a–11:59p, the same midnight boundary
+  bottles use) that have a recorded `pumpVolumeOz`. Unrecorded/projected
+  pumps contribute nothing — so it reads as "thus far" without a
+  Now-based time filter.
+- A recorded pump keeps a **Delete** button — pumps are user-scheduled
+  events, not in the [[§F71]] rhythm-slot reset set.
+- Future parallel (not built): a breastfeeding model tracking minutes
+  per side would get its own field, not overload `pumpVolumeOz`.
+
+Established 2026-05-30 (pumping-volume grill).
+
 ## happened-fact
 
 Shorthand for "a time or amount has been committed to this event AND
