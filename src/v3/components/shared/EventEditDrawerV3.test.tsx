@@ -536,12 +536,17 @@ describe("EventEditDrawerV3", () => {
     expect(createOptimistic).not.toHaveBeenCalled();
   });
 
-  it("delete button is shown for already-recorded events", () => {
+  it("delete button is shown for a user-created one-off event (extra)", () => {
     render(
       <EventEditDrawerV3
         open
         mode="edit"
-        event={projectedNap({ lifecycle: { state: "completed", committedAt: 10 * 60 } })}
+        event={projectedNap({
+          type: "extra",
+          id: "extra_uuid",
+          eventKey: "extra_uuid",
+          lifecycle: { state: "completed", committedAt: 10 * 60 },
+        })}
         owners={owners}
         nowMinutes={NOW}
         bedtimeThreshold={THRESHOLD}
@@ -551,18 +556,18 @@ describe("EventEditDrawerV3", () => {
         onDelete={() => {}}
       />,
     );
-    expect(screen.getByRole("button", { name: "Delete" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Delete" })).toBeVisible();
   });
 
-  it("delete button is HIDDEN for an auto-promoted bottle (recorded + annotatedAt===startTime)", () => {
-    // Auto-promote signature: recorded + annotatedAt===startTime. Manual logs use completed; drawer saves bump annotatedAt.
+  // §F71: a recorded rhythm slot reverts to projection — labelled "Reset", not "Delete".
+  it("shows Reset (not Delete) for a recorded nap in its cascade slot", () => {
     render(
       <EventEditDrawerV3
         open
         mode="edit"
-        event={projectedBottle({
-          id: "recorded_bottle_2",
-          startTime: 10 * 60,
+        event={projectedNap({
+          id: "recorded_nap_1",
+          eventKey: "nap_1",
           lifecycle: { state: "recorded", annotatedAt: 10 * 60 },
         })}
         owners={owners}
@@ -574,7 +579,62 @@ describe("EventEditDrawerV3", () => {
         onDelete={() => {}}
       />,
     );
+    expect(screen.getByRole("button", { name: "Reset" })).toBeVisible();
     expect(screen.queryByRole("button", { name: "Delete" })).toBeNull();
+  });
+
+  // §F70: an auto-promoted wake_window has a proj_ id (no doc) — no destructive button at all.
+  it("shows no destructive button for an auto-promoted wake_window", () => {
+    render(
+      <EventEditDrawerV3
+        open
+        mode="edit"
+        event={projectedNap({
+          type: "wake_window",
+          id: "proj_wake_window_2",
+          eventKey: "wake_window_2",
+          lifecycle: { state: "recorded", annotatedAt: 9 * 60 },
+        })}
+        owners={owners}
+        nowMinutes={NOW}
+        bedtimeThreshold={THRESHOLD}
+        defaultWakeTime={DEFAULT_WAKE_TIME}
+        onSave={() => {}}
+        onCancel={() => {}}
+        onDelete={() => {}}
+      />,
+    );
+    expect(screen.queryByRole("button", { name: "Delete" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Reset" })).toBeNull();
+  });
+
+  it("Reset routes through onDelete after the 'Reset to projected time?' confirm", async () => {
+    const onDelete = vi.fn();
+    const recordedBottle = projectedBottle({
+      id: "recorded_bottle_2",
+      eventKey: "bottle_2",
+      startTime: 10 * 60,
+      lifecycle: { state: "recorded", annotatedAt: 10 * 60 },
+    });
+    render(
+      <EventEditDrawerV3
+        open
+        mode="edit"
+        event={recordedBottle}
+        owners={owners}
+        nowMinutes={NOW}
+        bedtimeThreshold={THRESHOLD}
+        defaultWakeTime={DEFAULT_WAKE_TIME}
+        onSave={() => {}}
+        onCancel={() => {}}
+        onDelete={onDelete}
+      />,
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Reset" }));
+    const dialog = screen.getByRole("dialog", { name: "Reset to projected time?" });
+    await userEvent.click(within(dialog).getByRole("button", { name: "Reset" }));
+    expect(onDelete).toHaveBeenCalledTimes(1);
+    expect(onDelete.mock.calls[0]![0]).toMatchObject({ id: "recorded_bottle_2" });
   });
 
   it("delete button is SHOWN for a recorded bottle when annotatedAt !== startTime", () => {

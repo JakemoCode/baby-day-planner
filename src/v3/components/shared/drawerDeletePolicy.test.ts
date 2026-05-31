@@ -3,9 +3,8 @@ import type { Event, Lifecycle } from "../../schemas";
 import { NO_OWNER } from "../../schemas";
 import {
   canDeleteEvent,
+  drawerDestructiveAction,
   hasSuppressionDelete,
-  isAutoPromotedBottleEvent,
-  isAutoPromotedSleep,
 } from "./drawerDeletePolicy";
 
 function ev(overrides: Partial<Event> = {}): Event {
@@ -50,125 +49,192 @@ describe("hasSuppressionDelete", () => {
   it("is false for a normal rhythm bottle", () => {
     expect(hasSuppressionDelete(ev({ type: "bottle", eventKey: "bottle_1" }))).toBe(false);
   });
-
-  it("is false for a nap", () => {
-    expect(hasSuppressionDelete(ev({ type: "nap", eventKey: "nap_1" }))).toBe(false);
-  });
 });
 
-describe("isAutoPromotedSleep", () => {
-  it("is true for a nap with an engine-emitted id", () => {
-    expect(isAutoPromotedSleep(ev({ type: "nap", id: "proj_nap_1" }))).toBe(true);
-  });
-
-  it("is true for a bedtime with an engine-emitted id", () => {
-    expect(isAutoPromotedSleep(ev({ type: "bedtime", id: "proj_bedtime" }))).toBe(true);
-  });
-
-  it("is false once the sleep event has a persisted (non-proj) id", () => {
-    expect(isAutoPromotedSleep(ev({ type: "nap", id: "recorded_nap_1" }))).toBe(false);
-  });
-
-  it("is false for a bottle even with an engine-emitted id", () => {
-    expect(isAutoPromotedSleep(ev({ type: "bottle", id: "proj_bottle_1" }))).toBe(false);
-  });
-});
-
-describe("isAutoPromotedBottleEvent", () => {
-  it("is true when recorded with annotatedAt === startTime (the auto-promote signature)", () => {
-    expect(
-      isAutoPromotedBottleEvent(ev({ type: "bottle", startTime: 480, lifecycle: recorded(480) })),
-    ).toBe(true);
-  });
-
-  it("is false when annotatedAt differs from startTime (a manual drawer save bumps it to now)", () => {
-    expect(
-      isAutoPromotedBottleEvent(ev({ type: "bottle", startTime: 480, lifecycle: recorded(495) })),
-    ).toBe(false);
-  });
-
-  it("is false for a completed bottle (manual Log Bottle Now)", () => {
-    expect(isAutoPromotedBottleEvent(ev({ type: "bottle", lifecycle: completed(480) }))).toBe(
-      false,
-    );
-  });
-
-  it("is false for the dream-feed slot even when its lifecycle matches the signature", () => {
-    expect(
-      isAutoPromotedBottleEvent(
-        ev({ type: "bottle", eventKey: "bottle_dream", startTime: 480, lifecycle: recorded(480) }),
-      ),
-    ).toBe(false);
-  });
-
-  it("is false for a projected bottle", () => {
-    expect(
-      isAutoPromotedBottleEvent(ev({ type: "bottle", lifecycle: { state: "projected" } })),
-    ).toBe(false);
-  });
-});
-
-describe("canDeleteEvent", () => {
+describe("drawerDestructiveAction", () => {
   const opts = { mode: "edit" as const, hasOnDelete: true };
 
-  it("is false in create mode", () => {
+  it("is none in create mode", () => {
     expect(
-      canDeleteEvent(ev({ lifecycle: recorded(480) }), { mode: "create", hasOnDelete: true }),
-    ).toBe(false);
+      drawerDestructiveAction(ev({ lifecycle: recorded(480) }), { ...opts, mode: "create" }),
+    ).toBe("none");
   });
 
-  it("is false when no onDelete handler is wired", () => {
+  it("is none when no onDelete handler is wired", () => {
     expect(
-      canDeleteEvent(ev({ lifecycle: recorded(480) }), { mode: "edit", hasOnDelete: false }),
-    ).toBe(false);
+      drawerDestructiveAction(ev({ lifecycle: recorded(480) }), { ...opts, hasOnDelete: false }),
+    ).toBe("none");
   });
 
-  it("is true for a real recorded event (has a deletable doc)", () => {
+  // §F70: an auto-promoted wake_window has a proj_ id (no doc) — must offer no button.
+  it("is none for an engine-emitted wake_window (auto-promoted, no doc)", () => {
     expect(
-      canDeleteEvent(ev({ type: "bottle", startTime: 480, lifecycle: recorded(495) }), opts),
-    ).toBe(true);
+      drawerDestructiveAction(
+        ev({
+          type: "wake_window",
+          id: "proj_wake_window_2",
+          eventKey: "wake_window_2",
+          lifecycle: recorded(540),
+        }),
+        opts,
+      ),
+    ).toBe("none");
   });
 
-  it("is true for a projected daily_recurring (routes to suppression)", () => {
+  it("is none for an engine-emitted (auto-promoted) nap with no doc", () => {
     expect(
-      canDeleteEvent(
+      drawerDestructiveAction(
+        ev({ type: "nap", id: "proj_nap_1", eventKey: "nap_1", lifecycle: recorded(420) }),
+        opts,
+      ),
+    ).toBe("none");
+  });
+
+  it("is none for a plain projected nap (no doc, no suppression)", () => {
+    expect(
+      drawerDestructiveAction(
+        ev({ type: "nap", id: "proj_nap_1", eventKey: "nap_1", lifecycle: { state: "projected" } }),
+        opts,
+      ),
+    ).toBe("none");
+  });
+
+  // §F71: recorded rhythm slots revert to projection → "reset".
+  it("is reset for a recorded nap occupying its cascade slot", () => {
+    expect(
+      drawerDestructiveAction(
+        ev({ type: "nap", id: "recorded_nap_1", eventKey: "nap_1", lifecycle: recorded(420) }),
+        opts,
+      ),
+    ).toBe("reset");
+  });
+
+  it("is reset for an auto-promoted bottle with a persisted slot doc", () => {
+    expect(
+      drawerDestructiveAction(
+        ev({
+          type: "bottle",
+          id: "recorded_bottle_1",
+          eventKey: "bottle_1",
+          lifecycle: recorded(480),
+        }),
+        opts,
+      ),
+    ).toBe("reset");
+  });
+
+  it("is reset for a hand-edited (completed) cascade bottle", () => {
+    expect(
+      drawerDestructiveAction(
+        ev({
+          type: "bottle",
+          id: "recorded_bottle_2",
+          eventKey: "bottle_2",
+          lifecycle: completed(500),
+        }),
+        opts,
+      ),
+    ).toBe("reset");
+  });
+
+  // A FAB-created one-off bottle has a uuid id, not the deterministic recorded_<eventKey> — truly delete.
+  it("is delete for a user-added one-off bottle (uuid id)", () => {
+    expect(
+      drawerDestructiveAction(
+        ev({
+          type: "bottle",
+          id: "bottle_9f3c-uuid",
+          eventKey: "bottle_5",
+          lifecycle: completed(500),
+        }),
+        opts,
+      ),
+    ).toBe("delete");
+  });
+
+  it("is delete for a recorded bedtime (not in the reset set)", () => {
+    expect(
+      drawerDestructiveAction(
+        ev({
+          type: "bedtime",
+          id: "recorded_bedtime",
+          eventKey: "bedtime",
+          lifecycle: recorded(1140),
+        }),
+        opts,
+      ),
+    ).toBe("delete");
+  });
+
+  it("is delete for a recorded extra event", () => {
+    expect(
+      drawerDestructiveAction(
+        ev({ type: "extra", id: "extra_uuid", eventKey: "extra_uuid", lifecycle: completed(600) }),
+        opts,
+      ),
+    ).toBe("delete");
+  });
+
+  // Suppression precedes the engine-emitted short-circuit: a projected (proj_) recurring
+  // is still skippable for the day even though it has no doc.
+  it("is delete (suppression) for a projected daily_recurring", () => {
+    expect(
+      drawerDestructiveAction(
         ev({
           type: "daily_recurring",
+          id: "proj_recurring",
           eventKey: "recurring:tummy",
           lifecycle: { state: "projected" },
         }),
         opts,
       ),
-    ).toBe(true);
+    ).toBe("delete");
   });
 
-  it("is true for a projected dream-feed bottle (suppression path, not daily_recurring)", () => {
+  it("is delete (suppression) for a persisted daily_recurring doc", () => {
     expect(
-      canDeleteEvent(
-        ev({ type: "bottle", eventKey: "bottle_dream", lifecycle: { state: "projected" } }),
+      drawerDestructiveAction(
+        ev({
+          type: "daily_recurring",
+          id: "recorded_recurring:tummy",
+          eventKey: "recurring:tummy",
+          lifecycle: recorded(600),
+        }),
         opts,
       ),
-    ).toBe(true);
+    ).toBe("delete");
   });
 
-  it("is false for a plain projected nap (no doc, no suppression path)", () => {
+  it("is delete for the dream-feed slot (suppression, never reset)", () => {
     expect(
-      canDeleteEvent(
-        ev({ type: "nap", eventKey: "nap_1", lifecycle: { state: "projected" } }),
+      drawerDestructiveAction(
+        ev({
+          type: "bottle",
+          id: "recorded_bottle_dream",
+          eventKey: "bottle_dream",
+          lifecycle: recorded(1380),
+        }),
         opts,
       ),
-    ).toBe(false);
+    ).toBe("delete");
+  });
+});
+
+describe("canDeleteEvent (visibility wrapper)", () => {
+  const opts = { mode: "edit" as const, hasOnDelete: true };
+
+  it("is true whenever an action exists (delete or reset)", () => {
+    expect(canDeleteEvent(ev({ id: "recorded_bottle_1", lifecycle: recorded(480) }), opts)).toBe(
+      true,
+    );
   });
 
-  it("is false for an auto-promoted sleep event (delete would be a visual no-op)", () => {
+  it("is false when the action is none", () => {
     expect(
-      canDeleteEvent(ev({ type: "nap", id: "proj_nap_1", lifecycle: recorded(420) }), opts),
-    ).toBe(false);
-  });
-
-  it("is false for an auto-promoted bottle (cascade re-emits it next pass)", () => {
-    expect(
-      canDeleteEvent(ev({ type: "bottle", startTime: 480, lifecycle: recorded(480) }), opts),
+      canDeleteEvent(
+        ev({ type: "nap", id: "proj_nap_1", lifecycle: { state: "projected" } }),
+        opts,
+      ),
     ).toBe(false);
   });
 });
