@@ -42,9 +42,10 @@ export function drawerDestructiveAction(
   if (!isRecorded(event.lifecycle)) return "none";
   // A recorded rhythm slot uses the deterministic `recorded_<eventKey>` doc id;
   // deleting it re-projects the slot, so the action is a reset, not a delete.
-  // (§F71 — naps + bottles only; bedtime/extra/pump and uuid-id one-offs delete.)
+  // (§F71 — nap/bottle/bedtime; extra/pump and uuid-id one-offs delete.)
   const isRhythmSlot =
-    (event.type === "nap" || event.type === "bottle") && event.id === recordedIdFor(event.eventKey);
+    (event.type === "nap" || event.type === "bottle" || event.type === "bedtime") &&
+    event.id === recordedIdFor(event.eventKey);
   return isRhythmSlot ? "reset" : "delete";
 }
 

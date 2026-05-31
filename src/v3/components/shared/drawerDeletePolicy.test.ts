@@ -152,7 +152,7 @@ describe("drawerDestructiveAction", () => {
     ).toBe("delete");
   });
 
-  it("is delete for a recorded bedtime (not in the reset set)", () => {
+  it("is reset for a recorded bedtime in its cascade slot", () => {
     expect(
       drawerDestructiveAction(
         ev({
@@ -163,7 +163,7 @@ describe("drawerDestructiveAction", () => {
         }),
         opts,
       ),
-    ).toBe("delete");
+    ).toBe("reset");
   });
 
   it("is delete for a recorded extra event", () => {
