@@ -17,7 +17,7 @@ import { recordedIdFor } from "../../lib/eventConventions";
 import { formatHM24, formatTimeForDisplay, nextDayAt, parseHM24 } from "../../ui/time";
 import { OwnerPickerV3 } from "./OwnerPickerV3";
 import { formToEvent, type FormState } from "./formToEvent";
-import { canDeleteEvent } from "./drawerDeletePolicy";
+import { drawerDestructiveAction, type DrawerDestructiveAction } from "./drawerDeletePolicy";
 
 export type EventEditDrawerV3Mode = "edit" | "create";
 
@@ -181,6 +181,28 @@ function timeInputValue(t: TimeMin | undefined): string {
   return t === undefined ? "" : formatHM24(t);
 }
 
+function confirmCopyFor(action: DrawerDestructiveAction, event: Event) {
+  if (action === "reset") {
+    return {
+      title: "Reset to projected time?",
+      body: "This returns to the app's predicted time and clears what you recorded.",
+      confirmLabel: "Reset",
+    };
+  }
+  if (event.type === "daily_recurring") {
+    return {
+      title: `Skip ${event.label} today?`,
+      body: "It'll come back tomorrow.",
+      confirmLabel: "Skip today",
+    };
+  }
+  return {
+    title: `Delete this ${event.type === "extra" ? "event" : event.type.replace("_", " ")}?`,
+    body: "This cannot be undone.",
+    confirmLabel: "Delete",
+  };
+}
+
 export function EventEditDrawerV3({
   open,
   mode,
@@ -228,21 +250,16 @@ export function EventEditDrawerV3({
       ? `${baseTitle}: ${sourceEvent.label}`
       : baseTitle;
 
-  // Delete visibility delegated to drawerDeletePolicy (pure, testable).
-  const canDelete = canDeleteEvent(sourceEvent, { mode, hasOnDelete: onDelete !== undefined });
-
-  const confirmCopy =
-    type === "daily_recurring"
-      ? {
-          title: `Skip ${sourceEvent.label} today?`,
-          body: "It'll come back tomorrow.",
-          confirmLabel: "Skip today",
-        }
-      : {
-          title: `Delete this ${type === "extra" ? "event" : type.replace("_", " ")}?`,
-          body: "This cannot be undone.",
-          confirmLabel: "Delete",
-        };
+  // Destructive-action shape (delete / reset / none) delegated to drawerDeletePolicy.
+  const destructiveAction = drawerDestructiveAction(sourceEvent, {
+    mode,
+    hasOnDelete: onDelete !== undefined,
+  });
+  const showDestructive = destructiveAction !== "none";
+  // "Reset" reverts a recorded rhythm slot to the cascade projection (§F71); it routes
+  // through the same onDelete path (delete the doc → engine re-projects the slot).
+  const destructiveLabel = destructiveAction === "reset" ? "Reset" : "Delete";
+  const confirmCopy = confirmCopyFor(destructiveAction, sourceEvent);
 
   const showStartTime = type !== "wake_window";
   const showEndTime = type === "nap" || type === "extra" || type === "pump";
@@ -528,9 +545,9 @@ export function EventEditDrawerV3({
         )}
 
         <div className={styles.actions}>
-          {canDelete && (
+          {showDestructive && (
             <button type="button" className={styles.delete} onClick={() => setConfirmOpen(true)}>
-              Delete
+              {destructiveLabel}
             </button>
           )}
           <button type="button" className={styles.cancel} onClick={onCancel}>
