@@ -233,8 +233,6 @@ export function EventEditDrawerV3({
   const titleId = useId();
   const startTimeId = useId();
   const endTimeId = useId();
-  const pumpLeftId = useId();
-  const pumpRightId = useId();
 
   useEffect(() => {
     if (!open) return;
@@ -562,12 +560,9 @@ export function EventEditDrawerV3({
           <div className={styles.field}>
             <span className={styles.sectionTitle}>Volumes</span>
             <div className={styles.fieldPair}>
-              <div className={styles.field}>
-                <label className={styles.label} htmlFor={pumpLeftId}>
-                  Left
-                </label>
+              <label className={styles.field}>
+                <span className={styles.label}>Left</span>
                 <input
-                  id={pumpLeftId}
                   type="number"
                   step="0.25"
                   min="0"
@@ -578,13 +573,10 @@ export function EventEditDrawerV3({
                     setForm((prev) => ({ ...prev, pumpLeftOz: Number(e.target.value) || 0 }))
                   }
                 />
-              </div>
-              <div className={styles.field}>
-                <label className={styles.label} htmlFor={pumpRightId}>
-                  Right
-                </label>
+              </label>
+              <label className={styles.field}>
+                <span className={styles.label}>Right</span>
                 <input
-                  id={pumpRightId}
                   type="number"
                   step="0.25"
                   min="0"
@@ -595,7 +587,7 @@ export function EventEditDrawerV3({
                     setForm((prev) => ({ ...prev, pumpRightOz: Number(e.target.value) || 0 }))
                   }
                 />
-              </div>
+              </label>
             </div>
           </div>
         )}

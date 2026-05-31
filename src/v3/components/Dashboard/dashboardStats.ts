@@ -7,9 +7,9 @@ import { isRenderSynthetic } from "@/v3/lib/syntheticEvents";
 const DASHBOARD_NEXT_TYPES = new Set<Event["type"]>(["bottle", "nap", "bedtime"]);
 
 /**
- * Sum of (left + right) over every pump on the day with a recorded `pumpVolumeOz`.
- * Unrecorded/projected pumps have no volume and contribute nothing, so the total
- * reads as "thus far today" without a Now filter (CONTEXT.md "pump volume").
+ * Sum of (left + right) over the day's pumps with a recorded `pumpVolumeOz`.
+ * CONTEXT.md "pump volume" — projected pumps have no volume, so the total reads
+ * as "thus far today" without a Now filter.
  */
 export function pumpTotalOz(events: Event[]): number {
   let oz = 0;
