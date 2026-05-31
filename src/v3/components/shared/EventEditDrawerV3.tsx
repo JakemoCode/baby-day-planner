@@ -165,6 +165,9 @@ type InternalForm = {
   amountOz: number | undefined;
   owner: OwnerRef; // always defined; NO_OWNER for unassigned
   label: string;
+  // Pump per-side volume, ounces. Default 0; assembled into pumpVolumeOz on save.
+  pumpLeftOz: number;
+  pumpRightOz: number;
 };
 
 function eventToForm(event: Event | null): InternalForm {
@@ -174,6 +177,8 @@ function eventToForm(event: Event | null): InternalForm {
     amountOz: event?.amountOz,
     owner: event?.owner ?? NO_OWNER,
     label: event?.label ?? "",
+    pumpLeftOz: event?.pumpVolumeOz?.left ?? 0,
+    pumpRightOz: event?.pumpVolumeOz?.right ?? 0,
   };
 }
 
@@ -264,6 +269,7 @@ export function EventEditDrawerV3({
   const showStartTime = type !== "wake_window";
   const showEndTime = type === "nap" || type === "extra" || type === "pump";
   const showAmount = type === "bottle";
+  const showVolumes = type === "pump";
   const showOwner = OWNER_TYPES.has(type);
   const showLabel = type === "extra";
 
@@ -332,6 +338,7 @@ export function EventEditDrawerV3({
       amountOz: form.amountOz,
       owner: form.owner,
       label: form.label,
+      ...(showVolumes ? { pumpVolumeOz: { left: form.pumpLeftOz, right: form.pumpRightOz } } : {}),
     };
     const built = formToEvent(formForTransform, sourceEvent, nowMinutes, mode);
     // Sanitize future-projected saves back to source values so the edit routes through
@@ -404,6 +411,87 @@ export function EventEditDrawerV3({
     setEndNow();
   };
 
+  const startTimeField = showStartTime ? (
+    <div className={styles.field}>
+      <label className={styles.label} htmlFor={startTimeId}>
+        Start time
+      </label>
+      <div className={styles.fieldRow}>
+        <input
+          id={startTimeId}
+          type="time"
+          className={styles.input}
+          value={timeInputValue(form.startTime)}
+          onChange={(e) => handleStartTimeChange(e.target.value)}
+          required
+          disabled={futureProjected}
+          {...(errors.startTime ? { "aria-invalid": true } : {})}
+        />
+        {(showStartNow || showLogNow) && (
+          <button
+            type="button"
+            className={`${styles.nowButton} ${styles.nowStart}`}
+            onClick={handleStartNow}
+          >
+            {showStartNow ? "Start now" : "Log now"}
+          </button>
+        )}
+      </div>
+      {errors.startTime && (
+        <span className={styles.fieldError} role="alert">
+          {errors.startTime}
+        </span>
+      )}
+    </div>
+  ) : null;
+
+  const endTimeField = showEndTime ? (
+    <div className={styles.field}>
+      <label className={styles.label} htmlFor={endTimeId}>
+        End time
+      </label>
+      <div className={styles.fieldRow}>
+        <input
+          id={endTimeId}
+          type="time"
+          className={styles.input}
+          value={timeInputValue(form.endTime)}
+          onChange={(e) => setForm((prev) => ({ ...prev, endTime: parseHM24(e.target.value) }))}
+          disabled={futureProjected}
+          {...(errors.endTime ? { "aria-invalid": true } : {})}
+        />
+        {showEndNow && (
+          <button
+            type="button"
+            className={`${styles.nowButton} ${styles.nowEnd}`}
+            onClick={handleEndNow}
+          >
+            End now
+          </button>
+        )}
+      </div>
+      {errors.endTime && (
+        <span className={styles.fieldError} role="alert">
+          {errors.endTime}
+        </span>
+      )}
+    </div>
+  ) : null;
+
+  // Pumps collapse Start/End onto one row; every other type stacks them.
+  const timeFields =
+    type === "pump" ? (
+      <div className={styles.fieldPair}>
+        {startTimeField}
+        {endTimeField}
+      </div>
+    ) : (
+      <>
+        {startTimeField}
+        {endTimeField}
+      </>
+    );
+
   return (
     <div
       className={styles.backdrop}
@@ -445,74 +533,7 @@ export function EventEditDrawerV3({
           </label>
         )}
 
-        {showStartTime && (
-          <div className={styles.field}>
-            <label className={styles.label} htmlFor={startTimeId}>
-              Start time
-            </label>
-            <div className={styles.fieldRow}>
-              <input
-                id={startTimeId}
-                type="time"
-                className={styles.input}
-                value={timeInputValue(form.startTime)}
-                onChange={(e) => handleStartTimeChange(e.target.value)}
-                required
-                disabled={futureProjected}
-                {...(errors.startTime ? { "aria-invalid": true } : {})}
-              />
-              {(showStartNow || showLogNow) && (
-                <button
-                  type="button"
-                  className={`${styles.nowButton} ${styles.nowStart}`}
-                  onClick={handleStartNow}
-                >
-                  {showStartNow ? "Start now" : "Log now"}
-                </button>
-              )}
-            </div>
-            {errors.startTime && (
-              <span className={styles.fieldError} role="alert">
-                {errors.startTime}
-              </span>
-            )}
-          </div>
-        )}
-
-        {showEndTime && (
-          <div className={styles.field}>
-            <label className={styles.label} htmlFor={endTimeId}>
-              End time
-            </label>
-            <div className={styles.fieldRow}>
-              <input
-                id={endTimeId}
-                type="time"
-                className={styles.input}
-                value={timeInputValue(form.endTime)}
-                onChange={(e) =>
-                  setForm((prev) => ({ ...prev, endTime: parseHM24(e.target.value) }))
-                }
-                disabled={futureProjected}
-                {...(errors.endTime ? { "aria-invalid": true } : {})}
-              />
-              {showEndNow && (
-                <button
-                  type="button"
-                  className={`${styles.nowButton} ${styles.nowEnd}`}
-                  onClick={handleEndNow}
-                >
-                  End now
-                </button>
-              )}
-            </div>
-            {errors.endTime && (
-              <span className={styles.fieldError} role="alert">
-                {errors.endTime}
-              </span>
-            )}
-          </div>
-        )}
+        {timeFields}
 
         {showAmount && (
           <label className={styles.field}>
@@ -533,6 +554,42 @@ export function EventEditDrawerV3({
               }}
             />
           </label>
+        )}
+
+        {showVolumes && (
+          <div className={styles.field}>
+            <span className={styles.sectionTitle}>Volumes</span>
+            <div className={styles.fieldPair}>
+              <label className={styles.field}>
+                <span className={styles.label}>Left</span>
+                <input
+                  type="number"
+                  step="0.25"
+                  min="0"
+                  className={styles.input}
+                  value={form.pumpLeftOz}
+                  disabled={futureProjected}
+                  onChange={(e) =>
+                    setForm((prev) => ({ ...prev, pumpLeftOz: Number(e.target.value) || 0 }))
+                  }
+                />
+              </label>
+              <label className={styles.field}>
+                <span className={styles.label}>Right</span>
+                <input
+                  type="number"
+                  step="0.25"
+                  min="0"
+                  className={styles.input}
+                  value={form.pumpRightOz}
+                  disabled={futureProjected}
+                  onChange={(e) =>
+                    setForm((prev) => ({ ...prev, pumpRightOz: Number(e.target.value) || 0 }))
+                  }
+                />
+              </label>
+            </div>
+          </div>
         )}
 
         {showOwner && (

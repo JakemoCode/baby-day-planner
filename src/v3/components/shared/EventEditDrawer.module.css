@@ -92,6 +92,23 @@
   align-items: stretch;
 }
 
+/* Two equal-width fields side by side (pump start/end row, Volumes left/right). */
+.fieldPair {
+  display: flex;
+  gap: var(--space-3);
+}
+
+.fieldPair > .field {
+  flex: 1;
+  min-width: 0;
+}
+
+.sectionTitle {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  color: var(--color-fg);
+}
+
 .fieldRow .input {
   flex: 1;
   min-width: 0;

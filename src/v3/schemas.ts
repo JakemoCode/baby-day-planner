@@ -135,6 +135,8 @@ export type Event = {
   owner: OwnerRef;
   /** bottle only. */
   amountOz?: number;
+  /** pump only. Per-side recorded output in ounces; session total = left + right. */
+  pumpVolumeOz?: { left: number; right: number };
 
   /**
    * Render-only flag. true ⇒ renderer prepends a virtual putdown block.

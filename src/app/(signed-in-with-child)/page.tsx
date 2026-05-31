@@ -6,7 +6,7 @@ import { reduceLifecycle } from "@/v3/lifecycle";
 import { isInProgress } from "@/v3/lib/effectiveEnd";
 import { isRenderSynthetic } from "@/v3/lib/syntheticEvents";
 import { nextBottle, nextNap, projectedBedtime } from "@/v3/selectors";
-import { nextDashboardEvent } from "@/v3/components/Dashboard/dashboardStats";
+import { nextDashboardEvent, pumpTotalOz } from "@/v3/components/Dashboard/dashboardStats";
 import { useNowMinutes } from "@/hooks/useNowMinutes";
 import { useAutoPromotePersistence } from "@/v3/hooks/useAutoPromotePersistence";
 import { useV3TomorrowPlan } from "@/v3/hooks/useV3TomorrowPlan";
@@ -23,6 +23,7 @@ import { ContextualActionButton } from "@/v3/components/Dashboard/ContextualActi
 import { NextBottlePanel } from "@/v3/components/Dashboard/NextBottlePanel";
 import { NextEventCard } from "@/v3/components/Dashboard/NextEventCard";
 import { NextSleepPanel } from "@/v3/components/Dashboard/NextSleepPanel";
+import { PumpVolumeCard } from "@/v3/components/Dashboard/PumpVolumeCard";
 import { StartDayButton } from "@/v3/components/Dashboard/StartDayButton";
 import { WakeConfirmSheet } from "@/v3/components/Dashboard/WakeConfirmSheet";
 import styles from "./page.module.css";
@@ -156,6 +157,12 @@ export default function DashboardPage() {
         putdownLeadMinutes={settings.putdownLeadMinutes}
         owners={settings.owners}
       />
+
+      {/* `projected` (not `actuals`) so scheduled pumps from pumpTimes (R9.1) show the
+          card before any volume is recorded; recorded pumps carry the volume that sums. */}
+      {projected.some((e) => e.type === "pump") && (
+        <PumpVolumeCard totalOz={pumpTotalOz(projected)} />
+      )}
 
       <div className={styles.actions}>
         <ContextualActionButton

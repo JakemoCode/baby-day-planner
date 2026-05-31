@@ -12,6 +12,7 @@ export type FormState = {
   amountOz: number | undefined;
   owner: OwnerRef | undefined;
   label: string;
+  pumpVolumeOz?: { left: number; right: number };
 };
 
 export function formToEvent(
@@ -55,6 +56,12 @@ export function formToEvent(
     next.amountOz = form.amountOz;
   } else {
     delete (next as { amountOz?: number }).amountOz;
+  }
+
+  if (form.pumpVolumeOz !== undefined) {
+    next.pumpVolumeOz = form.pumpVolumeOz;
+  } else {
+    delete (next as { pumpVolumeOz?: { left: number; right: number } }).pumpVolumeOz;
   }
 
   // owner is required; NO_OWNER is explicit, never absent.
