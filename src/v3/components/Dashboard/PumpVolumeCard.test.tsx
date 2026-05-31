@@ -5,7 +5,7 @@ import { PumpVolumeCard } from "./PumpVolumeCard";
 describe("PumpVolumeCard", () => {
   it("shows the titled total in ounces", () => {
     render(<PumpVolumeCard totalOz={7.25} />);
-    expect(screen.getByText("Total pump volume today")).toBeVisible();
+    expect(screen.getByText("Pump volume today")).toBeVisible();
     expect(screen.getByText("7.25 oz")).toBeVisible();
   });
 

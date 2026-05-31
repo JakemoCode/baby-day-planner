@@ -8,7 +8,7 @@ export type PumpVolumeCardProps = {
 export function PumpVolumeCard({ totalOz }: PumpVolumeCardProps) {
   return (
     <div className={styles.card}>
-      <span className={styles.label}>Total pump volume today</span>
+      <span className={styles.label}>Pump volume today</span>
       {/* Number#toString trims trailing zeros (7 / 7.5 / 7.25); pumpTotalOz pre-rounds. */}
       <span className={styles.value}>{totalOz} oz</span>
     </div>
