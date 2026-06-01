@@ -26,8 +26,26 @@
 | 6f | Bottle should respect Putdown *start*, not the synthetic putdown emit point — bottle becomes putdown | §F54-adjacent | absorb |
 | 6g | Cannot get a 7th bottle to render with `bottlesPerDay=7` even with room before bedtime + manual add attempts | none | absorb (cascade ceiling/cap bug) |
 | 7 | "Nap N can't overlap putdown" validation toast flashes on save (save still succeeds) | none | **ship separately** (UI, trivial) |
+| 8 | Edit two PAST bottles (time + amount + owner=Daycare); after Dashboard→Timeline, NO-OWNER **zombie** bottles reappear at the original forecast times alongside the edited ones. They show "Reset"; resetting deletes them but they return after another Dashboard→Timeline. (2026-06-01, screenshot) | sharper restatement of #6a/#6b/#6e + §F59 | absorb; **write-path** — Contaminated Data section required in fix PR |
 
 Already-open entries that fold into this audit: **§F48, §F54, §F58, §F59, §F62, §F64**. Their individual specs stay as-is until the grill settles the model; if the model collapses change their fix shape, update them then.
+
+---
+
+## 2026-06-01 — zombie-bottle investigation (issue #8)
+
+Diagnosed with `/diagnose`. **Confirmed root-cause family** (not yet a deterministic repro of the exact screenshot):
+
+- **eventKey instability is real and proven.** A projected bottle's `eventKey` is `bottle_<slot>` where `slot = maxRecorded + 1` (`computeRenumber`, `bottles.ts`). As forecast bottles auto-promote and persist through the day, `maxRecorded` climbs, so the *same physical forecast slot* gets a *different* `eventKey` on later passes. A failing test demonstrates it: the 10:10 forecast bottle is `recorded_bottle_2` with no recorded bottles, `recorded_bottle_3` once one unrelated recorded bottle exists.
+- **`useAutoPromotePersistence` writes under `recordedIdFor(eventKey)`** — a shifting eventKey ⇒ a *new* Firestore doc ⇒ the prior one is **orphaned** (no-owner zombie). The `proj_` id is correctly startTime-anchored (`bottles.ts:33-34`); the eventKey is **not**.
+- **`reconcileDuplicateEventDocs` can't catch them** — it groups by `(type, eventKey)`; orphan + edited bottle have *different* eventKeys.
+- **Auto-promote runs only on the Dashboard**, not Timeline — editing on Timeline then visiting Dashboard is a distinct ordering.
+
+**But**: a faithful multi-pass harness (project → auto-promote-persist → edit → re-project → re-persist) **converges cleanly** in the simple orderings (edit-in-place and edit-projected-then-persist both end with no zombie). So the reappearing-zombie cycle needs **day-specific conditions not yet captured** — candidates: the daycare dropoff + owner assignment, the amount change altering `intervalForAmount` (so a different slot is forecast), naps shifting snap targets, or a specific navigation/timing ordering. **A captured artifact — the real Jun 1 event docs (id, eventKey, startTime, lifecycle, owner, amountOz) — is needed to replay it deterministically** before any fix.
+
+**Why no interim cascade patch shipped**: per this doc's own gate ("no cascade-touching code until the grill closes") + step-back rule. Simple-case convergence means there's no safe one-liner; a blind patch risks shifting the orphan or suppressing legitimate bottles in real data. Safe interim relief is **data-only** (direct deletion of the no-owner zombie docs) — does not touch the engine.
+
+**Grill must settle**: should a recorded bottle "claim" the forecast slot it was edited from, so the cascade never re-forecasts it? This is the H1 "time < Now ⇒ recorded" primitive plus "a recorded bottle satisfies the nearest forecast slot." Ties directly to #6a/#6b/#6e.
 
 ---
 
