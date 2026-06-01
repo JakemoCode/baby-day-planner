@@ -13,7 +13,7 @@ import {
   isNearestBottle,
 } from "../../lifecycle";
 import { isRenderSynthetic } from "../../lib/syntheticEvents";
-import { recordedIdFor } from "../../lib/eventConventions";
+import { isDreamFeed, recordedIdFor } from "../../lib/eventConventions";
 import { formatHM24, formatTimeForDisplay, nextDayAt, parseHM24 } from "../../ui/time";
 import { OwnerPickerV3 } from "./OwnerPickerV3";
 import { formToEvent, type FormState } from "./formToEvent";
@@ -73,6 +73,35 @@ export type EventEditDrawerV3Props = {
 
 type FormErrors = { startTime?: string; endTime?: string };
 
+// Instant events have no duration, so proximity guards against duplicate logging.
+const BOTTLE_MIN_GAP_MIN = 10;
+const MINUTES_PER_DAY = 24 * 60;
+
+// Clock-face distance in minutes: handles the midnight wrap (11:58 PM vs 12:01 AM
+// is 3 min apart, not ~1437) and cross-day TimeMin operands (mod 1440).
+function clockGapMin(a: TimeMin, b: TimeMin): number {
+  const raw = Math.abs(a - b) % MINUTES_PER_DAY;
+  return Math.min(raw, MINUTES_PER_DAY - raw);
+}
+
+function findIntervalOverlap(
+  type: EventType,
+  startTime: TimeMin,
+  endTime: TimeMin,
+  editingId: string | undefined,
+  existingEvents: Event[],
+): Event | undefined {
+  return existingEvents.find((e) => {
+    if (e.id === editingId) return false;
+    if (e.type !== type) return false;
+    // Putdown synthetics share type "nap" for geometry but aren't real naps; skip.
+    if (isRenderSynthetic(e)) return false;
+    if (e.endTime === undefined) return false;
+    if (!isRecorded(e.lifecycle)) return false;
+    return e.startTime < endTime && startTime < e.endTime;
+  });
+}
+
 function validateForm(
   type: EventType,
   startTime: TimeMin | undefined,
@@ -102,26 +131,32 @@ function validateForm(
   if (!errors.endTime && endTime !== undefined && startTime !== undefined && endTime <= startTime) {
     errors.endTime = "Must be after start time.";
   }
+  // Same-type interval overlap for duration blocks (nap, pump).
   if (
     !errors.endTime &&
-    type === "nap" &&
+    (type === "nap" || type === "pump") &&
     endTime !== undefined &&
     startTime !== undefined &&
     existingEvents
   ) {
-    const overlap = existingEvents.find((e) => {
-      if (e.id === editingId) return false;
-      if (e.type !== "nap") return false;
-      // Putdown synthetics share type "nap" for geometry but aren't real naps; skip.
-      if (isRenderSynthetic(e)) return false;
-      if (e.endTime === undefined) return false;
-      if (!isRecorded(e.lifecycle)) return false;
-      return e.startTime < endTime && startTime < e.endTime;
-    });
+    const overlap = findIntervalOverlap(type, startTime, endTime, editingId, existingEvents);
     if (overlap && overlap.endTime !== undefined) {
       const startStr = formatTimeForDisplay(overlap.startTime);
       const endStr = formatTimeForDisplay(overlap.endTime);
       errors.endTime = `Overlaps ${overlap.label} (${startStr} – ${endStr}).`;
+    }
+  }
+  // Bottles are instant: flag another recorded bottle logged within 10 min.
+  if (!errors.startTime && type === "bottle" && startTime !== undefined && existingEvents) {
+    const tooClose = existingEvents.find((e) => {
+      if (e.id === editingId) return false;
+      if (e.type !== "bottle") return false;
+      if (isRenderSynthetic(e)) return false;
+      if (!isRecorded(e.lifecycle)) return false;
+      return clockGapMin(e.startTime, startTime) < BOTTLE_MIN_GAP_MIN;
+    });
+    if (tooClose) {
+      errors.startTime = `Within ${BOTTLE_MIN_GAP_MIN} min of ${tooClose.label} (${formatTimeForDisplay(tooClose.startTime)}).`;
     }
   }
   return errors;
@@ -272,8 +307,12 @@ export function EventEditDrawerV3({
   const showStartNow =
     mode === "edit" && type === "nap" && isFocusNap(sourceEvent, siblings, nowMinutes);
   const showEndNow = showStartNow && isActiveNap(sourceEvent, nowMinutes);
+  // The dream feed is excluded from isNearestBottle (it's not in the rhythm chain),
+  // but it's the sole dream feed — always its own nearest — so it carries Log now too.
   const showLogNow =
-    mode === "edit" && type === "bottle" && isNearestBottle(sourceEvent, siblings, nowMinutes);
+    mode === "edit" &&
+    type === "bottle" &&
+    (isDreamFeed(sourceEvent) || isNearestBottle(sourceEvent, siblings, nowMinutes));
 
   const errors = validateForm(
     type,
