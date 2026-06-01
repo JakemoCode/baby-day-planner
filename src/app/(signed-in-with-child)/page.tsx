@@ -10,7 +10,6 @@ import { nextDashboardEvent, pumpTotalOz } from "@/v3/components/Dashboard/dashb
 import { useNowMinutes } from "@/hooks/useNowMinutes";
 import { useAutoPromotePersistence } from "@/v3/hooks/useAutoPromotePersistence";
 import { useV3TomorrowPlan } from "@/v3/hooks/useV3TomorrowPlan";
-import { useReconcileActiveDay } from "@/v3/hooks/useReconcileActiveDay";
 import { useDayPageState } from "@/v3/hooks/useDayPageState";
 import { isEngineEmittedId, recordedIdFor } from "@/v3/lib/eventConventions";
 import { promoteFromPlan, startNewDay } from "@/v3/repositories/days";
@@ -46,8 +45,7 @@ export default function DashboardPage() {
     onSave,
     onDelete,
   } = useDayPageState(db, CHILD_ID);
-  // Auto-reconciles the active day on mount; result flows back via useV3Day subscription.
-  useReconcileActiveDay(CHILD_ID, todayDate(), settings?.defaultWakeTime ?? 7 * 60);
+  // Day reconcile now lives in useDayPageState (shared by dashboard + timeline).
   // One-shot orphan cleanup: removes duplicate Firestore event docs sharing (type, eventKey). Idempotent.
   useEffect(() => {
     if (!day?.id) return;
