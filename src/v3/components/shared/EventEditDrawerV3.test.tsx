@@ -129,6 +129,40 @@ describe("EventEditDrawerV3", () => {
     expect(screen.queryByLabelText("End time")).not.toBeInTheDocument();
   });
 
+  it("drawer heading for a bottle includes its chronological number", () => {
+    render(
+      <EventEditDrawerV3
+        open
+        mode="edit"
+        event={projectedBottle({ label: "Bottle 3" })}
+        owners={owners}
+        nowMinutes={NOW}
+        bedtimeThreshold={THRESHOLD}
+        defaultWakeTime={DEFAULT_WAKE_TIME}
+        onSave={() => {}}
+        onCancel={() => {}}
+      />,
+    );
+    expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent("Edit Bottle 3");
+  });
+
+  it("drawer heading for a nap includes its number", () => {
+    render(
+      <EventEditDrawerV3
+        open
+        mode="edit"
+        event={projectedNap({ label: "Nap 2" })}
+        owners={owners}
+        nowMinutes={NOW}
+        bedtimeThreshold={THRESHOLD}
+        defaultWakeTime={DEFAULT_WAKE_TIME}
+        onSave={() => {}}
+        onCancel={() => {}}
+      />,
+    );
+    expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent("Edit Nap 2");
+  });
+
   it("drawer heading for a recurring event includes the event label", () => {
     const recurring: Event = {
       id: "rec-1",
