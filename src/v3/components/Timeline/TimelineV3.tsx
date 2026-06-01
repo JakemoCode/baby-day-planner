@@ -64,8 +64,9 @@ const EXTRA_BAND_WIDTH_PX = 80;
 const LEADER_LINE_W = 4;
 // Empty minutes padded before the first and after the last event.
 const VIEWPORT_PADDING_MIN = 30;
-// Default visible time range (minutes since midnight) when not clamping to events.
-const DEFAULT_VIEWPORT = { start: 5 * 60, end: 21 * 60 };
+// Default viewport bottom (minutes since midnight): the canonical timeline always
+// extends to at least 9 PM. The TOP has no floor — it opens at the earliest event.
+const DEFAULT_VIEWPORT_END = 21 * 60;
 // Hard bottom of the viewport (minutes) — caps overnight blocks at midnight.
 const DEFAULT_VIEWPORT_END_CAP = 24 * 60;
 // Px of padding left above "now" when auto-scrolling the timeline into view.
@@ -153,11 +154,10 @@ export function TimelineV3({
 
     const starts = events.map((e) => e.startTime);
     const ends = events.map((e) => e.endTime ?? e.startTime);
-    // clampToEvents uses the events' range; default keeps 5A–9P floor/ceiling. Both cap at midnight.
-    const minMin = clampToEvents
-      ? Math.min(...starts)
-      : Math.min(...starts, DEFAULT_VIEWPORT.start);
-    const maxRaw = clampToEvents ? Math.max(...ends) : Math.max(...ends, DEFAULT_VIEWPORT.end);
+    // Top always opens at the earliest event (no 5 AM floor). Bottom extends to at
+    // least 9 PM on the canonical timeline; clampToEvents previews hug the events. Both cap at midnight.
+    const minMin = Math.min(...starts);
+    const maxRaw = clampToEvents ? Math.max(...ends) : Math.max(...ends, DEFAULT_VIEWPORT_END);
     const maxMin = Math.min(maxRaw, DEFAULT_VIEWPORT_END_CAP);
     const origin = Math.max(0, minMin - viewportPaddingMin);
     const height = (maxMin + viewportPaddingMin - origin) * pxPerMin;
