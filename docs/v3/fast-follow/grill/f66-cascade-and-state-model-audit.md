@@ -47,6 +47,33 @@ Diagnosed with `/diagnose`. **Confirmed root-cause family** (not yet a determini
 
 **Grill must settle**: should a recorded bottle "claim" the forecast slot it was edited from, so the cascade never re-forecasts it? This is the H1 "time < Now ⇒ recorded" primitive plus "a recorded bottle satisfies the nearest forecast slot." Ties directly to #6a/#6b/#6e.
 
+### RESOLVED (2026-06-01 grill) — H4: identity & persistence model
+
+Settled with Jake. The model is **reality wins**: future = projected, past =
+recorded; the engine emits no projected-lifecycle event in the past (auto-promote,
+ADR-0006); an after-the-fact adjustment re-cascades **future only** (no retroactive
+shift, ADR-0006 Concern B); projections are **never persisted** (R2.2).
+
+**Identity decision → [ADR-0007](../../../adr/0007-uuid-storage-identity-eventkey-slot-role.md):**
+durable identity is the uuid `id`; `eventKey` is a renumberable slot/role label
+that never keys a Firestore doc. `recordedIdFor(eventKey)` is retired.
+
+**Resulting fix shape (for the plan):**
+1. Bottle cascade emits the **full day** (like naps R3.1), not forward-from-latest
+   (R5.1) — so past reality never vanishes and needs no persistence patch.
+2. **Delete `useAutoPromotePersistence`** — only user-recorded/adjusted facts persist.
+3. Recorded/adjusted bottles persist under a **stable uuid id** (same path as a
+   FAB-added extra); `recorded_<eventKey>` removed.
+4. Owner-overrides / owner-only-edit must hang off the durable identity, not a
+   still-renumbering projected `eventKey`.
+5. **Migration**: existing `recorded_bottle_<N>` docs → uuid ids (Contaminated Data).
+
+Collapses #6a/#6b/#6e/#8 and the §F59 id-convention work.
+
+**Still open**: the **skip / "this didn't happen"** semantics (H1 trade-off) — once
+Now crosses a trusted projection it auto-promotes to recorded; how does a user say
+"that feed didn't happen"? Delete = skip, or delete = recompute-as-if-fewer? Next.
+
 ### Update (2026-06-01, +2h) — the missing variable: CONCURRENT clients
 
 Jake: his **wife's Chrome instance was open and editing at the same time**, the bottles "got even weirder," then "ironed out" once both settled. This is the condition the single-client harness lacked, and it sharpens the root cause:

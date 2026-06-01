@@ -9,6 +9,23 @@ grills. Not a spec.
 Engine output. The forecast — "if everything keeps going as it has,
 this event will happen at this time." Not persisted to Firestore.
 
+## event id vs eventKey
+
+Two **separate** identities, clarified by the 2026-06-01 zombie-bottle
+grill (see [ADR-0007](docs/adr/0007-uuid-storage-identity-eventkey-slot-role.md)):
+
+- **`id`** — the **durable storage identity**. A stable `<type>_<uuid>`
+  (`newEventId`), assigned once at creation and never derived from mutable
+  state. The only thing that keys a Firestore doc. Pumps and FAB-created
+  bottles already use this.
+- **`eventKey`** — a **renumberable slot/role label** (`bottle_N`, `nap_N`,
+  `recurring_<id>`, `bedtime`, `bottle_dream`) used only for engine semantics:
+  owner-by-index, template/owner-override mapping, recorded↔projected slot
+  matching, sentinel detection. Re-sorts freely; **never keys storage**.
+
+The zombie bug was conflating them via `recordedIdFor(eventKey)` (deriving a
+doc id from the renumbering slot). Retired.
+
 ## recorded
 
 A field on a persisted event meaning **a physical fact about the day
