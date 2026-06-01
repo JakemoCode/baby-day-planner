@@ -303,6 +303,109 @@ describe("EventEditDrawerV3", () => {
     expect(screen.getByRole("alert")).toHaveTextContent(/Overlaps Nap 2/);
   });
 
+  it("flags overlap with a recorded pump on the same day", async () => {
+    const recordedPump: Event = {
+      id: "pump-other",
+      dayId: "d-1",
+      eventKey: "pump_2",
+      type: "pump",
+      kind: "block",
+      startTime: 8 * 60,
+      endTime: 8 * 60 + 30,
+      label: "Pump 2",
+      hasPutdown: false,
+      owner: NO_OWNER,
+      lifecycle: { state: "completed", committedAt: 8 * 60 + 30 },
+    };
+    const source = projectedPump({
+      startTime: 10 * 60,
+      endTime: 10 * 60 + 20,
+      lifecycle: { state: "recorded", annotatedAt: 10 * 60 },
+    });
+    render(
+      <EventEditDrawerV3
+        open
+        mode="edit"
+        event={source}
+        owners={owners}
+        nowMinutes={NOW}
+        bedtimeThreshold={THRESHOLD}
+        defaultWakeTime={DEFAULT_WAKE_TIME}
+        existingEvents={[recordedPump]}
+        onSave={() => {}}
+        onCancel={() => {}}
+      />,
+    );
+    const start = screen.getByLabelText("Start time");
+    await userEvent.clear(start);
+    await userEvent.type(start, "08:10");
+    expect(screen.getByRole("alert")).toHaveTextContent(/Overlaps Pump 2/);
+  });
+
+  it("flags a bottle logged within 10 minutes of a recorded bottle", async () => {
+    const recordedBottle: Event = {
+      ...projectedBottle({ startTime: 8 * 60 }),
+      id: "bottle-other",
+      eventKey: "bottle_2",
+      label: "Bottle 2",
+      lifecycle: { state: "completed", committedAt: 8 * 60 },
+    };
+    const source = projectedBottle({
+      startTime: 12 * 60,
+      lifecycle: { state: "recorded", annotatedAt: 12 * 60 },
+    });
+    render(
+      <EventEditDrawerV3
+        open
+        mode="edit"
+        event={source}
+        owners={owners}
+        nowMinutes={NOW}
+        bedtimeThreshold={THRESHOLD}
+        defaultWakeTime={DEFAULT_WAKE_TIME}
+        existingEvents={[recordedBottle]}
+        onSave={() => {}}
+        onCancel={() => {}}
+      />,
+    );
+    const start = screen.getByLabelText("Start time");
+    await userEvent.clear(start);
+    await userEvent.type(start, "08:05");
+    expect(screen.getByRole("alert")).toHaveTextContent(/Within 10 min of Bottle 2/);
+  });
+
+  it("does not flag a bottle exactly 10 minutes from another bottle", async () => {
+    const recordedBottle: Event = {
+      ...projectedBottle({ startTime: 8 * 60 }),
+      id: "bottle-other",
+      eventKey: "bottle_2",
+      label: "Bottle 2",
+      lifecycle: { state: "completed", committedAt: 8 * 60 },
+    };
+    const source = projectedBottle({
+      startTime: 12 * 60,
+      lifecycle: { state: "recorded", annotatedAt: 12 * 60 },
+    });
+    render(
+      <EventEditDrawerV3
+        open
+        mode="edit"
+        event={source}
+        owners={owners}
+        nowMinutes={NOW}
+        bedtimeThreshold={THRESHOLD}
+        defaultWakeTime={DEFAULT_WAKE_TIME}
+        existingEvents={[recordedBottle]}
+        onSave={() => {}}
+        onCancel={() => {}}
+      />,
+    );
+    const start = screen.getByLabelText("Start time");
+    await userEvent.clear(start);
+    await userEvent.type(start, "08:10");
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
   it("flags startTime < dayWakeTime as a pre-wake error (AM/PM safeguard)", async () => {
     // AM/PM mistake (e.g. 0:30 instead of 12:30) silently wrecks the cascade; validator must catch it.
     const recorded = projectedNap({
@@ -1456,6 +1559,31 @@ describe("Drawer now-shortcut buttons", () => {
 
       expect(screen.getByLabelText("Start time")).toHaveValue(hm(now));
       expect(screen.getByLabelText("Amount (oz)")).toHaveValue(4);
+    });
+
+    it("shows Log now on a dream feed (the sole dream feed is always its own nearest)", async () => {
+      const now = 23 * 60;
+      const dreamFeed = projectedBottle({
+        id: "proj_bottle_dream",
+        eventKey: "bottle_dream",
+        startTime: 23 * 60,
+        label: "Dream Feed",
+      });
+      render(
+        <EventEditDrawerV3
+          open
+          mode="edit"
+          event={dreamFeed}
+          owners={owners}
+          nowMinutes={now}
+          bedtimeThreshold={THRESHOLD}
+          defaultWakeTime={DEFAULT_WAKE_TIME}
+          existingEvents={[dreamFeed]}
+          onSave={vi.fn()}
+          onCancel={vi.fn()}
+        />,
+      );
+      expect(screen.getByRole("button", { name: "Log now" })).toBeVisible();
     });
   });
 });
