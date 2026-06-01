@@ -31,6 +31,9 @@ jobs:
       - name: Format check
         run: pnpm format:check
 
+      - name: A11y test coverage
+        run: pnpm check:a11y-coverage
+
       - name: Unit tests
         run: pnpm test
         env:
