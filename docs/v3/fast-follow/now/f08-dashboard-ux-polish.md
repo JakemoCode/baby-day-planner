@@ -1,22 +1,22 @@
 # §F8 — Dashboard UX polish pass
 
-**Source**: Jake, 2026-05-10 click-test feedback.
+**Source**: Jake, 2026-05-10 click-test feedback. **Re-triaged 2026-06-01.**
 
-**Status**: `pending`
+**Status**: `pending` — most items shipped or obsolete; two remain.
 
-**What** (collected items — split into sub-PRs as appropriate):
+**Remaining**:
 
-- **Day total ounces**: surface "X.X oz today" on the dashboard
-- **Last bottle consolidation**: replace `"logged X oz Bottle N / last: HH:MMa X oz"` with a single line `"last bottle: HH:MMa X oz"` and tap-to-edit
-- **Start Bottle button needs owner**: the current "Start" action commits without prompting for owner — add inline owner pick or default to last-used
-- **Edit nap start time from dashboard**: naps usually get "Started" 5+ min after actual start (busy putting baby down). Need an easy retro-edit affordance on the dashboard, not just in the drawer
-- **"In wake window" banner — show "asleep?"**: clarify state when baby's already napping but the WW projection is still active
-- **Button hierarchy**: Primary = start next event, Secondary = edit last event, Tertiary = skip event
+- **Last-bottle line**: reformat to a single `"last bottle: HH:MMa X oz"` line
+  (tap-to-edit already works).
+- **Button hierarchy audit**: confirm primary = start next event, secondary =
+  edit last, tertiary = skip — and fix any drift.
+
+**Done / obsolete (2026-06-01 triage)**:
+
+- ~~Day-total ounces on the dashboard~~ — shipped.
+- ~~Start-Bottle action should capture an owner~~ — obsolete; the Start/Log
+  Bottle button was removed in PR #282, no such action remains.
+- ~~Retro-edit nap start time from the dashboard~~ — dropped.
+- ~~"In wake window" banner should clarify "asleep?"~~ — dropped.
 
 **Why fast-follow**: UX polish on a working dashboard; engine-orthogonal.
-
-**Estimated effort**: split into 3-5 small PRs. ~1-2 days total.
-
----
-
-
