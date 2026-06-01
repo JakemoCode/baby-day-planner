@@ -10,8 +10,7 @@ import { PUTDOWN_KIND_TAG } from "./expandPutdown";
 import { ownerSlotKey } from "./ownerSlotKey";
 
 const NAP_TWO_ROW_THRESHOLD_PX = 50;
-// Below this height the extra band can't fit the title plus its (2-line, in the
-// narrow band) time range, so drop the range and keep the title legible.
+// Below this height the extra band can't fit the label plus the time range legibly.
 const EXTRA_LABEL_ONLY_THRESHOLD_PX = 56;
 // §F53: extra-with-duration renders as a fixed-width band whose LEFT edge sits
 // on the column break (cascade blocks' right edge). TimelineV3 sets the right

@@ -40,7 +40,7 @@ function renderExtra(heightPx: number) {
   );
 }
 
-const range = formatRangeShort(extraEvent.startTime, extraEvent.endTime!);
+const range = formatRangeShort(12 * 60 + 45, 13 * 60 + 15);
 
 describe("Block — extra-with-duration", () => {
   it("shows the time range when the block is tall enough", () => {
