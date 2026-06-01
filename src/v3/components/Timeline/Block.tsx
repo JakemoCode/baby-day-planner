@@ -10,6 +10,9 @@ import { PUTDOWN_KIND_TAG } from "./expandPutdown";
 import { ownerSlotKey } from "./ownerSlotKey";
 
 const NAP_TWO_ROW_THRESHOLD_PX = 50;
+// Below this height the extra band can't fit the title plus its (2-line, in the
+// narrow band) time range, so drop the range and keep the title legible.
+const EXTRA_LABEL_ONLY_THRESHOLD_PX = 56;
 // §F53: extra-with-duration renders as a fixed-width band whose LEFT edge sits
 // on the column break (cascade blocks' right edge). TimelineV3 sets the right
 // offset so the left edge lands on the break; this width must match the
@@ -63,6 +66,7 @@ export function Block({
     event.endTime !== undefined ? formatRangeVerbose(event.startTime, event.endTime) : "";
   const a11y = `${event.label}${rangeA11y ? ` ${rangeA11y}` : ""}${ownerName ? ` ${ownerName}` : ""}`;
   const napShortForm = event.type === "nap" && heightPx < NAP_TWO_ROW_THRESHOLD_PX;
+  const extraShortForm = event.type === "extra" && heightPx < EXTRA_LABEL_ONLY_THRESHOLD_PX;
   const isPutdown = event.eventKey === PUTDOWN_KIND_TAG;
   // Pump owner conveyed by left-stripe color, not text; sized to max-content and inset from parent.
   const isPump = event.type === "pump";
@@ -116,7 +120,7 @@ export function Block({
         )}
       </span>
       {isPump && range && <span className={styles.range}>{range}</span>}
-      {range && !isPutdown && !napShortForm && !isPump && (
+      {range && !isPutdown && !napShortForm && !extraShortForm && !isPump && (
         <span className={styles.range}>
           {range}
           {ownerName && (
