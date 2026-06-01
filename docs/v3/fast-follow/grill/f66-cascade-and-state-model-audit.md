@@ -116,9 +116,22 @@ substantial. Status:
 | 8 | LIVE | bottle zombie thread (H4) |
 
 **Remaining real work**: (a) the bottle zombie thread H4 (designed → ready to plan);
-(b) micro-decisions on #2a (intended?) and #6f-pt2 (should a putdown-snapped bottle
-render as putdown?); (c) bug-triage #6g (cap, not model); (d) trivial #7. Everything
-else is fixed — fold the STALE rows when this grill closes.
+(b) bug-triage #6g (cap, not model); (c) trivial #7 polish. Everything else fixed.
+
+**Micro-decisions — RESOLVED (2026-06-01):**
+- **#2a** — wontfix / low-priority. Jake: unsure the button even persists (may clear
+  after ~15 min); the timeline **Edit-wake-time** button does the real work here.
+  Not model work; verify behavior opportunistically, no fix planned.
+- **#6f** — RESOLVED, no change. A bottle timed at putdown **stays a bottle** (snap
+  already positions it at putdown-start). "Becomes putdown" was the bug, not the goal.
+
+### GRILL CLOSED (2026-06-01)
+
+Model fully settled across: reality-wins/now-cross (ADR-0006), bedtime band
+(ADR-0002), identity uuid-vs-slot (ADR-0007), skip=suppression (this grill). Code
+triage retired the stale issues. The only substantial implementation is the bottle
+zombie thread H4. Next per this doc's process: a scope doc (sequenced PRs) lands
+before the first implementation PR.
 
 ### Update (2026-06-01, +2h) — the missing variable: CONCURRENT clients
 
