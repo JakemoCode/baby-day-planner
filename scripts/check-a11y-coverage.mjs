@@ -33,8 +33,13 @@ function walk(dir) {
 
 const isTest = (f) => f.endsWith(".test.tsx");
 const inComponents = (f) => f.split("/").includes("components");
-const isClient = (src) => /^\s*["']use client["'];?/m.test(src.split("\n").slice(0, 3).join("\n"));
-const isExempt = (src) => /\/\/\s*a11y-exempt:/.test(src);
+// "use client" must be a directive line near the top, but a leading banner
+// comment can legally precede it — scan the first several lines, not just char 0.
+const isClient = (src) =>
+  /^\s*["']use client["'];?\s*$/m.test(src.split("\n").slice(0, 6).join("\n"));
+// Marker must be its own comment line with a non-empty reason, so an incidental
+// mention of "a11y-exempt:" elsewhere can't silently disable the gate.
+const isExempt = (src) => /^\s*\/\/\s*a11y-exempt:\s*\S/m.test(src);
 
 const missing = [];
 let checked = 0;
