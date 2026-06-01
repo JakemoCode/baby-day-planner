@@ -94,6 +94,32 @@ mergeable, tests-green; cascade PRs carry a `## Contaminated data` section):
 **Not yet grilled** (separable threads, own sessions): H2 bedtime band (ADR-0002
 exists), H3 cascade cap / #6g 7th-bottle, plus naps-side issues #2a/#2b/#3/#4.
 
+### 2026-06-01 — code-grounded triage (most issues are STALE)
+
+Verified every dogfood issue against current code (not the doc). Result: the
+model work is essentially done — three ADRs + the H4 grill above cover everything
+substantial. Status:
+
+| # | Verdict | Evidence |
+|---|---|---|
+| 2a | LIVE (maybe intended) | `inProgressBedtime` from `actuals` never auto-clears (`page.tsx:86-88`, `decideMode.ts:16`); memory `feedback_keep_confirmation_affordances_after_auto_promote` says current behavior is intentional. **Needs Jake's call.** |
+| 2b | **STALE** | §F24/PR #143 + no "Start Nap" button exists (`ContextualActionButton` has only end-bedtime/end-nap) |
+| 3 | **STALE** | ADR-0002 implemented: `naps.ts:82` threshold-cap + `terminateCascade:127` `earliestBedtime` floor |
+| 4 | **STALE** | `crowdsManualBedtime` guard `naps.ts:81` — cannot arise by construction |
+| 5 | **STALE** | `formatHoursMinutes` (`time.ts:90-94`) already → "2h 14m" |
+| 6a/6e | LIVE | bottle zombie thread (H4) — designed, not yet built |
+| 6b | **STALE** | `useDrawer.ts:94-126` owner-only→`setOwnerOverride`, amount→recorded |
+| 6c | **STALE** | `DRAWER_SAVE`+`isSchedulingType("nap")` → recorded; saved under `recordedIdFor` |
+| 6f | PARTIAL | snap-to-putdown-start works (`bottles.ts:124`); "bottle *becomes* putdown" visual unbuilt + ungrilled |
+| 6g | LIVE (bug) | cold-start cap `reachedColdStartCap` (`bottles.ts:279`) may stop < target; never triaged |
+| 7 | LIVE (trivial) | no toast lib; transient inline `validateForm` error; save is **blocked** not silent — original description wrong |
+| 8 | LIVE | bottle zombie thread (H4) |
+
+**Remaining real work**: (a) the bottle zombie thread H4 (designed → ready to plan);
+(b) micro-decisions on #2a (intended?) and #6f-pt2 (should a putdown-snapped bottle
+render as putdown?); (c) bug-triage #6g (cap, not model); (d) trivial #7. Everything
+else is fixed — fold the STALE rows when this grill closes.
+
 ### Update (2026-06-01, +2h) — the missing variable: CONCURRENT clients
 
 Jake: his **wife's Chrome instance was open and editing at the same time**, the bottles "got even weirder," then "ironed out" once both settled. This is the condition the single-client harness lacked, and it sharpens the root cause:
