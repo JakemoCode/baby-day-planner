@@ -257,14 +257,10 @@ export function EventEditDrawerV3({
   const destructiveLabel = destructiveAction === "reset" ? "Reset" : "Delete";
   const confirmCopy = confirmCopyFor(destructiveAction, sourceEvent);
 
-  // Field presence + layout is declarative (DRAWER_FIELD_SCHEMA); a single
-  // renderer walks it below. `fieldSet` answers cross-field questions (does
-  // this type carry pump volumes?) that aren't tied to render order.
   const schema = DRAWER_FIELD_SCHEMA[type];
-  const fieldSet = new Set<DrawerField>(
-    schema.flatMap((r) => (typeof r === "string" ? [r] : r.row)),
-  );
-  const showVolumes = fieldSet.has("volumes");
+  const showVolumes = schema
+    .flatMap((r) => (typeof r === "string" ? [r] : r.row))
+    .includes("volumes");
 
   // Lock time/amount on future-projected rhythm events except the chronologically-next
   // nap/bottle (editable so the user can pin the current rhythm anchor).
@@ -404,9 +400,6 @@ export function EventEditDrawerV3({
     setEndNow();
   };
 
-  // Each field's full JSX (including its own interaction wiring — now-buttons,
-  // errors, future-projected locking) keyed by DrawerField. DRAWER_FIELD_SCHEMA
-  // decides which render and how they're grouped; the logic stays here.
   const fieldNodes: Record<DrawerField, ReactNode> = {
     label: (
       <label className={styles.field}>
@@ -578,11 +571,11 @@ export function EventEditDrawerV3({
           </p>
         )}
 
-        {schema.map((entry, i) =>
+        {schema.map((entry) =>
           typeof entry === "string" ? (
             <Fragment key={entry}>{fieldNodes[entry]}</Fragment>
           ) : (
-            <div key={`row-${i}`} className={styles.fieldPair}>
+            <div key={entry.row.join(",")} className={styles.fieldPair}>
               {entry.row.map((f) => (
                 <Fragment key={f}>{fieldNodes[f]}</Fragment>
               ))}
