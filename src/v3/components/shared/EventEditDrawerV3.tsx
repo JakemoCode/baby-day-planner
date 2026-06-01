@@ -73,11 +73,17 @@ export type EventEditDrawerV3Props = {
 
 type FormErrors = { startTime?: string; endTime?: string };
 
-// Two instant bottles this close are the same feed, not a new one — instant
-// events have no duration, so proximity (not interval overlap) is the guard.
+// Instant events have no duration, so proximity guards against duplicate logging.
 const BOTTLE_MIN_GAP_MIN = 10;
+const MINUTES_PER_DAY = 24 * 60;
 
-// A recorded same-type duration block whose interval intersects [startTime, endTime).
+// Clock-face distance in minutes: handles the midnight wrap (11:58 PM vs 12:01 AM
+// is 3 min apart, not ~1437) and cross-day TimeMin operands (mod 1440).
+function clockGapMin(a: TimeMin, b: TimeMin): number {
+  const raw = Math.abs(a - b) % MINUTES_PER_DAY;
+  return Math.min(raw, MINUTES_PER_DAY - raw);
+}
+
 function findIntervalOverlap(
   type: EventType,
   startTime: TimeMin,
@@ -147,10 +153,10 @@ function validateForm(
       if (e.type !== "bottle") return false;
       if (isRenderSynthetic(e)) return false;
       if (!isRecorded(e.lifecycle)) return false;
-      return Math.abs(e.startTime - startTime) < BOTTLE_MIN_GAP_MIN;
+      return clockGapMin(e.startTime, startTime) < BOTTLE_MIN_GAP_MIN;
     });
     if (tooClose) {
-      errors.startTime = `Within 10 min of ${tooClose.label} (${formatTimeForDisplay(tooClose.startTime)}).`;
+      errors.startTime = `Within ${BOTTLE_MIN_GAP_MIN} min of ${tooClose.label} (${formatTimeForDisplay(tooClose.startTime)}).`;
     }
   }
   return errors;

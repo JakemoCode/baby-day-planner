@@ -66,6 +66,15 @@ const projectedPump = (overrides: Partial<Event> = {}): Event => ({
   ...overrides,
 });
 
+const recordedBottleNeighbor = (overrides: Partial<Event> = {}): Event => ({
+  ...projectedBottle({ startTime: 8 * 60 }),
+  id: "bottle-other",
+  eventKey: "bottle_2",
+  label: "Bottle 2",
+  lifecycle: { state: "completed", committedAt: 8 * 60 },
+  ...overrides,
+});
+
 describe("EventEditDrawerV3", () => {
   it("returns null when closed", () => {
     const { container } = render(
@@ -343,13 +352,32 @@ describe("EventEditDrawerV3", () => {
   });
 
   it("flags a bottle logged within 10 minutes of a recorded bottle", async () => {
-    const recordedBottle: Event = {
-      ...projectedBottle({ startTime: 8 * 60 }),
-      id: "bottle-other",
-      eventKey: "bottle_2",
-      label: "Bottle 2",
-      lifecycle: { state: "completed", committedAt: 8 * 60 },
-    };
+    const source = projectedBottle({
+      startTime: 12 * 60,
+      lifecycle: { state: "recorded", annotatedAt: 12 * 60 },
+    });
+    render(
+      <EventEditDrawerV3
+        open
+        mode="edit"
+        event={source}
+        owners={owners}
+        nowMinutes={NOW}
+        bedtimeThreshold={THRESHOLD}
+        defaultWakeTime={DEFAULT_WAKE_TIME}
+        existingEvents={[recordedBottleNeighbor()]}
+        onSave={() => {}}
+        onCancel={() => {}}
+      />,
+    );
+    const start = screen.getByLabelText("Start time");
+    await userEvent.clear(start);
+    await userEvent.type(start, "08:05");
+    expect(screen.getByRole("alert")).toHaveTextContent(/Within 10 min of Bottle 2/);
+  });
+
+  it("flags a bottle across the midnight wrap (11:58 PM neighbor, edit to 12:01 AM)", async () => {
+    const recordedBottle = recordedBottleNeighbor({ startTime: 23 * 60 + 58 });
     const source = projectedBottle({
       startTime: 12 * 60,
       lifecycle: { state: "recorded", annotatedAt: 12 * 60 },
@@ -370,18 +398,11 @@ describe("EventEditDrawerV3", () => {
     );
     const start = screen.getByLabelText("Start time");
     await userEvent.clear(start);
-    await userEvent.type(start, "08:05");
+    await userEvent.type(start, "00:01");
     expect(screen.getByRole("alert")).toHaveTextContent(/Within 10 min of Bottle 2/);
   });
 
   it("does not flag a bottle exactly 10 minutes from another bottle", async () => {
-    const recordedBottle: Event = {
-      ...projectedBottle({ startTime: 8 * 60 }),
-      id: "bottle-other",
-      eventKey: "bottle_2",
-      label: "Bottle 2",
-      lifecycle: { state: "completed", committedAt: 8 * 60 },
-    };
     const source = projectedBottle({
       startTime: 12 * 60,
       lifecycle: { state: "recorded", annotatedAt: 12 * 60 },
@@ -395,7 +416,7 @@ describe("EventEditDrawerV3", () => {
         nowMinutes={NOW}
         bedtimeThreshold={THRESHOLD}
         defaultWakeTime={DEFAULT_WAKE_TIME}
-        existingEvents={[recordedBottle]}
+        existingEvents={[recordedBottleNeighbor()]}
         onSave={() => {}}
         onCancel={() => {}}
       />,
@@ -1561,7 +1582,7 @@ describe("Drawer now-shortcut buttons", () => {
       expect(screen.getByLabelText("Amount (oz)")).toHaveValue(4);
     });
 
-    it("shows Log now on a dream feed (the sole dream feed is always its own nearest)", async () => {
+    it("shows Log now on a dream feed", async () => {
       const now = 23 * 60;
       const dreamFeed = projectedBottle({
         id: "proj_bottle_dream",
