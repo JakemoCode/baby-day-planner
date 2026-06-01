@@ -54,6 +54,14 @@ describe("TimelineV3", () => {
     expect(screen.getByTestId("instant-chip")).toBeInTheDocument();
   });
 
+  it("starts the viewport at the earliest event, not a fixed 5 AM floor", () => {
+    const events: Event[] = [ev({ id: "wake-nap", startTime: 7 * 60, endTime: 8 * 60 })];
+    render(<TimelineV3 events={events} owners={owners} />);
+    expect(screen.queryByText("5A")).toBeNull();
+    expect(screen.queryByText("6A")).toBeNull();
+    expect(screen.getByText("7A")).toBeVisible();
+  });
+
   it("renders pre-expanded putdown blocks (callers must run renderProjection)", () => {
     // Expansion moved to renderProjection; TimelineV3 just paints what it receives.
     const expanded = expandPutdownBlocks([ev({ id: "nap1", hasPutdown: true })], {
