@@ -9,6 +9,23 @@ grills. Not a spec.
 Engine output. The forecast — "if everything keeps going as it has,
 this event will happen at this time." Not persisted to Firestore.
 
+## event id vs eventKey
+
+Two **separate** identities, clarified by the 2026-06-01 zombie-bottle
+grill (see [ADR-0007](docs/adr/0007-uuid-storage-identity-eventkey-slot-role.md)):
+
+- **`id`** — the **durable storage identity**. A stable `<type>_<uuid>`
+  (`newEventId`), assigned once at creation and never derived from mutable
+  state. The only thing that keys a Firestore doc. Pumps and FAB-created
+  bottles already use this.
+- **`eventKey`** — a **renumberable slot/role label** (`bottle_N`, `nap_N`,
+  `recurring_<id>`, `bedtime`, `bottle_dream`) used only for engine semantics:
+  owner-by-index, template/owner-override mapping, recorded↔projected slot
+  matching, sentinel detection. Re-sorts freely; **never keys storage**.
+
+The zombie bug was conflating them via `recordedIdFor(eventKey)` (deriving a
+doc id from the renumbering slot). Retired.
+
 ## recorded
 
 A field on a persisted event meaning **a physical fact about the day
@@ -20,6 +37,17 @@ happened at a time that hasn't arrived yet).
 
 Established 2026-05-25 (§F66 grill). Supersedes DATA_MODEL.md R2.2's
 claim that owner-only edits promote projected→recorded.
+
+## skipped feed (suppression)
+
+A user-asserted **negative fact**: "the engine forecast a feed here, but it
+didn't happen." Because a trusted projection auto-promotes to `recorded` and
+isn't persisted, simply deleting it isn't enough — the cascade re-derives it
+next render. So a skip is persisted as a **suppression**, generalizing the
+existing `Day.suppressedDreamFeed` and `suppressRecurring` patterns; the cascade
+then permanently omits that feed. Future bottles are unaffected (they cadence
+from the latest *recorded* bottle, not from the skipped slot). Established
+2026-06-01 (§F66 grill).
 
 ## planning intent
 
