@@ -272,6 +272,33 @@ describe("useDrawer", () => {
     expect(result.current.drawer).toEqual({ open: false });
   });
 
+  // §F72: a daily_recurring owner edit must be per-DAY (Day.ownerOverrides), never a
+  // permanent change to the Settings template. setOwnerOverride is the per-day path;
+  // saveEvent (or a settings write) would leak the owner into future days.
+  it("owner edit on a projected daily_recurring routes to setOwnerOverride (per-day, not the template)", async () => {
+    const recurring = makeEvent({
+      id: "proj_recurring_meds",
+      eventKey: "recurring_meds",
+      type: "daily_recurring",
+      label: "Morning meds",
+      startTime: 8 * 60,
+    });
+    const saveEvent = makeSaveEvent();
+    const setOwnerOverride = makeSetOwnerOverride();
+    const { result } = setup({ actuals: [], saveEvent, setOwnerOverride });
+
+    act(() => result.current.openEdit(recurring));
+
+    const newOwner = { slot: "parent1" as const };
+    await act(async () => {
+      await result.current.onSave({ ...recurring, owner: newOwner });
+    });
+
+    expect(setOwnerOverride).toHaveBeenCalledTimes(1);
+    expect(setOwnerOverride).toHaveBeenCalledWith("recurring_meds", newOwner);
+    expect(saveEvent).not.toHaveBeenCalled();
+  });
+
   it("time edit on projected event still routes to saveEvent (not setOwnerOverride)", async () => {
     const projected = makeEvent({ id: "proj-nap-3", eventKey: "nap_3" });
     const saveEvent = makeSaveEvent();

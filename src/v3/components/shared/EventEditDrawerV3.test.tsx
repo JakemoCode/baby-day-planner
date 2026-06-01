@@ -150,6 +150,40 @@ describe("EventEditDrawerV3", () => {
     expect(heading).toHaveTextContent("Tummy time");
   });
 
+  it("shows the owner picker on a daily_recurring event and carries the selection on save", async () => {
+    const onSave = vi.fn();
+    const recurring: Event = {
+      id: "rec-1",
+      dayId: "d-1",
+      eventKey: "recurring_meds",
+      type: "daily_recurring",
+      kind: "instant",
+      startTime: 8 * 60,
+      label: "Morning meds",
+      hasPutdown: false,
+      owner: NO_OWNER,
+      lifecycle: { state: "projected" },
+    };
+    render(
+      <EventEditDrawerV3
+        open
+        mode="edit"
+        event={recurring}
+        owners={owners}
+        nowMinutes={NOW}
+        bedtimeThreshold={THRESHOLD}
+        defaultWakeTime={DEFAULT_WAKE_TIME}
+        onSave={onSave}
+        onCancel={() => {}}
+      />,
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Jake" }));
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+    const next: Event = onSave.mock.calls[0]![0];
+    expect(next.owner).toEqual({ slot: "parent1" });
+    expect(next.type).toBe("daily_recurring");
+  });
+
   it("saves owner-only edit as overridden lifecycle", async () => {
     const onSave = vi.fn();
     render(

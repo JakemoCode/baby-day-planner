@@ -15,7 +15,7 @@ describe("DRAWER_FIELD_SCHEMA", () => {
       pump: ["startTime", "endTime", "volumes"],
       bedtime: ["startTime", "owner"],
       extra: ["label", "startTime", "endTime", "owner"],
-      daily_recurring: ["startTime"],
+      daily_recurring: ["startTime", "owner"],
       daycare_dropoff: ["startTime", "owner"],
       daycare_pickup: ["startTime", "owner"],
     };
