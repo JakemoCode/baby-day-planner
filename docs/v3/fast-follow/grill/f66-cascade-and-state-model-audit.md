@@ -70,9 +70,29 @@ that never keys a Firestore doc. `recordedIdFor(eventKey)` is retired.
 
 Collapses #6a/#6b/#6e/#8 and the §F59 id-convention work.
 
-**Still open**: the **skip / "this didn't happen"** semantics (H1 trade-off) — once
-Now crosses a trusted projection it auto-promotes to recorded; how does a user say
-"that feed didn't happen"? Delete = skip, or delete = recompute-as-if-fewer? Next.
+**Skip semantics — RESOLVED (2026-06-01)**: deleting a past forecast persists a
+**suppression** (negative fact), generalizing `Day.suppressedDreamFeed` /
+`suppressRecurring`. The cascade permanently omits that feed; future bottles are
+unaffected (they cadence from the latest *recorded* bottle). Renders as gone.
+Implementation detail for the scope doc: the suppression key must be stable
+(durable identity / deterministic past-slot), never a renumbering `eventKey`.
+
+### Bottle thread: model CONVERGED → ready for the plan
+
+The reality-wins + identity + skip model is settled for the bottle/persistence
+thread (issues #6a/#6b/#6e/#8, §F59). Sequenced fix (each independently
+mergeable, tests-green; cascade PRs carry a `## Contaminated data` section):
+
+1. **Full-day bottle cascade** — R5.1 forward-from-latest → full-day emission
+   (match naps R3.1). Past reality never vanishes; no persistence patch needed.
+2. **Delete `useAutoPromotePersistence`** + persist recorded/adjusted bottles
+   under a stable uuid id (ADR-0007); retire `recorded_<eventKey>`. **Migration**:
+   existing `recorded_bottle_<N>` docs → uuid.
+3. **Skip = suppression** for regular bottles (generalize dream-feed/recurring).
+4. **Owner-overrides / owner-only-edit** off durable identity, not projected eventKey.
+
+**Not yet grilled** (separable threads, own sessions): H2 bedtime band (ADR-0002
+exists), H3 cascade cap / #6g 7th-bottle, plus naps-side issues #2a/#2b/#3/#4.
 
 ### Update (2026-06-01, +2h) — the missing variable: CONCURRENT clients
 

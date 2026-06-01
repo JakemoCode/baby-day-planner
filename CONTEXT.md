@@ -38,6 +38,17 @@ happened at a time that hasn't arrived yet).
 Established 2026-05-25 (§F66 grill). Supersedes DATA_MODEL.md R2.2's
 claim that owner-only edits promote projected→recorded.
 
+## skipped feed (suppression)
+
+A user-asserted **negative fact**: "the engine forecast a feed here, but it
+didn't happen." Because a trusted projection auto-promotes to `recorded` and
+isn't persisted, simply deleting it isn't enough — the cascade re-derives it
+next render. So a skip is persisted as a **suppression**, generalizing the
+existing `Day.suppressedDreamFeed` and `suppressRecurring` patterns; the cascade
+then permanently omits that feed. Future bottles are unaffected (they cadence
+from the latest *recorded* bottle, not from the skipped slot). Established
+2026-06-01 (§F66 grill).
+
 ## planning intent
 
 Any user-committed annotation that does NOT assert a past reality.
