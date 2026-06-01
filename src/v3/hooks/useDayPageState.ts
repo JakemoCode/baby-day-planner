@@ -2,7 +2,7 @@
 
 /**
  * Composite hook for active-day data wiring shared by dashboard and timeline.
- * Per-page concerns (auto-promote, reconcileActiveDay, wake-confirm) stay in each page.
+ * Per-page concerns (auto-promote, wake-confirm) stay in each page.
  */
 
 import { useCallback, useMemo } from "react";
@@ -58,12 +58,12 @@ export function useDayPageState(db: Firestore, childId: string): UseDayPageState
   // today's calendar day, not the stale active day. Edits keep their own day.
   const saveNewEvent = useCallback(
     async (event: Event) => {
-      const today = currentLocalDate();
-      if (!day || !settings || today === day.date) {
+      const nowDate = currentLocalDate();
+      if (!day || !settings || nowDate === day.date) {
         await saveEvent(event);
         return;
       }
-      await createEventOnCalendarDay(db, childId, event, today, settings.defaultWakeTime);
+      await createEventOnCalendarDay(db, childId, event, nowDate, settings.defaultWakeTime);
     },
     [db, childId, day, settings, saveEvent],
   );
