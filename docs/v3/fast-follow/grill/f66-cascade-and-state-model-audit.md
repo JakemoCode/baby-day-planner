@@ -47,6 +47,16 @@ Diagnosed with `/diagnose`. **Confirmed root-cause family** (not yet a determini
 
 **Grill must settle**: should a recorded bottle "claim" the forecast slot it was edited from, so the cascade never re-forecasts it? This is the H1 "time < Now ⇒ recorded" primitive plus "a recorded bottle satisfies the nearest forecast slot." Ties directly to #6a/#6b/#6e.
 
+### Update (2026-06-01, +2h) — the missing variable: CONCURRENT clients
+
+Jake: his **wife's Chrome instance was open and editing at the same time**, the bottles "got even weirder," then "ironed out" once both settled. This is the condition the single-client harness lacked, and it sharpens the root cause:
+
+- Two clients each run `useAutoPromotePersistence` **independently**. Each computes the projection from its own (sync-lagged) snapshot of Firestore, so client A and client B can momentarily see **different `maxRecorded`** → assign the **same physical forecast slot different `eventKey`s** → persist it under **different `recorded_bottle_N` doc ids**.
+- The persistence transaction only bails on the **same** doc id (`snap.exists()`). Two divergent ids both succeed → **orphans multiply** (matches "even weirder"). When both clients re-converge on the same Firestore state, eventKeys stabilize and no new orphans form ("ironed out").
+- So the bug is a **multi-client race amplified by eventKey instability** — the persistence identity depends on a renumbering counter (`maxRecorded`) that two clients can legitimately see differently mid-sync.
+
+**This makes the fix direction concrete and contained**: the recorded-bottle **doc id must be client-independent and renumber-independent** — derive it from the startTime anchor (like the `proj_bottle_t<startTime>` id already does), NOT from `recordedIdFor(eventKey)`. Then two clients forecasting the 10:10 slot both compute `recorded_bottle_t610`, the transaction bail dedupes across clients, and no orphan can form. This is a **persistence-identity** change (`useAutoPromotePersistence` + the drawer's projected-bottle save + reset-detection in `drawerDeletePolicy`), **not** a cascade-rule change — so it can be scoped as interim mitigation without tripping this doc's "no cascade code" gate. It still needs: the real Jun-1 docs to verify, a Contaminated Data plan for existing orphans, and §F59 alignment (id conventions).
+
 ---
 
 ## Collapse hypotheses to grill
