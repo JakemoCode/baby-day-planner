@@ -275,11 +275,12 @@ export function EventEditDrawerV3({
   const type = sourceEvent.type;
   const baseTitle =
     mode === "create" ? (CREATE_TITLE_BY_TYPE[type] ?? "Add event") : EDIT_TITLE_BY_TYPE[type];
-  // Include the label in the heading so recurring events are named.
-  const title =
-    mode === "edit" && type === "daily_recurring" && sourceEvent.label
-      ? `${baseTitle}: ${sourceEvent.label}`
-      : baseTitle;
+  // §F23: labels carry the chronological number from R5.4 ("Nap 2", "Bottle 3").
+  let title = baseTitle;
+  if (mode === "edit" && sourceEvent.label) {
+    if (type === "daily_recurring") title = `${baseTitle}: ${sourceEvent.label}`;
+    else if (type === "nap" || type === "bottle") title = `Edit ${sourceEvent.label}`;
+  }
 
   // Destructive-action shape (delete / reset / none) delegated to drawerDeletePolicy.
   const destructiveAction = drawerDestructiveAction(sourceEvent, {
