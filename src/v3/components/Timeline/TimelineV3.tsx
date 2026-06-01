@@ -35,11 +35,10 @@ export type TimelineV3Props = {
    */
   viewportPaddingMin?: number;
   /**
-   * When true, the viewport spans only the actual events plus padding —
-   * no default 5A-9P floor/ceiling. Used by preview surfaces (Tomorrow,
-   * History detail) where there's no reason to scroll past empty hours.
-   * Defaults to false so the canonical /timeline still shows the full
-   * day even when most of it is empty.
+   * Controls the viewport BOTTOM. When true (preview surfaces — Tomorrow,
+   * History detail) the bottom hugs the latest event. When false (canonical
+   * /timeline) it extends to at least 9 PM so the rest of the day stays in
+   * view. The TOP always opens at the earliest event regardless. Defaults to false.
    */
   clampToEvents?: boolean;
 };
@@ -64,8 +63,7 @@ const EXTRA_BAND_WIDTH_PX = 80;
 const LEADER_LINE_W = 4;
 // Empty minutes padded before the first and after the last event.
 const VIEWPORT_PADDING_MIN = 30;
-// Default viewport bottom (minutes since midnight): the canonical timeline always
-// extends to at least 9 PM. The TOP has no floor — it opens at the earliest event.
+// Default viewport bottom (minutes since midnight) for the canonical timeline.
 const DEFAULT_VIEWPORT_END = 21 * 60;
 // Hard bottom of the viewport (minutes) — caps overnight blocks at midnight.
 const DEFAULT_VIEWPORT_END_CAP = 24 * 60;
