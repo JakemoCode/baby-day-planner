@@ -40,7 +40,7 @@ Shipped items move to [`FAST_FOLLOW_COMPLETED.md`](./FAST_FOLLOW_COMPLETED.md) �
 - [§F54](./fast-follow/grill/f54-bottle-cascade-overnight.md)
 - [§F57](./fast-follow/grill/f57-extra-pump-overlap-ellipses.md)
 - [§F58](./fast-follow/grill/f58-dream-feed-default-time.md)
-- [§F62](./fast-follow/grill/f62-cancascade-idempotency-hole.md)
+- [§F62](./fast-follow/grill/f62-cancascade-idempotency-hole.md) — _likely moot under the ephemeral-projections model ([BOTTLE_SPEC.md](./BOTTLE_SPEC.md)); verify during PR-B, then archive_
 - [§F64](./fast-follow/grill/f64-nap-bedtime-too-aggressive.md)
 
 ## backlog/

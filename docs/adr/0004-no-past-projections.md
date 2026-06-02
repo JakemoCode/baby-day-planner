@@ -98,4 +98,4 @@ nap started late."
 
 - CONTEXT.md: "no-past-projections invariant," "putdown bottle-anchor rule"
 - ADR-0001 (Now-cross auto-promote) — this ADR keeps it honest
-- §F66 grill: docs/v3/fast-follow/grill/f66-cascade-and-state-model-audit.md
+- §F66 grill: docs/_archive/v3/fast-follow/grill/f66-cascade-and-state-model-audit.md

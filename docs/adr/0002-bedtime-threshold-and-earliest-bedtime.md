@@ -76,6 +76,6 @@ they tune the floor up.
 ## References
 
 - CONTEXT.md: "bedtimeThreshold," "earliestBedtime"
-- docs/v3/fast-follow/grill/f66-cascade-and-state-model-audit.md
+- docs/_archive/v3/fast-follow/grill/f66-cascade-and-state-model-audit.md
 - Supersedes §F64. Subsumes §F66 issue #4.
 - DATA_MODEL.md / ENGINE_SPEC.md require updates to match the new semantic.
