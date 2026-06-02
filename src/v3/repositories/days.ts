@@ -237,6 +237,12 @@ export type StartNewDayInput = {
   templateId?: string;
   /** Per-event owner overrides from a promoted TomorrowPlan; engine applies at projection time. */
   ownerOverrides?: Record<string, OwnerRef | null>;
+  /**
+   * §F66 Slice 4 — recorded docs to freeze into the CLOSING (archived) day so its
+   * forecast survives in history (projections are ephemeral; see `forecastSnapshotDocs`).
+   * Written under the active day being archived; no-op when there's no active day.
+   */
+  freezeForecast?: Event[];
 };
 
 /** Deterministic day id — prevents concurrent rollover calls from creating duplicate docs. */
@@ -289,6 +295,15 @@ export async function startNewDay(
   return runTransaction(db, async (tx) => {
     if (activeDoc) {
       tx.update(activeDoc.ref, { status: "archived" });
+      // §F66 Slice 4: freeze the closing day's forecast bottles into its history,
+      // since archived days read static docs (no recompute). Deterministic ids ⇒
+      // idempotent if rollover runs twice. Skipped when there's no day to archive.
+      for (const e of input.freezeForecast ?? []) {
+        const ref = doc(db, eventsCollectionPath(childId, activeDoc.id), e.id).withConverter(
+          v3EventConverter,
+        );
+        tx.set(ref, e);
+      }
     }
     if (bedtimeToTrim) {
       tx.update(bedtimeToTrim.ref, {

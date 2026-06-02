@@ -25,8 +25,10 @@ const CELLS: Cell[] = [
   { type: "bedtime", state: "projected", expectedHasPutdown: true },
   { type: "bedtime", state: "recorded", expectedHasPutdown: true },
   { type: "bedtime", state: "completed", expectedHasPutdown: false },
-  // Bottles never have putdown.
-  { type: "bottle", state: "projected", expectedHasPutdown: false },
+  // Bottles never have putdown. (bottle, projected) is intentionally omitted:
+  // per §F66/ADR-0007 the bottle cascade RECOMPUTES projected bottles from anchors
+  // each pass (projections are never persisted — R2.2), so a seeded projected
+  // bottle is not preserved by id. Full-day projection is covered in bottles.test.ts.
   { type: "bottle", state: "recorded", expectedHasPutdown: false },
   { type: "bottle", state: "completed", expectedHasPutdown: false },
   // Extras never have putdown (no nap/bedtime semantics).

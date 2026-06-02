@@ -8,7 +8,7 @@
 
 import { useState } from "react";
 import type { Event } from "../schemas";
-import { recordedIdFor } from "../lib/eventConventions";
+import { ownerOverrideKeyFor, recordedIdForEvent } from "../lib/eventConventions";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -98,14 +98,17 @@ export function useDrawer({
         source.lifecycle.state === "projected" &&
         isOwnerOnlyEdit(source, event)
       ) {
-        await setOwnerOverride(event.eventKey, event.owner);
+        // Bottles key the override by chronological position (§F66 / ADR-0007);
+        // naps/wake/bedtime key by their stable eventKey.
+        await setOwnerOverride(ownerOverrideKeyFor(event), event.owner);
         setDrawer({ open: false });
         return;
       }
       if (!isActual) {
         // Projected with time/amount/label change: re-ID deterministically so
-        // subsequent edits route through update rather than create.
-        await saveEvent({ ...event, id: recordedIdFor(event.eventKey) });
+        // subsequent edits route through update rather than create. ADR-0007:
+        // bottles key off startTime (renumber-independent), naps/bedtime off eventKey.
+        await saveEvent({ ...event, id: recordedIdForEvent(event) });
       } else {
         await saveEvent(event);
       }

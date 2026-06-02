@@ -185,87 +185,30 @@ const RuleSequentialBottleCascade: Rule = {
   produces: (events, ctx) => projectBottleChain(events, ctx),
 };
 
-/**
- * True when the cascade could emit more bottles: cold-start (count < bottlesPerDay)
- * or anchored (latest bottle's next interval fits before cap), or stale projections
- * need trimming.
- */
-function canCascade(events: Event[], ctx: Context): boolean {
+type CascadeInputs = {
+  wakeTime: number;
+  cap: number;
+  seedTime: number;
+  /** Recorded chain bottles in [wakeTime, cap), sorted ascending. */
+  anchors: Event[];
+  snap: (proposed: number) => number;
+};
+
+/** Shared setup so canCascade + projectBottleChain compute the identical schedule. */
+function bottleCascadeInputs(events: Event[], ctx: Context): CascadeInputs | null {
   const wakeTime = ctx.day.wakeTime;
-  if (wakeTime === undefined) return false;
-  const bottles = events.filter(isBottle);
-  const cap = forwardCapFor(events);
-
-  // Trimming: projected bottles outside [wakeTime, cap) are stale pass-1 results.
-  // Dream-feed lives outside cap by design and is preserved.
-  const needsTrim = bottles.some(
-    (b) => isProjected(b) && !isDreamFeed(b) && (b.startTime < wakeTime || b.startTime >= cap),
-  );
-  if (needsTrim) return true;
-
-  // Chain bottles: in-window, excluding dream-feed (sentinel, not a rhythm member).
-  const chainBottles = bottles
-    .filter((b) => !isDreamFeed(b) && b.startTime >= wakeTime && b.startTime < cap)
-    .sort((a, b) => a.startTime - b.startTime);
-  const anchors = chainBottles.filter((b) => !isProjected(b));
-  const target = ctx.settings.bottleChain.bottlesPerDay;
-
-  if (anchors.length === 0) {
-    // Cold-start: compare against chain (not total) — overnight bottles don't consume daytime slots.
-    return chainBottles.length < target;
-  }
-
-  // Anchored: check if cascade could extend forward (forward-only; no backfill).
-  const defaultInterval = ctx.settings.defaultBottleIntervalMinutes;
-  const rules = ctx.settings.bottleIntervalRules;
-  const latest = chainBottles[chainBottles.length - 1]!;
-  const forwardInterval = intervalForAmount(rules, latest.amountOz, defaultInterval);
-  return forwardInterval > 0 && latest.startTime + forwardInterval < cap;
-}
-
-function projectBottleChain(events: Event[], ctx: Context): Event[] {
-  const wakeTime = ctx.day.wakeTime;
-  if (wakeTime === undefined) return events;
-
-  const target = ctx.settings.bottleChain.bottlesPerDay;
+  if (wakeTime === undefined) return null;
   const cap = forwardCapFor(events);
   const wakeBuffer = wakeTime + ctx.settings.bottleChain.bufferAfterWakeMinutes;
   const defaultInterval = ctx.settings.defaultBottleIntervalMinutes;
   const rules = ctx.settings.bottleIntervalRules;
-
-  // Trim projected bottles outside [wakeTime, cap); recorded bottles are never trimmed.
-  const trimmedEvents = events.filter((e) => {
-    if (!isBottle(e)) return true;
-    if (!isProjected(e)) return true;
-    if (isDreamFeed(e)) return true; // lives outside cap by design
-    return e.startTime >= wakeTime && e.startTime < cap;
-  });
-
-  const bottles = trimmedEvents.filter(isBottle);
-  const regions = napRegions(trimmedEvents);
-
-  // Chain bottles: in-window, excluding dream-feed.
-  const chainBottles = bottles
-    .filter((b) => !isDreamFeed(b) && b.startTime >= wakeTime && b.startTime < cap)
-    .sort((a, b) => a.startTime - b.startTime);
-  const anchors = chainBottles.filter((b) => !isProjected(b));
-  const isAnchored = anchors.length > 0;
-
-  // Stable initial key index per pass; R5.4 renumbers the final set.
-  const maxIndex = bottles.reduce((m, b) => {
-    const idx = bottleIndexFromKey(b.eventKey);
-    return idx !== null ? Math.max(m, idx) : m;
-  }, 0);
-
-  let nextIndex = maxIndex + 1;
-  const projections: Event[] = [];
-  let chainCount = chainBottles.length; // count chain only; overnight bottles don't consume daytime slots
+  const regions = napRegions(events);
 
   const snap = (proposed: number) => {
     const noNap = snapOutOfNap(proposed, regions, ctx.nowMinutes);
     const withPutdown = snapToPutdown(
       noNap,
-      trimmedEvents,
+      events,
       ctx.settings.putdownLeadMinutes,
       ctx.settings.defaultNapLengthMinutes,
       ctx.nowMinutes,
@@ -274,60 +217,133 @@ function projectBottleChain(events: Event[], ctx: Context): Event[] {
     return snapForwardToNapEnd(outOfNap, regions, ctx.settings.putdownLeadMinutes, ctx.nowMinutes);
   };
 
-  // Cold-start cap applies only when there are no morning anchors; once anchored,
-  // the cascade runs to bedtime/midnight regardless of bottlesPerDay.
-  const reachedColdStartCap = () => !isAnchored && chainCount >= target;
-
-  // Overnight-near-wake guard: if an overnight bottle's forward interval
-  // extends past wake+buffer, seed the cold-start cascade from that later time.
-  const overnightAnchors = bottles
-    .filter((b) => !isProjected(b) && b.startTime < wakeTime)
+  const anchors = events
+    .filter(
+      (b) =>
+        isBottle(b) &&
+        !isProjected(b) &&
+        !isDreamFeed(b) &&
+        b.startTime >= wakeTime &&
+        b.startTime < cap,
+    )
     .sort((a, b) => a.startTime - b.startTime);
-  const latestOvernight = overnightAnchors.at(-1);
-  const overnightProposedSeed =
-    latestOvernight !== undefined
-      ? latestOvernight.startTime +
-        intervalForAmount(rules, latestOvernight.amountOz, defaultInterval)
+
+  // Overnight-near-wake guard (§F54): if an overnight bottle's forward interval
+  // extends past wake+buffer, seed the cascade from that later time instead.
+  const overnight = events
+    .filter((b) => isBottle(b) && !isProjected(b) && b.startTime < wakeTime)
+    .sort((a, b) => a.startTime - b.startTime)
+    .at(-1);
+  const overnightSeed =
+    overnight !== undefined
+      ? overnight.startTime + intervalForAmount(rules, overnight.amountOz, defaultInterval)
       : undefined;
   const seedTime =
-    overnightProposedSeed !== undefined && overnightProposedSeed > wakeBuffer
-      ? overnightProposedSeed
-      : wakeBuffer;
+    overnightSeed !== undefined && overnightSeed > wakeBuffer ? overnightSeed : wakeBuffer;
 
-  // Forward cascade from the latest chain bottle; subsequent passes extend rather than re-emit.
-  let prev: Event;
-  if (chainBottles.length > 0) {
-    prev = chainBottles[chainBottles.length - 1]!;
-  } else {
-    // Cold start: seed at seedTime (wake+buffer, shifted by overnight guard).
-    if (reachedColdStartCap()) return [...trimmedEvents, ...projections];
-    if (seedTime >= cap) return [...trimmedEvents, ...projections];
-    const seed = snap(seedTime);
-    if (seed >= cap) return [...trimmedEvents, ...projections];
-    // Snap pushed seed before wakeTime (nap straddles wake-buffer); refuse to avoid trim loop.
-    if (seed < wakeTime) return [...trimmedEvents, ...projections];
-    const firstProj = buildProjectedBottle(ctx, nextIndex++, seed);
-    projections.push(firstProj);
-    chainCount++;
-    prev = firstProj;
+  return { wakeTime, cap, seedTime, anchors, snap };
+}
+
+/**
+ * Full-day projected bottle TIMES: walk wake+buffer → cap at cadence. When the
+ * cursor reaches a recorded bottle, the cascade RE-SEEDS forward from it (R5.1) —
+ * but recorded bottles never absorb/replace a forecast slot (ENGINE_SPEC §R5.1/5.9):
+ * they are independent reality that re-cascades the forecast forward and keeps its
+ * own chronological number. Earlier forecast slots survive. Recorded anchors are
+ * NOT returned — only projection times. Deterministic in (anchors, settings) ⇒
+ * idempotent across evaluator passes. Fills the whole day (no bottlesPerDay cap),
+ * so morning forecasts survive a later recorded bottle (§F66, no persist-on-view).
+ */
+function computeBottleProjectionTimes(inputs: CascadeInputs, ctx: Context): number[] {
+  const { wakeTime, cap, seedTime, anchors, snap } = inputs;
+  const defaultInterval = ctx.settings.defaultBottleIntervalMinutes;
+  const rules = ctx.settings.bottleIntervalRules;
+  // Projections carry the default amount, so they advance by the default amount's
+  // interval (which the rules may shorten/lengthen) — not the raw default minutes.
+  const projInterval = intervalForAmount(
+    rules,
+    ctx.settings.defaultBottleAmountOz,
+    defaultInterval,
+  );
+
+  // The cursor has reached this recorded bottle → re-seed the forecast forward from
+  // it. NO look-ahead absorption: a recorded feed never deletes an earlier forecast
+  // slot (ENGINE_SPEC §R5.1/5.9 — the #300 absorption window was a rejected deviation).
+  const anchorReached = (t: number, anchor: Event | undefined): boolean =>
+    anchor !== undefined && anchor.startTime <= t;
+
+  const times: number[] = [];
+  let cursor = seedTime;
+  let anchorIdx = 0;
+  let lastPlaced = wakeTime - 1;
+  for (let guard = 0; cursor < cap && guard < 64; guard++) {
+    const anchor = anchors[anchorIdx];
+    // anchorReached true ⇒ anchor is defined (the `!` below is safe).
+    if (anchorReached(cursor, anchor)) {
+      cursor = anchor!.startTime + intervalForAmount(rules, anchor!.amountOz, defaultInterval);
+      lastPlaced = anchor!.startTime;
+      anchorIdx++;
+      continue;
+    }
+    const placed = snap(cursor);
+    if (placed >= cap || placed < wakeTime || placed <= lastPlaced) break;
+    if (anchorReached(placed, anchor)) {
+      cursor = anchor!.startTime + intervalForAmount(rules, anchor!.amountOz, defaultInterval);
+      lastPlaced = anchor!.startTime;
+      anchorIdx++;
+      continue;
+    }
+    times.push(placed);
+    lastPlaced = placed;
+    cursor = placed + projInterval;
   }
+  return times;
+}
 
-  while (true) {
-    if (reachedColdStartCap()) break;
-    const interval = intervalForAmount(rules, prev.amountOz, defaultInterval);
-    if (interval <= 0) break; // malformed rules; guard against infinite loop
-    const proposed = prev.startTime + interval;
-    if (proposed >= cap) break; // bedtime / midnight cap
-    const placed = snap(proposed);
-    if (placed >= cap) break;
-    if (placed <= prev.startTime) break; // strict-monotonic guard against pathological snap loops
-    const projection = buildProjectedBottle(ctx, nextIndex++, placed);
-    projections.push(projection);
-    chainCount++;
-    prev = projection;
-  }
+/**
+ * Fires when materialized bottle projections differ from the full-day schedule
+ * (something to add, remove, or re-place); false at the fixed point.
+ */
+function canCascade(events: Event[], ctx: Context): boolean {
+  const inputs = bottleCascadeInputs(events, ctx);
+  if (inputs === null) return false;
+  const { wakeTime, cap } = inputs;
+  // Any projected non-dream bottle outside the window is stale → recompute.
+  const hasStale = events.some(
+    (b) =>
+      isBottle(b) &&
+      isProjected(b) &&
+      !isDreamFeed(b) &&
+      (b.startTime < wakeTime || b.startTime >= cap),
+  );
+  if (hasStale) return true;
+  const want = computeBottleProjectionTimes(inputs, ctx).sort((a, b) => a - b);
+  const current = events
+    .filter((b) => isBottle(b) && isProjected(b) && !isDreamFeed(b))
+    .map((b) => b.startTime)
+    .sort((a, b) => a - b);
+  if (current.length !== want.length) return true;
+  return current.some((t, i) => t !== want[i]);
+}
 
-  return [...trimmedEvents, ...projections];
+function projectBottleChain(events: Event[], ctx: Context): Event[] {
+  const inputs = bottleCascadeInputs(events, ctx);
+  if (inputs === null) return events;
+
+  // Recompute ALL projected non-dream bottles from the anchors (pure ⇒ idempotent).
+  // Recorded bottles, dream-feed, and non-bottle events pass through untouched.
+  const kept = events.filter((e) => !(isBottle(e) && isProjected(e) && !isDreamFeed(e)));
+  const times = computeBottleProjectionTimes(inputs, ctx);
+
+  // Stable initial key index; R5.4 renumbers the final set chronologically.
+  const maxIndex = kept.filter(isBottle).reduce((m, b) => {
+    const idx = bottleIndexFromKey(b.eventKey);
+    return idx !== null ? Math.max(m, idx) : m;
+  }, 0);
+  let nextIndex = maxIndex + 1;
+
+  const projections = times.map((t) => buildProjectedBottle(ctx, nextIndex++, t));
+  return [...kept, ...projections];
 }
 
 // ---------------------------------------------------------------------------

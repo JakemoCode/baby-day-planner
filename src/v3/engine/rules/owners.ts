@@ -14,6 +14,7 @@ import {
 } from "../../schemas";
 import type { Rule } from "../evaluator";
 import { hasType, isBedtime, isProjected } from "../helpers";
+import { bottlePositionFromLabel, ownerOverrideKeyFor } from "../../lib/eventConventions";
 
 /** Build a rule that stamps template owner[N-1] onto projected events of the given type. */
 function templateOwnerByIndexRule(spec: {
@@ -23,8 +24,16 @@ function templateOwnerByIndexRule(spec: {
   type: Event["type"];
   keyPrefix: string;
   ownerList: (t: OwnershipTemplate) => OwnerSlotEntry[] | undefined;
+  /**
+   * 1-based slot index for an event. Defaults to parsing the eventKey suffix
+   * (naps/wake_windows — their keys don't renumber). Bottles override this to
+   * read chronological position, since their eventKey slot ≠ clock position
+   * once the full-day cascade places projections before recorded anchors (§F66).
+   */
+  indexOf?: (event: Event) => number | null;
 }): Rule {
   const isType = hasType(spec.type);
+  const indexOf = spec.indexOf ?? ((e: Event) => indexFromKey(e.eventKey, spec.keyPrefix));
 
   function ownersFor(template: OwnershipTemplate | undefined): OwnerSlotEntry[] | undefined {
     if (!template) return undefined;
@@ -33,8 +42,9 @@ function templateOwnerByIndexRule(spec: {
   }
 
   function isStampable(event: Event, overrides: Record<string, unknown> | undefined): boolean {
-    // Skip eventKeys claimed by R12.10 (any value, including null) to avoid stamp→override→stamp cycles.
-    if (overrides && Object.hasOwn(overrides, event.eventKey)) return false;
+    // Skip slots claimed by R12.10 (any value, including null) to avoid stamp→override→stamp cycles.
+    // Keyed via ownerOverrideKeyFor so bottle positional overrides are honored.
+    if (overrides && Object.hasOwn(overrides, ownerOverrideKeyFor(event))) return false;
     return isType(event) && isProjected(event) && isNoOwner(event.owner);
   }
 
@@ -48,7 +58,7 @@ function templateOwnerByIndexRule(spec: {
       const overrides = ctx.day.ownerOverrides;
       return events.some((e) => {
         if (!isStampable(e, overrides)) return false;
-        const idx = indexFromKey(e.eventKey, spec.keyPrefix);
+        const idx = indexOf(e);
         return idx !== null && idx <= owners.length;
       });
     },
@@ -58,7 +68,7 @@ function templateOwnerByIndexRule(spec: {
       const overrides = ctx.day.ownerOverrides;
       return events.map((e) => {
         if (!isStampable(e, overrides)) return e;
-        const idx = indexFromKey(e.eventKey, spec.keyPrefix);
+        const idx = indexOf(e);
         if (idx === null) return e;
         const owner = owners[idx - 1];
         return owner ? { ...e, owner } : e;
@@ -91,11 +101,13 @@ const RuleApplyTemplateWakeWindowOwners = templateOwnerByIndexRule({
 
 const RuleApplyTemplateBottleOwners = templateOwnerByIndexRule({
   id: "R12.6",
-  description: "Stamp template.bottleOwners[N-1] onto projected bottles in chronological order",
-  dependsOn: ["R5.4"], // R5.4 must renumber before index→owner mapping
+  description: "Stamp template.bottleOwners[N-1] onto projected bottles by chronological position",
+  dependsOn: ["R5.4"], // R5.4 must renumber (set chronological labels) before index→owner mapping
   type: "bottle",
   keyPrefix: "bottle_",
   ownerList: (t) => t.bottleOwners,
+  // §F66: slot eventKey ≠ clock position under the full-day cascade — use the label position.
+  indexOf: (e) => bottlePositionFromLabel(e.label),
 });
 
 // ---------------------------------------------------------------------------
@@ -156,15 +168,16 @@ const RuleApplyDayOwnerOverrides: Rule = {
   matches: (events, ctx) => {
     const map = ctx.day.ownerOverrides;
     if (!map) return false;
-    return events.some((e) => isProjected(e) && Object.hasOwn(map, e.eventKey));
+    return events.some((e) => isProjected(e) && Object.hasOwn(map, ownerOverrideKeyFor(e)));
   },
   produces: (events, ctx) => {
     const map = ctx.day.ownerOverrides;
     if (!map) return events;
     return events.map((e) => {
       if (!isProjected(e)) return e;
-      if (!Object.hasOwn(map, e.eventKey)) return e;
-      const override = map[e.eventKey];
+      const key = ownerOverrideKeyFor(e);
+      if (!Object.hasOwn(map, key)) return e;
+      const override = map[key];
       return { ...e, owner: override ?? NO_OWNER };
     });
   },

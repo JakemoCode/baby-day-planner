@@ -72,9 +72,10 @@ describe("useV3Projection — engine wiring (real projectDay)", () => {
 
     // Bottle 3 naive position 13:10 falls inside nap_2's putdown window;
     // R5.6 nudges it to the after-edge 13:30.
+    // §F66: the chain fills the whole day; assert the documented prefix incl the
+    // R5.6-displaced 3rd bottle.
     const bottles = events.filter((e) => e.type === "bottle");
-    expect(bottles).toHaveLength(3);
-    expect(bottles.map((b) => b.startTime)).toEqual([
+    expect(bottles.slice(0, 3).map((b) => b.startTime)).toEqual([
       7 * 60 + 10, // 7:10
       7 * 60 + 10 + 180, // 10:10
       13 * 60 + 30, // 13:30, R5.6-displaced

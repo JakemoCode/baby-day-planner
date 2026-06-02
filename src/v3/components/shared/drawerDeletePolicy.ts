@@ -2,7 +2,12 @@
 
 import type { Event } from "../../schemas";
 import { isRecorded } from "../../schemas";
-import { isDreamFeed, isEngineEmittedId, recordedIdFor } from "../../lib/eventConventions";
+import {
+  isDreamFeed,
+  isEngineEmittedId,
+  isRecordedBottleId,
+  recordedIdFor,
+} from "../../lib/eventConventions";
 
 /** True when the destructive action routes to a per-day suppression rather than a Firestore delete. */
 export function hasSuppressionDelete(event: Event): boolean {
@@ -40,12 +45,16 @@ export function drawerDestructiveAction(
   // Engine-emitted ids have no persisted doc — acting would be a visual no-op.
   if (isEngineEmittedId(event.id)) return "none";
   if (!isRecorded(event.lifecycle)) return "none";
-  // A recorded rhythm slot uses the deterministic `recorded_<eventKey>` doc id;
-  // deleting it re-projects the slot, so the action is a reset, not a delete.
+  // A recorded rhythm slot uses its deterministic doc id (ADR-0007); deleting it
+  // re-projects the slot, so the action is a reset, not a delete.
   // (§F71 — nap/bottle/bedtime; extra/pump and uuid-id one-offs delete.)
+  // Bottles match the recorded_bottle_t* PATTERN, not a startTime-derived id: a
+  // time-edited recorded bottle keeps its frozen id while startTime moves (§F66),
+  // so re-deriving from the live startTime would mis-classify it as delete.
   const isRhythmSlot =
-    (event.type === "nap" || event.type === "bottle" || event.type === "bedtime") &&
-    event.id === recordedIdFor(event.eventKey);
+    ((event.type === "nap" || event.type === "bedtime") &&
+      event.id === recordedIdFor(event.eventKey)) ||
+    (event.type === "bottle" && isRecordedBottleId(event.id));
   return isRhythmSlot ? "reset" : "delete";
 }
 

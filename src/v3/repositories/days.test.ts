@@ -14,6 +14,7 @@ import {
 import type { Day, Event } from "../schemas";
 import { NO_OWNER } from "../schemas";
 import { createEvent, listEvents } from "./events";
+import { forecastSnapshotDocs } from "../lib/forecastSnapshot";
 import {
   archiveDay,
   createDay,
@@ -342,6 +343,38 @@ describe("v3 days repository", () => {
     // V3 schema doesn't carry archivedAt or createdAt — confirm absent
     expect("archivedAt" in (got as object)).toBe(false);
     expect("createdAt" in (got as object)).toBe(false);
+  });
+
+  it("freezes the closing day's forecast bottles into its history (§F66 Slice 4)", async () => {
+    const database = db();
+    await createDay(database, day({ id: "day-yesterday", date: "2026-05-08" }));
+    // A projected (engine-emitted, never-persisted) bottle from yesterday's forecast.
+    const forecastBottle: Event = {
+      id: "proj_bottle_t430",
+      dayId: "day-yesterday",
+      eventKey: "bottle_1",
+      type: "bottle",
+      kind: "instant",
+      startTime: 430,
+      label: "Bottle 1",
+      hasPutdown: false,
+      owner: NO_OWNER,
+      lifecycle: { state: "projected" },
+    };
+
+    await startNewDay(database, "child-1", {
+      newDayId: "day-today",
+      newDate: "2026-05-09",
+      newWakeTime: 7 * 60,
+      freezeForecast: forecastSnapshotDocs([forecastBottle], "day-yesterday"),
+    });
+
+    // The archived day now carries the forecast bottle as a recorded doc (history survives).
+    const events = await listEvents(database, "child-1", "day-yesterday");
+    const bottle = events.find((e) => e.type === "bottle");
+    expect(bottle).toBeDefined();
+    expect(bottle!.id).toBe("recorded_bottle_t430");
+    expect(bottle!.lifecycle.state).toBe("recorded");
   });
 
   it("startNewDay archives the previous active day in the same call", async () => {
