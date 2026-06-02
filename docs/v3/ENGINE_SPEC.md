@@ -421,8 +421,8 @@ the *latest* recorded bottle's startTime per R5.1. Earlier placeholder
 projections survive — a recorded bottle never absorbs an earlier
 forecast slot (R5.9, §F66).
 
-Reality routinely exceeds any nominal daily count; additional bottles
-are added via FAB or via the cascade once recordings start.
+Babies commonly feed more often than any preset cadence; additional
+bottles are added via FAB or via the cascade once recordings start.
 
 - **Why**: Jake wants the timeline to show the day's expected cadence
   at a glance, without prescribing a ceiling that's wrong for newborns.

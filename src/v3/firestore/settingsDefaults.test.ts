@@ -188,7 +188,7 @@ describe("withV3SettingsDefaults", () => {
         other: [],
       },
     })!;
-    expect(out.bottleChain.bufferAfterWakeMinutes).toBe(20);
+    expect(out.bottleChain).toEqual({ bufferAfterWakeMinutes: 20 });
     expect(out.owners.parent1.displayName).toBe("Jake");
   });
 

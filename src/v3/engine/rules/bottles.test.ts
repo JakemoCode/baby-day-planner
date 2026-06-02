@@ -45,8 +45,8 @@ describe("R5.11 — placeholder projection when no bottle has been recorded", ()
 
     const bottles = out.filter((e) => e.type === "bottle");
     // §F66: cold-start fills the whole day to the cap (here midnight — no bedtime
-    // rule in this isolated set), identical to the anchored chain. The count
-    // no longer caps the count.
+    // rule in this isolated set), identical to the anchored chain. The cascade is
+    // purely interval-driven; there is no count cap.
     expect(bottles.map((b) => b.startTime)).toEqual([
       7 * 60 + 10, // 7:10
       10 * 60 + 10, // 10:10
