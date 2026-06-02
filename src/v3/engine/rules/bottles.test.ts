@@ -283,6 +283,94 @@ describe("§F66 PR1 — full-day cascade: morning bottles survive a recorded aft
   });
 });
 
+describe("§F66 PR2 — recorded cluster feeds both survive (reality wins)", () => {
+  it("two recorded bottles closer than one interval are both kept (neither absorbed)", () => {
+    // Cluster: 10:00 and 10:20, well inside the 180-min cadence. Both are reality —
+    // the cascade must not collapse them into one nor drop the second.
+    const first = aRecordedBottle({
+      id: "recorded_bottle_t600",
+      eventKey: "bottle_1",
+      start: 10 * 60,
+      lifecycle: { state: "recorded", annotatedAt: 10 * 60 },
+    });
+    const second = aRecordedBottle({
+      id: "recorded_bottle_t620",
+      eventKey: "bottle_2",
+      start: 10 * 60 + 20,
+      lifecycle: { state: "recorded", annotatedAt: 10 * 60 + 20 },
+    });
+
+    const out = projectDay(
+      {
+        day: aDay({ wakeTime: 7 * 60 }),
+        settings: aSettings({
+          bottleChain: { bottlesPerDay: 4, bufferAfterWakeMinutes: 10 },
+          defaultBottleIntervalMinutes: 180,
+          wakeWindowsMinutes: [],
+          bedtimeThreshold: 23 * 60,
+        }),
+        actuals: [first, second],
+        nowMinutes: 11 * 60,
+      },
+      { rules: ALL },
+    );
+
+    const recordedTimes = out
+      .filter((e) => e.type === "bottle" && e.lifecycle.state !== "projected")
+      .map((b) => b.startTime);
+    expect(recordedTimes).toContain(10 * 60);
+    expect(recordedTimes).toContain(10 * 60 + 20);
+  });
+});
+
+describe("§F66 PR2 — bottle-volume invariant", () => {
+  it("total volume = Σ recorded amounts + (projected count × default)", () => {
+    const DEFAULT = 5;
+    const recorded = [
+      aRecordedBottle({
+        id: "recorded_bottle_t450",
+        eventKey: "bottle_1",
+        start: 7 * 60 + 30,
+        amountOz: 4,
+        lifecycle: { state: "recorded", annotatedAt: 7 * 60 + 30 },
+      }),
+      aRecordedBottle({
+        id: "recorded_bottle_t630",
+        eventKey: "bottle_2",
+        start: 10 * 60 + 30,
+        amountOz: 6,
+        lifecycle: { state: "recorded", annotatedAt: 10 * 60 + 30 },
+      }),
+    ];
+
+    const out = projectDay(
+      {
+        day: aDay({ wakeTime: 7 * 60 }),
+        settings: aSettings({
+          bottleChain: { bottlesPerDay: 5, bufferAfterWakeMinutes: 10 },
+          defaultBottleIntervalMinutes: 180,
+          defaultBottleAmountOz: DEFAULT,
+          wakeWindowsMinutes: [],
+          bedtimeThreshold: 23 * 60,
+        }),
+        actuals: recorded,
+        nowMinutes: 11 * 60,
+      },
+      { rules: ALL },
+    );
+
+    const bottles = out.filter((e) => e.type === "bottle");
+    const projectedCount = bottles.filter((b) => b.lifecycle.state === "projected").length;
+    const total = bottles.reduce((sum, b) => sum + (b.amountOz ?? 0), 0);
+
+    // Every projected bottle carries the default; recorded carry their real amount.
+    bottles
+      .filter((b) => b.lifecycle.state === "projected")
+      .forEach((b) => expect(b.amountOz).toBe(DEFAULT));
+    expect(total).toBe(4 + 6 + projectedCount * DEFAULT);
+  });
+});
+
 describe("Sequential cascade — bottle landing in nap snaps to putdown.startTime (PR 3c)", () => {
   it("a projected bottle landing inside nap_1 snaps to nap.start - putdownLead (the start of putdown)", () => {
     // bottle_2 proposed at 10:15, inside nap_1 [10:00, 11:00]:

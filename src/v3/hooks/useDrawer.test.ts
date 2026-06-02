@@ -236,8 +236,15 @@ describe("useDrawer", () => {
     expect(result.current.drawer).toEqual({ open: false });
   });
 
-  it("projected event re-ID uses eventKey from the event passed to onSave", async () => {
-    const projected = makeEvent({ id: "proj-bottle-3", eventKey: "bottle_3" });
+  it("projected BOTTLE re-IDs to recorded_bottle_t<startTime> (renumber-independent, §F66)", async () => {
+    const projected = makeEvent({
+      id: "proj_bottle_t600",
+      type: "bottle",
+      kind: "instant",
+      eventKey: "bottle_3", // renumbering slot — must NOT key the doc id
+      label: "Bottle 2",
+      startTime: 10 * 60,
+    });
     const saveEvent = makeSaveEvent();
     const { result } = setup({ actuals: [], saveEvent });
 
@@ -247,7 +254,7 @@ describe("useDrawer", () => {
       await result.current.onSave(projected);
     });
 
-    expect(saveEvent).toHaveBeenCalledWith(expect.objectContaining({ id: "recorded_bottle_3" }));
+    expect(saveEvent).toHaveBeenCalledWith(expect.objectContaining({ id: "recorded_bottle_t600" }));
   });
 
   // owner-only edit on projected event must route to setOwnerOverride, not saveEvent.
@@ -270,6 +277,32 @@ describe("useDrawer", () => {
     expect(setOwnerOverride).toHaveBeenCalledWith("nap_3", newOwner);
     expect(saveEvent).not.toHaveBeenCalled();
     expect(result.current.drawer).toEqual({ open: false });
+  });
+
+  // §F66: a bottle owner-only edit keys the per-day override by chronological
+  // position (from the label), not the renumbering eventKey slot.
+  it("owner-only edit on a projected BOTTLE routes to setOwnerOverride with the positional key", async () => {
+    const projected = makeEvent({
+      id: "proj_bottle_t600",
+      type: "bottle",
+      kind: "instant",
+      eventKey: "bottle_3",
+      label: "Bottle 2",
+      startTime: 10 * 60,
+    });
+    const saveEvent = makeSaveEvent();
+    const setOwnerOverride = makeSetOwnerOverride();
+    const { result } = setup({ actuals: [], saveEvent, setOwnerOverride });
+
+    act(() => result.current.openEdit(projected));
+
+    const newOwner = { slot: "parent2" as const };
+    await act(async () => {
+      await result.current.onSave({ ...projected, owner: newOwner });
+    });
+
+    expect(setOwnerOverride).toHaveBeenCalledWith("bottle_pos_2", newOwner);
+    expect(saveEvent).not.toHaveBeenCalled();
   });
 
   // §F72: a daily_recurring owner edit must be per-DAY (Day.ownerOverrides), never a

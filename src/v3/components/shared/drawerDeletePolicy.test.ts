@@ -9,7 +9,7 @@ import {
 
 function ev(overrides: Partial<Event> = {}): Event {
   return {
-    id: "recorded_bottle_1",
+    id: "recorded_bottle_t480",
     dayId: "day-1",
     eventKey: "bottle_1",
     type: "bottle",
@@ -114,8 +114,9 @@ describe("drawerDestructiveAction", () => {
       drawerDestructiveAction(
         ev({
           type: "bottle",
-          id: "recorded_bottle_1",
+          id: "recorded_bottle_t480",
           eventKey: "bottle_1",
+          startTime: 480,
           lifecycle: recorded(480),
         }),
         opts,
@@ -128,8 +129,9 @@ describe("drawerDestructiveAction", () => {
       drawerDestructiveAction(
         ev({
           type: "bottle",
-          id: "recorded_bottle_2",
+          id: "recorded_bottle_t500",
           eventKey: "bottle_2",
+          startTime: 500,
           lifecycle: completed(500),
         }),
         opts,

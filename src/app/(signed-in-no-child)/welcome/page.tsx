@@ -20,6 +20,7 @@ import { BottomSheet } from "@/components/shared/BottomSheet";
 import { NO_OWNER, isNoOwner } from "@/v3/schemas";
 import type { Day, Event, OwnerRef, Settings } from "@/v3/schemas";
 import { currentLocalDate } from "@/v3/ui/time";
+import { ownerOverrideKeyFor } from "@/v3/lib/eventConventions";
 import styles from "./page.module.css";
 
 type Step = 1 | 2 | 3;
@@ -95,16 +96,17 @@ export default function WelcomePage() {
   }, [previewSettings, ownerOverrides]);
 
   const handleOwnerOverrideChange = (event: Event, owner: OwnerRef | undefined) => {
+    const key = ownerOverrideKeyFor(event); // bottles → positional key (§F66)
     if (owner === undefined || isNoOwner(owner)) {
-      setOwnerOverrides((prev) => ({ ...prev, [event.eventKey]: null }));
+      setOwnerOverrides((prev) => ({ ...prev, [key]: null }));
     } else {
-      setOwnerOverrides((prev) => ({ ...prev, [event.eventKey]: owner }));
+      setOwnerOverrides((prev) => ({ ...prev, [key]: owner }));
     }
     setPickedEvent(null);
   };
 
   const ownerForPicked = (event: Event): OwnerRef => {
-    const override = ownerOverrides[event.eventKey];
+    const override = ownerOverrides[ownerOverrideKeyFor(event)];
     if (override !== undefined) return override ?? NO_OWNER;
     return event.owner ?? NO_OWNER;
   };

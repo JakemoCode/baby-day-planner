@@ -818,7 +818,7 @@ describe("EventEditDrawerV3", () => {
   it("Reset routes through onDelete after the 'Reset to projected time?' confirm", async () => {
     const onDelete = vi.fn();
     const recordedBottle = projectedBottle({
-      id: "recorded_bottle_2",
+      id: "recorded_bottle_t600",
       eventKey: "bottle_2",
       startTime: 10 * 60,
       lifecycle: { state: "recorded", annotatedAt: 10 * 60 },
@@ -841,7 +841,7 @@ describe("EventEditDrawerV3", () => {
     const dialog = screen.getByRole("dialog", { name: "Reset to projected time?" });
     await userEvent.click(within(dialog).getByRole("button", { name: "Reset" }));
     expect(onDelete).toHaveBeenCalledTimes(1);
-    expect(onDelete.mock.calls[0]![0]).toMatchObject({ id: "recorded_bottle_2" });
+    expect(onDelete.mock.calls[0]![0]).toMatchObject({ id: "recorded_bottle_t600" });
   });
 
   it("delete button is SHOWN for a recorded bottle when annotatedAt !== startTime", () => {
