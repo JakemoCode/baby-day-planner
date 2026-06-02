@@ -151,7 +151,7 @@ export function aSettings(overrides: Partial<Settings> = {}): Settings {
     defaultBottleIntervalMinutes: 180,
     bottleRules: [{ minWeeks: 0, amountOz: 5 }],
     bottleIntervalRules: [],
-    bottleChain: { bottlesPerDay: 4, bufferAfterWakeMinutes: 10 },
+    bottleChain: { bufferAfterWakeMinutes: 10 },
     minBottleIntervalMinutes: 20,
     putdownLeadMinutes: 15,
     pumpTimes: [{ time: 10 * 60 + 30 }, { time: 14 * 60 + 30 }],

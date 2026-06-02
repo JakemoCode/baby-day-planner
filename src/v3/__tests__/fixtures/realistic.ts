@@ -54,7 +54,7 @@ export const v3SettingsDoc: Record<string, unknown> = {
   defaultBottleIntervalMinutes: 180,
   bottleRules: [],
   bottleIntervalRules: [],
-  bottleChain: { bottlesPerDay: 5, bufferAfterWakeMinutes: 10 },
+  bottleChain: { bufferAfterWakeMinutes: 10 },
   minBottleIntervalMinutes: 90,
   putdownLeadMinutes: 15,
   pumpTimes: [{ time: 10 * 60 + 30 }, { time: 14 * 60 + 30 }], // PumpSession[]
@@ -110,7 +110,7 @@ export const mixedSettingsDoc: Record<string, unknown> = {
     minMinutesAfterBedtime: 90,
   },
   // V3 fields wrote on top:
-  bottleChain: { bottlesPerDay: 5, bufferAfterWakeMinutes: 10 },
+  bottleChain: { bufferAfterWakeMinutes: 10 },
 };
 
 // ---------------------------------------------------------------------------

@@ -254,8 +254,8 @@ function bottleCascadeInputs(events: Event[], ctx: Context): CascadeInputs | nul
  * it absorbs the imminent slot it realized so editing a forecast moves it rather
  * than duplicating it. Recorded anchors are
  * NOT returned — only projection times. Deterministic in (anchors, settings) ⇒
- * idempotent across evaluator passes. Fills the whole day (no bottlesPerDay cap),
- * so morning forecasts survive a later recorded bottle (§F66, no persist-on-view).
+ * idempotent across evaluator passes. Fills the whole day to the time cap (no
+ * count cap), so morning forecasts survive a later recorded bottle (§F66, no persist-on-view).
  */
 function computeBottleProjectionTimes(inputs: CascadeInputs, ctx: Context): number[] {
   const { wakeTime, cap, seedTime, anchors, snap } = inputs;

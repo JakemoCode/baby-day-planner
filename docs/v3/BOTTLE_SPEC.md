@@ -14,20 +14,26 @@ Born when the step-back rule fired on a three-bug chain (2026-06-01 → 06-02):
    to the time cap; persisting-on-view flipped the day cold-start→anchored mid-view
    (fixed: cold-start now fills to the cap too, commit `81e2554`).
 3. **FAB-add relocates a feed** — logging a bottle at 6:25 made it *absorb* the 4:10
-   forecast (the absorption window is one full interval wide). **Open.**
+   forecast (the absorption window was one full interval wide). **Fixed in #303** by
+   removing absorption entirely: recorded bottles re-cascade forward, never absorb a
+   forecast slot.
 
-All three trace to **two mechanisms doing too much** (§2). The collapse is in §3;
-the rebuild sequence is §5.
+All three traced to **two mechanisms doing too much** (§2). The collapse is in §3;
+how it shipped is §5.
 
-> **Status — decisions locked (2026-06-02); rebuild in progress.** #300 (full-day
-> cascade) is the foundation; #301 is superseded (§4); rebuild = PR-K → PR-B → PR-D
-> (§5). `CONTEXT.md` identity glossary updates are deferred until PR-B ships.
+> **Status — SHIPPED (2026-06-02, PR #303).** The whole collapse landed as a single
+> PR (not the planned PR-K → PR-B → PR-D split — see §5): no-absorption cascade,
+> ephemeral projections (`useAutoPromotePersistence` deleted), day-close forecast
+> freeze, chronological owners. #300/#301 were closed superseded; their keepers were
+> extracted onto #303. This doc is now the historical record of *why* the subsystem
+> looks the way it does.
 >
-> **Sequencing constraint (PROVEN — see §8):** the flicker fix (`81e2554`) must
-> NOT ship in isolation. A diagnostic harness shows that, on its own, it makes the
-> full-day chain **re-phase off every recorded/added feed** (logging a bottle
-> reshuffles the day) and leaves the time-edit duplicate (C) live. It is
-> necessary-but-not-sufficient: bundle it with PR A (and ideally PR B).
+> **Sequencing constraint (PROVEN — see §8), why it forced one PR:** the flicker fix
+> (`81e2554`) could NOT ship in isolation — on its own it makes the full-day chain
+> **re-phase off every recorded/added feed** (logging a bottle reshuffles the day)
+> and leaves the time-edit duplicate (C) live. The fixes were coupled (can't remove
+> the persist-on-view hook without the full-day cascade; can't ship the cascade
+> without removing the hook), so the split plan collapsed into #303.
 
 ---
 
@@ -71,7 +77,8 @@ Two consequences the implementation must honor:
    never deletes an earlier or extra feed. An added bottle **inserts**; it is a fact.
 3. **Bottle number = chronological position. Pure.** Retire `maxRecorded` /
    `nextFreeSlot` / projected-slot reservation. eventKey stops carrying a number
-   for bottles (recorded bottles use a uuid like pumps/extras; see §4).
+   for bottles (recorded bottles were targeted to use a uuid like pumps/extras;
+   see §4 — but #303 kept `recorded_bottle_t<startTime>`, see §5/§7).
 4. **Retire `bottlesPerDay`** from schema/UI/defaults (engine already ignores it).
 
 ---
@@ -120,20 +127,23 @@ a distinct extra feed that **inserts and never deletes a forecast** (PR A).
 
 ---
 
-## §5 Rebuild sequence (graph-aware; the whole §F66 stack is unmerged)
+## §5 How it shipped — one PR (#303)
 
-State: `#300` (full-day cascade, the foundation) and `#301` (doc-id, superseded)
-are **both open**; `main` lacks the cascade. So the rebuild re-bases on `#300`.
+The rebuild was *planned* as a three-step split (PR-K keepers+extras → PR-B
+no-persist-on-view → PR-D retire `bottlesPerDay`) re-based on the open #300/#301
+stack. In practice the steps were **too coupled to separate**: you can't remove the
+persist-on-view hook without the full-day cascade already in place, and you can't
+ship the full-day cascade without removing the hook (it would persist the wider
+forecast and re-feed the engine). So #300/#301 were **closed superseded** and the
+whole collapse landed as **one PR, #303**, built via TDD on `feat/f66-prb-ephemeral-projections`.
 
-| Step | Scope | Notes |
-|---|---|---|
-| **0. Merge #300** | Full-day cascade (PR1). Foundation; correct per diagnose. | Its `anchorAbsorbs` is reworked in PR-K, so #300 + PR-K ship close together. |
-| **PR-K (keepers + extras)** | Extract #301 keepers (flicker `81e2554`, R12.6 chronological, R12.10 positional + tests) **and** PR A (FAB-add = non-anchoring *extra*: inserts, never deletes/re-phases a forecast; absorption narrowed to fire only at/after the cursor reaches the feed). Then **close #301**. | Bundles the flicker fix with the extras fix so logging never reshuffles (Jake's constraint). The active-day forecast becomes coherent. |
-| **PR-B (no persist-on-view)** | `useAutoPromotePersistence` → ephemeral recompute; recorded bottles created only by explicit actions; **day-close snapshot** freezes the forecast into recorded docs for history. Recorded bottles → **uuid**; drop `recorded_bottle_t`/`recordedIdForEvent`/`isRecordedBottleId` + slot machinery (`maxRecorded`/`nextFreeSlot`). | Kills zombie + time-edit dup + persist churn at the root. The crux of §3.1 + resolves §4. Medium; lifecycle + history + migration. |
-| **PR-D** | Retire `bottlesPerDay` (schema/UI/defaults/fixtures). | Low; mechanical. |
+What #303 delivered, against the planned steps:
 
-Each step is independently mergeable. PR-K is what unblocks dev-testing (the FAB
-bug + a coherent active day). PR-B is the structural root-cause fix.
+| Planned step | Disposition in #303 |
+|---|---|
+| PR-K — keepers (flicker `81e2554`, R12.6 chronological owners, R12.10 positional overrides) + FAB-add fix | **Landed.** Keepers extracted; absorption *removed entirely* (stronger than the planned "narrow the window" — see §4 / the no-absorption decision). |
+| PR-B — no persist-on-view; ephemeral projections; day-close snapshot; recorded bottles → uuid | **Landed**, with one deviation: recorded *bottles* kept the deterministic `recorded_bottle_t<startTime>` id (`recordedIdForEvent`/`isRecordedBottleId` retained) rather than moving to uuid. The zombie/flicker root was killed by deleting `useAutoPromotePersistence` (projections never persist on view); the day-close `forecastSnapshotDocs` freeze is the single moment history is written. The uuid migration was judged unnecessary once persist-on-view was gone. |
+| PR-D — retire `bottlesPerDay` | **Deferred.** Engine already ignores it (`81e2554`); schema/UI field removal is still pending as a mechanical fast-follow. |
 
 ---
 
@@ -144,13 +154,24 @@ bug + a coherent active day). PR-B is the structural root-cause fix.
 - Nap/bedtime identity (`recorded_<eventKey>`) — their keys don't renumber.
 - Midnight rule, no-eating-during-naps, interval-from-amount, dream-feed.
 
-## §7 Open questions
-- §4: supersede vs. build-on #301.
-- Day-close snapshot: which device writes it, and what triggers archival exactly
-  (first wake of the next day? explicit "Start new day"?).
-- Does any *projected* bottle ever need to survive a reload mid-day for UX reasons,
-  or is pure recompute always acceptable now that the cascade is idempotent?
-- **PR A model decision (below).**
+## §7 Open questions — resolved in #303
+- ~~§4: supersede vs. build-on #301.~~ **Superseded #301** (keepers extracted), but
+  recorded bottles kept `recorded_bottle_t<startTime>` rather than moving to uuid —
+  the no-persist-on-view change alone closed the zombie/dup, so the migration wasn't
+  needed.
+- ~~Day-close snapshot: which device writes it / what triggers archival.~~ Written by
+  the single client that confirms morning wake (`handleConfirmWake` → `startNewDay`
+  with `freezeForecast: forecastSnapshotDocs(...)`); the archival transaction freezes
+  the closing day's forecast bottles into its history. Single-writer, no concurrency.
+- ~~Does any *projected* bottle need to survive a reload mid-day?~~ No — pure
+  recompute every render; the cascade is idempotent. Projections never persist
+  except the one day-close freeze.
+- ~~PR A model decision (below).~~ Resolved: a FAB-add is an intentional **extra**
+  that inserts and never deletes/relocates a forecast; recorded bottles re-cascade
+  the forward forecast but never absorb an earlier slot.
+
+Still pending (fast-follow): retire the `bottlesPerDay` field from schema/UI/defaults
+(engine already ignores it).
 
 ## §8 Diagnostic findings (verified 2026-06-02, `/diagnose`)
 

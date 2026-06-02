@@ -29,7 +29,7 @@ describe("applyDreamFeedLabel — end-to-end with projectDay", () => {
         defaultNapLengthMinutes: 60,
         defaultBottleAmountOz: 5,
         defaultBottleIntervalMinutes: 180,
-        bottleChain: { bottlesPerDay: 6, bufferAfterWakeMinutes: 10 },
+        bottleChain: { bufferAfterWakeMinutes: 10 },
         minBottleIntervalMinutes: 90,
       }),
       actuals: [],

@@ -86,7 +86,6 @@ describe("useV3Settings (emulator-backed)", () => {
 
       // Defaulter fills bottleChain through the real wiring — the seam under test.
       expect(result.current.settings?.bottleChain).toEqual({
-        bottlesPerDay: 5,
         bufferAfterWakeMinutes: 10,
       });
 
