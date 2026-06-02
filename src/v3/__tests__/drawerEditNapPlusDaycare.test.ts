@@ -96,7 +96,7 @@ describe("drawer-edit nap + daycare overlap (2026-05-20 Jake bug)", () => {
       settings: aSettings({
         wakeWindowsMinutes: [95, 100, 110, 120, 120, 120],
         defaultNapLengthMinutes: napLen,
-        bottleChain: { bottlesPerDay: 0, bufferAfterWakeMinutes: 10 },
+        bottleChain: { bufferAfterWakeMinutes: 10 },
         daycare: {
           enabled: true,
           dropoffTime: 8 * 60 + 30, // inside [8:25, 9:10)

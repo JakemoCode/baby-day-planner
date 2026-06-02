@@ -38,7 +38,7 @@ const settings = aSettings({
   wakeWindowsMinutes: [120, 150, 180],
   defaultBottleAmountOz: 5,
   defaultBottleIntervalMinutes: 180,
-  bottleChain: { bottlesPerDay: 6, bufferAfterWakeMinutes: 10 },
+  bottleChain: { bufferAfterWakeMinutes: 10 },
   putdownLeadMinutes: 20,
   minBottleIntervalMinutes: 20,
 });

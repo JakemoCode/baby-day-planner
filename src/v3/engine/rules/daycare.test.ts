@@ -47,7 +47,7 @@ describe("R21.1 — daycare projection (owner-less)", () => {
       day: aDay({ wakeTime: 7 * 60, date: "2026-05-08" }), // Friday
       settings: aSettings({
         wakeWindowsMinutes: [],
-        bottleChain: { bottlesPerDay: 0, bufferAfterWakeMinutes: 10 },
+        bottleChain: { bufferAfterWakeMinutes: 10 },
         daycare: {
           enabled: true,
           dropoffTime: 8 * 60 + 30,
@@ -75,7 +75,7 @@ describe("R21.1 — daycare projection (owner-less)", () => {
       day: aDay({ wakeTime: 7 * 60, date: "2026-05-08" }),
       settings: aSettings({
         wakeWindowsMinutes: [],
-        bottleChain: { bottlesPerDay: 0, bufferAfterWakeMinutes: 10 },
+        bottleChain: { bufferAfterWakeMinutes: 10 },
         daycare: {
           enabled: false,
           dropoffTime: 8 * 60 + 30,
@@ -94,7 +94,7 @@ describe("R21.1 — daycare projection (owner-less)", () => {
       day: aDay({ wakeTime: 7 * 60, date: "2026-05-08" }), // Fri
       settings: aSettings({
         wakeWindowsMinutes: [],
-        bottleChain: { bottlesPerDay: 0, bufferAfterWakeMinutes: 10 },
+        bottleChain: { bufferAfterWakeMinutes: 10 },
         daycare: {
           enabled: true,
           dropoffTime: 8 * 60 + 30,
@@ -117,7 +117,7 @@ describe("R21.1 — daycare projection (owner-less)", () => {
       }),
       settings: aSettings({
         wakeWindowsMinutes: [],
-        bottleChain: { bottlesPerDay: 0, bufferAfterWakeMinutes: 10 },
+        bottleChain: { bufferAfterWakeMinutes: 10 },
         daycare: {
           enabled: true,
           dropoffTime: 8 * 60 + 30,
@@ -140,7 +140,7 @@ describe("R21.2 — nominal time shifted out of nap windows", () => {
       settings: aSettings({
         wakeWindowsMinutes: [30, 120, 120, 120, 120, 120],
         defaultNapLengthMinutes: 45,
-        bottleChain: { bottlesPerDay: 0, bufferAfterWakeMinutes: 10 },
+        bottleChain: { bufferAfterWakeMinutes: 10 },
         daycare: {
           enabled: true,
           dropoffTime: 8 * 60, // inside nap_1 [7:30, 8:15)
@@ -163,7 +163,7 @@ describe("R21.2 — nominal time shifted out of nap windows", () => {
         defaultNapLengthMinutes: 45,
         // bedtimeThreshold > nap_4 start so the 4th sleep stays a nap, not bedtime.
         bedtimeThreshold: 18 * 60,
-        bottleChain: { bottlesPerDay: 0, bufferAfterWakeMinutes: 10 },
+        bottleChain: { bufferAfterWakeMinutes: 10 },
         daycare: {
           enabled: true,
           dropoffTime: 6 * 60, // pre-wake; no nap conflict
@@ -200,7 +200,7 @@ describe("R21.2 — nominal time shifted out of nap windows", () => {
       settings: aSettings({
         wakeWindowsMinutes: [],
         defaultNapLengthMinutes: 45,
-        bottleChain: { bottlesPerDay: 0, bufferAfterWakeMinutes: 10 },
+        bottleChain: { bufferAfterWakeMinutes: 10 },
         daycare: {
           enabled: true,
           dropoffTime: 8 * 60, // inside [7:55, 8:40)
@@ -235,7 +235,7 @@ describe("R21.2 — nominal time shifted out of nap windows", () => {
         wakeWindowsMinutes: [110, 110, 110, 110, 120, 120],
         defaultNapLengthMinutes: 45,
         bedtimeThreshold: 18 * 60,
-        bottleChain: { bottlesPerDay: 0, bufferAfterWakeMinutes: 10 },
+        bottleChain: { bufferAfterWakeMinutes: 10 },
         daycare: {
           enabled: true,
           dropoffTime: 6 * 60, // pre-wake; no conflict
@@ -257,7 +257,7 @@ describe("R21.2 — nominal time shifted out of nap windows", () => {
       settings: aSettings({
         wakeWindowsMinutes: [30, 120, 120, 120, 120, 120],
         defaultNapLengthMinutes: 45,
-        bottleChain: { bottlesPerDay: 0, bufferAfterWakeMinutes: 10 },
+        bottleChain: { bufferAfterWakeMinutes: 10 },
         daycare: {
           enabled: true,
           dropoffTime: 8 * 60,
@@ -278,7 +278,7 @@ describe("R21.2 — nominal time shifted out of nap windows", () => {
       settings: aSettings({
         wakeWindowsMinutes: [180, 120, 120, 120, 120, 120], // long first WW → no nap before 10:00
         defaultNapLengthMinutes: 45,
-        bottleChain: { bottlesPerDay: 0, bufferAfterWakeMinutes: 10 },
+        bottleChain: { bufferAfterWakeMinutes: 10 },
         daycare: {
           enabled: true,
           dropoffTime: 8 * 60 + 30, // well before nap_1 at 10:00
@@ -299,7 +299,7 @@ describe("R21 — defensive edge case", () => {
       day: aDay({ wakeTime: 7 * 60, date: "not-a-date" }),
       settings: aSettings({
         wakeWindowsMinutes: [],
-        bottleChain: { bottlesPerDay: 0, bufferAfterWakeMinutes: 10 },
+        bottleChain: { bufferAfterWakeMinutes: 10 },
         daycare: {
           enabled: true,
           dropoffTime: 8 * 60 + 30,

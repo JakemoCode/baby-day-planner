@@ -18,7 +18,7 @@ describe("withV3SettingsDefaults — realistic data", () => {
   it("a clean V3 settings doc round-trips with no field loss", () => {
     const out = withV3SettingsDefaults(fixtures.settings.v3 as Partial<Settings>);
     expect(out).not.toBeNull();
-    expect(out!.bottleChain.bottlesPerDay).toBe(5);
+    expect(out!.bottleChain.bufferAfterWakeMinutes).toBe(10);
     expect(out!.owners.parent1.displayName).toBe("Jake");
     expect(out!.daycare.weekdays.mon).toBe(false);
   });
@@ -27,7 +27,7 @@ describe("withV3SettingsDefaults — realistic data", () => {
     // Doc lacks bottleChain, owners, daycare, dailyRecurring, dreamFeed*.
     const out = withV3SettingsDefaults(fixtures.settings.v2 as Partial<Settings>);
     expect(out).not.toBeNull();
-    expect(out!.bottleChain).toEqual({ bottlesPerDay: 5, bufferAfterWakeMinutes: 10 });
+    expect(out!.bottleChain).toEqual({ bufferAfterWakeMinutes: 10 });
     // No `owners` field → defaulter fills empty displayNames for the form to bind to.
     expect(out!.owners.parent1.displayName).toBe("");
     expect(out!.owners.parent2.displayName).toBe("");
@@ -38,7 +38,7 @@ describe("withV3SettingsDefaults — realistic data", () => {
   it("a partial V3 doc (missing critical fields) gets defaults filled", () => {
     const out = withV3SettingsDefaults(fixtures.settings.partialV3 as Partial<Settings>);
     expect(out).not.toBeNull();
-    expect(out!.bottleChain).toEqual({ bottlesPerDay: 5, bufferAfterWakeMinutes: 10 });
+    expect(out!.bottleChain).toEqual({ bufferAfterWakeMinutes: 10 });
     expect(out!.owners.parent1.displayName).toBe("");
     expect(out!.owners.parent2.displayName).toBe("");
     expect(out!.daycare.enabled).toBe(false);
@@ -48,7 +48,7 @@ describe("withV3SettingsDefaults — realistic data", () => {
     const out = withV3SettingsDefaults(fixtures.settings.mixed as Partial<Settings>);
     expect(out).not.toBeNull();
     expect(out!.bedtimeThreshold).toBe(19 * 60); // V3 wrote, preserved
-    expect(out!.bottleChain.bottlesPerDay).toBe(5);
+    expect(out!.bottleChain.bufferAfterWakeMinutes).toBe(10);
   });
 
   it("returns null for null input (lets the hook stay loading)", () => {

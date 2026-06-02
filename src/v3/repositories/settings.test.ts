@@ -18,7 +18,7 @@ import { getSettings, saveSettings, watchSettings } from "./settings";
 const settings = (overrides: Partial<Settings> = {}): Settings =>
   aSettings({
     childId: "child-1",
-    bottleChain: { bottlesPerDay: 5, bufferAfterWakeMinutes: 10 },
+    bottleChain: { bufferAfterWakeMinutes: 10 },
     owners: {
       parent1: { displayName: "Jake", color: "#0af" },
       parent2: { displayName: "Sam", color: "#f0a" },
@@ -55,7 +55,7 @@ describe("v3 settings repository", () => {
     const got = await getSettings(database, "child-1");
     expect(got?.defaultWakeTime).toBe(7 * 60);
     expect(got?.owners.parent1.displayName).toBe("Jake");
-    expect(got?.bottleChain.bottlesPerDay).toBe(5);
+    expect(got?.bottleChain.bufferAfterWakeMinutes).toBe(10);
   });
 
   it("watches settings and emits on change", async () => {

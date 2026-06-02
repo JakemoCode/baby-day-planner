@@ -22,7 +22,7 @@ describe("makeDefaultSettings", () => {
 
   it("returns all required fields structurally valid", () => {
     const s = makeDefaultSettings("child-1");
-    expect(s.bottleChain).toEqual({ bottlesPerDay: 5, bufferAfterWakeMinutes: 10 });
+    expect(s.bottleChain).toEqual({ bufferAfterWakeMinutes: 10 });
     expect(s.owners.parent1.displayName).toBe("");
     expect(s.daycare.weekdays.mon).toBe(false);
     expect(s.wakeWindowsMinutes).toEqual([95, 100, 110, 120, 120, 120]);
@@ -122,7 +122,7 @@ describe("normalizeSettingsDoc", () => {
   it("fills in missing required fields via DEFAULTS", () => {
     const raw = { childId: "child-1" };
     const s = normalizeSettingsDoc(raw);
-    expect(s.bottleChain).toEqual({ bottlesPerDay: 5, bufferAfterWakeMinutes: 10 });
+    expect(s.bottleChain).toEqual({ bufferAfterWakeMinutes: 10 });
     expect(s.daycare.weekdays).toEqual({
       mon: false,
       tue: false,
@@ -140,10 +140,10 @@ describe("normalizeSettingsDoc", () => {
       timelinePxPerHour: 120,
       timelineColorMode: "type" as const,
       pumpTimes: [{ time: 8 * 60 }],
-      bottleChain: { bottlesPerDay: 7, bufferAfterWakeMinutes: 15 },
+      bottleChain: { bufferAfterWakeMinutes: 15 },
     };
     const s = normalizeSettingsDoc(raw);
-    expect(s.bottleChain.bottlesPerDay).toBe(7);
+    expect(s.bottleChain.bufferAfterWakeMinutes).toBe(15);
     expect(s.timelinePxPerHour).toBe(120);
     expect(s.pumpTimes).toEqual([{ time: 480 }]);
   });
@@ -169,7 +169,7 @@ describe("normalizeSettingsDoc", () => {
 describe("withV3SettingsDefaults", () => {
   it("returns a fully-shaped Settings even from an empty input", () => {
     const out = withV3SettingsDefaults({ childId: "child-1" })!;
-    expect(out.bottleChain).toEqual({ bottlesPerDay: 5, bufferAfterWakeMinutes: 10 });
+    expect(out.bottleChain).toEqual({ bufferAfterWakeMinutes: 10 });
     // Empty string so the Settings form has something to bind to; undefined
     // or a leaked default name is a real regression.
     expect(out.owners.parent1.displayName).toBe("");
@@ -181,14 +181,14 @@ describe("withV3SettingsDefaults", () => {
   it("preserves caller-supplied values over defaults", () => {
     const out = withV3SettingsDefaults({
       childId: "child-1",
-      bottleChain: { bottlesPerDay: 7, bufferAfterWakeMinutes: 20 },
+      bottleChain: { bufferAfterWakeMinutes: 20 },
       owners: {
         parent1: { displayName: "Jake", color: "#0af" },
         parent2: { displayName: "Sam", color: "#f0a" },
         other: [],
       },
     })!;
-    expect(out.bottleChain.bottlesPerDay).toBe(7);
+    expect(out.bottleChain.bufferAfterWakeMinutes).toBe(20);
     expect(out.owners.parent1.displayName).toBe("Jake");
   });
 
@@ -211,7 +211,7 @@ describe("withV3SettingsDefaults", () => {
       sat: false,
       sun: false,
     });
-    expect(out.bottleChain).toEqual({ bottlesPerDay: 5, bufferAfterWakeMinutes: 10 });
+    expect(out.bottleChain).toEqual({ bufferAfterWakeMinutes: 10 });
   });
 
   it("returns null when the input itself is null (lets the hook stay loading)", () => {

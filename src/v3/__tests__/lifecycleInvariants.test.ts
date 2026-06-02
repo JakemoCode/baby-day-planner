@@ -78,7 +78,7 @@ describe("Engine invariants per (event type, lifecycle state)", () => {
         settings: aSettings({
           // Keep cascade output minimal so we can isolate the seeded event.
           wakeWindowsMinutes: [],
-          bottleChain: { bottlesPerDay: 0, bufferAfterWakeMinutes: 10 },
+          bottleChain: { bufferAfterWakeMinutes: 10 },
           bedtimeThreshold: 23 * 60,
         }),
         actuals: [seeded],

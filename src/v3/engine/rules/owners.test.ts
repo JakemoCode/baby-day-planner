@@ -349,7 +349,7 @@ describe("R12.6 — projected bottles inherit template.bottleOwners[N-1] (chrono
     const ctx = aContext({
       day: aDay({ wakeTime: 7 * 60 }),
       settings: aSettings({
-        bottleChain: { bottlesPerDay: 4, bufferAfterWakeMinutes: 10 },
+        bottleChain: { bufferAfterWakeMinutes: 10 },
         defaultBottleIntervalMinutes: 180,
         wakeWindowsMinutes: [], // disable nap chain so bottles run alone
       }),
@@ -378,7 +378,7 @@ describe("R12.6 — projected bottles inherit template.bottleOwners[N-1] (chrono
     const ctx = aContext({
       day: aDay({ wakeTime: 7 * 60 }),
       settings: aSettings({
-        bottleChain: { bottlesPerDay: 4, bufferAfterWakeMinutes: 10 },
+        bottleChain: { bufferAfterWakeMinutes: 10 },
         defaultBottleIntervalMinutes: 180,
         wakeWindowsMinutes: [],
       }),
@@ -409,7 +409,7 @@ describe("R12.6 — projected bottles inherit template.bottleOwners[N-1] (chrono
     const ctx = aContext({
       day: aDay({ wakeTime: 7 * 60 }),
       settings: aSettings({
-        bottleChain: { bottlesPerDay: 4, bufferAfterWakeMinutes: 10 },
+        bottleChain: { bufferAfterWakeMinutes: 10 },
         defaultBottleIntervalMinutes: 180,
         wakeWindowsMinutes: [],
         bedtimeThreshold: 23 * 60,
@@ -442,7 +442,7 @@ describe("R12.6 — projected bottles inherit template.bottleOwners[N-1] (chrono
     const ctx = aContext({
       day: aDay({ wakeTime: 7 * 60 }),
       settings: aSettings({
-        bottleChain: { bottlesPerDay: 3, bufferAfterWakeMinutes: 10 },
+        bottleChain: { bufferAfterWakeMinutes: 10 },
         defaultBottleIntervalMinutes: 180,
         wakeWindowsMinutes: [],
       }),
@@ -487,7 +487,7 @@ describe("R12.10 — Day.ownerOverrides applies to projected events", () => {
         ownerOverrides: { bottle_pos_2: PARENT2 }, // 2nd bottle of the day → P2
       }),
       settings: aSettings({
-        bottleChain: { bottlesPerDay: 3, bufferAfterWakeMinutes: 10 },
+        bottleChain: { bufferAfterWakeMinutes: 10 },
         defaultBottleIntervalMinutes: 180,
         wakeWindowsMinutes: [],
         bedtimeThreshold: 23 * 60,

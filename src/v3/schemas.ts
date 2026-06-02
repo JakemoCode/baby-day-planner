@@ -250,8 +250,6 @@ export type DaycareConfig = {
 };
 
 export type BottleChainConfig = {
-  /** Expected lower limit of daily intake (R5.11). Drives placeholder projection. */
-  bottlesPerDay: number;
   /**
    * Minutes between Day.wakeTime and the first placeholder bottle when
    * no bottle has been recorded yet (R5.11). Default 10. Avoids the
@@ -325,7 +323,7 @@ export type Settings = {
   /** Default duration of a pump session; pumps render as blocks of this length. */
   defaultPumpDurationMinutes: number;
 
-  // Dream feed — when enabled, R5.5 emits a projected bottle at `dreamFeedTime` (counts toward bottlesPerDay).
+  // Dream feed — when enabled, R5.5 emits a projected bottle at `dreamFeedTime`.
   // Renderer labels it "Dream Feed". Subject to Now-cross auto-promote (ADR-0001).
   dreamFeedEnabled: boolean;
   /** TimeMin for the projected dream-feed bottle (e.g. 23 * 60 = 11pm). */
