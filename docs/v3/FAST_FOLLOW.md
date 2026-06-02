@@ -66,6 +66,7 @@ Shipped items move to [`FAST_FOLLOW_COMPLETED.md`](./FAST_FOLLOW_COMPLETED.md) �
 - [§F59](./fast-follow/backlog/f59-write-path-id-conventions.md)
 - [§F68](./fast-follow/backlog/f68-post-midnight-create-vanishes-from-timeline.md)
 - [§F69](./fast-follow/backlog/f69-usedrawer-options-object.md)
+- [§F73](./fast-follow/backlog/f73-realize-absorb-identity.md)
 
 ---
 
