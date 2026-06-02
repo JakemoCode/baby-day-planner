@@ -257,6 +257,42 @@ describe("useDrawer", () => {
     expect(saveEvent).toHaveBeenCalledWith(expect.objectContaining({ id: "recorded_bottle_t600" }));
   });
 
+  // BOTTLE_SPEC §4: editing a projected bottle realizes that forecast slot. The
+  // recorded doc is tagged so the cascade absorbs the slot (no duplicate beside it).
+  it("projected BOTTLE edit tags realizedForecast: true", async () => {
+    const projected = makeEvent({
+      id: "proj_bottle_t600",
+      type: "bottle",
+      kind: "instant",
+      eventKey: "bottle_1",
+      startTime: 10 * 60,
+    });
+    const saveEvent = makeSaveEvent();
+    const { result } = setup({ actuals: [], saveEvent });
+
+    act(() => result.current.openEdit(projected));
+    await act(async () => {
+      await result.current.onSave({ ...projected, startTime: 10 * 60 + 30 });
+    });
+
+    expect(saveEvent).toHaveBeenCalledWith(expect.objectContaining({ realizedForecast: true }));
+  });
+
+  // The tag is bottle-only: a projected nap edit must NOT carry it.
+  it("projected NAP edit does not tag realizedForecast", async () => {
+    const projected = makeEvent({ id: "proj-nap-5", eventKey: "nap_5" });
+    const saveEvent = makeSaveEvent();
+    const { result } = setup({ actuals: [], saveEvent });
+
+    act(() => result.current.openEdit(projected));
+    await act(async () => {
+      await result.current.onSave({ ...projected, startTime: 11 * 60 });
+    });
+
+    const saved = saveEvent.mock.calls[0]![0] as Event;
+    expect(saved.realizedForecast).toBeUndefined();
+  });
+
   // owner-only edit on projected event must route to setOwnerOverride, not saveEvent.
   // saveEvent would promote to recorded, anchoring time and preventing cascade re-projection.
   it("owner-only edit on projected event routes to setOwnerOverride (not saveEvent)", async () => {

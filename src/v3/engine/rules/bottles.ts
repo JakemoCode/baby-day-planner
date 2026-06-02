@@ -246,10 +246,13 @@ function bottleCascadeInputs(events: Event[], ctx: Context): CascadeInputs | nul
 
 /**
  * Full-day projected bottle TIMES: walk wake+buffer → cap at cadence. When the
- * cursor reaches a recorded bottle, the cascade RE-SEEDS forward from it (R5.1) —
- * but recorded bottles never absorb/replace a forecast slot (ENGINE_SPEC §R5.1/5.9):
- * they are independent reality that re-cascades the forecast forward and keeps its
- * own chronological number. Earlier forecast slots survive. Recorded anchors are
+ * cursor reaches a recorded bottle, the cascade RE-SEEDS forward from it (R5.1).
+ * An ordinary recorded bottle (FAB-add extra) never absorbs a forecast slot
+ * (ENGINE_SPEC §R5.1/5.9) — it re-cascades the forecast forward and keeps its own
+ * chronological number; earlier forecast slots survive. The ONE exception is a
+ * bottle tagged `realizedForecast` (a drawer edit of a projection, BOTTLE_SPEC §4):
+ * it absorbs the imminent slot it realized so editing a forecast moves it rather
+ * than duplicating it. Recorded anchors are
  * NOT returned — only projection times. Deterministic in (anchors, settings) ⇒
  * idempotent across evaluator passes. Fills the whole day (no bottlesPerDay cap),
  * so morning forecasts survive a later recorded bottle (§F66, no persist-on-view).
@@ -290,6 +293,16 @@ function computeBottleProjectionTimes(inputs: CascadeInputs, ctx: Context): numb
     if (anchorReached(placed, anchor)) {
       cursor = anchor!.startTime + intervalForAmount(rules, anchor!.amountOz, defaultInterval);
       lastPlaced = anchor!.startTime;
+      anchorIdx++;
+      continue;
+    }
+    // Realize/relocate (BOTTLE_SPEC §4): a recorded bottle tagged as realized came
+    // from a drawer edit of THIS forecast slot — absorb the imminent slot it realized
+    // (the one within one interval before it) instead of re-emitting it beside the
+    // feed. Earlier slots and untagged FAB-add extras still survive (R5.1/5.9).
+    if (anchor?.realizedForecast === true && placed >= anchor.startTime - projInterval) {
+      cursor = anchor.startTime + intervalForAmount(rules, anchor.amountOz, defaultInterval);
+      lastPlaced = anchor.startTime;
       anchorIdx++;
       continue;
     }

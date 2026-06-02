@@ -111,6 +111,13 @@ to FAB-add (more work) — trust that signal. So **the action disambiguates inte
 drawer time-edit on a projection = *realize/relocate* that forecast slot; FAB-add =
 a distinct extra feed that **inserts and never deletes a forecast** (PR A).
 
+> **Implemented (2026-06-02).** The §F66 rebuild (`#303`) shipped the FAB-add =
+> extra half (no-absorption) but not the realize/relocate half — editing a forecast
+> bottle to a *later* time spawned a duplicate. Closed by tagging the recorded doc
+> `realizedForecast: true` at the write path (`useDrawer`) when a projection is
+> edited; the cascade absorbs the one imminent slot that tag realized. FAB-add stays
+> untagged. See `Event.realizedForecast`, `bottles.ts` (R5 realize branch).
+
 ---
 
 ## §5 Rebuild sequence (graph-aware; the whole §F66 stack is unmerged)

@@ -135,6 +135,14 @@ export type Event = {
   owner: OwnerRef;
   /** bottle only. */
   amountOz?: number;
+  /**
+   * bottle only. `true` ⇒ this recorded bottle realized a forecast slot via a
+   * drawer time-edit / "Log now" on a projection (BOTTLE_SPEC §4). The cascade
+   * absorbs the imminent forecast slot it realized instead of re-emitting it
+   * beside the recorded feed (R5 realize/relocate). Absent on FAB-added extras,
+   * which insert and never delete a forecast.
+   */
+  realizedForecast?: boolean;
   /** pump only. Per-side recorded output in ounces; session total = left + right. */
   pumpVolumeOz?: { left: number; right: number };
 

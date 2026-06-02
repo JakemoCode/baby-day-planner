@@ -52,6 +52,7 @@ function eventBase(
   };
   if (end !== undefined) event.endTime = end;
   if (overrides.amountOz !== undefined) event.amountOz = overrides.amountOz;
+  if (overrides.realizedForecast !== undefined) event.realizedForecast = overrides.realizedForecast;
   return event;
 }
 

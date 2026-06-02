@@ -1976,3 +1976,70 @@ describe("B4 — past-time emit during nap edit snaps to nap edge", () => {
     expect(bottles[0]?.lifecycle.state).toBe("recorded");
   });
 });
+
+describe("R5 realize/relocate — editing a forecast bottle moves it, never duplicates (BOTTLE_SPEC §4)", () => {
+  // Wake 7:00, buffer 10, interval 180 ⇒ natural forecast slot at 16:10.
+  function runWith(recorded: Event) {
+    const ctx = aContext({
+      day: aDay({ wakeTime: 7 * 60 }),
+      settings: aSettings({
+        bottleChain: { bottlesPerDay: 4, bufferAfterWakeMinutes: 10 },
+        defaultBottleIntervalMinutes: 180,
+      }),
+      nowMinutes: 16 * 60 + 20,
+      actuals: [recorded],
+    });
+    return projectDay(
+      { day: ctx.day, settings: ctx.settings, actuals: ctx.actuals, nowMinutes: ctx.nowMinutes },
+      { rules: ALL },
+    )
+      .filter((e) => e.type === "bottle")
+      .map((b) => b.startTime)
+      .sort((a, b) => a - b);
+  }
+
+  // The bug: "Log now" on the 16:10 forecast records at 16:30 (later than the slot).
+  it("realized bottle later than its slot absorbs the imminent forecast — single bottle at 16:30", () => {
+    const times = runWith(
+      aRecordedBottle({
+        id: "rec",
+        eventKey: "bottle_1",
+        start: 16 * 60 + 30,
+        realizedForecast: true,
+      }),
+    );
+    expect(times).toContain(16 * 60 + 30);
+    expect(times).not.toContain(16 * 60 + 10); // no stranded forecast beside it
+  });
+
+  // Control: an untagged FAB-add extra at the same time must NOT delete the forecast.
+  it("untagged extra at 16:30 keeps the 16:10 forecast (R5.1/5.9 no-absorption preserved)", () => {
+    const times = runWith(
+      aRecordedBottle({ id: "rec", eventKey: "bottle_1", start: 16 * 60 + 30 }),
+    );
+    expect(times).toContain(16 * 60 + 30);
+    expect(times).toContain(16 * 60 + 10);
+  });
+
+  // Editing earlier already worked via the re-seed; the tag must not break it.
+  it("realized bottle earlier than its slot still produces a single moved bottle at 16:00", () => {
+    const times = runWith(
+      aRecordedBottle({ id: "rec", eventKey: "bottle_1", start: 16 * 60, realizedForecast: true }),
+    );
+    expect(times).toContain(16 * 60);
+    expect(times).not.toContain(16 * 60 + 10);
+  });
+
+  // A realized bottle absorbs ONLY the imminent slot — a full-interval-earlier forecast survives.
+  it("realized bottle does not absorb a forecast a full interval earlier (13:10 survives)", () => {
+    const times = runWith(
+      aRecordedBottle({
+        id: "rec",
+        eventKey: "bottle_1",
+        start: 16 * 60 + 30,
+        realizedForecast: true,
+      }),
+    );
+    expect(times).toContain(13 * 60 + 10);
+  });
+});
