@@ -27,7 +27,7 @@ describe("R5.11 — placeholder projection when no bottle has been recorded", ()
     const ctx = aContext({
       day: aDay({ wakeTime: 7 * 60 }),
       settings: aSettings({
-        bottleChain: { bottlesPerDay: 4, bufferAfterWakeMinutes: 10 },
+        bottleChain: { bufferAfterWakeMinutes: 10 },
         defaultBottleIntervalMinutes: 180,
       }),
       actuals: [],
@@ -45,8 +45,8 @@ describe("R5.11 — placeholder projection when no bottle has been recorded", ()
 
     const bottles = out.filter((e) => e.type === "bottle");
     // §F66: cold-start fills the whole day to the cap (here midnight — no bedtime
-    // rule in this isolated set), identical to the anchored chain. bottlesPerDay
-    // no longer caps the count.
+    // rule in this isolated set), identical to the anchored chain. The cascade is
+    // purely interval-driven; there is no count cap.
     expect(bottles.map((b) => b.startTime)).toEqual([
       7 * 60 + 10, // 7:10
       10 * 60 + 10, // 10:10
@@ -69,7 +69,7 @@ describe("R5.11 — placeholder projection when no bottle has been recorded", ()
 });
 
 describe("R5.8 — cascade stops at midnight (the 'midnight rule', DOMAIN.md §2)", () => {
-  it("bottlesPerDay=20 caps at the last slot before midnight (1440)", () => {
+  it("cascade caps at the last slot before midnight (1440)", () => {
     // §F66 (no absorption): a 7:10 morning forecast precedes the recorded 7:30 (it's
     // not absorbed — recorded bottles never delete a forecast), then forward from 7:30:
     // 10:30, 13:30, 16:30, 19:30, 22:30; next 25:30 ≥ 1440 → stop. 7 bottles total.
@@ -82,7 +82,7 @@ describe("R5.8 — cascade stops at midnight (the 'midnight rule', DOMAIN.md §2
     const ctx = aContext({
       day: aDay({ wakeTime: 7 * 60 }),
       settings: aSettings({
-        bottleChain: { bottlesPerDay: 20, bufferAfterWakeMinutes: 10 },
+        bottleChain: { bufferAfterWakeMinutes: 10 },
         defaultBottleIntervalMinutes: 180,
         defaultWakeTime: 7 * 60,
       }),
@@ -128,7 +128,7 @@ describe("R5.4 — labels renumber chronologically (all bottles); recorded event
     const ctx = aContext({
       day: aDay({ wakeTime: 7 * 60 }),
       settings: aSettings({
-        bottleChain: { bottlesPerDay: 2, bufferAfterWakeMinutes: 10 },
+        bottleChain: { bufferAfterWakeMinutes: 10 },
         defaultBottleIntervalMinutes: 180,
       }),
       actuals: [recordedAt0730WithLaterKey, recordedAt0900WithEarlierKey],
@@ -172,7 +172,7 @@ describe("R5.4 — labels renumber chronologically (all bottles); recorded event
     const ctx = aContext({
       day: aDay({ wakeTime: 7 * 60 }),
       settings: aSettings({
-        bottleChain: { bottlesPerDay: 4, bufferAfterWakeMinutes: 10 },
+        bottleChain: { bufferAfterWakeMinutes: 10 },
         defaultBottleIntervalMinutes: 180,
       }),
       actuals: [recorded],
@@ -213,7 +213,7 @@ describe("R5.1 — cascade resumes from the latest recorded bottle", () => {
     const ctx = aContext({
       day: aDay({ wakeTime: 7 * 60 }),
       settings: aSettings({
-        bottleChain: { bottlesPerDay: 4, bufferAfterWakeMinutes: 10 },
+        bottleChain: { bufferAfterWakeMinutes: 10 },
         defaultBottleIntervalMinutes: 180,
       }),
       actuals: [recorded],
@@ -234,7 +234,7 @@ describe("R5.1 — cascade resumes from the latest recorded bottle", () => {
       .sort((a, b) => a.startTime - b.startTime);
 
     // §F66 (no absorption): morning 7:10 forecast survives; recorded at 8:30 + cascade to midnight: 11:30…23:30.
-    // bottlesPerDay=4 is the cold-start target, not a hard cap.
+    // The chain fills to the cap, not a fixed count.
     expect(bottles.map((b) => b.startTime)).toEqual([
       7 * 60 + 10, // morning forecast (not absorbed)
       8 * 60 + 30,
@@ -274,7 +274,7 @@ describe("§F66 PR1 — full-day cascade: morning bottles survive a recorded aft
     const ctx = aContext({
       day: aDay({ wakeTime: 7 * 60 }),
       settings: aSettings({
-        bottleChain: { bottlesPerDay: 4, bufferAfterWakeMinutes: 10 },
+        bottleChain: { bufferAfterWakeMinutes: 10 },
         defaultBottleIntervalMinutes: 180,
       }),
       actuals: [recorded],
@@ -303,7 +303,7 @@ describe("§F66 — cascade is idempotent under persist-the-past (flicker regres
   // chain caps differently from the anchored chain, so the bottle SET flips on view.
   it("persisting the now-crossed past leaves the bottle set unchanged", () => {
     const settings = aSettings({
-      bottleChain: { bottlesPerDay: 5, bufferAfterWakeMinutes: 10 },
+      bottleChain: { bufferAfterWakeMinutes: 10 },
       defaultBottleIntervalMinutes: 180,
       wakeWindowsMinutes: [],
       bedtimeThreshold: 23 * 60,
@@ -355,7 +355,7 @@ describe("§F66 PR2 — recorded cluster feeds both survive (reality wins)", () 
       {
         day: aDay({ wakeTime: 7 * 60 }),
         settings: aSettings({
-          bottleChain: { bottlesPerDay: 4, bufferAfterWakeMinutes: 10 },
+          bottleChain: { bufferAfterWakeMinutes: 10 },
           defaultBottleIntervalMinutes: 180,
           wakeWindowsMinutes: [],
           bedtimeThreshold: 23 * 60,
@@ -398,7 +398,7 @@ describe("§F66 PR2 — bottle-volume invariant", () => {
       {
         day: aDay({ wakeTime: 7 * 60 }),
         settings: aSettings({
-          bottleChain: { bottlesPerDay: 5, bufferAfterWakeMinutes: 10 },
+          bottleChain: { bufferAfterWakeMinutes: 10 },
           defaultBottleIntervalMinutes: 180,
           defaultBottleAmountOz: DEFAULT,
           wakeWindowsMinutes: [],
@@ -440,7 +440,7 @@ describe("Sequential cascade — bottle landing in nap snaps to putdown.startTim
     const ctx = aContext({
       day: aDay({ wakeTime: 7 * 60 + 5 }),
       settings: aSettings({
-        bottleChain: { bottlesPerDay: 2, bufferAfterWakeMinutes: 10 },
+        bottleChain: { bufferAfterWakeMinutes: 10 },
         defaultBottleIntervalMinutes: 180,
         wakeWindowsMinutes: [],
         putdownLeadMinutes: 15,
@@ -488,7 +488,7 @@ describe("R5.6 — convergence regression with various nowMinutes", () => {
     const ctx = aContext({
       day: aDay({ wakeTime: 5 * 60 }),
       settings: aSettings({
-        bottleChain: { bottlesPerDay: 4, bufferAfterWakeMinutes: 10 },
+        bottleChain: { bufferAfterWakeMinutes: 10 },
         defaultBottleIntervalMinutes: 180,
         wakeWindowsMinutes: [120, 135, 135, 150],
       }),
@@ -537,7 +537,7 @@ describe("R5.6 — convergence regression (mirrors property-test failure)", () =
     const ctx = aContext({
       day: aDay({ wakeTime: 5 * 60 }),
       settings: aSettings({
-        bottleChain: { bottlesPerDay: 4, bufferAfterWakeMinutes: 10 },
+        bottleChain: { bufferAfterWakeMinutes: 10 },
         defaultBottleIntervalMinutes: 180,
         wakeWindowsMinutes: [120, 135, 135, 150],
       }),
@@ -575,7 +575,7 @@ describe("Sequential cascade — snap-out-of-nap + putdown-anchor (PR 3c)", () =
     const ctx = aContext({
       day: aDay({ wakeTime: 7 * 60 }),
       settings: aSettings({
-        bottleChain: { bottlesPerDay: 4, bufferAfterWakeMinutes: 10 },
+        bottleChain: { bufferAfterWakeMinutes: 10 },
         defaultBottleIntervalMinutes: 180,
         wakeWindowsMinutes: [120, 90, 90, 90],
       }),
@@ -633,7 +633,7 @@ describe("R5.1 — cascade interval honors bottleIntervalRules", () => {
     const ctx = aContext({
       day: aDay({ wakeTime: 7 * 60 }),
       settings: aSettings({
-        bottleChain: { bottlesPerDay: 2, bufferAfterWakeMinutes: 10 },
+        bottleChain: { bufferAfterWakeMinutes: 10 },
         defaultBottleIntervalMinutes: 180,
         bottleIntervalRules: [
           { minOz: 0, maxOz: 5, intervalMinutes: 120 },
@@ -683,7 +683,7 @@ describe("R5.1 — cascade interval honors bottleIntervalRules", () => {
     const ctx = aContext({
       day: aDay({ wakeTime: 7 * 60 }),
       settings: aSettings({
-        bottleChain: { bottlesPerDay: 2, bufferAfterWakeMinutes: 10 },
+        bottleChain: { bufferAfterWakeMinutes: 10 },
         defaultBottleIntervalMinutes: 180,
         bottleIntervalRules: [{ minOz: 0, maxOz: 5, intervalMinutes: 120 }],
       }),
@@ -731,7 +731,7 @@ describe("R5.1 — cascade interval honors bottleIntervalRules", () => {
     const ctx = aContext({
       day: aDay({ wakeTime: 7 * 60 }),
       settings: aSettings({
-        bottleChain: { bottlesPerDay: 4, bufferAfterWakeMinutes: 10 },
+        bottleChain: { bufferAfterWakeMinutes: 10 },
         defaultBottleAmountOz: 5,
         defaultBottleIntervalMinutes: 999, // never used; would fail loudly
         bottleIntervalRules: [
@@ -781,7 +781,7 @@ describe("R5.1 — cascade interval honors bottleIntervalRules", () => {
     const ctx = aContext({
       day: aDay({ wakeTime: 7 * 60 }),
       settings: aSettings({
-        bottleChain: { bottlesPerDay: 2, bufferAfterWakeMinutes: 10 },
+        bottleChain: { bufferAfterWakeMinutes: 10 },
         defaultBottleIntervalMinutes: 180,
       }),
       actuals: [recorded],
@@ -834,7 +834,7 @@ describe("R5.1 — recorded bottles anchor the cascade", () => {
     const ctx = aContext({
       day: aDay({ wakeTime: 7 * 60 }),
       settings: aSettings({
-        bottleChain: { bottlesPerDay: 4, bufferAfterWakeMinutes: 10 },
+        bottleChain: { bufferAfterWakeMinutes: 10 },
         defaultBottleIntervalMinutes: 180,
       }),
       actuals: [overridden],
@@ -891,7 +891,7 @@ describe("R5.1 — recorded bottles anchor the cascade", () => {
     const ctx = aContext({
       day: aDay({ wakeTime: 7 * 60 }),
       settings: aSettings({
-        bottleChain: { bottlesPerDay: 5, bufferAfterWakeMinutes: 10 },
+        bottleChain: { bufferAfterWakeMinutes: 10 },
         defaultBottleIntervalMinutes: 180,
         defaultWakeTime: 7 * 60,
       }),
@@ -944,7 +944,7 @@ describe("R5.1 — recorded bottles anchor the cascade", () => {
     const ctx = aContext({
       day: aDay({ wakeTime: 7 * 60 }),
       settings: aSettings({
-        bottleChain: { bottlesPerDay: 4, bufferAfterWakeMinutes: 10 },
+        bottleChain: { bufferAfterWakeMinutes: 10 },
         defaultBottleIntervalMinutes: 180,
       }),
       actuals: [recorded, overridden],
@@ -982,7 +982,7 @@ describe("R5.1 — recorded bottles anchor the cascade", () => {
 //
 // Each bottle's time is computed from the PREVIOUS bottle's actual rendered time (not a grid).
 // No-feed region is [nap.start, nap.end] only. Cascade stops at midnight.
-// Overnight bottles tally toward bottlesPerDay but don't anchor the cascade.
+// Overnight bottles are part of the day but don't anchor the cascade.
 
 describe("Sequential bottle cascade — chain coherence", () => {
   it("bottle_3's time is computed from bottle_2's SNAPPED time, not from a grid", () => {
@@ -998,7 +998,7 @@ describe("Sequential bottle cascade — chain coherence", () => {
     const ctx = aContext({
       day: aDay({ wakeTime: 7 * 60 }),
       settings: aSettings({
-        bottleChain: { bottlesPerDay: 5, bufferAfterWakeMinutes: 10 },
+        bottleChain: { bufferAfterWakeMinutes: 10 },
         defaultBottleIntervalMinutes: 180,
         // Long wake windows: nap_2 from R3.1 projection won't interfere.
         wakeWindowsMinutes: [120, 600, 600, 600],
@@ -1027,7 +1027,7 @@ describe("Sequential bottle cascade — chain coherence", () => {
       12 * 60 + 15, // cascade from 9:15 (not 9:30 — chain coherence)
       15 * 60 + 15,
       18 * 60 + 15,
-      21 * 60 + 15, // §F66: chain fills the whole day, no bottlesPerDay cap
+      21 * 60 + 15, // §F66: chain fills the whole day, no count cap
     ]);
   });
 
@@ -1042,7 +1042,7 @@ describe("Sequential bottle cascade — chain coherence", () => {
     const ctx = aContext({
       day: aDay({ wakeTime: 7 * 60 }),
       settings: aSettings({
-        bottleChain: { bottlesPerDay: 3, bufferAfterWakeMinutes: 0 },
+        bottleChain: { bufferAfterWakeMinutes: 0 },
         defaultBottleIntervalMinutes: 60,
         wakeWindowsMinutes: [600, 600, 600, 600],
       }),
@@ -1070,11 +1070,11 @@ describe("Sequential bottle cascade — chain coherence", () => {
 
 describe("Sequential bottle cascade — midnight rule (DOMAIN.md §2)", () => {
   it("cascade stops at midnight (1440), not at tomorrowWake", () => {
-    // bottlesPerDay=10, interval=180: slots 7:10…22:10, next 25:10 ≥ 1440 → stop. Emits 6.
+    // interval=180: slots 7:10…22:10, next 25:10 ≥ 1440 → stop. Emits 6.
     const ctx = aContext({
       day: aDay({ wakeTime: 7 * 60 }),
       settings: aSettings({
-        bottleChain: { bottlesPerDay: 10, bufferAfterWakeMinutes: 10 },
+        bottleChain: { bufferAfterWakeMinutes: 10 },
         defaultBottleIntervalMinutes: 180,
         defaultWakeTime: 7 * 60,
         wakeWindowsMinutes: [600, 600, 600, 600],
@@ -1115,7 +1115,7 @@ describe("Sequential bottle cascade — midnight rule (DOMAIN.md §2)", () => {
     const ctx = aContext({
       day: aDay({ wakeTime: 7 * 60 }),
       settings: aSettings({
-        bottleChain: { bottlesPerDay: 5, bufferAfterWakeMinutes: 10 },
+        bottleChain: { bufferAfterWakeMinutes: 10 },
         defaultBottleIntervalMinutes: 180,
         wakeWindowsMinutes: [600, 600, 600, 600],
       }),
@@ -1134,7 +1134,7 @@ describe("Sequential bottle cascade — midnight rule (DOMAIN.md §2)", () => {
       .filter((e) => e.type === "bottle")
       .sort((a, b) => a.startTime - b.startTime);
     // Overnight is part of the day but doesn't anchor; the daytime chain fills
-    // wake+buffer → cap (§F66, no bottlesPerDay cap), overnight is extra.
+    // wake+buffer → cap (§F66, no count cap), overnight is extra.
     expect(bottles.map((b) => b.startTime)).toEqual([
       2 * 60,
       7 * 60 + 10,
@@ -1161,7 +1161,7 @@ describe("Sequential bottle cascade — full-day from anchor (§F66)", () => {
     const ctx = aContext({
       day: aDay({ wakeTime: 7 * 60 }),
       settings: aSettings({
-        bottleChain: { bottlesPerDay: 4, bufferAfterWakeMinutes: 10 },
+        bottleChain: { bufferAfterWakeMinutes: 10 },
         defaultBottleIntervalMinutes: 180,
         wakeWindowsMinutes: [600, 600, 600, 600],
       }),
@@ -1185,7 +1185,7 @@ describe("Sequential bottle cascade — full-day from anchor (§F66)", () => {
       13 * 60, // anchor
       16 * 60,
       19 * 60,
-      22 * 60, // extends past bottlesPerDay
+      22 * 60, // fills to the cap
     ]);
     const recordedOut = bottles.find((b) => b.id === recorded.id);
     expect(recordedOut?.lifecycle.state).toBe("completed");
@@ -1202,7 +1202,7 @@ describe("Sequential bottle cascade — full-day from anchor (§F66)", () => {
     const ctx = aContext({
       day: aDay({ wakeTime: 7 * 60 }),
       settings: aSettings({
-        bottleChain: { bottlesPerDay: 4, bufferAfterWakeMinutes: 10 },
+        bottleChain: { bufferAfterWakeMinutes: 10 },
         defaultBottleIntervalMinutes: 240,
       }),
       actuals: [overnight],
@@ -1239,7 +1239,7 @@ describe("Sequential bottle cascade — full-day from anchor (§F66)", () => {
     const ctx = aContext({
       day: aDay({ wakeTime: 7 * 60 }),
       settings: aSettings({
-        bottleChain: { bottlesPerDay: 4, bufferAfterWakeMinutes: 10 },
+        bottleChain: { bufferAfterWakeMinutes: 10 },
         defaultBottleIntervalMinutes: 240,
       }),
       actuals: [overnight],
@@ -1262,15 +1262,15 @@ describe("Sequential bottle cascade — full-day from anchor (§F66)", () => {
       11 * 60 + 10,
       15 * 60 + 10,
       19 * 60 + 10,
-      23 * 60 + 10, // §F66: chain fills to the cap, no bottlesPerDay limit
+      23 * 60 + 10, // §F66: chain fills to the cap, no count limit
     ]);
   });
 });
 
-describe("Sequential bottle cascade — bottlesPerDay is a cold-start target, not a hard cap", () => {
-  it("when recordings already meet bottlesPerDay, cascade still projects forward (predict-don't-prescribe)", () => {
-    // bottlesPerDay is a cold-start target only; once anchors exist, cascade continues to midnight.
-    // 5 recordings + 3 forward projections = 8 bottles; not capped at bottlesPerDay=5.
+describe("Sequential bottle cascade — fills forward past recordings, no count cap", () => {
+  it("with many recordings already, cascade still projects forward to the cap (predict-don't-prescribe)", () => {
+    // Once anchors exist, cascade continues to midnight.
+    // 5 recordings + 3 forward projections = 8 bottles; no count cap.
     const overnight1 = aRecordedBottle({
       id: "rec_4am",
       eventKey: "bottle_overnight_1",
@@ -1305,7 +1305,7 @@ describe("Sequential bottle cascade — bottlesPerDay is a cold-start target, no
     const ctx = aContext({
       day: aDay({ wakeTime: 7 * 60 }),
       settings: aSettings({
-        bottleChain: { bottlesPerDay: 5, bufferAfterWakeMinutes: 10 },
+        bottleChain: { bufferAfterWakeMinutes: 10 },
         defaultBottleIntervalMinutes: 180,
         wakeWindowsMinutes: [600, 600, 600, 600],
       }),
@@ -1343,13 +1343,13 @@ describe("Sequential bottle cascade — bottlesPerDay is a cold-start target, no
     }
   });
 
-  it("cold-start fills the whole day to the cap — no bottlesPerDay limit (§F66)", () => {
+  it("cold-start fills the whole day to the cap — no count limit (§F66)", () => {
     // §F66: cold-start and anchored emit the identical interval-filled chain, so
     // persisting the now-crossed past can't change the forecast (no flicker).
     const ctx = aContext({
       day: aDay({ wakeTime: 7 * 60 }),
       settings: aSettings({
-        bottleChain: { bottlesPerDay: 5, bufferAfterWakeMinutes: 10 },
+        bottleChain: { bufferAfterWakeMinutes: 10 },
         defaultBottleIntervalMinutes: 180,
         wakeWindowsMinutes: [600, 600, 600, 600],
       }),
@@ -1387,7 +1387,7 @@ describe("Sequential bottle cascade — caps forward at bedtime (DOMAIN.md §1 +
     const ctx = aContext({
       day: aDay({ wakeTime: 7 * 60 }),
       settings: aSettings({
-        bottleChain: { bottlesPerDay: 10, bufferAfterWakeMinutes: 10 },
+        bottleChain: { bufferAfterWakeMinutes: 10 },
         defaultBottleIntervalMinutes: 180,
         defaultWakeTime: 7 * 60,
         bedtimeThreshold: 19 * 60,
@@ -1438,7 +1438,7 @@ describe("Sequential bottle cascade — caps forward at bedtime (DOMAIN.md §1 +
     const ctx = aContext({
       day: aDay({ wakeTime: 7 * 60 }),
       settings: aSettings({
-        bottleChain: { bottlesPerDay: 5, bufferAfterWakeMinutes: 10 },
+        bottleChain: { bufferAfterWakeMinutes: 10 },
         defaultBottleIntervalMinutes: 180,
         defaultWakeTime: 7 * 60,
         bedtimeThreshold: 19 * 60,
@@ -1488,7 +1488,7 @@ describe("Overnight bottle does NOT interrupt the bedtime block (DOMAIN.md §3)"
     const ctx = aContext({
       day: aDay({ wakeTime: 7 * 60 }),
       settings: aSettings({
-        bottleChain: { bottlesPerDay: 5, bufferAfterWakeMinutes: 10 },
+        bottleChain: { bufferAfterWakeMinutes: 10 },
       }),
       actuals: [recordedBedtime, overnightBottle],
       nowMinutes: 3 * 60 + 5,
@@ -1542,7 +1542,7 @@ describe("PR 3c — putdown bottle-anchor rule (ADR-0006 Concern B)", () => {
         defaultNapLengthMinutes: 45,
         putdownLeadMinutes: 15,
         defaultBottleIntervalMinutes: 180,
-        bottleChain: { bottlesPerDay: 6, bufferAfterWakeMinutes: 10 },
+        bottleChain: { bufferAfterWakeMinutes: 10 },
         bedtimeThreshold: 20 * 60,
         earliestBedtime: 20 * 60,
       }),
@@ -1582,7 +1582,7 @@ describe("PR 3c — putdown bottle-anchor rule (ADR-0006 Concern B)", () => {
         defaultNapLengthMinutes: 45,
         putdownLeadMinutes: 15,
         defaultBottleIntervalMinutes: 180,
-        bottleChain: { bottlesPerDay: 6, bufferAfterWakeMinutes: 10 },
+        bottleChain: { bufferAfterWakeMinutes: 10 },
         bedtimeThreshold: 20 * 60,
         earliestBedtime: 20 * 60,
       }),
@@ -1621,7 +1621,7 @@ describe("PR 3c — putdown bottle-anchor rule (ADR-0006 Concern B)", () => {
         defaultNapLengthMinutes: 45,
         putdownLeadMinutes: 15,
         defaultBottleIntervalMinutes: 180,
-        bottleChain: { bottlesPerDay: 6, bufferAfterWakeMinutes: 10 },
+        bottleChain: { bufferAfterWakeMinutes: 10 },
         bedtimeThreshold: 20 * 60,
         earliestBedtime: 20 * 60,
       }),
@@ -1776,7 +1776,7 @@ describe("R5.5 — dream-feed emission", () => {
         wakeWindowsMinutes: [120, 150, 180, 180, 30],
         defaultNapLengthMinutes: 60,
         defaultBottleIntervalMinutes: 180,
-        bottleChain: { bottlesPerDay: 4, bufferAfterWakeMinutes: 10 },
+        bottleChain: { bufferAfterWakeMinutes: 10 },
       });
     const run = (dreamFeedEnabled: boolean) =>
       projectDay(
@@ -1845,7 +1845,7 @@ describe("B4 — past-time emit during nap edit snaps to nap edge", () => {
     const ctx = aContext({
       day: aDay({ wakeTime: 7 * 60 }),
       settings: aSettings({
-        bottleChain: { bottlesPerDay: 4, bufferAfterWakeMinutes: 10 },
+        bottleChain: { bufferAfterWakeMinutes: 10 },
         defaultBottleIntervalMinutes: 180,
         wakeWindowsMinutes: [],
         bedtimeThreshold: 22 * 60,
@@ -1882,7 +1882,7 @@ describe("B4 — past-time emit during nap edit snaps to nap edge", () => {
     const ctx = aContext({
       day: aDay({ wakeTime: 8 * 60 }),
       settings: aSettings({
-        bottleChain: { bottlesPerDay: 2, bufferAfterWakeMinutes: 10 },
+        bottleChain: { bufferAfterWakeMinutes: 10 },
         defaultBottleIntervalMinutes: 180,
         wakeWindowsMinutes: [7 * 60], // 8am + 7h → nap_1 at 3:00-3:45p
         defaultNapLengthMinutes: 45,
@@ -1922,7 +1922,7 @@ describe("B4 — past-time emit during nap edit snaps to nap edge", () => {
     const ctx = aContext({
       day: aDay({ wakeTime: 8 * 60 }),
       settings: aSettings({
-        bottleChain: { bottlesPerDay: 2, bufferAfterWakeMinutes: 10 },
+        bottleChain: { bufferAfterWakeMinutes: 10 },
         defaultBottleIntervalMinutes: 180,
         wakeWindowsMinutes: [7 * 60 + 20], // 8am + 7h20m → nap_1 at 3:20-4:05p
         defaultNapLengthMinutes: 45,
@@ -1952,7 +1952,7 @@ describe("B4 — past-time emit during nap edit snaps to nap edge", () => {
     const ctx = aContext({
       day: aDay({ wakeTime: 7 * 60 }),
       settings: aSettings({
-        bottleChain: { bottlesPerDay: 3, bufferAfterWakeMinutes: 10 },
+        bottleChain: { bufferAfterWakeMinutes: 10 },
         defaultBottleIntervalMinutes: 180,
         wakeWindowsMinutes: [],
         bedtimeThreshold: 22 * 60,

@@ -366,13 +366,12 @@ adjustments occur in a pass, bounded by `MAX_PASSES = 8`.
 V2 hard-suppressed projected bottles past `bedtimeThreshold` AND
 implicitly capped daily emission. V3 removes both. Babies — especially
 newborns — are unpredictable and may feed 8–12+ times/day, including
-overnight. The engine projects bottles via cascade (R5.1) until either:
-
-- The next projected start would land at/after the next day's
-  `defaultWakeTime` (then it's tomorrow's bottle, not today's).
-- The user has logged enough bottles that no further projections are
-  needed for the day's expected cadence (see R5.11 for the lower
-  bound that drives placeholder projection).
+overnight. The engine projects bottles via cascade (R5.1) until the
+next projected start would land at/after the day's time cap (midnight,
+R5.8) — then it's tomorrow's bottle, not today's. There is no
+count-based stop: the chain fills the whole day regardless of how many
+bottles have been logged (§F66, predicts-not-prescribes; see R5.11 for
+how the placeholder chain anchors).
 
 There is no `maxBottlesPerDay` setting. There is no `latestProjectedStart`
 setting either — the latest projected start is **derived** from the
@@ -402,28 +401,28 @@ time is a forecast, not a measurement.
 - **Edge case it prevents**: dashboard counting "Bottle 1" as logged
   before the user has actually fed the baby.
 
-### R5.11 Expected bottles per day drives placeholder projection
+### R5.11 Placeholder projection anchors at wake + buffer and fills the day
 
-`Settings.bottleChain.bottlesPerDay` (whole number; configurable, no
-hard default — set per child's stage) is the **expected lower limit**
-of daily intake. The engine projects bottle placeholders up to this
-count so the timeline shows expected feeding cadence even before any
-bottle has been recorded.
+The engine projects bottle placeholders so the timeline shows expected
+feeding cadence even before any bottle has been recorded. The chain
+**fills the whole day to the time cap** (midnight, R5.8) — there is no
+expected-count target that caps it (§F66 removed the former
+`bottleChain.bottlesPerDay` field; the cascade is purely interval-driven).
 
 **Anchoring with no recorded bottles**: the first placeholder lands at
 `Day.wakeTime + settings.bottleChain.bufferAfterWakeMinutes` (default
 10). Subsequent placeholders cascade at `defaultBottleIntervalMinutes`
-intervals up to `bottlesPerDay` total. The buffer is what avoids the
-"first bottle exactly at wake time" false-history problem from R5.10
-while still rendering an actionable forecast from minute one.
+intervals until the next start crosses the time cap. The buffer is what
+avoids the "first bottle exactly at wake time" false-history problem
+from R5.10 while still rendering an actionable forecast from minute one.
 
-**Anchoring after the first recorded bottle**: cascade resumes from
+**Anchoring after a recorded bottle**: cascade re-seeds forward from
 the *latest* recorded bottle's startTime per R5.1. Earlier placeholder
-projections from before that recording are dropped.
+projections survive — a recorded bottle never absorbs an earlier
+forecast slot (R5.9, §F66).
 
-There is no upper bound (R5.8); reality routinely exceeds
-`bottlesPerDay` and additional bottles are added via FAB or via the
-cascade once recordings start.
+Babies commonly feed more often than any preset cadence; additional
+bottles are added via FAB or via the cascade once recordings start.
 
 - **Why**: Jake wants the timeline to show the day's expected cadence
   at a glance, without prescribing a ceiling that's wrong for newborns.

@@ -17,7 +17,7 @@ vi.mock("../../hooks/useNowMinutes", () => ({
 const day = aDay({ wakeTime: 7 * 60 });
 const settings = aSettings({
   wakeWindowsMinutes: [120, 150],
-  bottleChain: { bottlesPerDay: 3, bufferAfterWakeMinutes: 10 },
+  bottleChain: { bufferAfterWakeMinutes: 10 },
   defaultBottleIntervalMinutes: 180,
 });
 

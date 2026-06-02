@@ -28,7 +28,7 @@ const DEFAULTS: Omit<Settings, "childId"> = {
   defaultBottleIntervalMinutes: 180,
   bottleRules: [],
   bottleIntervalRules: [],
-  bottleChain: { bottlesPerDay: 5, bufferAfterWakeMinutes: 10 },
+  bottleChain: { bufferAfterWakeMinutes: 10 },
   minBottleIntervalMinutes: 90,
   putdownLeadMinutes: 15,
   pumpTimes: [],

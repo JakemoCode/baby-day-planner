@@ -316,12 +316,12 @@ Existing fields:
 
 V3 additions:
 - `defaultWakeTime`: "07:00" (drives bedtime endTime — ENGINE_SPEC.md R7.1)
-- `bottleChain`: { bottlesPerDay: number;
-  bufferAfterWakeMinutes: number } — expected lower limit of daily
-  intake plus the wake-to-first-placeholder buffer (default 10) that
-  anchors the placeholder projection per ENGINE_SPEC.md R5.11. No upper
-  bound and no fixed `latestProjectedStart`; both are derived from the
-  cascade (R5.8). Configurable per child.
+- `bottleChain`: { bufferAfterWakeMinutes: number } — the
+  wake-to-first-placeholder buffer (default 10) that anchors the
+  placeholder projection per ENGINE_SPEC.md R5.11. No daily-count
+  target, no upper bound, no fixed `latestProjectedStart`; the chain
+  fills the day from the cascade alone (R5.8, §F66). Configurable per
+  child.
 - `pumpOwnerSlot`: "parent2" (drives pump owner default — ENGINE_SPEC.md R12.8)
 - `dailyRecurring`: [] (replaces `cookDinner` — ENGINE_SPEC.md §11)
 - `owners`: { parent1: {displayName, color}, parent2: {...},

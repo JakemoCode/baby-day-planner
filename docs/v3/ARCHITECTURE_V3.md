@@ -253,9 +253,9 @@ Settings.defaultWakeTime: TimeMin;            // R7.1 — drives bedtime endTime
 Settings.bedtimeThreshold: TimeMin;           // R7.6 — probability shaper
 Settings.defaultNapLengthMinutes: number;     // R7.6.1 — drives convert-prompt window
 Settings.bottleChain: {
-  bottlesPerDay: number;                      // R5.11 — expected lower limit
-  // No upper bound and no fixed latest-projected-start; both are
-  // derived from the cascade itself (see R5.8).
+  bufferAfterWakeMinutes: number;             // R5.11 — wake→first-placeholder anchor
+  // No daily-count target, no upper bound, no fixed latest-projected-
+  // start; the chain fills the day from the cascade itself (R5.8, §F66).
 };
 Settings.napDurationMin: number;              // R3.10.1 — soft warning floor
 Settings.napDurationMax: number;              // R3.10.1 — soft warning ceiling

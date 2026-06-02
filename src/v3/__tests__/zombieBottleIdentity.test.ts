@@ -18,7 +18,7 @@ import { aDay, aRecordedBottle, aSettings } from "./factories";
 import type { Event } from "../schemas";
 
 const settings = aSettings({
-  bottleChain: { bottlesPerDay: 4, bufferAfterWakeMinutes: 10 },
+  bottleChain: { bufferAfterWakeMinutes: 10 },
   defaultBottleIntervalMinutes: 180,
   wakeWindowsMinutes: [], // isolate the bottle chain
   bedtimeThreshold: 23 * 60,

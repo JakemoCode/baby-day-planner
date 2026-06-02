@@ -180,13 +180,6 @@ export default function SettingsPage() {
           onChange={(v) => set("minBottleIntervalMinutes", v)}
         />
         <NumberRow
-          id="bottlesPerDay"
-          label="Expected bottles per day"
-          value={value.bottleChain.bottlesPerDay}
-          onChange={(v) => set("bottleChain", { ...value.bottleChain, bottlesPerDay: v })}
-          help="Lower-bound forecast; baby may feed more often. Drives placeholder projection."
-        />
-        <NumberRow
           id="bufferAfterWakeMinutes"
           label="Buffer after wake (min)"
           value={value.bottleChain.bufferAfterWakeMinutes}

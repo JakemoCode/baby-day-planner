@@ -57,7 +57,7 @@ describe("v3SettingsConverter", () => {
     // Explicitly-written field preserved.
     expect(back.defaultWakeTime).toBe(7 * 60);
     // Defaulter fills nested shapes that were absent in the raw doc.
-    expect(back.bottleChain).toEqual({ bottlesPerDay: 5, bufferAfterWakeMinutes: 10 });
+    expect(back.bottleChain).toEqual({ bufferAfterWakeMinutes: 10 });
     expect(back.daycare.enabled).toBe(false);
     expect(back.owners.parent1.displayName).toBe("");
     expect(back.wakeWindowsMinutes).toEqual([95, 100, 110, 120, 120, 120]);

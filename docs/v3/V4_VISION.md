@@ -8,7 +8,7 @@
 
 ## §1 The shift
 
-Today: user configures ~10 numeric settings (`bottlesPerDay`,
+Today: user configures ~10 numeric settings (`defaultBottleAmountOz`,
 `wakeWindowsMinutes`, `bedtimeThreshold`, `defaultNapLengthMinutes`,
 …) that describe baby's schedule.
 
@@ -23,7 +23,7 @@ Per-family overrides still possible. Defaults update as baby ages.
   6-9 / 9-12 / 12+ months), each carrying typical
   wake-window, naps/day, feeds/day, oz/feed, daily intake, sleep-
   cycle length, bedtime-emerged flag, overnight-feeds expectation.
-- **Settings thins out**. `bottlesPerDay`, intervals, wake windows,
+- **Settings thins out**. Bottle amounts, intervals, wake windows,
   `bedtimeThreshold`, nap length, short-nap params — all derived
   with override. Render-time settings (`putdownLeadMinutes`,
   `bufferAfterWakeMinutes`, `minBottleIntervalMinutes`,

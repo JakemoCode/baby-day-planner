@@ -119,13 +119,12 @@ export const arbDay: fc.Arbitrary<Day> = arbDayTime.map((wakeTime) => aDay({ wak
 /** Settings spanning realistic ranges so the cascade produces sensible cadence shapes. */
 export const arbSettings: fc.Arbitrary<Settings> = fc
   .record({
-    bottlesPerDay: fc.integer({ min: 2, max: 8 }),
     bedtimeThresholdHour: fc.integer({ min: 18, max: 21 }),
     bottleIntervalMinutes: fc.constantFrom(150, 180, 210),
   })
-  .map(({ bottlesPerDay, bedtimeThresholdHour, bottleIntervalMinutes }) =>
+  .map(({ bedtimeThresholdHour, bottleIntervalMinutes }) =>
     aSettings({
-      bottleChain: { bottlesPerDay, bufferAfterWakeMinutes: 10 },
+      bottleChain: { bufferAfterWakeMinutes: 10 },
       bedtimeThreshold: bedtimeThresholdHour * 60,
       defaultBottleIntervalMinutes: bottleIntervalMinutes,
     }),
