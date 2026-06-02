@@ -12,6 +12,7 @@ import { useV3TomorrowPlan } from "@/v3/hooks/useV3TomorrowPlan";
 import { useDayPageState } from "@/v3/hooks/useDayPageState";
 import { isEngineEmittedId, recordedIdFor } from "@/v3/lib/eventConventions";
 import { promoteFromPlan, startNewDay } from "@/v3/repositories/days";
+import { forecastSnapshotDocs } from "@/v3/lib/forecastSnapshot";
 import { deleteEvent, listEvents, reconcileDuplicateEventDocs } from "@/v3/repositories/events";
 import { db } from "@/lib/firebase/client";
 import { DashboardSkeleton } from "@/v3/components/Dashboard/DashboardSkeleton";
@@ -104,6 +105,9 @@ export default function DashboardPage() {
       newDate: todayDate(),
       newWakeTime: wakeTime,
       ...(day.templateId ? { templateId: day.templateId } : {}),
+      // §F66 Slice 4: freeze the closing day's forecast bottles into history
+      // (projections are ephemeral, so this is the one moment we persist them).
+      freezeForecast: forecastSnapshotDocs(projected, day.id),
     });
   };
   const handleStartDay = async ({ useTomorrowPlan }: { useTomorrowPlan: boolean }) => {
