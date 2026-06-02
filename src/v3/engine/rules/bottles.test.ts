@@ -1983,7 +1983,7 @@ describe("R5 realize/relocate — editing a forecast bottle moves it, never dupl
     const ctx = aContext({
       day: aDay({ wakeTime: 7 * 60 }),
       settings: aSettings({
-        bottleChain: { bottlesPerDay: 4, bufferAfterWakeMinutes: 10 },
+        bottleChain: { bufferAfterWakeMinutes: 10 },
         defaultBottleIntervalMinutes: 180,
       }),
       nowMinutes: 16 * 60 + 20,

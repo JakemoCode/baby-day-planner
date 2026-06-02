@@ -22,7 +22,7 @@ function ctxWith(actuals: Event[]) {
   return aContext({
     day: aDay({ wakeTime: 7 * 60 }),
     settings: aSettings({
-      bottleChain: { bottlesPerDay: 4, bufferAfterWakeMinutes: 10 },
+      bottleChain: { bufferAfterWakeMinutes: 10 },
       defaultBottleIntervalMinutes: 180,
     }),
     nowMinutes: NOW,
