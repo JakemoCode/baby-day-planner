@@ -279,31 +279,28 @@ function computeBottleProjectionTimes(inputs: CascadeInputs, ctx: Context): numb
   let cursor = seedTime;
   let anchorIdx = 0;
   let lastPlaced = wakeTime - 1;
+  // Re-seed the cascade forward from a consumed anchor (re-flow at its amount's interval).
+  const consume = (a: Event): void => {
+    cursor = a.startTime + intervalForAmount(rules, a.amountOz, defaultInterval);
+    lastPlaced = a.startTime;
+    anchorIdx++;
+  };
   for (let guard = 0; cursor < cap && guard < 64; guard++) {
     const anchor = anchors[anchorIdx];
-    // anchorReached true ⇒ anchor is defined (the `!` below is safe).
     if (anchorReached(cursor, anchor)) {
-      cursor = anchor!.startTime + intervalForAmount(rules, anchor!.amountOz, defaultInterval);
-      lastPlaced = anchor!.startTime;
-      anchorIdx++;
+      consume(anchor!);
       continue;
     }
     const placed = snap(cursor);
     if (placed >= cap || placed < wakeTime || placed <= lastPlaced) break;
     if (anchorReached(placed, anchor)) {
-      cursor = anchor!.startTime + intervalForAmount(rules, anchor!.amountOz, defaultInterval);
-      lastPlaced = anchor!.startTime;
-      anchorIdx++;
+      consume(anchor!);
       continue;
     }
-    // Realize/relocate (BOTTLE_SPEC §4): a recorded bottle tagged as realized came
-    // from a drawer edit of THIS forecast slot — absorb the imminent slot it realized
-    // (the one within one interval before it) instead of re-emitting it beside the
-    // feed. Earlier slots and untagged FAB-add extras still survive (R5.1/5.9).
+    // Realize/relocate (BOTTLE_SPEC §4): absorb the imminent slot a realized bottle
+    // moved (the one adjacent to it), instead of re-emitting it beside the feed.
     if (anchor?.realizedForecast === true && placed >= anchor.startTime - projInterval) {
-      cursor = anchor.startTime + intervalForAmount(rules, anchor.amountOz, defaultInterval);
-      lastPlaced = anchor.startTime;
-      anchorIdx++;
+      consume(anchor);
       continue;
     }
     times.push(placed);
