@@ -182,8 +182,10 @@ describe("R5.4 — labels renumber chronologically (all bottles); recorded event
     expect(rec.eventKey).toBe("bottle_3");
     expect(rec.label).toBe(`Bottle ${bottles.indexOf(rec) + 1}`);
     bottles.forEach((b, i) => expect(b.label).toBe(`Bottle ${i + 1}`));
+    // §F66 full-day: a 7:10 morning forecast precedes the 12:30 anchor (the ~10:10
+    // slot is absorbed by it), so the first future-projected bottle (15:30) is slot 5.
     const firstProjected = bottles.find((b) => b.lifecycle.state === "projected");
-    expect(firstProjected!.eventKey).toBe("bottle_4");
+    expect(firstProjected!.eventKey).toBe("bottle_5");
   });
 });
 
@@ -243,6 +245,41 @@ describe("R5.1 — cascade resumes from the latest recorded bottle", () => {
       ),
     ).toBe(true);
     expect(projections.every((b) => b.kind === "instant")).toBe(true);
+  });
+});
+
+describe("§F66 PR1 — full-day cascade: morning bottles survive a recorded afternoon bottle", () => {
+  it("fills morning forecast slots before a far-out recorded anchor (not forward-only)", () => {
+    // One recorded bottle at 2:00pm, wake 7:00, 180-min cadence. The morning has
+    // room for forecasts at ~7:10 and ~10:10 before the 2pm anchor; forward-only
+    // (old R5.1) would drop them. Reality wins: morning reality must not vanish.
+    const recorded = aRecordedBottle({
+      id: "recorded_bottle_afternoon",
+      eventKey: "bottle_4",
+      start: 14 * 60,
+    });
+    const ctx = aContext({
+      day: aDay({ wakeTime: 7 * 60 }),
+      settings: aSettings({
+        bottleChain: { bottlesPerDay: 4, bufferAfterWakeMinutes: 10 },
+        defaultBottleIntervalMinutes: 180,
+      }),
+      actuals: [recorded],
+    });
+
+    const out = projectDay(
+      { day: ctx.day, settings: ctx.settings, actuals: ctx.actuals, nowMinutes: 14 * 60 + 30 },
+      { rules: ALL },
+    );
+    const times = out
+      .filter((e) => e.type === "bottle")
+      .map((b) => b.startTime)
+      .sort((a, b) => a - b);
+
+    // Morning forecasts present alongside the 2pm anchor (not erased by it).
+    expect(times).toContain(7 * 60 + 10);
+    expect(times).toContain(10 * 60 + 10);
+    expect(times).toContain(14 * 60);
   });
 });
 
@@ -686,9 +723,9 @@ describe("R5.1 — recorded bottles anchor the cascade", () => {
     ).toBe(true);
   });
 
-  it("late-day recorded anchor: forward-only cascade to midnight (no backfill per DOMAIN §2)", () => {
-    // Late-day anchor forward-only; missing morning slots not phantom-filled.
-    // Recorded at 19:10; forward: 22:10 → 25:10 ≥ 1440 → stop. Result: [19:10, 22:10].
+  it("late-day recorded anchor: full-day cascade fills morning slots + forward (§F66)", () => {
+    // §F66: past reality must not vanish. Morning forecasts (7:10, 10:10, 13:10,
+    // 16:10) fill before the 19:10 anchor; forward from it: 22:10 (25:10 ≥ 1440 stop).
     const overridden: Event = aProjectedBottle({
       id: "manual_bottle_1",
       eventKey: "bottle_1",
@@ -720,7 +757,14 @@ describe("R5.1 — recorded bottles anchor the cascade", () => {
       .filter((e) => e.type === "bottle")
       .sort((a, b) => a.startTime - b.startTime);
 
-    expect(bottles.map((b) => b.startTime)).toEqual([19 * 60 + 10, 22 * 60 + 10]);
+    expect(bottles.map((b) => b.startTime)).toEqual([
+      7 * 60 + 10,
+      10 * 60 + 10,
+      13 * 60 + 10,
+      16 * 60 + 10,
+      19 * 60 + 10, // anchor
+      22 * 60 + 10,
+    ]);
     const uniqueStarts = new Set(bottles.map((b) => b.startTime)); // guard against dup-render regression
     expect(uniqueStarts.size).toBe(bottles.length);
     const anchor = bottles.find((b) => b.id === overridden.id);
@@ -937,10 +981,11 @@ describe("Sequential bottle cascade — midnight rule (DOMAIN.md §2)", () => {
   });
 });
 
-describe("Sequential bottle cascade — forward-only from anchor", () => {
-  it("mid-day recorded anchor: forward-only cascade to midnight, no backfill", () => {
+describe("Sequential bottle cascade — full-day from anchor (§F66)", () => {
+  it("mid-day recorded anchor: morning fill + forward, with the near slot absorbed", () => {
     // Mid-day recording doesn't phantom-anchor missing morning slots.
-    // Recorded at 13:00; forward: 16:00, 19:00, 22:00, then 25:00 ≥ 1440 → stop.
+    // §F66 full-day: 7:10 morning forecast, then the ~10:10 slot is absorbed by the
+    // 13:00 anchor (610→780 is < one interval), then forward 16:00, 19:00, 22:00.
     const recorded = aRecordedBottle({
       id: "actual_bottle_midday",
       eventKey: "bottle_midday",
@@ -969,7 +1014,8 @@ describe("Sequential bottle cascade — forward-only from anchor", () => {
       .filter((e) => e.type === "bottle")
       .sort((a, b) => a.startTime - b.startTime);
     expect(bottles.map((b) => b.startTime)).toEqual([
-      13 * 60, // anchor
+      7 * 60 + 10, // morning forecast
+      13 * 60, // anchor (absorbs the ~10:10 slot)
       16 * 60,
       19 * 60,
       22 * 60, // extends past bottlesPerDay
