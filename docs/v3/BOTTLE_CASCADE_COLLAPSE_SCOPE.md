@@ -85,25 +85,44 @@ actions** — log-feed, FAB-add — plus a **single-writer** day-close snapshot)
   the time-edit id-integrity problem (#301 reviewer finding, still open) **all
   dissolve** — there's nothing to converge and nothing to re-derive.
 
-**Decision needed:** does PR #301 merge as-is (and the collapse builds on it), or
-does the collapse **supersede** it (close #301, fold the zombie fix into "don't
-persist projections on view")? Recommendation: **supersede** — #301 is a narrower
-fix for a problem §3.1 removes at the root. But #301 is already reviewed and green,
-so merging it first as a safety net (then simplifying) is also defensible.
+**DECIDED (2026-06-02): supersede #301.** The zombie is killed by §3.1 (no
+persist-on-view → recorded bottles are uuids), not by the startTime-id — which
+scenario C proves is fragile under time-edits. **But #301 is a mix; don't close it
+blind:**
+
+| #301 contains | Disposition |
+|---|---|
+| Flicker fix `81e2554` (cold-start fills to cap) | **KEEP** — survives the collapse |
+| R12.6 owner-by-index → chronological position | **KEEP** — correct, coupled to the full-day cascade |
+| R12.10 / `setOwnerOverride` → `bottle_pos_N` positional | **KEEP** — projected-bottle overrides still apply |
+| `recorded_bottle_t<startTime>` id, `recordedIdForEvent`, `isRecordedBottleId`, drawer/persist id wiring | **DROP** — superseded by uuid + no-persist-on-view |
+
+So "supersede #301" = **extract the keepers onto the rebuild, drop the doc-id
+machinery, close the PR.** Per "no silent behavior drops," the keepers must land,
+not vanish with the PR.
+
+**Logged-feed semantics — DECIDED (2026-06-02): a FAB-add is an intentional
+*extra*.** The user could have time-edited a forecast bottle (less work) but chose
+to FAB-add (more work) — trust that signal. So **the action disambiguates intent:**
+drawer time-edit on a projection = *realize/relocate* that forecast slot; FAB-add =
+a distinct extra feed that **inserts and never deletes a forecast** (PR A).
 
 ---
 
-## §5 Incremental PR plan (each independently mergeable; confirm §4 first)
+## §5 Rebuild sequence (graph-aware; the whole §F66 stack is unmerged)
 
-| PR | Scope | Risk |
+State: `#300` (full-day cascade, the foundation) and `#301` (doc-id, superseded)
+are **both open**; `main` lacks the cascade. So the rebuild re-bases on `#300`.
+
+| Step | Scope | Notes |
 |---|---|---|
-| **A** | Fix recording/adding a feed (see §8-B + the model decision below). + seam test. | Low–med; engine-local. Unblocks the FAB bug. **Encodes a model decision — confirm first.** |
-| **B** | Stop persisting projections on view (`useAutoPromotePersistence` → ephemeral recompute). Move the snapshot-to-recorded to day-close/archival. | Medium; touches lifecycle + history. The crux of §3.1. |
-| **C** | Recorded bottles → uuid; retire `recordedIdForEvent`/`recorded_bottle_t`/slot machinery (`maxRecorded`/`nextFreeSlot`). Resolves §4. | Medium; identity + migration. |
-| **D** | Retire `bottlesPerDay` field (schema/UI/defaults/fixtures). | Low; mechanical. |
+| **0. Merge #300** | Full-day cascade (PR1). Foundation; correct per diagnose. | Its `anchorAbsorbs` is reworked in PR-K, so #300 + PR-K ship close together. |
+| **PR-K (keepers + extras)** | Extract #301 keepers (flicker `81e2554`, R12.6 chronological, R12.10 positional + tests) **and** PR A (FAB-add = non-anchoring *extra*: inserts, never deletes/re-phases a forecast; absorption narrowed to fire only at/after the cursor reaches the feed). Then **close #301**. | Bundles the flicker fix with the extras fix so logging never reshuffles (Jake's constraint). The active-day forecast becomes coherent. |
+| **PR-B (no persist-on-view)** | `useAutoPromotePersistence` → ephemeral recompute; recorded bottles created only by explicit actions; **day-close snapshot** freezes the forecast into recorded docs for history. Recorded bottles → **uuid**; drop `recorded_bottle_t`/`recordedIdForEvent`/`isRecordedBottleId` + slot machinery (`maxRecorded`/`nextFreeSlot`). | Kills zombie + time-edit dup + persist churn at the root. The crux of §3.1 + resolves §4. Medium; lifecycle + history + migration. |
+| **PR-D** | Retire `bottlesPerDay` (schema/UI/defaults/fixtures). | Low; mechanical. |
 
-PRs are ordered so each is shippable alone. A is the only one that touches the
-open FAB bug; if dev-testing needs unblocking sooner, A can go first standalone.
+Each step is independently mergeable. PR-K is what unblocks dev-testing (the FAB
+bug + a coherent active day). PR-B is the structural root-cause fix.
 
 ---
 
