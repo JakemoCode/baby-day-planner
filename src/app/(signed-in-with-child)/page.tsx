@@ -56,11 +56,6 @@ export default function DashboardPage() {
   const hasTomorrowPlan = todaysPlan?.status === "confirmed";
   const [wakeSheetOpen, setWakeSheetOpen] = useState(false);
 
-  // §F66: projections are EPHEMERAL — never persisted on view. The full-day cascade
-  // keeps morning forecasts alive without persistence (so the old auto-promote hook is
-  // gone), which kills the zombie + the nav-to-nav flicker at the root. History is
-  // frozen at day-close via the archival snapshot, not by writing on every render.
-
   // Show skeleton until day+settings arrive. `wakeTime === undefined` is the gate
   // (not `!wakeTime`) because wakeTime:0 is valid (midnight).
   if (dayLoading || settingsLoading || !settings || !day || day.wakeTime === undefined) {
