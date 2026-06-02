@@ -155,3 +155,24 @@ Issue #6g (7th bottle never renders) is probably its own root cause — likely a
 **Estimated effort**: grill ~1–2 hr → plan ~1 hr → 3–5 implementation PRs of 1–3 hr each. Trivial items ship anytime.
 
 ---
+
+## POST-AUDIT REVISION (2026-06-01) — supersedes the "delete hook / skip" resolutions above
+
+An adversarial review of `F66_SCOPE.md` (13 findings, S1–S7 + N1–N6) overturned two
+earlier-in-the-grill conclusions. The **authoritative final model lives in
+`docs/v3/F66_SCOPE.md` + ADR-0007 + CONTEXT.md**; this section records what changed:
+
+- **KEEP `useAutoPromotePersistence`** (do NOT delete it). History reads static docs
+  (`history/[date]/page.tsx` → `listEvents`, no recompute), so an auto-promoted
+  bottle must persist to survive in the record — and Jake wants promotion-to-recorded
+  retained (zero-edit when the forecast was right). The bug was the *id*, not the hook.
+- **Stable id = `recorded_bottle_t<startTime>`** (deterministic), NOT uuid. uuid would
+  re-create the zombie under concurrent two-device auto-promotion (two random ids per
+  feed). Naps/bedtime keep `recorded_<eventKey>` — `recordedIdFor` is NOT retired.
+- **No skip/suppression** — babies don't skip cascade feeds (they move/shrink/extra),
+  so the "skipped feed (suppression)" resolution is **retired**. Cascade bottles are
+  edited; the drawer keeps **Reset** (revert-to-forecast), not a skip.
+- **Owner-by-index by chronological position** (matches spec); owner-overrides off the
+  renumbering eventKey.
+- **Plan is 2 PRs, not 4**: (1) full-day cascade [done, #300]; (2) stable-id persistence
+  + owner re-keying + deterministic migration (merges old PR2+PR4; PR3-skip dropped).

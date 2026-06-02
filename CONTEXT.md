@@ -14,17 +14,20 @@ this event will happen at this time." Not persisted to Firestore.
 Two **separate** identities, clarified by the 2026-06-01 zombie-bottle
 grill (see [ADR-0007](docs/adr/0007-uuid-storage-identity-eventkey-slot-role.md)):
 
-- **`id`** — the **durable storage identity**. A stable `<type>_<uuid>`
-  (`newEventId`), assigned once at creation and never derived from mutable
-  state. The only thing that keys a Firestore doc. Pumps and FAB-created
-  bottles already use this.
+- **`id`** — the **durable storage identity**: stable, assigned once, and
+  **never derived from a renumbering value**. Its form depends on how the event
+  is created: a random `<type>_<uuid>` (`newEventId`) for a deliberate single
+  action (FAB-add, pump); a **deterministic `recorded_bottle_t<startTime>`** for
+  an auto-promoted bottle (so two devices promoting the same feed converge on
+  one doc — a random uuid would diverge); `recorded_<eventKey>` for naps/bedtime
+  (whose `eventKey`s don't renumber).
 - **`eventKey`** — a **renumberable slot/role label** (`bottle_N`, `nap_N`,
   `recurring_<id>`, `bedtime`, `bottle_dream`) used only for engine semantics:
   owner-by-index, template/owner-override mapping, recorded↔projected slot
   matching, sentinel detection. Re-sorts freely; **never keys storage**.
 
-The zombie bug was conflating them via `recordedIdFor(eventKey)` (deriving a
-doc id from the renumbering slot). Retired.
+The zombie bug was conflating them — deriving the *bottle* doc id from the
+renumbering slot (`recordedIdFor(eventKey)`), amplified by concurrent devices.
 
 ## recorded
 
@@ -38,16 +41,23 @@ happened at a time that hasn't arrived yet).
 Established 2026-05-25 (§F66 grill). Supersedes DATA_MODEL.md R2.2's
 claim that owner-only edits promote projected→recorded.
 
-## skipped feed (suppression)
+## feeds move, they don't skip
 
-A user-asserted **negative fact**: "the engine forecast a feed here, but it
-didn't happen." Because a trusted projection auto-promotes to `recorded` and
-isn't persisted, simply deleting it isn't enough — the cascade re-derives it
-next render. So a skip is persisted as a **suppression**, generalizing the
-existing `Day.suppressedDreamFeed` and `suppressRecurring` patterns; the cascade
-then permanently omits that feed. Future bottles are unaffected (they cadence
-from the latest *recorded* bottle, not from the skipped slot). Established
-2026-06-01 (§F66 grill).
+Domain truth (Jake, 2026-06-01 §F66 grill): a baby does **not** skip an entire
+cascade feed — critical calories always get taken. A feed may come **early,
+late, or small** (a small feed shortens the interval, so the next comes sooner),
+or an **extra** feed may happen — but a forecast feed never just "didn't happen."
+
+Consequence: cascade bottles are **edited** (time / amount / owner), never
+deleted-as-skipped. There is **no per-bottle suppression** for cascade feeds —
+the drawer's destructive action is **Reset** (revert to forecast), not Delete.
+A spurious bottle a user removes is a *bug artifact*, not a skip. Deletion is
+reserved for a **FAB-added extra** (a genuine mistake). Dream-feed and recurring
+events keep their own suppressions — those are *optional scheduled* events the
+user turns off, not cascade feeds.
+
+(This **supersedes** an earlier-in-the-grill "skipped feed (suppression)" entry
+— the suppression mechanism was designed before the domain truth surfaced.)
 
 ## planning intent
 
