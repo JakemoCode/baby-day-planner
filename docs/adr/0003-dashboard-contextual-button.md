@@ -87,4 +87,4 @@ already touched by that PR; the additional mode is incremental.
 
 - CONTEXT.md: "dashboard contextual button," "Now-cross promotion"
 - ADR-0001 (Now-cross + button removal) — this ADR extends it
-- §F66 grill: docs/v3/fast-follow/grill/f66-cascade-and-state-model-audit.md
+- §F66 grill: docs/_archive/v3/fast-follow/grill/f66-cascade-and-state-model-audit.md

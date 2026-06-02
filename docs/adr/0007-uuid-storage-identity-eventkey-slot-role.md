@@ -9,6 +9,20 @@ value* — but the first draft over-generalized to "uuid everywhere / remove
 re-create the zombie via concurrent random uuids). The Decision below is the
 corrected version.
 
+**Partial supersession (2026-06-02) — see [`../v3/BOTTLE_SPEC.md`](../v3/BOTTLE_SPEC.md) §3–§4.**
+A `/diagnose` pass found the `recorded_bottle_t<startTime>` id (Decision bullet 2)
+has a correctness hole: a time-edited bottle keeps its frozen id while its startTime
+moves, so a fresh projection at the new time can persist a *second* doc. The collapse
+fixes this at the root by making **projections ephemeral (never persisted on view)**
+and snapshotting to recorded docs only at **day-close**. That re-adopts
+"projections never persisted / bottles use uuid" — which the 2026-06-01 revision
+rejected, but its three objections no longer hold: nap/bedtime reset is untouched
+(bullets 1/3 stand); history is preserved by the day-close snapshot; and the
+concurrent-uuid zombie can't recur because auto-promote is no longer a write path
+(recorded bottles come only from explicit single-user actions). **Net: bullet 2 is
+superseded — auto-promoted bottles cease to exist; recorded bottles use `<type>_<uuid>`.
+The core principle (id ≠ renumbering value) and bullets 1, 3, 4, 5 are unchanged.**
+
 ## Context
 
 The "zombie bottle" bug: editing past bottles (concurrently, across two

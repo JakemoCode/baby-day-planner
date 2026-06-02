@@ -60,5 +60,5 @@ never anchors off ghost projections.
 ## References
 
 - CONTEXT.md: "Now-cross promotion," "recorded," "happened-fact"
-- docs/v3/fast-follow/grill/f66-cascade-and-state-model-audit.md
+- docs/_archive/v3/fast-follow/grill/f66-cascade-and-state-model-audit.md
 - Subsumes §F48 / §F59 (partially) / §F62 in fast-follow/

@@ -1,7 +1,11 @@
-# Bottle cascade & identity collapse
+# Bottle cascade & identity — spec
 
-Blueprint for collapsing the bottle subsystem after the step-back rule fired on
-a three-bug chain (2026-06-01 → 06-02):
+The single authoritative doc for the bottle subsystem. Supersedes the earlier
+`F66_SCOPE.md`, `F66_PLAN.md`, `F66_PR4_PLAN.md`, and the
+`f66-cascade-and-state-model-audit` grill doc (all archived under
+`docs/_archive/v3/`). Update this doc, not the code, if implementation reveals drift.
+
+Born when the step-back rule fired on a three-bug chain (2026-06-01 → 06-02):
 
 1. **Zombie duplicates** — concurrent auto-promote persisted the same feed under
    divergent `recorded_<eventKey>` ids (fixed by PR #301 / ADR-0007, deterministic
@@ -12,12 +16,12 @@ a three-bug chain (2026-06-01 → 06-02):
 3. **FAB-add relocates a feed** — logging a bottle at 6:25 made it *absorb* the 4:10
    forecast (the absorption window is one full interval wide). **Open.**
 
-All three trace to **two mechanisms doing too much**. This doc maps the collapse.
-It is the spec — update the doc, not the code, if implementation reveals drift.
+All three trace to **two mechanisms doing too much** (§2). The collapse is in §3;
+the rebuild sequence is §5.
 
-> **Status — scope, pre-implementation.** Confirm §4 (the PR2-supersession
-> decision) before opening any implementation PR. The collapse may moot part of
-> PR #301; sequence accordingly.
+> **Status — decisions locked (2026-06-02); rebuild in progress.** #300 (full-day
+> cascade) is the foundation; #301 is superseded (§4); rebuild = PR-K → PR-B → PR-D
+> (§5). `CONTEXT.md` identity glossary updates are deferred until PR-B ships.
 >
 > **Sequencing constraint (PROVEN — see §8):** the flicker fix (`81e2554`) must
 > NOT ship in isolation. A diagnostic harness shows that, on its own, it makes the

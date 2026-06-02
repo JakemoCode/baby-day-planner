@@ -27,7 +27,7 @@ The only currently-known shifting rule is the upcoming
 
 ADR-0001 stated "Now-cross promotion" as a behavior but was
 layer-agnostic about *where* in the pipeline it runs.
-`docs/v3/F66_PLAN.md` PR 4 Task 4.2 placed it in `renderProjection`
+`docs/_archive/v3/F66_PLAN.md` PR 4 Task 4.2 placed it in `renderProjection`
 (render-side, after engine). That's wrong: downstream engine rules
 must see past events as `recorded` so they only inform remaining
 projections, not re-project them. Engine-side is the right layer.
