@@ -266,34 +266,36 @@ function computeBottleProjectionTimes(inputs: CascadeInputs, ctx: Context): numb
   );
   const isColdStart = anchors.length === 0;
 
+  // No room for a full projection-interval gap before the anchor → the anchor IS
+  // this feed (the forecast slot it satisfies). Advance from its amount.
+  const anchorAbsorbs = (t: number, anchor: Event | undefined): boolean =>
+    anchor !== undefined && (anchor.startTime <= t || anchor.startTime - t < projInterval);
+
   const times: number[] = [];
   let cursor = seedTime;
-  let ai = 0;
-  let last = wakeTime - 1;
+  let anchorIdx = 0;
+  let lastPlaced = wakeTime - 1;
   // bottlesPerDay caps cold-start only; once anchored the chain runs to cap.
   for (let guard = 0; cursor < cap && guard < 64; guard++) {
     if (isColdStart && times.length >= target) break;
-    const anchor = anchors[ai];
-    // Crowds: no room for a full projection-interval gap before the anchor → the
-    // anchor IS this feed (the forecast slot it satisfies). Advance from its amount.
-    const crowds = (t: number) =>
-      anchor !== undefined && (anchor.startTime <= t || anchor.startTime - t < projInterval);
-    if (crowds(cursor)) {
+    const anchor = anchors[anchorIdx];
+    // anchorAbsorbs true ⇒ anchor is defined (the `!` below is safe).
+    if (anchorAbsorbs(cursor, anchor)) {
       cursor = anchor!.startTime + intervalForAmount(rules, anchor!.amountOz, defaultInterval);
-      last = anchor!.startTime;
-      ai++;
+      lastPlaced = anchor!.startTime;
+      anchorIdx++;
       continue;
     }
     const placed = snap(cursor);
-    if (placed >= cap || placed < wakeTime || placed <= last) break;
-    if (crowds(placed)) {
+    if (placed >= cap || placed < wakeTime || placed <= lastPlaced) break;
+    if (anchorAbsorbs(placed, anchor)) {
       cursor = anchor!.startTime + intervalForAmount(rules, anchor!.amountOz, defaultInterval);
-      last = anchor!.startTime;
-      ai++;
+      lastPlaced = anchor!.startTime;
+      anchorIdx++;
       continue;
     }
     times.push(placed);
-    last = placed;
+    lastPlaced = placed;
     cursor = placed + projInterval;
   }
   return times;
