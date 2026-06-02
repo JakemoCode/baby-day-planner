@@ -8,7 +8,6 @@ import { isRenderSynthetic } from "@/v3/lib/syntheticEvents";
 import { nextBottle, nextNap, projectedBedtime } from "@/v3/selectors";
 import { nextDashboardEvent, pumpTotalOz } from "@/v3/components/Dashboard/dashboardStats";
 import { useNowMinutes } from "@/hooks/useNowMinutes";
-import { useAutoPromotePersistence } from "@/v3/hooks/useAutoPromotePersistence";
 import { useV3TomorrowPlan } from "@/v3/hooks/useV3TomorrowPlan";
 import { useDayPageState } from "@/v3/hooks/useDayPageState";
 import { isEngineEmittedId, recordedIdFor } from "@/v3/lib/eventConventions";
@@ -56,13 +55,10 @@ export default function DashboardPage() {
   const hasTomorrowPlan = todaysPlan?.status === "confirmed";
   const [wakeSheetOpen, setWakeSheetOpen] = useState(false);
 
-  // Persists engine-auto-promoted bottles so they survive the next cascade pass.
-  useAutoPromotePersistence({
-    db,
-    childId: CHILD_ID,
-    projected,
-    actuals,
-  });
+  // §F66: projections are EPHEMERAL — never persisted on view. The full-day cascade
+  // keeps morning forecasts alive without persistence (so the old auto-promote hook is
+  // gone), which kills the zombie + the nav-to-nav flicker at the root. History is
+  // frozen at day-close via the archival snapshot, not by writing on every render.
 
   // Show skeleton until day+settings arrive. `wakeTime === undefined` is the gate
   // (not `!wakeTime`) because wakeTime:0 is valid (midnight).
