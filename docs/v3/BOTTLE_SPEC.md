@@ -124,6 +124,8 @@ a distinct extra feed that **inserts and never deletes a forecast** (PR A).
 > `realizedForecast: true` at the write path (`useDrawer`) when a projection is
 > edited; the cascade absorbs the one imminent slot that tag realized. FAB-add stays
 > untagged. See `Event.realizedForecast`, `bottles.ts` (R5 realize branch).
+> Known gap (no sane edit path reaches it): a forecast moved >1 interval strands its
+> old slot — identity-based absorption tracked in §F73.
 
 ---
 
