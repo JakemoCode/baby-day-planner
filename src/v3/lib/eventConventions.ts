@@ -7,9 +7,32 @@ export function isEngineEmittedId(id: string): boolean {
   return id.startsWith(ENGINE_PROJECTED_ID_PREFIX);
 }
 
+/** Dream-feed sentinel: type "bottle" but skipped by the cascade (fixed post-bedtime slot, not an anchor). */
+export const DREAM_FEED_EVENT_KEY = "bottle_dream";
+
+export function isDreamFeed(e: { eventKey: string }): boolean {
+  return e.eventKey === DREAM_FEED_EVENT_KEY;
+}
+
 /** Deterministic Firestore doc id for a recorded event; idempotent re-saves overwrite the same doc. */
 export function recordedIdFor(eventKey: string): string {
   return `recorded_${eventKey}`;
+}
+
+/**
+ * A bottle whose slot renumbers (ADR-0007) — every bottle except the fixed-slot
+ * dream-feed. Such bottles must key their doc id + owner state off something
+ * other than the renumbering `eventKey`.
+ */
+function isRenumberableBottle(event: { type: string; eventKey: string }): boolean {
+  return event.type === "bottle" && event.eventKey !== DREAM_FEED_EVENT_KEY;
+}
+
+/** Parse the R5.4 label ("Bottle N") → 1-based chronological position; null for unrecognized labels. */
+const BOTTLE_POSITION_LABEL = /^Bottle (\d+)$/;
+export function bottlePositionFromLabel(label: string): number | null {
+  const match = BOTTLE_POSITION_LABEL.exec(label);
+  return match ? Number(match[1]) : null;
 }
 
 /**
@@ -19,8 +42,14 @@ export function recordedIdFor(eventKey: string): string {
  * clients, so deriving a doc id from it orphaned docs (the zombie). startTime is
  * client-deterministic, so concurrent auto-promotes of the same feed converge.
  */
-export function recordedBottleIdFor(startTime: number): string {
+function recordedBottleIdFor(startTime: number): string {
   return `recorded_bottle_t${startTime}`;
+}
+
+/** True for the deterministic recorded-bottle doc id, independent of the live startTime. */
+const RECORDED_BOTTLE_ID = /^recorded_bottle_t\d+$/;
+export function isRecordedBottleId(id: string): boolean {
+  return RECORDED_BOTTLE_ID.test(id);
 }
 
 /**
@@ -33,7 +62,7 @@ export function recordedIdForEvent(event: {
   eventKey: string;
   startTime: number;
 }): string {
-  if (event.type === "bottle" && event.eventKey !== DREAM_FEED_EVENT_KEY) {
+  if (isRenumberableBottle(event)) {
     return recordedBottleIdFor(event.startTime);
   }
   return recordedIdFor(event.eventKey);
@@ -47,24 +76,16 @@ export function recordedIdForEvent(event: {
  * Position-keyed overrides follow "the Nth bottle of the day", matching how
  * template `bottleOwners` map in R12.6.
  */
-const BOTTLE_POSITION_LABEL = /^Bottle (\d+)$/;
 export function ownerOverrideKeyFor(event: {
   type: string;
   eventKey: string;
   label: string;
 }): string {
-  if (event.type === "bottle" && event.eventKey !== DREAM_FEED_EVENT_KEY) {
-    const match = BOTTLE_POSITION_LABEL.exec(event.label);
-    if (match) return `bottle_pos_${match[1]}`;
+  if (isRenumberableBottle(event)) {
+    const pos = bottlePositionFromLabel(event.label);
+    if (pos !== null) return `bottle_pos_${pos}`;
   }
   return event.eventKey;
-}
-
-/** Dream-feed sentinel: type "bottle" but skipped by the cascade (fixed post-bedtime slot, not an anchor). */
-export const DREAM_FEED_EVENT_KEY = "bottle_dream";
-
-export function isDreamFeed(e: { eventKey: string }): boolean {
-  return e.eventKey === DREAM_FEED_EVENT_KEY;
 }
 
 /** Daycare singleton eventKeys; eventKey equals the EventType discriminant. Locked here to prevent drift between the daycare rule and drawer delete-suppression. */

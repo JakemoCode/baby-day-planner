@@ -844,16 +844,18 @@ describe("EventEditDrawerV3", () => {
     expect(onDelete.mock.calls[0]![0]).toMatchObject({ id: "recorded_bottle_t600" });
   });
 
-  it("delete button is SHOWN for a recorded bottle when annotatedAt !== startTime", () => {
-    // Dropping `annotatedAt===startTime` from the auto-promote check would hide Delete on all recorded bottles.
+  it("Reset (not Delete) is shown for a recorded cascade bottle whose time was edited (§F66)", () => {
+    // The recorded_bottle_t* doc id is frozen at the original startTime; a later
+    // time-edit moves startTime but keeps the id, so reset-detection must key off
+    // the id pattern. It stays a rhythm slot → Reset.
     render(
       <EventEditDrawerV3
         open
         mode="edit"
         event={projectedBottle({
-          id: "recorded_bottle_2",
-          startTime: 10 * 60,
-          // Drawer re-save at 11:00 bumped annotatedAt away from startTime.
+          id: "recorded_bottle_t600", // first recorded at 10:00
+          eventKey: "bottle_2",
+          startTime: 11 * 60, // user edited the time to 11:00
           lifecycle: { state: "recorded", annotatedAt: 11 * 60 },
         })}
         owners={owners}
@@ -865,17 +867,19 @@ describe("EventEditDrawerV3", () => {
         onDelete={() => {}}
       />,
     );
-    expect(screen.getByRole("button", { name: "Delete" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Reset" })).toBeVisible();
+    expect(screen.queryByRole("button", { name: "Delete" })).toBeNull();
   });
 
-  it("delete button is SHOWN for a manually-logged bottle (lifecycle completed)", () => {
-    // buildLoggedBottle writes lifecycle completed; user must be able to delete it.
+  it("delete button is SHOWN for a user-added one-off bottle (uuid id, lifecycle completed)", () => {
+    // A FAB-created bottle has a uuid id (newEventId), not the deterministic
+    // recorded_bottle_t* — it's a genuine one-off the user must be able to delete.
     render(
       <EventEditDrawerV3
         open
         mode="edit"
         event={projectedBottle({
-          id: "recorded_bottle_5",
+          id: "bottle_9f3c-uuid",
           startTime: 14 * 60,
           lifecycle: { state: "completed", committedAt: 14 * 60 },
         })}

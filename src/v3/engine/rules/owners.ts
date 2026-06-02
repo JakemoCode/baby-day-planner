@@ -14,7 +14,7 @@ import {
 } from "../../schemas";
 import type { Rule } from "../evaluator";
 import { hasType, isBedtime, isProjected } from "../helpers";
-import { ownerOverrideKeyFor } from "../../lib/eventConventions";
+import { bottlePositionFromLabel, ownerOverrideKeyFor } from "../../lib/eventConventions";
 
 /** Build a rule that stamps template owner[N-1] onto projected events of the given type. */
 function templateOwnerByIndexRule(spec: {
@@ -99,13 +99,6 @@ const RuleApplyTemplateWakeWindowOwners = templateOwnerByIndexRule({
   ownerList: (t) => t.wakeWindowOwners,
 });
 
-/** Chronological position from the R5.4-assigned label ("Bottle N" → N); null for dream-feed. */
-const BOTTLE_LABEL = /^Bottle (\d+)$/;
-function bottleChronologicalIndex(event: Event): number | null {
-  const match = BOTTLE_LABEL.exec(event.label);
-  return match ? Number(match[1]) : null;
-}
-
 const RuleApplyTemplateBottleOwners = templateOwnerByIndexRule({
   id: "R12.6",
   description: "Stamp template.bottleOwners[N-1] onto projected bottles by chronological position",
@@ -114,7 +107,7 @@ const RuleApplyTemplateBottleOwners = templateOwnerByIndexRule({
   keyPrefix: "bottle_",
   ownerList: (t) => t.bottleOwners,
   // §F66: slot eventKey ≠ clock position under the full-day cascade — use the label position.
-  indexOf: bottleChronologicalIndex,
+  indexOf: (e) => bottlePositionFromLabel(e.label),
 });
 
 // ---------------------------------------------------------------------------

@@ -139,7 +139,25 @@ describe("drawerDestructiveAction", () => {
     ).toBe("reset");
   });
 
-  // A FAB-created one-off bottle has a uuid id, not the deterministic recorded_<eventKey> — truly delete.
+  // Regression (§F66): a recorded cascade bottle whose TIME was edited keeps its
+  // frozen recorded_bottle_t<originalStart> doc id while startTime moves. Reset
+  // detection must key off the doc-id pattern, not the live startTime.
+  it("is reset for a recorded cascade bottle after its time was edited (id frozen, startTime moved)", () => {
+    expect(
+      drawerDestructiveAction(
+        ev({
+          type: "bottle",
+          id: "recorded_bottle_t600", // first recorded at 10:00
+          eventKey: "bottle_2",
+          startTime: 11 * 60, // user later edited the time to 11:00
+          lifecycle: recorded(11 * 60),
+        }),
+        opts,
+      ),
+    ).toBe("reset");
+  });
+
+  // A FAB-created one-off bottle has a uuid id, not the deterministic recorded_bottle_t* — truly delete.
   it("is delete for a user-added one-off bottle (uuid id)", () => {
     expect(
       drawerDestructiveAction(
