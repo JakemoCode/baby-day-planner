@@ -41,4 +41,5 @@
 - [§F55](./fast-follow/completed/f55-collapse-2-overlapping-instant-chips-into.md)
 - [§F56](./fast-follow/completed/f56-recurring-event-drawer-heading-shows-the.md)
 - [§F65](./fast-follow/completed/f65-delete-recurring-event-from-todays-timeline.md)
+- [§F74](./fast-follow/completed/f74-retire-bottlesperday-field.md)
 
