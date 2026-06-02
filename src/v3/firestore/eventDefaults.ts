@@ -35,6 +35,7 @@ export function withV3EventDefaults(input: Partial<Event>): Event {
 
   if (input.endTime !== undefined) out.endTime = input.endTime;
   if (input.amountOz !== undefined) out.amountOz = input.amountOz;
+  if (input.realizedForecast !== undefined) out.realizedForecast = input.realizedForecast;
   if (input.pumpVolumeOz !== undefined) out.pumpVolumeOz = input.pumpVolumeOz;
 
   return out;

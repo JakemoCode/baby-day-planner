@@ -108,7 +108,16 @@ export function useDrawer({
         // Projected with time/amount/label change: re-ID deterministically so
         // subsequent edits route through update rather than create. ADR-0007:
         // bottles key off startTime (renumber-independent), naps/bedtime off eventKey.
-        await saveEvent({ ...event, id: recordedIdForEvent(event) });
+        // MOVING a projected bottle realizes/relocates that forecast slot (BOTTLE_SPEC
+        // §4): tag it so the cascade absorbs the slot instead of re-emitting it beside
+        // the feed. Gated on a time change — a same-time edit lands on the slot and the
+        // cascade's anchorReached path handles it. FAB-add (create mode) stays untagged.
+        const movedBottle = event.type === "bottle" && event.startTime !== source.startTime;
+        await saveEvent({
+          ...event,
+          ...(movedBottle && { realizedForecast: true }),
+          id: recordedIdForEvent(event),
+        });
       } else {
         await saveEvent(event);
       }
