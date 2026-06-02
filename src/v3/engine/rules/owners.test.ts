@@ -364,11 +364,13 @@ describe("R12.6 — projected bottles inherit template.bottleOwners[N-1] (chrono
     const bottles = out
       .filter((e) => e.type === "bottle")
       .sort((a, b) => a.startTime - b.startTime);
-    expect(bottles).toHaveLength(4);
+    // §F66: the chain fills the whole day; the first four map to bottleOwners,
+    // any beyond the template list are unowned.
     expect(bottles[0]!.owner).toEqual(PARENT1);
     expect(bottles[1]!.owner).toEqual(PARENT2);
     expect(bottles[2]!.owner).toEqual(PARENT1);
     expect(bottles[3]!.owner).toEqual(PARENT2);
+    bottles.slice(4).forEach((b) => expect(b.owner).toEqual(NO_OWNER));
   });
 
   it("stamps bottleOwners by chronological position onto projected bottles even when recorded eventKeys are non-chronological", () => {

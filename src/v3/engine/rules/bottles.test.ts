@@ -13,6 +13,7 @@ import {
 } from "../../__tests__/factories";
 import type { Rule } from "../evaluator";
 import { projectDay } from "../projectDay";
+import { recordedIdForEvent } from "../../lib/eventConventions";
 import { RULES as NAP_RULES } from "./naps";
 import { RULES as BOTTLE_RULES } from "./bottles";
 
@@ -22,7 +23,7 @@ const ALL_WITH_NAPS: Rule[] = [...NAP_RULES, ...BOTTLE_RULES];
 const ALL_WITH_BEDTIME: Rule[] = [...NAP_RULES, ...BOTTLE_RULES];
 
 describe("R5.11 — placeholder projection when no bottle has been recorded", () => {
-  it("projects bottlesPerDay placeholders, anchored at wake + buffer, spaced by interval", () => {
+  it("projects a full-day chain of placeholders, anchored at wake + buffer, spaced by interval (to the cap)", () => {
     const ctx = aContext({
       day: aDay({ wakeTime: 7 * 60 }),
       settings: aSettings({
@@ -43,11 +44,16 @@ describe("R5.11 — placeholder projection when no bottle has been recorded", ()
     );
 
     const bottles = out.filter((e) => e.type === "bottle");
+    // §F66: cold-start fills the whole day to the cap (here midnight — no bedtime
+    // rule in this isolated set), identical to the anchored chain. bottlesPerDay
+    // no longer caps the count.
     expect(bottles.map((b) => b.startTime)).toEqual([
       7 * 60 + 10, // 7:10
       10 * 60 + 10, // 10:10
       13 * 60 + 10, // 13:10
       16 * 60 + 10, // 16:10
+      19 * 60 + 10, // 19:10
+      22 * 60 + 10, // 22:10
     ]);
 
     // ADR-0006: nowMinutes=12:00; bottles at 7:10, 10:10 auto-promote to recorded; 13:10, 16:10 stay projected.
@@ -283,6 +289,44 @@ describe("§F66 PR1 — full-day cascade: morning bottles survive a recorded aft
   });
 });
 
+describe("§F66 — cascade is idempotent under persist-the-past (flicker regression)", () => {
+  // The auto-promote hook persists now-crossed projections on view. The forecast
+  // must not change when it does: a now-crossed projection and a persisted-recorded
+  // bottle at the same time must yield the SAME forward chain. Today the cold-start
+  // chain caps differently from the anchored chain, so the bottle SET flips on view.
+  it("persisting the now-crossed past leaves the bottle set unchanged", () => {
+    const settings = aSettings({
+      bottleChain: { bottlesPerDay: 5, bufferAfterWakeMinutes: 10 },
+      defaultBottleIntervalMinutes: 180,
+      wakeWindowsMinutes: [],
+      bedtimeThreshold: 23 * 60,
+    });
+    const day = aDay({ wakeTime: 60 }); // matches Jake's day: first feed ~1:10
+    const now = 13 * 60;
+
+    const out1 = projectDay({ day, settings, actuals: [], nowMinutes: now });
+    const times1 = out1
+      .filter((e) => e.type === "bottle")
+      .map((b) => b.startTime)
+      .sort((a, b) => a - b);
+
+    // Simulate useAutoPromotePersistence: persist the now-crossed (past) projections.
+    const persisted: Event[] = out1
+      .filter(
+        (e) => e.type === "bottle" && e.lifecycle.state === "recorded" && e.id.startsWith("proj_"),
+      )
+      .map((e) => ({ ...e, id: recordedIdForEvent(e) }));
+
+    const out2 = projectDay({ day, settings, actuals: persisted, nowMinutes: now });
+    const times2 = out2
+      .filter((e) => e.type === "bottle")
+      .map((b) => b.startTime)
+      .sort((a, b) => a - b);
+
+    expect(times2).toEqual(times1);
+  });
+});
+
 describe("§F66 PR2 — recorded cluster feeds both survive (reality wins)", () => {
   it("two recorded bottles closer than one interval are both kept (neither absorbed)", () => {
     // Cluster: 10:00 and 10:20, well inside the 180-min cadence. Both are reality —
@@ -408,7 +452,10 @@ describe("Sequential cascade — bottle landing in nap snaps to putdown.startTim
       .filter((e) => e.type === "bottle" && e.lifecycle.state === "projected")
       .sort((a, b) => a.startTime - b.startTime);
     // Snapped to putdown start (nap.start - lead = 9:45), not nap.start (10:00).
-    expect(bottles[bottles.length - 1]!.startTime).toBe(9 * 60 + 45);
+    // (Chain now fills the whole day; the snapped slot is present, not necessarily last.)
+    const times = bottles.map((b) => b.startTime);
+    expect(times).toContain(9 * 60 + 45);
+    expect(times.filter((t) => t >= 10 * 60 && t < 11 * 60)).toEqual([]); // none inside the nap
   });
 });
 
@@ -539,7 +586,9 @@ describe("Sequential cascade — snap-out-of-nap + putdown-anchor (PR 3c)", () =
       .filter((e) => e.type === "bottle")
       .sort((a, b) => a.startTime - b.startTime);
 
-    expect(bottles.map((b) => b.startTime)).toEqual([
+    // First four show the snap/putdown-anchor sequence; the chain now fills the
+    // rest of the day (§F66), so assert the documented prefix.
+    expect(bottles.slice(0, 4).map((b) => b.startTime)).toEqual([
       7 * 60 + 10, // anchor
       9 * 60 + 15, // snapOutOfNap → 9:30, putdown-anchor → 9:15
       12 * 60 + 15, // putdown-anchor: nap_2.start 12:30 − 15
@@ -953,6 +1002,7 @@ describe("Sequential bottle cascade — chain coherence", () => {
       12 * 60 + 15, // cascade from 9:15 (not 9:30 — chain coherence)
       15 * 60 + 15,
       18 * 60 + 15,
+      21 * 60 + 15, // §F66: chain fills the whole day, no bottlesPerDay cap
     ]);
   });
 
@@ -986,7 +1036,10 @@ describe("Sequential bottle cascade — chain coherence", () => {
       .filter((e) => e.type === "bottle")
       .sort((a, b) => a.startTime - b.startTime);
     // Boundary bottles (at nap.start and nap.end) are kept; strictly inside is filtered.
-    expect(bottles.map((b) => b.startTime)).toEqual([7 * 60, 8 * 60, 9 * 60]);
+    // (Chain now fills past 9:00; assert the documented boundary prefix + nothing
+    // strictly inside the nap.)
+    expect(bottles.slice(0, 3).map((b) => b.startTime)).toEqual([7 * 60, 8 * 60, 9 * 60]);
+    expect(bottles.map((b) => b.startTime).filter((t) => t > 8 * 60 && t < 9 * 60)).toEqual([]);
   });
 });
 
@@ -1055,8 +1108,8 @@ describe("Sequential bottle cascade — midnight rule (DOMAIN.md §2)", () => {
     const bottles = out
       .filter((e) => e.type === "bottle")
       .sort((a, b) => a.startTime - b.startTime);
-    // Overnight tallies toward the day but doesn't consume a daytime slot.
-    // bottlesPerDay=5 chain bottles; overnight is extra.
+    // Overnight is part of the day but doesn't anchor; the daytime chain fills
+    // wake+buffer → cap (§F66, no bottlesPerDay cap), overnight is extra.
     expect(bottles.map((b) => b.startTime)).toEqual([
       2 * 60,
       7 * 60 + 10,
@@ -1064,6 +1117,7 @@ describe("Sequential bottle cascade — midnight rule (DOMAIN.md §2)", () => {
       13 * 60 + 10,
       16 * 60 + 10,
       19 * 60 + 10,
+      22 * 60 + 10,
     ]);
     expect(bottles[0]?.id).toBe(overnight.id);
   });
@@ -1178,11 +1232,12 @@ describe("Sequential bottle cascade — full-day from anchor (§F66)", () => {
       .filter((e) => e.type === "bottle")
       .sort((a, b) => a.startTime - b.startTime);
     expect(bottles.map((b) => b.startTime)).toEqual([
-      2 * 60, // overnight (tallied; doesn't consume daytime slot)
+      2 * 60, // overnight (doesn't consume a daytime slot)
       7 * 60 + 10, // wake+buffer (no shift needed)
       11 * 60 + 10,
       15 * 60 + 10,
-      19 * 60 + 10, // 4th chain bottle → cold-start cap
+      19 * 60 + 10,
+      23 * 60 + 10, // §F66: chain fills to the cap, no bottlesPerDay limit
     ]);
   });
 });
@@ -1263,8 +1318,9 @@ describe("Sequential bottle cascade — bottlesPerDay is a cold-start target, no
     }
   });
 
-  it("cold-start still caps at bottlesPerDay (no anchors → bottlesPerDay placeholders)", () => {
-    // Cold-start cap applies only when there are no non-projected morning anchors.
+  it("cold-start fills the whole day to the cap — no bottlesPerDay limit (§F66)", () => {
+    // §F66: cold-start and anchored emit the identical interval-filled chain, so
+    // persisting the now-crossed past can't change the forecast (no flicker).
     const ctx = aContext({
       day: aDay({ wakeTime: 7 * 60 }),
       settings: aSettings({
@@ -1288,13 +1344,14 @@ describe("Sequential bottle cascade — bottlesPerDay is a cold-start target, no
     const bottles = out
       .filter((e) => e.type === "bottle")
       .sort((a, b) => a.startTime - b.startTime);
-    expect(bottles).toHaveLength(5);
+    // No bedtime in this isolated set → cap is midnight; fills 7:10…22:10.
     expect(bottles.map((b) => b.startTime)).toEqual([
       7 * 60 + 10,
       10 * 60 + 10,
       13 * 60 + 10,
       16 * 60 + 10,
       19 * 60 + 10,
+      22 * 60 + 10,
     ]);
   });
 });
@@ -1683,33 +1740,38 @@ describe("R5.5 — dream-feed emission", () => {
     expect(out.find((e) => e.id === "evt-night")).toBeDefined();
   });
 
-  it("misconfig: dreamFeedTime < bedtime — dream-feed does NOT pollute the rhythm chain's cold-start count", () => {
-    // dreamFeedTime=18:00 is inside the rhythm window; dream-feed must be excluded from cold-start counting.
-    const ctx = aContext({
-      day: aDay({ wakeTime: 7 * 60 }),
-      settings: aSettings({
-        dreamFeedEnabled: true,
+  it("misconfig: dreamFeedTime < bedtime — dream-feed does NOT alter the rhythm chain", () => {
+    // dreamFeedTime=18:00 is inside the rhythm window; the dream-feed must be a
+    // separate slot that neither adds to nor shifts the rhythm chain.
+    const settings = (dreamFeedEnabled: boolean) =>
+      aSettings({
+        dreamFeedEnabled,
         dreamFeedTime: 18 * 60,
         bedtimeThreshold: 22 * 60 + 30,
         wakeWindowsMinutes: [120, 150, 180, 180, 30],
         defaultNapLengthMinutes: 60,
         defaultBottleIntervalMinutes: 180,
         bottleChain: { bottlesPerDay: 4, bufferAfterWakeMinutes: 10 },
-      }),
-      actuals: [],
-    });
-    const out = projectDay(
-      {
-        day: ctx.day,
-        settings: ctx.settings,
-        actuals: ctx.actuals,
-        nowMinutes: ctx.nowMinutes,
-      },
-      { rules: ALL_WITH_NAPS },
-    );
-    const rhythmBottles = out.filter((e) => e.type === "bottle" && e.eventKey !== "bottle_dream");
-    expect(rhythmBottles).toHaveLength(4); // cold-start target unaffected
-    const dream = out.find((e) => e.type === "bottle" && e.eventKey === "bottle_dream");
+      });
+    const run = (dreamFeedEnabled: boolean) =>
+      projectDay(
+        {
+          day: aDay({ wakeTime: 7 * 60 }),
+          settings: settings(dreamFeedEnabled),
+          actuals: [],
+          nowMinutes: 12 * 60,
+        },
+        { rules: ALL_WITH_NAPS },
+      );
+    const rhythmTimes = (out: Event[]) =>
+      out
+        .filter((e) => e.type === "bottle" && e.eventKey !== "bottle_dream")
+        .map((b) => b.startTime)
+        .sort((a, b) => a - b);
+
+    // Enabling the dream-feed must not change the rhythm chain at all.
+    expect(rhythmTimes(run(true))).toEqual(rhythmTimes(run(false)));
+    const dream = run(true).find((e) => e.type === "bottle" && e.eventKey === "bottle_dream");
     expect(dream?.startTime).toBe(18 * 60);
   });
 

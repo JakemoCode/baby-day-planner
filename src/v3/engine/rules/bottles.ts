@@ -254,7 +254,6 @@ function bottleCascadeInputs(events: Event[], ctx: Context): CascadeInputs | nul
  */
 function computeBottleProjectionTimes(inputs: CascadeInputs, ctx: Context): number[] {
   const { wakeTime, cap, seedTime, anchors, snap } = inputs;
-  const target = ctx.settings.bottleChain.bottlesPerDay;
   const defaultInterval = ctx.settings.defaultBottleIntervalMinutes;
   const rules = ctx.settings.bottleIntervalRules;
   // Projections carry the default amount, so they advance by the default amount's
@@ -264,7 +263,6 @@ function computeBottleProjectionTimes(inputs: CascadeInputs, ctx: Context): numb
     ctx.settings.defaultBottleAmountOz,
     defaultInterval,
   );
-  const isColdStart = anchors.length === 0;
 
   // No room for a full projection-interval gap before the anchor → the anchor IS
   // this feed (the forecast slot it satisfies). Advance from its amount.
@@ -275,9 +273,11 @@ function computeBottleProjectionTimes(inputs: CascadeInputs, ctx: Context): numb
   let cursor = seedTime;
   let anchorIdx = 0;
   let lastPlaced = wakeTime - 1;
-  // bottlesPerDay caps cold-start only; once anchored the chain runs to cap.
+  // Fill the whole day by interval to the cap (bedtime/midnight) — identical for
+  // cold-start and anchored, so persisting the now-crossed past doesn't change the
+  // forecast (§F66 idempotency: the engine predicts every feed, never clamps to a
+  // bottles-per-day count).
   for (let guard = 0; cursor < cap && guard < 64; guard++) {
-    if (isColdStart && times.length >= target) break;
     const anchor = anchors[anchorIdx];
     // anchorAbsorbs true ⇒ anchor is defined (the `!` below is safe).
     if (anchorAbsorbs(cursor, anchor)) {
