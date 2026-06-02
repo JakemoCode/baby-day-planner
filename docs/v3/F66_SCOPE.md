@@ -1,83 +1,88 @@
 # §F66 — Bottle cascade & identity collapse: implementation scope
 
-**Status**: scope (pre-implementation). Grill closed 2026-06-01 — see
-`docs/v3/fast-follow/grill/f66-cascade-and-state-model-audit.md`.
+**Status**: scope (pre-implementation). Grill closed 2026-06-01; revised after an
+adversarial audit of this doc — see
+`docs/v3/fast-follow/grill/f66-cascade-and-state-model-audit.md` and ADR-0006/0007.
 
-**Model** (settled): reality wins — future = projected, past = recorded; no
-projected event in the past (ADR-0006); adjustments re-cascade **future only**;
-projections are never persisted (DATA_MODEL R2.2); durable identity = uuid `id`,
-`eventKey`/`bottle_N` = renumberable slot/role label that never keys a doc
-(ADR-0007); skip = persisted suppression.
+**Model** (settled): **reality wins** — future = projected, past = recorded; the
+engine emits no *projected-lifecycle* event in the past (it promotes, ADR-0006);
+adjustments re-cascade **future only**. A forecast that crosses Now is **promoted
+to `recorded` AND persisted** (so it survives in history and the zero-edit case
+sticks) — under a **deterministic, renumber-independent doc id**, never the
+renumbering `eventKey`. **Feeds move, they don't skip** — cascade bottles are
+edited, never suppressed.
+
+Durable id by create-mode (ADR-0007): `recorded_bottle_t<startTime>` for
+auto-promoted bottles (client-deterministic → concurrent devices converge to one
+doc), `<type>_<uuid>` for deliberate FAB/pump creates, `recorded_<eventKey>`
+retained for naps/bedtime (their keys don't renumber).
 
 **What's being fixed**: the bottle zombie family (#6a/#6e/#8) + the §F59 id
-convention. Everything else in §F66 is stale or peripheral (see the triage).
+convention + owner-state keyed off the renumbering eventKey. Reconciles all 13
+audit findings (S1–S7, N1–N6). Everything else in §F66 is stale or peripheral.
 
-## Sequenced PRs
+## Sequenced PRs (2)
 
-Each is independently mergeable, tests-green at every step. Cascade/write-path
-PRs carry a `## Contaminated data` section. **Hard ordering: PR1 before PR2** —
-PR2 deletes the persistence patch, which is only safe once PR1 keeps morning
-bottles alive.
+### PR 1 — Full-day bottle cascade (engine-only) — ✅ DONE (#300)
 
-### PR 1 — Full-day bottle cascade (engine-only, no write-path)
+R5.1 forward-from-latest → full-day emission (match naps R3.1): the chain spans
+`[wakeBuffer, cap)` with recorded bottles as in-chain anchors; a recorded bottle
+**absorbs** the forecast slot within one interval of it. Pure in `(anchors,
+settings)` ⇒ idempotent (canCascade compares to the recomputed schedule). Past
+emits auto-promote to `recorded`. Preserves overnight-no-anchor (§F54), §F62 seed
+guard, nap-snap, `bottlesPerDay`-is-a-cold-start-target, midnight cap.
+**No write-path change; no contaminated data.**
 
-Bring R5.1 up to the naps R3.1 treatment. Today the bottle cascade, once
-anchored, only walks **forward from the latest recorded bottle**, so morning
-forecasts vanish when an afternoon bottle is recorded. Change it to emit the
-**full day** `[wakeBuffer, cap)` with recorded bottles as in-chain anchors:
-slots *before* the earliest anchor and *between* anchors are filled, not just
-forward from the latest. Past-time emits auto-promote to `recorded` (ADR-0006),
-so morning reality survives **without any persistence**.
+### PR 2 — Stable-id persistence + owner re-keying + migration (write-path)
 
-- **Preserve**: "overnight bottles don't anchor" (DOMAIN §2), §F54 overnight
-  sizing, §F62 cold-start seed guard, nap-snap (`snapToPutdown` etc.), the
-  `bottlesPerDay` cold-start-target-not-cap rule, and the strict-monotonic /
-  cap termination guards.
-- **Test seams**: (a) recorded afternoon bottle + projected morning bottles all
-  present in one pass; (b) full-day invariant — chain spans wake→cap regardless
-  of where anchors sit; (c) existing `bottles.test.ts` stays green.
-- **Contaminated data**: none (engine output only; nothing persisted changes).
+**Keep `useAutoPromotePersistence`** (promotion-to-persisted is wanted — history
++ zero-edit). The fix is the **id**, not the hook:
 
-### PR 2 — Stable uuid identity + delete auto-promote-persistence (write-path)
+- Auto-promoted bottles persist under **`recorded_bottle_t<startTime>`**
+  (deterministic) instead of `recorded_<eventKey>`. The drawer's projected-bottle
+  save and `drawerDeletePolicy` reset-detection use this for **bottles only**;
+  **naps/bedtime keep `recorded_<eventKey>`** (`recordedIdFor` is *not* removed).
+- Edits update the existing doc in place (id frozen at first persist).
+- **Owner durable state off `eventKey`:** R12.6 owner-by-index maps by
+  **chronological position** (matches its spec); `Day.ownerOverrides` (R12.10) +
+  owner-only-edit key off the stable id.
+- `eventKey`/`bottle_N` stays the renumberable slot/role label — never a doc key.
 
-- **Delete `useAutoPromotePersistence`** and its mount in `page.tsx`.
-- Recorded/adjusted bottles persist under a stable uuid `id` (`newEventId`,
-  exactly like FAB-added extras and pumps). **Retire `recordedIdFor` for the
-  bottle write-path** — the drawer's projected-bottle save and the reset
-  detection in `drawerDeletePolicy` stop deriving the doc id from `eventKey`.
-- `eventKey` (`bottle_N`) stays the slot/role label for owner-by-index (R12.6),
-  template mapping, and recorded↔projected matching — never a storage key.
-- **Test seams**: drawer-edit of a projected bottle creates one uuid doc (not a
-  renumber-keyed one); editing again updates the same doc; multi-pass project→
-  edit→reproject yields exactly one bottle per feed (the zombie regression).
-- **Contaminated data**: existing `recorded_bottle_<N>` docs (incl. no-owner
-  zombie orphans) — one-time migration: re-key surviving recorded bottles to
-  uuid ids and drop orphans that duplicate an owner-assigned bottle. Provide a
-  reconcile pass (extend/replace `reconcileDuplicateEventDocs`) + manual-cleanup
-  notes for Jake's live data.
+**Why multi-client-safe:** two devices auto-promoting the same feed compute the
+*same* `recorded_bottle_t<startTime>` id → write the **same doc** (converges),
+not two orphans. The zombie is impossible by construction.
 
-### PR 3 — Skip = suppression for regular bottles
+**Test seams:** multi-pass project→auto-promote→edit→reproject yields exactly one
+bottle per feed (zombie regression); two-client simulation converges to one doc;
+owner-by-index maps by clock position under the full-day cascade; cluster-feed
+(two close *recorded* bottles both survive); bottle-volume invariant
+(Σ = recorded amounts + projected defaults).
 
-Deleting a past bottle (forecast or recorded) persists a **suppression** keyed
-by durable identity, generalizing `Day.suppressedDreamFeed` / `suppressRecurring`.
-The cascade permanently omits that feed; future bottles are unaffected.
+**Contaminated data:** existing `recorded_bottle_<N>` bottle docs → one-time,
+**deterministic** migration to `recorded_bottle_t<startTime>` (two clients
+converge; idempotent). Run against a captured **real Jun-1 export** to confirm
+the shape first. Existing no-owner zombie orphans: once this lands they stop
+regenerating, so a one-shot delete (or manual) finally sticks (the reason it
+didn't before — issue #8 — was regeneration). Nap/bedtime docs are **not**
+migrated.
 
-- **Test seams**: delete a past forecast → it stays gone across reproject;
-  future cadence unchanged; suppression key survives renumber.
-- **Contaminated data**: none (additive `Day` field).
+## Not in this collapse
 
-### PR 4 — Owner-overrides / owner-only-edit off durable identity
-
-`Day.ownerOverrides` and the owner-only-edit path key off `eventKey` today —
-fine for *recorded* (frozen) bottles, fragile for a still-renumbering *projected*
-one. Re-key durable owner state to the stable identity.
-
-- **Contaminated data**: migrate any `ownerOverrides` entries keyed by a
-  projected eventKey (rare); document.
-
-## Out of scope (separate, non-model)
-
-- **#6g** — cold-start cap may stop short of `bottlesPerDay`; a focused bug fix.
+- **Skip/suppression** — dropped. Babies don't skip feeds (they move/shrink/extra);
+  cascade bottles are edited, not deleted. (Dream-feed/recurring suppressions stay.)
+- **#6g** — cold-start cap may stop short of `bottlesPerDay`; focused bug fix.
 - **#7** — transient inline validation message; trivial UI polish.
 
-These close as normal fast-follows, not part of this collapse.
+## Audit-finding disposition (S1–S7, N1–N6)
+
+| Finding | Resolution |
+|---|---|
+| S1/N6 retire recordedIdFor breaks naps | Bottle-scoped; naps/bedtime keep `recorded_<eventKey>` |
+| S2/N5 migration unsafe / dedup can't catch | Deterministic target id → idempotent, multi-client-safe |
+| S3 PR1-alone amplifies | Reframed: keep hook, stabilize id; PR1+PR2 are the fix together |
+| S4 skip key undefined | Dropped — feeds don't skip |
+| S5 owner-by-index slot vs position | Map by chronological position (matches spec) |
+| S6 absorption eats cluster feed | Non-issue (recorded feeds are anchors, survive) + test |
+| S7 #6d volume / cleanup | Volume invariant test; deterministic migration + real-data export |
+| N1/N2 auto-promote anchoring / oscillation | Stable id → deterministic anchor, idempotent (best-guess = reality, intended) |
+| N3/N4 owner-override ordering / dual identity | Folded into PR2 (owner state off eventKey) |
