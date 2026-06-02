@@ -245,12 +245,14 @@ function bottleCascadeInputs(events: Event[], ctx: Context): CascadeInputs | nul
 }
 
 /**
- * Full-day projected bottle TIMES: walk wake+buffer → cap at cadence, absorbing
- * any slot within one interval of a recorded anchor (the anchor IS that feed).
- * Recorded anchors are NOT returned — only projection times. Deterministic in
- * (anchors, settings) ⇒ idempotent across evaluator passes (so the cascade
- * reaches a fixed point). Replaces the old forward-from-latest walk (R5.1) per
- * ADR-0006 + §F66: past reality must never vanish when a later bottle is recorded.
+ * Full-day projected bottle TIMES: walk wake+buffer → cap at cadence. When the
+ * cursor reaches a recorded bottle, the cascade RE-SEEDS forward from it (R5.1) —
+ * but recorded bottles never absorb/replace a forecast slot (ENGINE_SPEC §R5.1/5.9):
+ * they are independent reality that re-cascades the forecast forward and keeps its
+ * own chronological number. Earlier forecast slots survive. Recorded anchors are
+ * NOT returned — only projection times. Deterministic in (anchors, settings) ⇒
+ * idempotent across evaluator passes. Fills the whole day (no bottlesPerDay cap),
+ * so morning forecasts survive a later recorded bottle (§F66, no persist-on-view).
  */
 function computeBottleProjectionTimes(inputs: CascadeInputs, ctx: Context): number[] {
   const { wakeTime, cap, seedTime, anchors, snap } = inputs;
@@ -264,23 +266,20 @@ function computeBottleProjectionTimes(inputs: CascadeInputs, ctx: Context): numb
     defaultInterval,
   );
 
-  // No room for a full projection-interval gap before the anchor → the anchor IS
-  // this feed (the forecast slot it satisfies). Advance from its amount.
-  const anchorAbsorbs = (t: number, anchor: Event | undefined): boolean =>
-    anchor !== undefined && (anchor.startTime <= t || anchor.startTime - t < projInterval);
+  // The cursor has reached this recorded bottle → re-seed the forecast forward from
+  // it. NO look-ahead absorption: a recorded feed never deletes an earlier forecast
+  // slot (ENGINE_SPEC §R5.1/5.9 — the #300 absorption window was a rejected deviation).
+  const anchorReached = (t: number, anchor: Event | undefined): boolean =>
+    anchor !== undefined && anchor.startTime <= t;
 
   const times: number[] = [];
   let cursor = seedTime;
   let anchorIdx = 0;
   let lastPlaced = wakeTime - 1;
-  // Fill the whole day by interval to the cap (bedtime/midnight) — identical for
-  // cold-start and anchored, so persisting the now-crossed past doesn't change the
-  // forecast (§F66 idempotency: the engine predicts every feed, never clamps to a
-  // bottles-per-day count).
   for (let guard = 0; cursor < cap && guard < 64; guard++) {
     const anchor = anchors[anchorIdx];
-    // anchorAbsorbs true ⇒ anchor is defined (the `!` below is safe).
-    if (anchorAbsorbs(cursor, anchor)) {
+    // anchorReached true ⇒ anchor is defined (the `!` below is safe).
+    if (anchorReached(cursor, anchor)) {
       cursor = anchor!.startTime + intervalForAmount(rules, anchor!.amountOz, defaultInterval);
       lastPlaced = anchor!.startTime;
       anchorIdx++;
@@ -288,7 +287,7 @@ function computeBottleProjectionTimes(inputs: CascadeInputs, ctx: Context): numb
     }
     const placed = snap(cursor);
     if (placed >= cap || placed < wakeTime || placed <= lastPlaced) break;
-    if (anchorAbsorbs(placed, anchor)) {
+    if (anchorReached(placed, anchor)) {
       cursor = anchor!.startTime + intervalForAmount(rules, anchor!.amountOz, defaultInterval);
       lastPlaced = anchor!.startTime;
       anchorIdx++;

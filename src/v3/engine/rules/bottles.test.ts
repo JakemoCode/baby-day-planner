@@ -70,8 +70,9 @@ describe("R5.11 — placeholder projection when no bottle has been recorded", ()
 
 describe("R5.8 — cascade stops at midnight (the 'midnight rule', DOMAIN.md §2)", () => {
   it("bottlesPerDay=20 caps at the last slot before midnight (1440)", () => {
-    // Recorded bottle_1 at 7:30, interval 180: slots at 7:30, 10:30, 13:30, 16:30, 19:30, 22:30;
-    // next would be 25:30 ≥ 1440 → stop. 6 bottles total.
+    // §F66 (no absorption): a 7:10 morning forecast precedes the recorded 7:30 (it's
+    // not absorbed — recorded bottles never delete a forecast), then forward from 7:30:
+    // 10:30, 13:30, 16:30, 19:30, 22:30; next 25:30 ≥ 1440 → stop. 7 bottles total.
     const recorded = aRecordedBottle({
       id: "actual_bottle_first",
       eventKey: "bottle_1",
@@ -102,7 +103,8 @@ describe("R5.8 — cascade stops at midnight (the 'midnight rule', DOMAIN.md §2
       .filter((e) => e.type === "bottle")
       .sort((a, b) => a.startTime - b.startTime);
 
-    expect(bottles).toHaveLength(6);
+    expect(bottles).toHaveLength(7);
+    expect(bottles[0]!.startTime).toBe(7 * 60 + 10); // morning forecast survives
     expect(bottles[bottles.length - 1]!.startTime).toBe(22 * 60 + 30);
     expect(bottles.every((b) => b.startTime < 24 * 60)).toBe(true);
   });
@@ -147,13 +149,17 @@ describe("R5.4 — labels renumber chronologically (all bottles); recorded event
       .filter((e) => e.type === "bottle")
       .sort((a, b) => a.startTime - b.startTime);
 
-    expect(bottles[0]!.id).toBe("b_0730");
-    expect(bottles[0]!.eventKey).toBe("bottle_2");
-    expect(bottles[1]!.id).toBe("b_0900");
-    expect(bottles[1]!.eventKey).toBe("bottle_1");
+    // §F66 (no absorption): a 7:10 morning forecast precedes both recorded bottles,
+    // so they're no longer at indices 0/1 — find them by id. Their eventKeys stay
+    // frozen; labels follow clock order.
+    const b0730 = bottles.find((b) => b.id === "b_0730")!;
+    const b0900 = bottles.find((b) => b.id === "b_0900")!;
+    expect(b0730.eventKey).toBe("bottle_2"); // frozen, non-chronological
+    expect(b0900.eventKey).toBe("bottle_1"); // frozen, non-chronological
     bottles.forEach((b, i) => expect(b.label).toBe(`Bottle ${i + 1}`));
     const firstProjected = bottles.find((b) => b.lifecycle.state === "projected");
-    expect(firstProjected!.eventKey).toBe("bottle_3");
+    // §F66 (no absorption): morning 7:10 forecast is assigned bottle_3; first future-projected is bottle_4.
+    expect(firstProjected!.eventKey).toBe("bottle_4"); // slots fill after maxRecorded (2) + morning forecast (3)
   });
 
   it("relabels a time-edited recorded bottle to its new chronological position, keeping its eventKey", () => {
@@ -188,10 +194,11 @@ describe("R5.4 — labels renumber chronologically (all bottles); recorded event
     expect(rec.eventKey).toBe("bottle_3");
     expect(rec.label).toBe(`Bottle ${bottles.indexOf(rec) + 1}`);
     bottles.forEach((b, i) => expect(b.label).toBe(`Bottle ${i + 1}`));
-    // §F66 full-day: a 7:10 morning forecast precedes the 12:30 anchor (the ~10:10
-    // slot is absorbed by it), so the first future-projected bottle (15:30) is slot 5.
+    // §F66 (no absorption): 7:10 AND 10:10 morning forecasts precede the 12:30 anchor
+    // (neither absorbed), both auto-promoted past now=13:00 → maxRecorded=5, so the
+    // first future-projected bottle (15:30) is slot 6.
     const firstProjected = bottles.find((b) => b.lifecycle.state === "projected");
-    expect(firstProjected!.eventKey).toBe("bottle_5");
+    expect(firstProjected!.eventKey).toBe("bottle_6");
   });
 });
 
@@ -226,9 +233,10 @@ describe("R5.1 — cascade resumes from the latest recorded bottle", () => {
       .filter((e) => e.type === "bottle")
       .sort((a, b) => a.startTime - b.startTime);
 
-    // Recorded at 8:30 + cascade at 180min to midnight: 11:30, 14:30, 17:30, 20:30, 23:30.
+    // §F66 (no absorption): morning 7:10 forecast survives; recorded at 8:30 + cascade to midnight: 11:30…23:30.
     // bottlesPerDay=4 is the cold-start target, not a hard cap.
     expect(bottles.map((b) => b.startTime)).toEqual([
+      7 * 60 + 10, // morning forecast (not absorbed)
       8 * 60 + 30,
       11 * 60 + 30,
       14 * 60 + 30,
@@ -237,12 +245,11 @@ describe("R5.1 — cascade resumes from the latest recorded bottle", () => {
       23 * 60 + 30,
     ]);
 
-    const first = bottles[0]!;
-    expect(first.id).toBe(recorded.id);
-    expect(first.lifecycle.state).toBe("completed");
+    const rec = bottles.find((b) => b.id === recorded.id)!;
+    expect(rec.lifecycle.state).toBe("completed");
 
     // ADR-0006: past-now projections auto-promote to recorded.
-    const projections = bottles.slice(1);
+    const projections = bottles.filter((b) => b.id !== recorded.id);
     expect(
       projections.every((b) =>
         b.startTime <= ctx.nowMinutes
@@ -404,14 +411,18 @@ describe("§F66 PR2 — bottle-volume invariant", () => {
     );
 
     const bottles = out.filter((e) => e.type === "bottle");
-    const projectedCount = bottles.filter((b) => b.lifecycle.state === "projected").length;
     const total = bottles.reduce((sum, b) => sum + (b.amountOz ?? 0), 0);
+    // §F66 (no absorption): a 7:10 morning forecast precedes the recorded bottles and is
+    // auto-promoted (state="recorded") with DEFAULT amountOz — it's not an actual, so
+    // count it alongside projected bottles for the DEFAULT-oz contribution.
+    const actualIds = new Set(recorded.map((r) => r.id));
+    const nonActualCount = bottles.filter((b) => !actualIds.has(b.id)).length;
 
     // Every projected bottle carries the default; recorded carry their real amount.
     bottles
       .filter((b) => b.lifecycle.state === "projected")
       .forEach((b) => expect(b.amountOz).toBe(DEFAULT));
-    expect(total).toBe(4 + 6 + projectedCount * DEFAULT);
+    expect(total).toBe(4 + 6 + nonActualCount * DEFAULT);
   });
 });
 
@@ -646,8 +657,10 @@ describe("R5.1 — cascade interval honors bottleIntervalRules", () => {
       .filter((e) => e.type === "bottle")
       .sort((a, b) => a.startTime - b.startTime);
 
-    // Step 1: 4oz recorded → 120m. Steps 2+: default 5oz → 0-5oz rule → 120m. Last slot 22:00.
+    // §F66 (no absorption): 7:10 morning forecast survives. Then recorded 8:00 (4oz) → 120m cascade.
+    // Steps 2+: default 5oz → 0-5oz rule → 120m.
     expect(bottles.map((b) => b.startTime)).toEqual([
+      7 * 60 + 10, // morning forecast (not absorbed)
       8 * 60, // recorded (4oz)
       10 * 60, // 8:00 + 120m
       12 * 60,
@@ -691,8 +704,10 @@ describe("R5.1 — cascade interval honors bottleIntervalRules", () => {
       .filter((e) => e.type === "bottle")
       .sort((a, b) => a.startTime - b.startTime);
 
-    // Step 1: 6oz → no rule match → default 180m. Steps 2+: 5oz default → 0-5oz rule → 120m.
+    // §F66 (no absorption): 7:10 morning forecast survives. Then recorded 8:00 (6oz) → 180m (no rule match).
+    // Steps 2+: 5oz default → 0-5oz rule → 120m.
     expect(bottles.map((b) => b.startTime)).toEqual([
+      7 * 60 + 10, // morning forecast (not absorbed)
       8 * 60, // recorded (6oz)
       11 * 60, // 8:00 + 180m (no rule match)
       13 * 60, // 11:00 + 120m (default 5oz)
@@ -786,7 +801,9 @@ describe("R5.1 — cascade interval honors bottleIntervalRules", () => {
       .filter((e) => e.type === "bottle")
       .sort((a, b) => a.startTime - b.startTime);
 
+    // §F66 (no absorption): 7:10 morning forecast survives alongside recorded 8:30 anchor.
     expect(bottles.map((b) => b.startTime)).toEqual([
+      7 * 60 + 10, // morning forecast (not absorbed)
       8 * 60 + 30,
       11 * 60 + 30,
       14 * 60 + 30,
@@ -837,8 +854,9 @@ describe("R5.1 — recorded bottles anchor the cascade", () => {
       .filter((e) => e.type === "bottle")
       .sort((a, b) => a.startTime - b.startTime);
 
-    // Anchor + forward cascade to midnight, same as a completed-recorded bottle.
+    // §F66 (no absorption): morning 7:10 forecast survives alongside the 8:30 anchor.
     expect(bottles.map((b) => b.startTime)).toEqual([
+      7 * 60 + 10, // morning forecast (not absorbed)
       8 * 60 + 30,
       11 * 60 + 30,
       14 * 60 + 30,
@@ -846,12 +864,12 @@ describe("R5.1 — recorded bottles anchor the cascade", () => {
       20 * 60 + 30,
       23 * 60 + 30,
     ]);
-    expect(bottles[0]?.id).toBe(overridden.id);
-    expect(bottles[0]?.lifecycle.state).toBe("recorded");
+    const anchor = bottles.find((b) => b.id === overridden.id)!;
+    expect(anchor.lifecycle.state).toBe("recorded");
     // ADR-0006: past-now projections auto-promote to recorded.
     expect(
       bottles
-        .slice(1)
+        .filter((b) => b.id !== overridden.id)
         .every((b) =>
           b.startTime <= ctx.nowMinutes
             ? b.lifecycle.state === "recorded"
@@ -946,8 +964,15 @@ describe("R5.1 — recorded bottles anchor the cascade", () => {
       .filter((e) => e.type === "bottle")
       .sort((a, b) => a.startTime - b.startTime);
 
-    // Forward from latest anchor (13:00): 16:00, 19:00, 22:00 → stop.
-    expect(bottles.map((b) => b.startTime)).toEqual([10 * 60, 13 * 60, 16 * 60, 19 * 60, 22 * 60]);
+    // §F66 (no absorption): 7:10 morning forecast survives. Forward from latest anchor (13:00): 16:00, 19:00, 22:00.
+    expect(bottles.map((b) => b.startTime)).toEqual([
+      7 * 60 + 10, // morning forecast (not absorbed)
+      10 * 60,
+      13 * 60,
+      16 * 60,
+      19 * 60,
+      22 * 60,
+    ]);
   });
 });
 
@@ -1124,10 +1149,9 @@ describe("Sequential bottle cascade — midnight rule (DOMAIN.md §2)", () => {
 });
 
 describe("Sequential bottle cascade — full-day from anchor (§F66)", () => {
-  it("mid-day recorded anchor: morning fill + forward, with the near slot absorbed", () => {
-    // Mid-day recording doesn't phantom-anchor missing morning slots.
-    // §F66 full-day: 7:10 morning forecast, then the ~10:10 slot is absorbed by the
-    // 13:00 anchor (610→780 is < one interval), then forward 16:00, 19:00, 22:00.
+  it("mid-day recorded anchor: morning fill + forward, near slot now survives (no absorption)", () => {
+    // §F66 (no absorption): 7:10 morning forecast AND the ~10:10 cold-start slot both survive
+    // alongside the 13:00 anchor — forecast slots are never deleted by a recorded bottle.
     const recorded = aRecordedBottle({
       id: "actual_bottle_midday",
       eventKey: "bottle_midday",
@@ -1157,7 +1181,8 @@ describe("Sequential bottle cascade — full-day from anchor (§F66)", () => {
       .sort((a, b) => a.startTime - b.startTime);
     expect(bottles.map((b) => b.startTime)).toEqual([
       7 * 60 + 10, // morning forecast
-      13 * 60, // anchor (absorbs the ~10:10 slot)
+      10 * 60 + 10, // near-slot survives (not absorbed)
+      13 * 60, // anchor
       16 * 60,
       19 * 60,
       22 * 60, // extends past bottlesPerDay
