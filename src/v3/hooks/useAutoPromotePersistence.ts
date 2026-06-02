@@ -15,7 +15,11 @@ import { doc, runTransaction, type Firestore } from "firebase/firestore";
 import { v3EventConverter } from "../firestore/converters";
 import { eventPath } from "@/lib/firestore/paths";
 import type { Event } from "../schemas";
-import { DREAM_FEED_EVENT_KEY, isEngineEmittedId, recordedIdFor } from "../lib/eventConventions";
+import {
+  DREAM_FEED_EVENT_KEY,
+  isEngineEmittedId,
+  recordedIdForEvent,
+} from "../lib/eventConventions";
 
 export type UseAutoPromotePersistenceInput = {
   db: Firestore | null;
@@ -42,7 +46,9 @@ export function useAutoPromotePersistence(input: UseAutoPromotePersistenceInput)
       if (e.lifecycle.state === "projected") continue;
       // Already-persisted events have non-"proj_" ids.
       if (!isEngineEmittedId(e.id)) continue;
-      const recordedId = recordedIdFor(e.eventKey);
+      // ADR-0007: bottle doc id keys off startTime, not the renumbering eventKey —
+      // two clients auto-promoting the same feed converge to one doc (kills the zombie).
+      const recordedId = recordedIdForEvent(e);
       if (actualIds.has(recordedId)) continue;
       // Cache key must include dayId: recordedId alone collides across days
       // (hook stays mounted across day-rolls with stale writtenIds).

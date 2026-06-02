@@ -18,6 +18,7 @@ import { useDrawer } from "@/v3/hooks/useDrawer";
 import { useTomorrowPlanState } from "@/v3/hooks/useTomorrowPlanState";
 import styles from "./page.module.css";
 import { useCurrentChild } from "@/v3/context/ChildProvider";
+import { ownerOverrideKeyFor } from "@/v3/lib/eventConventions";
 
 // Anchors "now" to noon so drawer constraints land mid-day regardless of wall-clock time.
 const TOMORROW_ANCHOR_MINUTES = 12 * 60;
@@ -126,16 +127,17 @@ function TomorrowPageInner({
 
   // Chip-tap handler: writes to plan.ownerOverrides. undefined/NO_OWNER → null in the map (un-assigned).
   const handleOwnerOverrideChange = (event: Event, owner: OwnerRef | undefined) => {
+    const key = ownerOverrideKeyFor(event); // bottles → positional key (§F66)
     if (owner === undefined || isNoOwner(owner)) {
-      planState.setOwnerOverride(event.eventKey, null);
+      planState.setOwnerOverride(key, null);
     } else {
-      planState.setOwnerOverride(event.eventKey, owner);
+      planState.setOwnerOverride(key, owner);
     }
     setPickedEvent(null);
   };
 
   const ownerForPicked = (event: Event): OwnerRef => {
-    const override = planState.ownerOverrides[event.eventKey];
+    const override = planState.ownerOverrides[ownerOverrideKeyFor(event)];
     if (override !== undefined) return override ?? NO_OWNER;
     return event.owner ?? NO_OWNER;
   };

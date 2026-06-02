@@ -364,14 +364,16 @@ describe("R12.6 — projected bottles inherit template.bottleOwners[N-1] (chrono
     const bottles = out
       .filter((e) => e.type === "bottle")
       .sort((a, b) => a.startTime - b.startTime);
-    expect(bottles).toHaveLength(4);
+    // §F66: the chain fills the whole day; the first four map to bottleOwners,
+    // any beyond the template list are unowned.
     expect(bottles[0]!.owner).toEqual(PARENT1);
     expect(bottles[1]!.owner).toEqual(PARENT2);
     expect(bottles[2]!.owner).toEqual(PARENT1);
     expect(bottles[3]!.owner).toEqual(PARENT2);
+    bottles.slice(4).forEach((b) => expect(b.owner).toEqual(NO_OWNER));
   });
 
-  it("stamps bottleOwners by eventKey index onto projected bottles when recorded keys are non-chronological", () => {
+  it("stamps bottleOwners by chronological position onto projected bottles even when recorded eventKeys are non-chronological", () => {
     const bottleOwners = [PARENT1, PARENT2, PARENT1, PARENT2];
     const ctx = aContext({
       day: aDay({ wakeTime: 7 * 60 }),
@@ -397,6 +399,43 @@ describe("R12.6 — projected bottles inherit template.bottleOwners[N-1] (chrono
     const ownerOf = (eventKey: string) => bottles.find((b) => b.eventKey === eventKey)!.owner;
     expect(ownerOf("bottle_3")).toEqual(bottleOwners[2]);
     expect(ownerOf("bottle_4")).toEqual(bottleOwners[3]);
+  });
+
+  it("projected bottle BEFORE a recorded one is owned by chronological position, not slot (§F66 PR2)", () => {
+    // Full-day cascade (PR1) lets morning projections fall before a pre-logged
+    // afternoon bottle. Their eventKey slots start above maxRecorded, so slot-based
+    // mapping would mis-assign; owner must follow clock position.
+    const bottleOwners = [PARENT1, PARENT2, PARENT1, PARENT2];
+    const ctx = aContext({
+      day: aDay({ wakeTime: 7 * 60 }),
+      settings: aSettings({
+        bottleChain: { bottlesPerDay: 4, bufferAfterWakeMinutes: 10 },
+        defaultBottleIntervalMinutes: 180,
+        wakeWindowsMinutes: [],
+        bedtimeThreshold: 23 * 60,
+      }),
+      template: aTemplate({ bottleOwners }),
+      // A caregiver pre-logs an afternoon daycare bottle; eventKey bottle_1 is frozen.
+      actuals: [
+        aRecordedBottle({
+          id: "recorded_bottle_t840",
+          eventKey: "bottle_1",
+          start: 14 * 60,
+          lifecycle: { state: "recorded", annotatedAt: 14 * 60 },
+        }),
+      ],
+      nowMinutes: 7 * 60, // morning bottles stay projected (future of Now)
+    });
+
+    const out = run(ctx);
+    const bottles = out
+      .filter((e) => e.type === "bottle")
+      .sort((a, b) => a.startTime - b.startTime);
+
+    // First two bottles (earliest by clock) are projected morning feeds.
+    expect(bottles[0]!.lifecycle.state).toBe("projected");
+    expect(bottles[0]!.owner).toEqual(bottleOwners[0]); // chronological position 1
+    expect(bottles[1]!.owner).toEqual(bottleOwners[1]); // position 2
   });
 
   it("no template.bottleOwners → bottles have no owner (default cleared)", () => {
@@ -439,6 +478,31 @@ describe("R12.10 — Day.ownerOverrides applies to projected events", () => {
     const naps = out.filter((e) => e.type === "nap").sort((a, b) => a.startTime - b.startTime);
     expect(naps[0]!.owner).toEqual(PARENT2);
     expect(naps[1]!.owner).toEqual(PARENT1); // no override → template default
+  });
+
+  it("override on a projected bottle keys off chronological position, beating the template (§F66 PR2)", () => {
+    const ctx = aContext({
+      day: aDay({
+        wakeTime: 7 * 60,
+        ownerOverrides: { bottle_pos_2: PARENT2 }, // 2nd bottle of the day → P2
+      }),
+      settings: aSettings({
+        bottleChain: { bottlesPerDay: 3, bufferAfterWakeMinutes: 10 },
+        defaultBottleIntervalMinutes: 180,
+        wakeWindowsMinutes: [],
+        bedtimeThreshold: 23 * 60,
+      }),
+      template: aTemplate({ bottleOwners: [PARENT1, PARENT1, PARENT1] }),
+      actuals: [],
+    });
+
+    const out = run(ctx);
+    const bottles = out
+      .filter((e) => e.type === "bottle")
+      .sort((a, b) => a.startTime - b.startTime);
+    expect(bottles[0]!.owner).toEqual(PARENT1);
+    expect(bottles[1]!.owner).toEqual(PARENT2); // positional override beats template
+    expect(bottles[2]!.owner).toEqual(PARENT1);
   });
 
   it("ownerOverride does NOT anchor the event's time or lifecycle", () => {
