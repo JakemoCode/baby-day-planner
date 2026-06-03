@@ -3,10 +3,10 @@
  *
  * A projected bottle can't fall inside a nap (DOMAIN §2, R5.6). Given a
  * cascade-proposed time, `snapBottleTime` returns a legal time: outside every
- * nap region, snapped to putdown start when adjacent ([[putdown bottle-anchor
- * rule]]), and never shifted retroactively into the past ([[no-retroactive-shift
- * rule]], ADR-0006). Each step is exported on its own so it is directly
- * testable — the cascade in `bottles.ts` only consumes the composed entry point.
+ * nap region, snapped to putdown start when adjacent (R5.6), and never shifted
+ * retroactively into the past (ADR-0006). Each step is exported on its own so
+ * it is directly testable — the cascade in `bottles.ts` only consumes the
+ * composed entry point.
  */
 
 import type { Event } from "../../schemas";
@@ -60,10 +60,9 @@ export function snapToPutdown(
     const lo = ev.startTime - putdownLeadMinutes;
     const hi = ev.startTime + half;
     if (proposed < lo || proposed > hi) continue;
-    const snapTarget = ev.startTime - putdownLeadMinutes;
     // No retroactive snap: if putdown start is past, snapForwardToNapEnd takes over.
-    if (snapTarget <= nowMinutes) continue;
-    return snapTarget;
+    if (lo <= nowMinutes) continue;
+    return lo;
   }
   return proposed;
 }

@@ -1,9 +1,3 @@
-/**
- * Direct unit tests for the bottle snap pipeline. Before extraction these
- * functions were unexported and only reachable through the full cascade; the
- * interaction cases (esp. the putdown→re-snap path) had no isolated surface.
- */
-
 import { describe, expect, it } from "vitest";
 import type { Event } from "../../schemas";
 import { NO_OWNER } from "../../schemas";
@@ -17,7 +11,7 @@ import {
 } from "./bottleSnap";
 
 const H = (h: number, m = 0) => h * 60 + m;
-const PAST = H(0); // nowMinutes far in the past → no retroactive guard fires
+const PAST = H(0);
 
 function nap(start: number, end: number): Event {
   return {
@@ -78,7 +72,7 @@ describe("snapToPutdown", () => {
   });
 
   it("uses only the lead window for bedtime (no midpoint)", () => {
-    const bedtime: Event = { ...nap(H(19), H(31)), type: "bedtime", eventKey: "bedtime" };
+    const bedtime: Event = { ...nap(H(19), H(20)), type: "bedtime", eventKey: "bedtime" };
     // window is [18:45, 19:00]; 19:30 is past it → unchanged.
     expect(snapToPutdown(H(19, 30), [bedtime], 15, 60, PAST)).toBe(H(19, 30));
     expect(snapToPutdown(H(18, 50), [bedtime], 15, 60, PAST)).toBe(H(18, 45));
