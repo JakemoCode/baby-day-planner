@@ -45,9 +45,8 @@ Framework-agnostic chrome; survived the PR-C1 V2 wipe.
 | `NowBanner` | Wake-window + in-progress sleep banner |
 | `OwnerPill` | Compact owner display |
 | `PreviewCard` | Card scaffold reused across panels |
-| `ActionButton` | Base CTA button used by sleep/bottle/day actions |
-| `StartBottleButton` | "Start Bottle Now" |
-| `NapActionButton` | Context-aware: Start Nap / End Nap / Start Bedtime |
+| `ActionButton` | Base CTA button used by the contextual + day actions |
+| `ContextualActionButton` | Single multi-mode dashboard button (End Nap / Log bottle now / End overnight sleep; hidden otherwise). Replaced the per-action `StartBottleButton` / `NapActionButton` — see ADR-0001, ADR-0003 |
 | `StartDayButton` | Dev-only — see §F17 fast-follow for auto-anchor plan |
 | `dashboardStats.ts` | Selector helpers (totals, last-X, next-event filtering) |
 

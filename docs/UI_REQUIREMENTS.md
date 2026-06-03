@@ -52,8 +52,7 @@ Sign-in flow + `(authed)` layout already shipped in Plan B.
 - **NextSleepPanel** _(was `NextNapPreview`; renamed + reshaped in §F32 2026-05-17)_ — secondary card. Selector: `nextNap`; adds per-day nap totals.
 - **NowBanner** _(was `CurrentWakeWindowStatus`; renamed + extended in §F32 2026-05-17)_ — wake-window + in-progress sleep banner. Priority: bedtime > nap > wake-window.
 - **Action buttons (context-aware):**
-  - **StartBottleButton** ("Start Bottle Now") — always visible during the day
-  - **NapActionButton** — "Start Nap Now" outside a nap, "End Nap" during one
+  - **ContextualActionButton** — single multi-mode button: "End Nap" during an in-progress nap, "Log bottle now" within ±15min of a projected bottle, "End overnight sleep" for the morning wake; hidden otherwise. Replaced the per-action "Start Nap/Bottle Now" buttons (ADR-0001, ADR-0003); everything else auto-promotes at Now-cross (ADR-0006).
   - **StartDayButton** — context-aware label: "Start New Day" if no Tomorrow Plan, "Start Day from Plan" if one exists. Kebab override: "Start blank instead". Settings toggle: "Always promote Tomorrow Plan if one exists".
   - **FAB (+)** — opens EventEditDrawer in "create extra" mode
 - **EndOfDayCard** — _(retired in §F32 2026-05-17; see `docs/v3/FAST_FOLLOW_COMPLETED.md` §F32)_ Previously replaced primary card after dream feed completes. Dashboard now always shows stats; wake gate replaced with a slim "Wake up" CTA.
@@ -140,17 +139,16 @@ Sign-in flow + `(authed)` layout already shipped in Plan B.
 
 ## Key flows
 
-### Start Bottle Now
-1. User taps StartBottleButton on Dashboard
-2. Bottle event created at current time with `defaultBottleAmountOz` (source: `actual`)
-3. Engine cascades: `projectBottleChain` re-anchors to this bottle, updating all projected later bottles
-4. Bottle amount editable from Timeline / drawer at any time. Edit changes source to `manual`, cascades again.
+### Log a bottle (ADR-0001 / ADR-0003 / ADR-0006)
+1. Within ±15min of a projected bottle, the ContextualActionButton shows "Log bottle now" → writes a recorded bottle at `startTime = now`, `amount = defaultBottleAmountOz`, overwriting that projected slot.
+2. Otherwise (no manual tap), Now-cross auto-promote records the projected bottle at its projected time + default amount when the wall clock crosses it.
+3. Engine cascades: `projectBottleChain` re-anchors from the recorded bottle, updating later projections.
+4. Bottle time/amount editable from Timeline / drawer at any time; the edit cascades again.
 
-### Start Nap Now / End Nap
-1. User taps NapActionButton (label is context-aware)
-2. Outside a nap → creates `nap` event with start = now, end = null (in-progress)
-3. During a nap → updates the in-progress nap's end = now
-4. Engine cascades: `applyNapActuals` re-anchors wake windows; short-nap rule fires if applicable.
+### End Nap (ADR-0001 / ADR-0003 / ADR-0006)
+1. Naps are never manually *started* — when Now crosses a projected nap's start, the engine auto-promotes it to `recorded` (in-progress).
+2. During an in-progress nap, the ContextualActionButton shows "End Nap" → sets the nap's `endTime = now` (TIME_EDIT → `completed`).
+3. Engine cascades: `applyNapActuals` re-anchors wake windows; short-nap rule fires if applicable.
 
 ### Start New Day / Start Day from Plan
 1. User taps StartDayButton (label is context-aware based on Tomorrow Plan presence)
