@@ -53,4 +53,19 @@ describe("NextSleepPanel a11y", () => {
     );
     expect(await axe(container)).toHaveNoViolations();
   });
+
+  it("has no axe violations when bedtime is the next sleep", async () => {
+    const bedtime = projectedBedtime((19 * 60 + 30) as TimeMin);
+    const { container } = render(
+      <NextSleepPanel
+        nextSleep={bedtime}
+        bedtime={bedtime}
+        actuals={[]}
+        nowMinutes={(17 * 60) as TimeMin}
+        putdownLeadMinutes={20}
+        owners={owners}
+      />,
+    );
+    expect(await axe(container)).toHaveNoViolations();
+  });
 });

@@ -33,7 +33,6 @@ export function NextSleepPanel({
   const last = lastCompletedNap(actuals, nowMinutes);
   const totals = napTotals(actuals, nowMinutes);
   const isBedtimeNext = nextSleep?.type === "bedtime";
-  // Putdown is a nap-prep affordance; not shown for the bedtime row.
   const putdownTime =
     nextSleep && !isBedtimeNext
       ? (Math.max(0, nextSleep.startTime - putdownLeadMinutes) as TimeMin)
@@ -68,7 +67,6 @@ export function NextSleepPanel({
           Today: {totals.count} {pluralNaps(totals.count)} ·{" "}
           {formatHoursMinutes(totals.totalMinutes)}
         </span>
-        {/* End-of-day marker — omitted when bedtime is already the prominent next sleep. */}
         {bedtime && !isBedtimeNext && (
           <span>Bedtime {formatTimeForDisplay(bedtime.startTime)}</span>
         )}

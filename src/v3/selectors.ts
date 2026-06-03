@@ -50,9 +50,8 @@ export function nextNap(events: Event[], nowMinutes: TimeMin): Event | undefined
 }
 
 /**
- * The next sleep — nap OR bedtime, whichever comes first (DOMAIN.md §1/§3: the day
- * runs wake → nap → … → bedtime, and bedtime is a sleep). When no nap remains this
- * resolves to bedtime, so the "Next sleep" panel shows it instead of going blank.
+ * Next nap OR bedtime, whichever comes first (DOMAIN.md §1/§3). Falls back to
+ * bedtime once all naps have passed, so the "Next sleep" panel never goes blank.
  */
 export function nextSleep(events: Event[], nowMinutes: TimeMin): Event | undefined {
   return nextEvent(
