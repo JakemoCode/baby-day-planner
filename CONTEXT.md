@@ -4,6 +4,13 @@ Authoritative definitions for terms used across the codebase, specs,
 and dogfood feedback. Updated lazily as terms are resolved during
 grills. Not a spec.
 
+For the rules themselves (not just term definitions), see the spec docs:
+[`docs/v3/ENGINE_SPEC.md`](docs/v3/ENGINE_SPEC.md) (engine rules R3.x–R21.x),
+[`docs/v3/BOTTLE_SPEC.md`](docs/v3/BOTTLE_SPEC.md) (bottle cascade + `eventKey`/`id`
+identity), [`docs/v3/DATA_MODEL.md`](docs/v3/DATA_MODEL.md) (schema + lifecycle),
+[`docs/v3/RENDER_SPEC.md`](docs/v3/RENDER_SPEC.md) (timeline/drawer/dashboard).
+`SOURCEMAP.md`'s read-first table is the full map.
+
 ## projected
 
 Engine output. The forecast — "if everything keeps going as it has,
