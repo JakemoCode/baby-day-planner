@@ -32,6 +32,14 @@
   line-height: 1;
 }
 
+.label {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  color: var(--color-success);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
 .delta {
   font-size: var(--text-sm);
   color: var(--color-muted);

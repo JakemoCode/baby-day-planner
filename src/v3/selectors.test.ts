@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { currentWakeWindow, nextBottle, nextEvent, nextNap, projectedBedtime } from "./selectors";
+import {
+  currentWakeWindow,
+  nextBottle,
+  nextEvent,
+  nextNap,
+  nextSleep,
+  projectedBedtime,
+} from "./selectors";
 import type { Event, EventKind, EventType, Lifecycle, TimeMin } from "./schemas";
 import { NO_OWNER } from "./schemas";
 import { PUTDOWN_KIND_TAG } from "./components/Timeline/expandPutdown";
@@ -91,6 +98,26 @@ describe("nextNap", () => {
   it("returns undefined when no nap events match", () => {
     const bottle = makeEvent({ id: "b", type: "bottle", startTime: 9 * 60 });
     expect(nextNap([bottle], 8 * 60)).toBeUndefined();
+  });
+});
+
+describe("nextSleep", () => {
+  it("returns the next nap when a nap precedes bedtime", () => {
+    const nap = makeEvent({ id: "n", type: "nap", startTime: 14 * 60, endTime: 15 * 60 });
+    const bedtime = makeEvent({ id: "bt", type: "bedtime", startTime: 19 * 60, endTime: 30 * 60 });
+    expect(nextSleep([bedtime, nap], 13 * 60)).toBe(nap);
+  });
+
+  it("returns bedtime when no nap remains (the bug: panel went blank)", () => {
+    const nap = makeEvent({ id: "n", type: "nap", startTime: 14 * 60, endTime: 15 * 60 });
+    const bedtime = makeEvent({ id: "bt", type: "bedtime", startTime: 19 * 60, endTime: 30 * 60 });
+    expect(nextSleep([nap, bedtime], 16 * 60)).toBe(bedtime);
+  });
+
+  it("ignores bottles and other non-sleep events", () => {
+    const bottle = makeEvent({ id: "b", type: "bottle", startTime: 15 * 60 });
+    const bedtime = makeEvent({ id: "bt", type: "bedtime", startTime: 19 * 60, endTime: 30 * 60 });
+    expect(nextSleep([bottle, bedtime], 16 * 60)).toBe(bedtime);
   });
 });
 

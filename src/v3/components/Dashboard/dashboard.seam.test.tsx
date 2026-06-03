@@ -12,7 +12,7 @@ import { NO_OWNER } from "@/v3/schemas";
 import { aDay, aSettings } from "@/v3/__tests__/factories";
 import { projectDay } from "@/v3/engine/projectDay";
 import { isInProgress } from "@/v3/lib/effectiveEnd";
-import { projectedBedtime, nextBottle, nextNap } from "@/v3/selectors";
+import { projectedBedtime, nextBottle, nextSleep } from "@/v3/selectors";
 import { nextDashboardEvent, bottleTotals, napTotals } from "./dashboardStats";
 import { NowBanner } from "./NowBanner";
 import { NextEventCard } from "./NextEventCard";
@@ -120,7 +120,7 @@ describe("Dashboard seam — real projectDay + new panels", () => {
     const inProgressNap = actuals.find((e) => e.type === "nap" && isInProgress(e, settings, now));
     const bedtime = projectedBedtime(projected);
     const nb = nextBottle(projected, now);
-    const nn = nextNap(projected, now);
+    const ns = nextSleep(projected, now);
 
     // -- Render all four surfaces together --
     render(
@@ -138,7 +138,7 @@ describe("Dashboard seam — real projectDay + new panels", () => {
         />
         <NextBottlePanel nextBottle={nb} actuals={actuals} nowMinutes={now} owners={owners} />
         <NextSleepPanel
-          nextNap={nn}
+          nextSleep={ns}
           bedtime={bedtime}
           actuals={actuals}
           nowMinutes={now}

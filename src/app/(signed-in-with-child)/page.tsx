@@ -5,7 +5,7 @@ import type { Event, TimeMin } from "@/v3/schemas";
 import { reduceLifecycle } from "@/v3/lifecycle";
 import { isInProgress } from "@/v3/lib/effectiveEnd";
 import { isRenderSynthetic } from "@/v3/lib/syntheticEvents";
-import { nextBottle, nextNap, projectedBedtime } from "@/v3/selectors";
+import { nextBottle, nextSleep, projectedBedtime } from "@/v3/selectors";
 import { nextDashboardEvent, pumpTotalOz } from "@/v3/components/Dashboard/dashboardStats";
 import { useNowMinutes } from "@/hooks/useNowMinutes";
 import { useV3TomorrowPlan } from "@/v3/hooks/useV3TomorrowPlan";
@@ -66,7 +66,7 @@ export default function DashboardPage() {
 
   // §F67: the panel announces the next upcoming bottle (any distance out).
   const upcomingBottle = nextBottle(projected, nowMinutes);
-  const nn = nextNap(projected, nowMinutes);
+  const ns = nextSleep(projected, nowMinutes);
   // Use `projected` (not `actuals`) to surface engine-auto-promoted in-progress naps.
   // Filter out render-synthetic putdown chips — they inherit the parent's lifecycle
   // and would falsely trigger "End nap" before the real nap starts.
@@ -144,7 +144,7 @@ export default function DashboardPage() {
         owners={settings.owners}
       />
       <NextSleepPanel
-        nextNap={nn}
+        nextSleep={ns}
         bedtime={bedtime}
         actuals={actuals}
         nowMinutes={nowMinutes}
