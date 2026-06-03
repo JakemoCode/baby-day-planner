@@ -8,7 +8,11 @@
 
 import { useState } from "react";
 import type { Event } from "../schemas";
-import { ownerOverrideKeyFor, recordedIdForEvent } from "../lib/eventConventions";
+import {
+  isEngineEmittedId,
+  ownerOverrideKeyFor,
+  recordedIdForEvent,
+} from "../lib/eventConventions";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -42,8 +46,6 @@ export type UseDrawerResult = {
 // ---------------------------------------------------------------------------
 
 type UseDrawerOptions = {
-  /** Persisted events for today; determines projected vs actual routing. */
-  actuals: Event[];
   /** Write a single event (create or update). */
   saveEvent: (event: Event) => Promise<void> | void;
   /** Delete by id; only called for confirmed actuals. */
@@ -64,7 +66,6 @@ type UseDrawerOptions = {
 };
 
 export function useDrawer({
-  actuals,
   saveEvent,
   deleteOptimistic,
   setOwnerOverride,
@@ -89,7 +90,10 @@ export function useDrawer({
     if (drawer.open && drawer.mode === "edit") {
       const originalId = drawer.event.id;
       const source = drawer.event;
-      const isActual = actuals.some((e) => e.id === originalId);
+      // Projected (engine-emitted `proj_` id) ⇔ not-yet-persisted. The write seam
+      // (v3EventConverter.toFirestore) refuses to persist a `proj_` id, so this is
+      // ground-truth, not a heuristic — see §F59 / BOTTLE_SPEC §3.1.
+      const isActual = !isEngineEmittedId(originalId);
       // Owner-only edit on a projected event: route to Day.ownerOverrides so the cascade
       // stays free to re-project times. saveEvent would anchor the slot as "recorded".
       if (
@@ -140,7 +144,7 @@ export function useDrawer({
   const onDelete = async (event: Event) => {
     if (drawer.open && drawer.mode === "edit") {
       const originalId = drawer.event.id;
-      const isActual = actuals.some((e) => e.id === originalId);
+      const isActual = !isEngineEmittedId(originalId);
       if (isActual) {
         await deleteOptimistic(event.id);
       }

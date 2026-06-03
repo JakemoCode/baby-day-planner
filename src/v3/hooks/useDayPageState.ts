@@ -69,7 +69,6 @@ export function useDayPageState(db: Firestore, childId: string): UseDayPageState
   );
 
   const { drawer, openCreate, openEdit, close, onSave, onDelete } = useDrawer({
-    actuals,
     saveEvent,
     deleteOptimistic,
     ...(day?.id

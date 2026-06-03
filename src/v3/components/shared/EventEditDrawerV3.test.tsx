@@ -1254,7 +1254,7 @@ describe("Past-threshold prompt when editing a nap (physiology cascade)", () => 
   describe("future-event drawer rule (ADR-0001)", () => {
     const futureNap = () =>
       projectedNap({
-        id: "nap-future",
+        id: "proj_nap_3",
         eventKey: "nap_3",
         startTime: 14 * 60,
         endTime: 14 * 60 + 45,
@@ -1400,7 +1400,6 @@ describe("Past-threshold prompt when editing a nap (physiology cascade)", () => 
 
       function Harness() {
         const { drawer, openEdit, onSave } = useDrawer({
-          actuals: [], // empty actuals → source is projected
           saveEvent,
           deleteOptimistic,
           setOwnerOverride,

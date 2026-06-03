@@ -10,7 +10,7 @@ import { nextDashboardEvent, pumpTotalOz } from "@/v3/components/Dashboard/dashb
 import { useNowMinutes } from "@/hooks/useNowMinutes";
 import { useV3TomorrowPlan } from "@/v3/hooks/useV3TomorrowPlan";
 import { useDayPageState } from "@/v3/hooks/useDayPageState";
-import { isEngineEmittedId, recordedIdFor } from "@/v3/lib/eventConventions";
+import { isEngineEmittedId, recordedIdForEvent } from "@/v3/lib/eventConventions";
 import { promoteFromPlan, startNewDay } from "@/v3/repositories/days";
 import { forecastSnapshotDocs } from "@/v3/lib/forecastSnapshot";
 import { deleteEvent, listEvents, reconcileDuplicateEventDocs } from "@/v3/repositories/events";
@@ -84,7 +84,8 @@ export default function DashboardPage() {
   // never overwrite an actual's original doc id (would orphan legacy docs).
   const handleEndNap = async (event: Event, endTime: number) => {
     if (!day || day.id === "") return;
-    const id = isEngineEmittedId(event.id) ? recordedIdFor(event.eventKey) : event.id;
+    // §F59 / ADR-0007: re-key an engine projection to its durable recorded id.
+    const id = isEngineEmittedId(event.id) ? recordedIdForEvent(event) : event.id;
     await saveEvent({
       ...event,
       id,

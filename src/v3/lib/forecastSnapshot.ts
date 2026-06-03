@@ -12,6 +12,7 @@
 
 import type { Event } from "../schemas";
 import { isDreamFeed, isEngineEmittedId, recordedIdForEvent } from "./eventConventions";
+import { recordedLifecycle } from "../lifecycle";
 
 /**
  * The recorded docs to write for the closing day so its forecast survives in history.
@@ -25,6 +26,6 @@ export function forecastSnapshotDocs(projected: Event[], closingDayId: string): 
       ...e,
       id: recordedIdForEvent(e),
       dayId: closingDayId,
-      lifecycle: { state: "recorded" as const, annotatedAt: e.startTime },
+      lifecycle: recordedLifecycle(e.startTime),
     }));
 }

@@ -25,6 +25,7 @@ import type {
 import { withV3DayDefaults } from "./dayDefaults";
 import { withV3EventDefaults } from "./eventDefaults";
 import { normalizeSettingsDoc } from "./settingsDefaults";
+import { isEngineEmittedId } from "../lib/eventConventions";
 
 function passthrough<T extends object>(): FirestoreDataConverter<T> {
   return {
@@ -63,7 +64,20 @@ export const v3SettingsConverter: FirestoreDataConverter<Settings> = {
  * `lifecycle` or `kind` crash the engine/renderer downstream.
  */
 export const v3EventConverter: FirestoreDataConverter<Event> = {
-  toFirestore: (data) => data,
+  // Write seam guard (§F59 / BOTTLE_SPEC §3.1): projections are ephemeral and must
+  // never be persisted with their engine-emitted `proj_` id — that was the
+  // zombie/flicker class. A projection must be *realized* (re-keyed via
+  // recordedIdForEvent) before it reaches Firestore. Throwing here makes
+  // "persisted ⇒ realized" hold by construction, so isEngineEmittedId is
+  // ground-truth rather than a heuristic.
+  toFirestore: (data) => {
+    if (typeof data.id === "string" && isEngineEmittedId(data.id)) {
+      throw new Error(
+        `Refusing to persist an unrealized projection (${data.id}). Realize via recordedIdForEvent first.`,
+      );
+    }
+    return data;
+  },
   fromFirestore: (snap: QueryDocumentSnapshot, opts?: SnapshotOptions) => {
     return withV3EventDefaults(snap.data(opts) as Partial<Event>);
   },

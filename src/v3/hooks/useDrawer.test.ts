@@ -13,9 +13,11 @@ import { useDrawer } from "./useDrawer";
 // Fixtures
 // ---------------------------------------------------------------------------
 
+// Projected events carry an engine-emitted `proj_` id; `useDrawer` routes on that
+// prefix (isEngineEmittedId), not on membership in an actuals list (§F59).
 function makeEvent(overrides: Partial<Event> = {}): Event {
   return {
-    id: "evt-proj-1",
+    id: "proj_nap_1",
     dayId: "day-1",
     eventKey: "nap_1",
     type: "nap",
@@ -68,14 +70,12 @@ function makeSuppressRecurring() {
 }
 
 function setup({
-  actuals = [] as Event[],
   saveEvent = makeSaveEvent(),
   deleteOptimistic = makeDeleteFn(),
   setOwnerOverride,
   suppressRecurring,
   saveNewEvent,
 }: {
-  actuals?: Event[];
   saveEvent?: ((event: Event) => Promise<void>) & ReturnType<typeof vi.fn>;
   deleteOptimistic?: ((eventId: string) => Promise<void>) & ReturnType<typeof vi.fn>;
   setOwnerOverride?: ((eventKey: string, owner: Event["owner"]) => Promise<void>) &
@@ -99,7 +99,6 @@ function setup({
     : [];
   const result = renderHook(() =>
     useDrawer({
-      actuals,
       saveEvent,
       deleteOptimistic,
       suppressions,
@@ -190,7 +189,7 @@ describe("useDrawer", () => {
     const saveEvent = makeSaveEvent();
     const saveNewEvent = makeSaveEvent();
     const actual = makeActualEvent({ eventKey: "bottle_1" });
-    const { result } = setup({ actuals: [actual], saveEvent, saveNewEvent });
+    const { result } = setup({ saveEvent, saveNewEvent });
 
     act(() => result.current.openEdit(actual));
     await act(async () => {
@@ -201,11 +200,11 @@ describe("useDrawer", () => {
     expect(saveNewEvent).not.toHaveBeenCalled();
   });
 
-  // 5. onSave in edit mode where event IS in actuals — same id
+  // 5. onSave on a persisted (non-`proj_` id) event — preserves the id
   it("onSave for edit of persisted actual preserves the event id", async () => {
     const actual = makeActualEvent({ id: "evt-actual-1", eventKey: "nap_1" });
     const saveEvent = makeSaveEvent();
-    const { result } = setup({ actuals: [actual], saveEvent });
+    const { result } = setup({ saveEvent });
 
     act(() => result.current.openEdit(actual));
 
@@ -219,11 +218,11 @@ describe("useDrawer", () => {
     expect(result.current.drawer).toEqual({ open: false });
   });
 
-  // 6. onSave in edit mode where event is NOT in actuals — re-ID to recorded_${eventKey}
+  // 6. onSave on a projected (`proj_` id) event — re-ID to recorded_${eventKey}
   it("onSave for edit of projected event re-IDs to recorded_${eventKey}", async () => {
-    const projected = makeEvent({ id: "proj-nap-1", eventKey: "nap_2" });
+    const projected = makeEvent({ id: "proj_nap_1", eventKey: "nap_2" });
     const saveEvent = makeSaveEvent();
-    const { result } = setup({ actuals: [], saveEvent });
+    const { result } = setup({ saveEvent });
 
     act(() => result.current.openEdit(projected));
 
@@ -246,7 +245,7 @@ describe("useDrawer", () => {
       startTime: 10 * 60,
     });
     const saveEvent = makeSaveEvent();
-    const { result } = setup({ actuals: [], saveEvent });
+    const { result } = setup({ saveEvent });
 
     act(() => result.current.openEdit(projected));
 
@@ -268,7 +267,7 @@ describe("useDrawer", () => {
       startTime: 10 * 60,
     });
     const saveEvent = makeSaveEvent();
-    const { result } = setup({ actuals: [], saveEvent });
+    const { result } = setup({ saveEvent });
 
     act(() => result.current.openEdit(projected));
     await act(async () => {
@@ -280,9 +279,9 @@ describe("useDrawer", () => {
 
   // The tag is bottle-only: a projected nap edit must NOT carry it.
   it("projected NAP edit does not tag realizedForecast", async () => {
-    const projected = makeEvent({ id: "proj-nap-5", eventKey: "nap_5" });
+    const projected = makeEvent({ id: "proj_nap_5", eventKey: "nap_5" });
     const saveEvent = makeSaveEvent();
-    const { result } = setup({ actuals: [], saveEvent });
+    const { result } = setup({ saveEvent });
 
     act(() => result.current.openEdit(projected));
     await act(async () => {
@@ -296,10 +295,10 @@ describe("useDrawer", () => {
   // owner-only edit on projected event must route to setOwnerOverride, not saveEvent.
   // saveEvent would promote to recorded, anchoring time and preventing cascade re-projection.
   it("owner-only edit on projected event routes to setOwnerOverride (not saveEvent)", async () => {
-    const projected = makeEvent({ id: "proj-nap-3", eventKey: "nap_3" });
+    const projected = makeEvent({ id: "proj_nap_3", eventKey: "nap_3" });
     const saveEvent = makeSaveEvent();
     const setOwnerOverride = makeSetOwnerOverride();
-    const { result } = setup({ actuals: [], saveEvent, setOwnerOverride });
+    const { result } = setup({ saveEvent, setOwnerOverride });
 
     act(() => result.current.openEdit(projected));
 
@@ -328,7 +327,7 @@ describe("useDrawer", () => {
     });
     const saveEvent = makeSaveEvent();
     const setOwnerOverride = makeSetOwnerOverride();
-    const { result } = setup({ actuals: [], saveEvent, setOwnerOverride });
+    const { result } = setup({ saveEvent, setOwnerOverride });
 
     act(() => result.current.openEdit(projected));
 
@@ -354,7 +353,7 @@ describe("useDrawer", () => {
     });
     const saveEvent = makeSaveEvent();
     const setOwnerOverride = makeSetOwnerOverride();
-    const { result } = setup({ actuals: [], saveEvent, setOwnerOverride });
+    const { result } = setup({ saveEvent, setOwnerOverride });
 
     act(() => result.current.openEdit(recurring));
 
@@ -369,10 +368,10 @@ describe("useDrawer", () => {
   });
 
   it("time edit on projected event still routes to saveEvent (not setOwnerOverride)", async () => {
-    const projected = makeEvent({ id: "proj-nap-3", eventKey: "nap_3" });
+    const projected = makeEvent({ id: "proj_nap_3", eventKey: "nap_3" });
     const saveEvent = makeSaveEvent();
     const setOwnerOverride = makeSetOwnerOverride();
-    const { result } = setup({ actuals: [], saveEvent, setOwnerOverride });
+    const { result } = setup({ saveEvent, setOwnerOverride });
 
     act(() => result.current.openEdit(projected));
 
@@ -401,7 +400,7 @@ describe("useDrawer", () => {
     });
     const saveEvent = makeSaveEvent();
     const setOwnerOverride = makeSetOwnerOverride();
-    const { result } = setup({ actuals: [actual], saveEvent, setOwnerOverride });
+    const { result } = setup({ saveEvent, setOwnerOverride });
 
     act(() => result.current.openEdit(actual));
 
@@ -415,10 +414,10 @@ describe("useDrawer", () => {
   });
 
   it("falls back to legacy recorded-doc path when setOwnerOverride callback is omitted", async () => {
-    const projected = makeEvent({ id: "proj-nap-3", eventKey: "nap_3" });
+    const projected = makeEvent({ id: "proj_nap_3", eventKey: "nap_3" });
     const saveEvent = makeSaveEvent();
     // No setOwnerOverride: simulates pages (e.g. /tomorrow) with their own plumbing.
-    const { result } = setup({ actuals: [], saveEvent });
+    const { result } = setup({ saveEvent });
 
     act(() => result.current.openEdit(projected));
 
@@ -431,11 +430,11 @@ describe("useDrawer", () => {
     expect(saveEvent).toHaveBeenCalledWith(expect.objectContaining({ id: "recorded_nap_3" }));
   });
 
-  // 7. onDelete where event is in actuals → deleteOptimistic(event.id)
+  // 7. onDelete on a persisted (non-`proj_` id) event → deleteOptimistic(event.id)
   it("onDelete for persisted actual calls deleteOptimistic and closes", async () => {
     const actual = makeActualEvent({ id: "evt-actual-del", eventKey: "nap_1" });
     const deleteOptimistic = makeDeleteFn();
-    const { result } = setup({ actuals: [actual], deleteOptimistic });
+    const { result } = setup({ deleteOptimistic });
 
     act(() => result.current.openEdit(actual));
 
@@ -450,9 +449,9 @@ describe("useDrawer", () => {
 
   // 8. onDelete where event is projected → just closes, no persist
   it("onDelete for projected event just closes without calling deleteOptimistic", async () => {
-    const projected = makeEvent({ id: "proj-nap-1", eventKey: "nap_1" });
+    const projected = makeEvent({ id: "proj_nap_1", eventKey: "nap_1" });
     const deleteOptimistic = makeDeleteFn();
-    const { result } = setup({ actuals: [], deleteOptimistic });
+    const { result } = setup({ deleteOptimistic });
 
     act(() => result.current.openEdit(projected));
 
@@ -475,7 +474,7 @@ describe("useDrawer", () => {
     });
     const deleteOptimistic = makeDeleteFn();
     const suppressRecurring = makeSuppressRecurring();
-    const { result } = setup({ actuals: [], deleteOptimistic, suppressRecurring });
+    const { result } = setup({ deleteOptimistic, suppressRecurring });
 
     act(() => result.current.openEdit(recurring));
     await act(async () => {
@@ -500,7 +499,6 @@ describe("useDrawer", () => {
     const deleteOptimistic = makeDeleteFn();
     const suppressRecurring = makeSuppressRecurring();
     const { result } = setup({
-      actuals: [recurring],
       deleteOptimistic,
       suppressRecurring,
     });
@@ -525,7 +523,7 @@ describe("useDrawer", () => {
       label: "Tummy time",
     });
     const deleteOptimistic = makeDeleteFn();
-    const { result } = setup({ actuals: [recurring], deleteOptimistic });
+    const { result } = setup({ deleteOptimistic });
 
     act(() => result.current.openEdit(recurring));
     await act(async () => {
