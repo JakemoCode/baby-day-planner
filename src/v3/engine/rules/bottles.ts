@@ -10,6 +10,7 @@ import { intervalForAmount } from "../bottleIntervalRules";
 import { isBedtime, isBottle, isProjected, projectedEvent } from "../helpers";
 import { MINUTES_PER_DAY } from "../../ui/time";
 import { DREAM_FEED_EVENT_KEY, isDreamFeed } from "../../lib/eventConventions";
+import { napRegions, snapBottleTime } from "./bottleSnap";
 
 const MIDNIGHT = MINUTES_PER_DAY;
 
@@ -72,103 +73,6 @@ function buildProjectedDreamFeed(ctx: Context, startTime: number): Event {
   );
 }
 
-type Region = { start: number; end: number };
-
-/**
- * Merged nap regions for snap checks. No-feed region is the nap itself;
- * putdown/wind-down is render-only and not excluded. Overlapping naps are
- * merged so a snap from nap A can't land inside nap B.
- */
-function napRegions(events: Event[]): Region[] {
-  const raw = events
-    .filter((e) => e.type === "nap" && e.endTime !== undefined)
-    .map((e) => ({ start: e.startTime, end: e.endTime! }))
-    .sort((a, b) => a.start - b.start);
-  const merged: Region[] = [];
-  for (const r of raw) {
-    const last = merged[merged.length - 1];
-    if (last && r.start <= last.end) {
-      last.end = Math.max(last.end, r.end);
-    } else {
-      merged.push({ ...r });
-    }
-  }
-  return merged;
-}
-
-/**
- * If `proposed` falls in `[nap.start - lead, nap.start + napLen/2]`, snap
- * to putdown start (`nap.start - lead`). Bedtime uses only the lead window.
- * Skipped when the snap target is ≤ nowMinutes (no retroactive shift).
- */
-function snapToPutdown(
-  proposed: number,
-  events: Event[],
-  putdownLeadMinutes: number,
-  napLengthMinutes: number,
-  nowMinutes: number,
-): number {
-  for (const ev of events) {
-    if (ev.type !== "nap" && ev.type !== "bedtime") continue;
-    // Bedtime has no midpoint (half=0); nap uses actual or default duration.
-    const napLen =
-      ev.type !== "nap"
-        ? 0
-        : ev.endTime !== undefined
-          ? ev.endTime - ev.startTime
-          : napLengthMinutes;
-    const half = Math.floor(napLen / 2);
-    const lo = ev.startTime - putdownLeadMinutes;
-    const hi = ev.startTime + half;
-    if (proposed < lo || proposed > hi) continue;
-    const snapTarget = ev.startTime - putdownLeadMinutes;
-    // No retroactive snap: if putdown start is past, snapForwardToNapEnd takes over.
-    if (snapTarget <= nowMinutes) continue;
-    return snapTarget;
-  }
-  return proposed;
-}
-
-/**
- * Snaps `proposed` to the nearest nap edge when it falls strictly inside a
- * nap region. Ties favor `region.start`. Falls back to the other edge if
- * the chosen one is in the past.
- */
-function snapOutOfNap(proposed: number, regions: Region[], nowMinutes: number): number {
-  const region = regions.find((r) => proposed > r.start && proposed < r.end);
-  if (!region) return proposed;
-  const distBefore = Math.abs(proposed - region.start);
-  const distAfter = Math.abs(proposed - region.end);
-  let chosen = distBefore <= distAfter ? region.start : region.end;
-  if (chosen < nowMinutes) {
-    // With both edges past, hold the closer choice to avoid a snap-to-pre-wake loop.
-    const other = chosen === region.start ? region.end : region.start;
-    if (other >= nowMinutes) chosen = other;
-  }
-  return chosen;
-}
-
-/**
- * When `proposed` falls in `[nap.start - lead, nap.end]` and the putdown era
- * has opened (`lo ≤ now`), snap to `nap.endTime`. Future putdowns (`lo > now`)
- * are handled by snapToPutdown; this function skips them.
- */
-function snapForwardToNapEnd(
-  proposed: number,
-  regions: Region[],
-  putdownLead: number,
-  nowMinutes: number,
-): number {
-  for (const r of regions) {
-    const lo = r.start - putdownLead;
-    if (proposed < lo || proposed > r.end) continue;
-    if (r.end <= nowMinutes) continue; // block already past; auto-promote handles it
-    if (lo > nowMinutes) continue; // future putdown: handled by snapToPutdown
-    return r.end;
-  }
-  return proposed;
-}
-
 // ---------------------------------------------------------------------------
 // R5 — Sequential bottle cascade (unified)
 // ---------------------------------------------------------------------------
@@ -204,18 +108,14 @@ function bottleCascadeInputs(events: Event[], ctx: Context): CascadeInputs | nul
   const rules = ctx.settings.bottleIntervalRules;
   const regions = napRegions(events);
 
-  const snap = (proposed: number) => {
-    const noNap = snapOutOfNap(proposed, regions, ctx.nowMinutes);
-    const withPutdown = snapToPutdown(
-      noNap,
+  const snap = (proposed: number) =>
+    snapBottleTime(proposed, {
       events,
-      ctx.settings.putdownLeadMinutes,
-      ctx.settings.defaultNapLengthMinutes,
-      ctx.nowMinutes,
-    );
-    const outOfNap = snapOutOfNap(withPutdown, regions, ctx.nowMinutes);
-    return snapForwardToNapEnd(outOfNap, regions, ctx.settings.putdownLeadMinutes, ctx.nowMinutes);
-  };
+      regions,
+      putdownLeadMinutes: ctx.settings.putdownLeadMinutes,
+      defaultNapLengthMinutes: ctx.settings.defaultNapLengthMinutes,
+      nowMinutes: ctx.nowMinutes,
+    });
 
   const anchors = events
     .filter(
