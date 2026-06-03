@@ -5,6 +5,7 @@
  */
 
 import { isRecorded, NO_OWNER, type Context, type Event, type Lifecycle } from "../schemas";
+import { recordedLifecycle } from "../lifecycle";
 
 // ---------------------------------------------------------------------------
 // Rule shape
@@ -237,7 +238,7 @@ export function evaluate(rules: Rule[], ctx: Context, options: EvaluateOptions =
   // as committed reality.
   events = events.map((e) =>
     e.lifecycle.state === "projected" && e.startTime <= ctx.nowMinutes
-      ? { ...e, lifecycle: { state: "recorded", annotatedAt: e.startTime } }
+      ? { ...e, lifecycle: recordedLifecycle(e.startTime) }
       : e,
   );
 

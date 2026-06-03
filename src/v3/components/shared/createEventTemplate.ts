@@ -4,6 +4,7 @@
  */
 
 import { newEventId } from "../../lib/newEventId";
+import { projectedLifecycle } from "../../lifecycle";
 import { isRecorded, NO_OWNER } from "../../schemas";
 import type { Event, EventType, Settings, TimeMin } from "../../schemas";
 
@@ -44,7 +45,7 @@ export function buildCreateTemplate({
       amountOz: settings.defaultBottleAmountOz,
       hasPutdown: false,
       owner: NO_OWNER, // owner required; new events start unassigned
-      lifecycle: { state: "projected" },
+      lifecycle: projectedLifecycle(),
     };
   }
 
@@ -61,7 +62,7 @@ export function buildCreateTemplate({
       endTime: nowMinutes + settings.defaultPumpDurationMinutes,
       hasPutdown: false,
       owner: NO_OWNER, // owner required
-      lifecycle: { state: "projected" },
+      lifecycle: projectedLifecycle(),
     };
   }
 
@@ -78,7 +79,7 @@ export function buildCreateTemplate({
       startTime: nowMinutes,
       hasPutdown: false,
       owner: NO_OWNER, // owner required
-      lifecycle: { state: "projected" },
+      lifecycle: projectedLifecycle(),
     };
   }
 

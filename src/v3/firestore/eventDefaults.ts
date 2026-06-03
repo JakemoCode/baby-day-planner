@@ -6,7 +6,7 @@
  */
 
 import { NO_OWNER, type Event, type EventKind, type EventType } from "../schemas";
-import { migrateLegacyLifecycle } from "../lifecycle";
+import { migrateLegacyLifecycle, projectedLifecycle } from "../lifecycle";
 
 function deriveKind(input: Partial<Event>): EventKind {
   if (input.kind) return input.kind;
@@ -30,7 +30,7 @@ export function withV3EventDefaults(input: Partial<Event>): Event {
     hasPutdown: input.hasPutdown ?? false,
     // owner is required; pre-existing docs missing the field migrate to NO_OWNER on read.
     owner: input.owner ?? NO_OWNER,
-    lifecycle: migratedLifecycle ?? input.lifecycle ?? { state: "projected" },
+    lifecycle: migratedLifecycle ?? input.lifecycle ?? projectedLifecycle(),
   };
 
   if (input.endTime !== undefined) out.endTime = input.endTime;

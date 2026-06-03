@@ -181,6 +181,25 @@ export function isSchedulingType(type: EventType): boolean {
   return type === "nap" || type === "bedtime" || type === "daily_recurring";
 }
 
+// ---------------------------------------------------------------------------
+// Constructors — the single place a Lifecycle value is minted.
+// Shape is enforced by the discriminated union (schemas.ts) under strict TS;
+// authorship is convention: call these instead of hand-building a
+// `{ state: ... }` literal. See CONTEXT.md "realize" + DATA_MODEL.md §2 (§F59).
+// ---------------------------------------------------------------------------
+
+export function projectedLifecycle(): Lifecycle {
+  return { state: "projected" };
+}
+
+export function recordedLifecycle(annotatedAt: TimeMin): Lifecycle {
+  return { state: "recorded", annotatedAt };
+}
+
+export function completedLifecycle(committedAt: TimeMin): Lifecycle {
+  return { state: "completed", committedAt };
+}
+
 export type LifecycleAction =
   | { type: "RECORD_INSTANT"; at: TimeMin; eventKind: EventKind }
   | { type: "TIME_EDIT"; at: TimeMin }
@@ -232,11 +251,11 @@ export function reduceLifecycle(current: Lifecycle, action: LifecycleAction): Li
           "RECORD_INSTANT requires projected state",
         );
       }
-      return { state: "completed", committedAt: action.at };
+      return completedLifecycle(action.at);
     }
 
     case "TIME_EDIT": {
-      return { state: "completed", committedAt: action.at };
+      return completedLifecycle(action.at);
     }
 
     case "OWNER_EDIT": {
@@ -244,7 +263,7 @@ export function reduceLifecycle(current: Lifecycle, action: LifecycleAction): Li
         // Owner edits on already-recorded or completed events stay in their current state.
         return current;
       }
-      return { state: "recorded", annotatedAt: action.at };
+      return recordedLifecycle(action.at);
     }
 
     case "DRAWER_SAVE": {
@@ -266,25 +285,25 @@ export function reduceLifecycle(current: Lifecycle, action: LifecycleAction): Li
           !(eventKind === "block" && !hasEndTime)
         ) {
           return startTime <= nowMinutes
-            ? { state: "completed", committedAt: nowMinutes }
-            : { state: "recorded", annotatedAt: nowMinutes };
+            ? completedLifecycle(nowMinutes)
+            : recordedLifecycle(nowMinutes);
         }
         if (!timeChanged) {
           // No time change: owner/amount/label only → annotate as recorded.
-          return { state: "recorded", annotatedAt: nowMinutes };
+          return recordedLifecycle(nowMinutes);
         }
         // Block with no endTime is "started but not done yet" — recorded.
         if (eventKind === "block" && !hasEndTime) {
-          return { state: "recorded", annotatedAt: nowMinutes };
+          return recordedLifecycle(nowMinutes);
         }
         // Scheduling types: drawer time-edits are scheduling intent, not
         // reality. Stay in `recorded` so the engine treats the event as
         // a future projection with an anchored time (preserves hasPutdown).
         if (isSchedulingType(eventType)) {
-          return { state: "recorded", annotatedAt: nowMinutes };
+          return recordedLifecycle(nowMinutes);
         }
         // All other types: time-edit locks in the time.
-        return { state: "completed", committedAt: nowMinutes };
+        return completedLifecycle(nowMinutes);
       }
 
       // current.state === "recorded"
@@ -292,10 +311,10 @@ export function reduceLifecycle(current: Lifecycle, action: LifecycleAction): Li
       if (!timeChanged) return current;
       // Re-scheduling a scheduling-type stays recorded.
       if (isSchedulingType(eventType)) {
-        return { state: "recorded", annotatedAt: nowMinutes };
+        return recordedLifecycle(nowMinutes);
       }
       // Other recorded + time-edit: promote to completed.
-      return { state: "completed", committedAt: nowMinutes };
+      return completedLifecycle(nowMinutes);
     }
   }
 }

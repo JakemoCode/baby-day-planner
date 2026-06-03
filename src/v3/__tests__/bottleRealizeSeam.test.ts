@@ -62,7 +62,7 @@ describe("seam: edit a forecast bottle → record → one bottle, not two", () =
     const projected = projectedBottleAt(16 * 60 + 10);
     const saveEvent = vi.fn().mockResolvedValue(undefined);
     const { result } = renderHook(() =>
-      useDrawer({ actuals: [], saveEvent, deleteOptimistic: vi.fn(), suppressions: [] }),
+      useDrawer({ saveEvent, deleteOptimistic: vi.fn(), suppressions: [] }),
     );
 
     act(() => result.current.openEdit(projected));

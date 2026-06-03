@@ -6,8 +6,9 @@
 
 import { describe, expect, it } from "vitest";
 import type { QueryDocumentSnapshot } from "firebase/firestore";
-import type { Day } from "../schemas";
-import { v3DayConverter, v3SettingsConverter } from "./converters";
+import type { Day, Event } from "../schemas";
+import { NO_OWNER } from "../schemas";
+import { v3DayConverter, v3EventConverter, v3SettingsConverter } from "./converters";
 
 function mockSnap(data: Record<string, unknown>): QueryDocumentSnapshot {
   return {
@@ -69,5 +70,31 @@ describe("v3SettingsConverter", () => {
     // Cast to partial to avoid building a complete Settings fixture.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     expect(v3SettingsConverter.toFirestore(partial as any)).toBe(partial);
+  });
+});
+
+describe("v3EventConverter.toFirestore — realization guard (§F59 / BOTTLE_SPEC §3.1)", () => {
+  function evt(id: string): Event {
+    return {
+      id,
+      dayId: "d-1",
+      eventKey: "nap_1",
+      type: "nap",
+      kind: "block",
+      label: "Nap 1",
+      startTime: 9 * 60,
+      hasPutdown: false,
+      owner: NO_OWNER,
+      lifecycle: { state: "recorded", annotatedAt: 9 * 60 },
+    };
+  }
+
+  it("throws rather than persist an unrealized projection (proj_ id)", () => {
+    expect(() => v3EventConverter.toFirestore(evt("proj_nap_1"))).toThrow(/unrealized projection/i);
+  });
+
+  it("passes a realized recorded-doc id straight through", () => {
+    const realized = evt("recorded_nap_1");
+    expect(v3EventConverter.toFirestore(realized)).toBe(realized);
   });
 });

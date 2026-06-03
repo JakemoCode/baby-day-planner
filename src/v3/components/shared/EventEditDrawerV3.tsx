@@ -11,6 +11,7 @@ import {
   isActiveNap,
   isFocusNap,
   isNearestBottle,
+  recordedLifecycle,
 } from "../../lifecycle";
 import { isRenderSynthetic } from "../../lib/syntheticEvents";
 import { isDreamFeed, recordedIdFor } from "../../lib/eventConventions";
@@ -414,7 +415,7 @@ export function EventEditDrawerV3({
       endTime: nextDayAt(defaultWakeTime),
       hasPutdown: false,
       owner: napCandidate.owner,
-      lifecycle: { state: "recorded", annotatedAt: nowMinutes },
+      lifecycle: recordedLifecycle(nowMinutes),
     };
     // Delete original first to avoid a brief dual-chip state.
     if (isRecorded(sourceEvent.lifecycle) && onDelete) {
