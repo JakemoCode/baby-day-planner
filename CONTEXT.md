@@ -48,6 +48,33 @@ happened at a time that hasn't arrived yet).
 Established 2026-05-25 (§F66 grill). Supersedes DATA_MODEL.md R2.2's
 claim that owner-only edits promote projected→recorded.
 
+## realize
+
+To convert an **ephemeral engine projection into a persisted recorded
+Firestore doc**. The verb for what the write path does at the moment a
+forecast becomes stored history.
+
+Distinct from [[Now-cross promotion]]: now-cross flips a past-Now
+projection's `lifecycle.state` to `recorded` *in the engine output*, but
+the event stays ephemeral — still a `proj_` id, never written to Firestore
+(BOTTLE_SPEC §3.1; the now-cross pass touches only `lifecycle.state`, never
+the id). "Behind the Now line" makes an event *look* happened; realizing it
+makes it *be* stored.
+
+Realization is triggered by exactly two things:
+1. The user **commits a specific detail** to a projection — a drawer
+   time/amount edit, end-nap, or log-bottle-now. (Owner-only edits do NOT
+   realize; they route to `Day.ownerOverrides` and stay projected.)
+2. **Day-close freeze** — the one batch path that snapshots the closing
+   day's remaining forecast bottles into history so an archived day reads
+   as it was forecast (`forecastSnapshotDocs`).
+
+The durable `id` for the persisted doc is resolved via `recordedIdForEvent`
+— renumberable bottles key off `startTime`, not the renumbering `eventKey`
+(see [[event id vs eventKey]] / ADR-0007).
+
+Established 2026-06-03 (realization-seam grill).
+
 ## feeds move, they don't skip
 
 Domain truth (Jake, 2026-06-01 §F66 grill): a baby does **not** skip an entire

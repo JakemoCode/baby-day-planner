@@ -42,6 +42,7 @@ Shipped items move to [`FAST_FOLLOW_COMPLETED.md`](./FAST_FOLLOW_COMPLETED.md) �
 - [§F58](./fast-follow/grill/f58-dream-feed-default-time.md)
 - [§F62](./fast-follow/grill/f62-cancascade-idempotency-hole.md) — _likely moot under the ephemeral-projections model now shipped in #303 ([BOTTLE_SPEC.md](./BOTTLE_SPEC.md)); verify, then archive_
 - [§F64](./fast-follow/grill/f64-nap-bedtime-too-aggressive.md)
+- [§F75](./fast-follow/grill/f75-bedtime-confirm-future-recorded.md)
 
 ## backlog/
 
