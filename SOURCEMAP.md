@@ -3,8 +3,9 @@
 **Read this before grep-walking the tree.** It answers *"where does this
 live?"* at directory granularity — not file-by-file (files churn; layers
 don't). For *what terms mean* see `CONTEXT.md`; for *how babies behave* see
-`DOMAIN.md`; for *how to work/test here* see `AGENTS.md`; for *why a decision
-was made* see `docs/adr/`.
+`DOMAIN.md`; for *what rules the engine obeys* see `docs/v3/ENGINE_SPEC.md`
+(and the spec triad in the read-first table below); for *how to work/test
+here* see `AGENTS.md`; for *why a decision was made* see `docs/adr/`.
 
 > Keyed to **layers**, not files. When a file moves within its layer, this map
 > stays correct. If a whole layer's *purpose* changes, update the row.
@@ -17,10 +18,21 @@ was made* see `docs/adr/`.
 |---|---|
 | How do babies actually behave? (authoritative domain) | `DOMAIN.md` |
 | What does a V3 term/rule mean? (glossary) | `CONTEXT.md` |
+| **What rules does the engine compute?** (authoritative) | `docs/v3/ENGINE_SPEC.md` |
+| **How does the bottle cascade + identity work?** | `docs/v3/BOTTLE_SPEC.md` |
+| **What's the data schema, lifecycle & persistence?** | `docs/v3/DATA_MODEL.md` |
+| **How does the timeline/drawer/dashboard render?** | `docs/v3/RENDER_SPEC.md` |
+| Pinned (input × expected) regression scenarios | `docs/v3/EDGE_CASES.md` |
+| What's explicitly NOT in V3 scope? | `docs/v3/OUT_OF_SCOPE.md` |
 | How do I work and test in this repo? | `AGENTS.md` |
 | Why was X decided? | `docs/adr/000N-*.md` |
 | What's built / in progress? | `docs/BUILD_STATUS.md`, `docs/v3/FAST_FOLLOW.md` |
 | Component catalog | `docs/COMPONENT_INVENTORY.md` |
+
+> The spec triad is **`ENGINE_SPEC` (rules) ↔ `DATA_MODEL` (schema/lifecycle) ↔
+> `RENDER_SPEC` (display)** — they cross-link each other; enter from whichever
+> question you have. `BOTTLE_SPEC` is the standalone authority for the bottle
+> subsystem (cascade, no-absorption, `eventKey`/`id` identity).
 
 ---
 
@@ -44,8 +56,8 @@ Next.js routes  ──>  React components  ──>  hooks (useV3*)  ──>  rep
 
 | Dir / file | Job | Entry point |
 |---|---|---|
-| `engine/` | **Pure** day-projection. No I/O, no React. Takes events+settings → forecast. | `projectDay.ts` |
-| `engine/rules/` | One file per rule family (naps, bottles, putdown, owners, daycare, pumps…). Each exports a resolver run by the evaluator. | `index.ts` (rule registry), `naps.ts` |
+| `engine/` | **Pure** day-projection. No I/O, no React. Takes events+settings → forecast. Behavior is specced in `docs/v3/ENGINE_SPEC.md`. | `projectDay.ts` |
+| `engine/rules/` | One file per rule family (naps, bottles, putdown, owners, daycare, pumps…). Each exports a resolver run by the evaluator. Rule refs (R3.x, R5.x, R12.x…) → `docs/v3/ENGINE_SPEC.md`; bottle cascade + identity → `docs/v3/BOTTLE_SPEC.md`. | `index.ts` (rule registry), `naps.ts` |
 | `engine/evaluator.ts` | Runs the rule pipeline over a day. | — |
 | `engine/bottleIntervalRules.ts` | Bottle-spacing logic (its own file by size). | — |
 | `repositories/` | Firestore read/write per collection (children, days, events, settings, templates, tomorrowPlans, users, invites). | one file per collection |
@@ -55,8 +67,8 @@ Next.js routes  ──>  React components  ──>  hooks (useV3*)  ──>  rep
 | `components/` | UI organized **by page**: `Dashboard/` (39 files), `Timeline/`, `Tomorrow/`, `History/`, `Settings/`, `DayTemplates/`, `shared/`. | per-page dir |
 | `ui/` | Primitive/presentational widgets (no domain logic). | — |
 | `lib/` | V3-local helpers. | — |
-| `lifecycle.ts` | Event lifecycle states (projected → recorded, etc.). Match existing lifecycle when converting event types. | — |
-| `schemas.ts` | Zod schemas / shared types for V3 entities. | — |
+| `lifecycle.ts` | Event lifecycle states (projected → recorded, etc.). Match existing lifecycle when converting event types. Specced in `docs/v3/DATA_MODEL.md`. | — |
+| `schemas.ts` | Zod schemas / shared types for V3 entities. Schema authority: `docs/v3/DATA_MODEL.md`. | — |
 | `selectors.ts` | Derived reads over projection/state. | — |
 | `__tests__/` | Cross-cutting tests + `fixtures/`. | — |
 

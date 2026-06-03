@@ -173,8 +173,9 @@ re-edits cannot un-record.
 ### R2.1 The three valid states are `projected | recorded | completed`
 
 - `projected` — engine output, never persisted to Firestore.
-- `recorded` — user annotation: in-progress sleep (NapActionButton),
-  owner-only drawer edit, or scheduling intent. Carries `annotatedAt: TimeMin`.
+- `recorded` — user annotation: in-progress sleep (via Now-cross
+  auto-promote — ADR-0006), owner-only drawer edit, or scheduling intent.
+  Carries `annotatedAt: TimeMin`.
 - `completed` — time-committed recording: FAB-create, drawer time-edit,
   or End Nap (TIME_EDIT action). Carries `committedAt: TimeMin`.
 
@@ -185,7 +186,7 @@ in-progress when `startTime ≤ now < effectiveEndOf(event)`. No separate
 ### R2.2 Allowed status transitions
 
 ```
-projected → recorded         (NapActionButton "Start Nap Now", or drawer owner-only edit)
+projected → recorded         (Now-cross auto-promote — ADR-0006, or drawer owner-only edit)
 projected → completed        (FAB-create OR drawer time-edit)
 recorded  → completed        (TIME_EDIT action — End Nap, or drawer time commit)
 recorded  → recorded         (subsequent drawer owner-only edit — annotatedAt unchanged)
