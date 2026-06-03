@@ -11,7 +11,7 @@ import { renderProjection } from "../ui/renderProjection";
 import { aContext, aDay, aSettings } from "./factories";
 import { PUTDOWN_KIND_TAG } from "../components/Timeline/expandPutdown";
 import { recordedIdForEvent } from "../lib/eventConventions";
-import { reduceLifecycle } from "../lifecycle";
+import { recordedLifecycle, reduceLifecycle } from "../lifecycle";
 
 // "Start Nap Now" shape: recorded + no endTime; effectiveEndOf auto-extends until End Nap is tapped.
 // napLen param unused (kept for call-site stability); placeholder derives from settings.
@@ -265,11 +265,8 @@ describe("seam: Start Nap Now → renderProjection", () => {
   });
 });
 
-// §F59: end-nap (the dashboard contextual button) realizes the in-progress nap.
-// page.tsx handleEndNap re-keys via recordedIdForEvent + reduceLifecycle(TIME_EDIT).
-// This composes those REAL helpers with the REAL projectDay to close the documented
-// "end-nap → engine next cycle" seam gap: the realized nap must anchor its slot with
-// no surviving proj_ duplicate.
+// §F59: end-nap realization seam — the realized nap must anchor its slot with no
+// surviving proj_ duplicate in the next engine cycle.
 describe("seam: End Nap realizes the in-progress nap → no duplicate next projection", () => {
   it("a realized nap_1 anchors slot 1; the engine emits no second nap_1", () => {
     const wakeTime = 7 * 60;
@@ -295,10 +292,9 @@ describe("seam: End Nap realizes the in-progress nap → no duplicate next proje
       endTime: 10 * 60, // placeholder
       hasPutdown: false,
       owner: NO_OWNER,
-      lifecycle: { state: "recorded", annotatedAt: 9 * 60 },
+      lifecycle: recordedLifecycle(9 * 60),
     };
 
-    // Exactly what page.tsx handleEndNap does, via the real helpers.
     const realized: Event = {
       ...inProgressNap,
       id: recordedIdForEvent(inProgressNap),

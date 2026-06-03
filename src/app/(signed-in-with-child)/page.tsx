@@ -84,8 +84,7 @@ export default function DashboardPage() {
   // never overwrite an actual's original doc id (would orphan legacy docs).
   const handleEndNap = async (event: Event, endTime: number) => {
     if (!day || day.id === "") return;
-    // §F59 / ADR-0007: one durable-id resolver. recordedIdForEvent keys renumberable
-    // bottles off startTime; for nap/bedtime it yields the same recorded_<eventKey>.
+    // §F59 / ADR-0007: re-key an engine projection to its durable recorded id.
     const id = isEngineEmittedId(event.id) ? recordedIdForEvent(event) : event.id;
     await saveEvent({
       ...event,
