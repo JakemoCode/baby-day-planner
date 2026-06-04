@@ -1644,4 +1644,71 @@ describe("Drawer now-shortcut buttons", () => {
       expect(screen.getByRole("button", { name: "Log now" })).toBeVisible();
     });
   });
+
+  describe("Log now (bedtime)", () => {
+    const projectedBedtime = (overrides: Partial<Event> = {}): Event => ({
+      id: "bedtime-1",
+      dayId: "d-1",
+      eventKey: "bedtime",
+      type: "bedtime",
+      kind: "block",
+      startTime: 19 * 60,
+      endTime: DEFAULT_WAKE_TIME + 24 * 60, // default wake next day (cross-day TimeMin)
+      label: "Bedtime",
+      hasPutdown: false,
+      owner: NO_OWNER,
+      lifecycle: { state: "projected" },
+      ...overrides,
+    });
+
+    it("shows Log now and offers no wake/end-time field", () => {
+      const bedtime = projectedBedtime();
+      render(
+        <EventEditDrawerV3
+          open
+          mode="edit"
+          event={bedtime}
+          owners={owners}
+          nowMinutes={20 * 60}
+          bedtimeThreshold={THRESHOLD}
+          defaultWakeTime={DEFAULT_WAKE_TIME}
+          existingEvents={[bedtime]}
+          onSave={vi.fn()}
+          onCancel={vi.fn()}
+        />,
+      );
+      expect(screen.getByRole("button", { name: "Log now" })).toBeVisible();
+      expect(screen.queryByLabelText("End time")).toBeNull();
+    });
+
+    it("pins bedtime startTime to Now on Save, leaving the default wake (endTime) untouched", async () => {
+      const now = 20 * 60 + 30; // 8:30 PM
+      const onSave = vi.fn();
+      const bedtime = projectedBedtime();
+      render(
+        <EventEditDrawerV3
+          open
+          mode="edit"
+          event={bedtime}
+          owners={owners}
+          nowMinutes={now}
+          bedtimeThreshold={THRESHOLD}
+          defaultWakeTime={DEFAULT_WAKE_TIME}
+          existingEvents={[bedtime]}
+          onSave={onSave}
+          onCancel={vi.fn()}
+        />,
+      );
+
+      await userEvent.click(screen.getByRole("button", { name: "Log now" }));
+      expect(screen.getByLabelText("Start time")).toHaveValue(hm(now));
+
+      await userEvent.click(screen.getByRole("button", { name: "Save" }));
+      expect(onSave).toHaveBeenCalledTimes(1);
+      const next: Event = onSave.mock.calls[0]![0];
+      expect(next.startTime).toBe(now);
+      expect(next.endTime).toBe(DEFAULT_WAKE_TIME + 24 * 60); // unchanged
+      expect(next.lifecycle.state).not.toBe("projected");
+    });
+  });
 });

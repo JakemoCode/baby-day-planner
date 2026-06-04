@@ -25,6 +25,7 @@ function makeProps(
   return {
     inProgressNap: undefined,
     inProgressBedtime: undefined,
+    nowMinutes: hm(2),
     onEndNap: vi.fn().mockResolvedValue(undefined),
     onWakeRequest: vi.fn(),
     ...overrides,

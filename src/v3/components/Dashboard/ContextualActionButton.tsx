@@ -8,6 +8,7 @@ import { decideMode, type ContextMode } from "./decideMode";
 export type ContextualActionButtonProps = {
   inProgressNap: Event | undefined;
   inProgressBedtime: Event | undefined;
+  nowMinutes: TimeMin;
   onEndNap: (nap: Event, endTime: TimeMin) => Promise<void> | void;
   onWakeRequest: () => void;
 };
@@ -20,10 +21,11 @@ const MODE_LABEL: Record<Exclude<ContextMode["kind"], "hidden">, string> = {
 export function ContextualActionButton({
   inProgressNap,
   inProgressBedtime,
+  nowMinutes,
   onEndNap,
   onWakeRequest,
 }: ContextualActionButtonProps) {
-  const mode = decideMode({ inProgressBedtime, inProgressNap });
+  const mode = decideMode({ inProgressBedtime, inProgressNap, nowMinutes });
 
   if (mode.kind === "hidden") return null;
 

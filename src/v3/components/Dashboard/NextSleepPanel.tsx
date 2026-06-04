@@ -10,7 +10,7 @@ import { lastCompletedNap, napTotals } from "./dashboardStats";
 import styles from "./NextSleepPanel.module.css";
 
 export type NextSleepPanelProps = {
-  nextNap: Event | undefined;
+  nextSleep: Event | undefined;
   bedtime: Event | undefined;
   actuals: Event[];
   nowMinutes: TimeMin;
@@ -23,7 +23,7 @@ function pluralNaps(n: number): string {
 }
 
 export function NextSleepPanel({
-  nextNap,
+  nextSleep,
   bedtime,
   actuals,
   nowMinutes,
@@ -32,18 +32,23 @@ export function NextSleepPanel({
 }: NextSleepPanelProps) {
   const last = lastCompletedNap(actuals, nowMinutes);
   const totals = napTotals(actuals, nowMinutes);
-  const putdownTime = nextNap && (Math.max(0, nextNap.startTime - putdownLeadMinutes) as TimeMin);
-  const delta = nextNap ? formatStartDelta(nextNap.startTime - nowMinutes) : null;
+  const isBedtimeNext = nextSleep?.type === "bedtime";
+  // Both naps and bedtime have a putdown / wind-down lead.
+  const putdownTime = nextSleep
+    ? (Math.max(0, nextSleep.startTime - putdownLeadMinutes) as TimeMin)
+    : undefined;
+  const delta = nextSleep ? formatStartDelta(nextSleep.startTime - nowMinutes) : null;
 
   return (
     <section className={styles.card} aria-label="Sleep stats">
       <p className={styles.heading}>Next sleep</p>
-      {nextNap && delta && (
+      {nextSleep && delta && (
         <>
           <div className={styles.timeRow}>
-            <span className={styles.time}>{formatTimeForDisplay(nextNap.startTime)}</span>
+            {isBedtimeNext && <span className={styles.label}>Bedtime</span>}
+            <span className={styles.time}>{formatTimeForDisplay(nextSleep.startTime)}</span>
             <span className={styles.delta}>{delta.text}</span>
-            {nextNap.owner && <OwnerPill owner={nextNap.owner} owners={owners} />}
+            {nextSleep.owner && <OwnerPill owner={nextSleep.owner} owners={owners} />}
           </div>
           {putdownTime !== undefined && (
             <p className={styles.putdown}>Putdown {formatTimeForDisplay(putdownTime)}</p>
@@ -62,7 +67,9 @@ export function NextSleepPanel({
           Today: {totals.count} {pluralNaps(totals.count)} ·{" "}
           {formatHoursMinutes(totals.totalMinutes)}
         </span>
-        {bedtime && <span>Bedtime {formatTimeForDisplay(bedtime.startTime)}</span>}
+        {bedtime && !isBedtimeNext && (
+          <span>Bedtime {formatTimeForDisplay(bedtime.startTime)}</span>
+        )}
       </p>
     </section>
   );

@@ -40,6 +40,7 @@ function makeProps(
   return {
     inProgressNap: undefined,
     inProgressBedtime: undefined,
+    nowMinutes: hm(2), // after midnight by default, so the bedtime CTA is eligible
     onEndNap: vi.fn().mockResolvedValue(undefined),
     onWakeRequest: vi.fn(),
     ...overrides,
@@ -63,9 +64,18 @@ describe("ContextualActionButton", () => {
     expect(screen.getByRole("button", { name: /end nap/i })).toBeVisible();
   });
 
-  it("renders 'End overnight sleep' when an in-progress bedtime exists", () => {
+  it("renders 'End overnight sleep' when bedtime is in progress and it's past midnight", () => {
     render(<ContextualActionButton {...makeProps({ inProgressBedtime: inProgressBedtime() })} />);
     expect(screen.getByRole("button", { name: /end overnight sleep/i })).toBeVisible();
+  });
+
+  it("hides 'End overnight sleep' before midnight (e.g. 8 PM, right after bedtime)", () => {
+    render(
+      <ContextualActionButton
+        {...makeProps({ inProgressBedtime: inProgressBedtime(), nowMinutes: hm(20) })}
+      />,
+    );
+    expect(screen.queryByRole("button")).toBeNull();
   });
 
   it("End Nap click fires onEndNap with the nap and current local minutes", async () => {

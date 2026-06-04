@@ -50,6 +50,17 @@ export function nextNap(events: Event[], nowMinutes: TimeMin): Event | undefined
 }
 
 /**
+ * Next nap OR bedtime, whichever comes first (DOMAIN.md §1/§3). Falls back to
+ * bedtime once all naps have passed, so the "Next sleep" panel never goes blank.
+ */
+export function nextSleep(events: Event[], nowMinutes: TimeMin): Event | undefined {
+  return nextEvent(
+    events.filter((e) => e.type === "nap" || e.type === "bedtime"),
+    nowMinutes,
+  );
+}
+
+/**
  * Returns the wake_window event covering nowMinutes.
  * Interval is half-open: `startTime <= nowMinutes < (endTime ?? Infinity)`.
  * A wake_window without `endTime` is treated as open-ended.

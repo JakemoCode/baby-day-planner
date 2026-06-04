@@ -57,7 +57,7 @@ describe("NextSleepPanel", () => {
   it("renders putdown→nap pair with leadMinutes offset", () => {
     render(
       <NextSleepPanel
-        nextNap={projectedNap((14 * 60 + 10) as TimeMin)}
+        nextSleep={projectedNap((14 * 60 + 10) as TimeMin)}
         bedtime={projectedBedtime((19 * 60 + 30) as TimeMin)}
         actuals={[]}
         nowMinutes={(13 * 60) as TimeMin}
@@ -70,31 +70,36 @@ describe("NextSleepPanel", () => {
     expect(screen.getByText(/bedtime 7:30 PM/i)).toBeVisible();
   });
 
-  it("renders 'Last nap' line and today totals when prior naps exist", () => {
+  it("shows bedtime as the next sleep when no nap remains, prominently — not just in the footer", () => {
     const actuals: Event[] = [
       nap({ startTime: (9 * 60) as TimeMin, endTime: (10 * 60) as TimeMin }),
       nap({ startTime: (13 * 60) as TimeMin, endTime: (14 * 60 + 18) as TimeMin }),
     ];
+    const bedtime = projectedBedtime((19 * 60 + 30) as TimeMin);
     render(
       <NextSleepPanel
-        nextNap={undefined}
-        bedtime={projectedBedtime((19 * 60 + 30) as TimeMin)}
+        nextSleep={bedtime}
+        bedtime={bedtime}
         actuals={actuals}
         nowMinutes={(15 * 60 + 5) as TimeMin}
         putdownLeadMinutes={20}
         owners={owners}
       />,
     );
-    expect(screen.queryByText(/putdown/i)).toBeNull();
+    expect(screen.getByText("Bedtime")).toBeVisible();
+    expect(screen.getByText("7:30 PM")).toBeVisible();
+    expect(screen.getByText(/4h 25m/i)).toBeVisible();
+    // Bedtime has a wind-down putdown (lead 20m → 7:10 PM) and isn't duplicated in the footer.
+    expect(screen.getByText(/putdown 7:10 PM/i)).toBeVisible();
+    expect(screen.queryByText(/bedtime 7:30 PM/i)).toBeNull();
     expect(screen.getByText(/last nap: 1h 18m, 47m ago \(2:18p\)/i)).toBeVisible();
     expect(screen.getByText(/today: 2 naps · 2h 18m/i)).toBeVisible();
-    expect(screen.getByText(/bedtime 7:30 PM/i)).toBeVisible();
   });
 
   it("hides 'Last nap' when no completed nap yet today", () => {
     render(
       <NextSleepPanel
-        nextNap={projectedNap((9 * 60 + 30) as TimeMin)}
+        nextSleep={projectedNap((9 * 60 + 30) as TimeMin)}
         bedtime={projectedBedtime((19 * 60 + 30) as TimeMin)}
         actuals={[]}
         nowMinutes={(8 * 60) as TimeMin}
@@ -109,7 +114,7 @@ describe("NextSleepPanel", () => {
   it("hides bedtime footer line when bedtime prop is undefined", () => {
     render(
       <NextSleepPanel
-        nextNap={projectedNap((9 * 60 + 30) as TimeMin)}
+        nextSleep={projectedNap((9 * 60 + 30) as TimeMin)}
         bedtime={undefined}
         actuals={[]}
         nowMinutes={(8 * 60) as TimeMin}
