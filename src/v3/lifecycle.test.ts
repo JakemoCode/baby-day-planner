@@ -4,6 +4,7 @@ import {
   isNextProjectedOfType,
   isActiveNap,
   isFocusNap,
+  isFocusBedtime,
   isNearestBottle,
   NAP_END_GRACE_MIN,
   isSchedulingType,
@@ -274,6 +275,50 @@ describe("isFocusNap", () => {
     const now = 14 * 60 + 5;
     expect(isFocusNap(justEnded, all, now)).toBe(true);
     expect(isFocusNap(upcoming, all, now)).toBe(false);
+  });
+});
+
+function bedtime(id: string, startTime: number, life: Lifecycle = projected): Event {
+  return {
+    id,
+    dayId: "d1",
+    eventKey: id,
+    type: "bedtime",
+    kind: "block",
+    label: id,
+    startTime,
+    endTime: startTime + 11 * 60, // morning wake (not used by isFocusBedtime)
+    hasPutdown: false,
+    owner: NO_OWNER,
+    lifecycle: life,
+  };
+}
+
+describe("isFocusBedtime", () => {
+  it("is the focus while upcoming and through the start + grace window", () => {
+    const bt = bedtime("bt", 19 * 60);
+    expect(isFocusBedtime(bt, [bt], 18 * 60)).toBe(true); // upcoming
+    expect(isFocusBedtime(bt, [bt], 19 * 60 + NAP_END_GRACE_MIN - 1)).toBe(true); // within grace
+  });
+
+  it("drops once now passes start + grace (no all-night lingering)", () => {
+    const bt = bedtime("bt", 18 * 60); // 6 PM
+    expect(isFocusBedtime(bt, [bt], 18 * 60 + NAP_END_GRACE_MIN)).toBe(false);
+    expect(isFocusBedtime(bt, [bt], 20 * 60)).toBe(false); // 8 PM — the reported bug
+  });
+
+  it("yields to an active nap", () => {
+    const bt = bedtime("bt", 19 * 60);
+    const activeNap = nap("n", 13 * 60, 14 * 60);
+    expect(isFocusBedtime(bt, [bt, activeNap], 13 * 60 + 30)).toBe(false);
+  });
+
+  it("yields while a nap is still upcoming before it", () => {
+    const bt = bedtime("bt", 19 * 60);
+    const upcomingNap = nap("n", 16 * 60, 17 * 60);
+    expect(isFocusBedtime(bt, [bt, upcomingNap], 14 * 60)).toBe(false);
+    // …but once that nap is done, bedtime becomes the focus.
+    expect(isFocusBedtime(bt, [bt, upcomingNap], 18 * 60)).toBe(true);
   });
 });
 
