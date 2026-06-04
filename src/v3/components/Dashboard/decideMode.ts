@@ -11,12 +11,22 @@ export type DecideModeArgs = {
   nowMinutes: TimeMin;
 };
 
+/**
+ * "End overnight sleep" only once we're past midnight, so it never appears the
+ * evening bedtime is logged (the 8 PM "end sleep" prompt). An evening (PM) bedtime
+ * qualifies once the clock has wrapped below its start; a bedtime logged after
+ * midnight (AM start) is already past midnight, so it qualifies immediately —
+ * otherwise the CTA, the sole entry to the morning-wake flow, would never appear.
+ */
+function pastMidnightSince(bedtime: Event, nowMinutes: TimeMin): boolean {
+  const startedInEvening = bedtime.startTime >= 12 * 60;
+  return startedInEvening ? nowMinutes < bedtime.startTime : true;
+}
+
 export function decideMode(args: DecideModeArgs): ContextMode {
   const { inProgressBedtime, inProgressNap, nowMinutes } = args;
 
-  // "End overnight sleep" only after the clock has wrapped past midnight since
-  // bedtime began (now is earlier than bedtime.startTime) — no 8 PM "end sleep" prompt.
-  if (inProgressBedtime && nowMinutes < inProgressBedtime.startTime) {
+  if (inProgressBedtime && pastMidnightSince(inProgressBedtime, nowMinutes)) {
     return { kind: "end-bedtime", bedtime: inProgressBedtime };
   }
 

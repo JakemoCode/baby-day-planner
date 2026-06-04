@@ -19,7 +19,7 @@ function inProgressNap(): Event {
   };
 }
 
-function inProgressBedtime(): Event {
+function inProgressBedtime(overrides: Partial<Event> = {}): Event {
   return {
     id: "recorded_bedtime",
     dayId: "day-1",
@@ -32,6 +32,7 @@ function inProgressBedtime(): Event {
     hasPutdown: false,
     owner: NO_OWNER,
     lifecycle: { state: "recorded", annotatedAt: hm(19) },
+    ...overrides,
   };
 }
 
@@ -61,6 +62,13 @@ describe("decideMode — sleep-only dashboard button", () => {
     expect(decideMode({ inProgressBedtime: bedtime, nowMinutes: hm(20) })).toEqual({
       kind: "hidden",
     });
+  });
+
+  it("shows end-bedtime for a bedtime logged AFTER midnight (it's already past midnight)", () => {
+    // Baby down at 00:30; at 6 AM the CTA must still appear — it's the only way to
+    // roll the day over. now(360) ≥ start(30) would falsely hide it without the AM case.
+    const bedtime = inProgressBedtime({ startTime: hm(0, 30) });
+    expect(decideMode({ inProgressBedtime: bedtime, nowMinutes: hm(6) }).kind).toBe("end-bedtime");
   });
 
   it("end-bedtime wins when both an in-progress bedtime and nap are present (after midnight)", () => {

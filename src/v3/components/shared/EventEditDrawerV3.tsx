@@ -309,14 +309,13 @@ export function EventEditDrawerV3({
   const showStartNow =
     mode === "edit" && type === "nap" && isFocusNap(sourceEvent, siblings, nowMinutes);
   const showEndNow = showStartNow && isActiveNap(sourceEvent, nowMinutes);
-  // The dream feed is excluded from isNearestBottle (it's not in the rhythm chain),
-  // but it's the sole dream feed — always its own nearest — so it carries Log now too.
+  // Dream feed is excluded from isNearestBottle (not in the rhythm chain) but is always its own nearest.
+  const isLogNowBottle =
+    type === "bottle" &&
+    (isDreamFeed(sourceEvent) || isNearestBottle(sourceEvent, siblings, nowMinutes));
   // Bedtime carries Log now to pin its start to now; endTime (the default wake) is untouched.
-  const showLogNow =
-    mode === "edit" &&
-    ((type === "bottle" &&
-      (isDreamFeed(sourceEvent) || isNearestBottle(sourceEvent, siblings, nowMinutes))) ||
-      type === "bedtime");
+  const isLogNowBedtime = type === "bedtime";
+  const showLogNow = mode === "edit" && (isLogNowBottle || isLogNowBedtime);
 
   const errors = validateForm(
     type,
