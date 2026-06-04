@@ -89,8 +89,8 @@ describe("NextSleepPanel", () => {
     expect(screen.getByText("Bedtime")).toBeVisible();
     expect(screen.getByText("7:30 PM")).toBeVisible();
     expect(screen.getByText(/4h 25m/i)).toBeVisible();
-    // No putdown for bedtime, and bedtime is not duplicated in the footer.
-    expect(screen.queryByText(/putdown/i)).toBeNull();
+    // Bedtime has a wind-down putdown (lead 20m → 7:10 PM) and isn't duplicated in the footer.
+    expect(screen.getByText(/putdown 7:10 PM/i)).toBeVisible();
     expect(screen.queryByText(/bedtime 7:30 PM/i)).toBeNull();
     expect(screen.getByText(/last nap: 1h 18m, 47m ago \(2:18p\)/i)).toBeVisible();
     expect(screen.getByText(/today: 2 naps · 2h 18m/i)).toBeVisible();

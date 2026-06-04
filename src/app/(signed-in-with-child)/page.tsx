@@ -162,6 +162,7 @@ export default function DashboardPage() {
         <ContextualActionButton
           inProgressNap={inProgressNap}
           inProgressBedtime={inProgressBedtime}
+          nowMinutes={nowMinutes}
           onEndNap={handleEndNap}
           onWakeRequest={() => setWakeSheetOpen(true)}
         />

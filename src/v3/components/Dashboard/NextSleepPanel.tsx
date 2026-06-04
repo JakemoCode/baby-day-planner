@@ -33,10 +33,10 @@ export function NextSleepPanel({
   const last = lastCompletedNap(actuals, nowMinutes);
   const totals = napTotals(actuals, nowMinutes);
   const isBedtimeNext = nextSleep?.type === "bedtime";
-  const putdownTime =
-    nextSleep && !isBedtimeNext
-      ? (Math.max(0, nextSleep.startTime - putdownLeadMinutes) as TimeMin)
-      : undefined;
+  // Both naps and bedtime have a putdown / wind-down lead.
+  const putdownTime = nextSleep
+    ? (Math.max(0, nextSleep.startTime - putdownLeadMinutes) as TimeMin)
+    : undefined;
   const delta = nextSleep ? formatStartDelta(nextSleep.startTime - nowMinutes) : null;
 
   return (
