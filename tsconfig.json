@@ -18,6 +18,14 @@
     "jsx": "react-jsx",
     "incremental": true,
     "plugins": [
+      // The Next.js TS plugin flags function props on every "use client" component
+      // as "must be serializable" (diagnostic 71007), even when the component is only
+      // ever rendered by other client components, so the props never cross the RSC
+      // boundary. Those are editor-only false positives — they do NOT reach `tsc`,
+      // `next build`, or CI (eslint + tsc are clean). Left intentionally untouched:
+      // there is no granular per-diagnostic suppression for a TS language-service
+      // plugin (`@ts-ignore` doesn't apply), and renaming client callbacks to
+      // `*Action` would falsely imply Server Actions. See docs/v3/NEXT_NOTES.md.
       {
         "name": "next"
       }
