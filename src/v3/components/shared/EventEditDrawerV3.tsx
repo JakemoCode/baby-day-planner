@@ -10,6 +10,7 @@ import {
   isNextProjectedOfType,
   isActiveNap,
   isFocusNap,
+  isFocusBedtime,
   isNearestBottle,
   recordedLifecycle,
 } from "../../lifecycle";
@@ -313,8 +314,9 @@ export function EventEditDrawerV3({
   const isLogNowBottle =
     type === "bottle" &&
     (isDreamFeed(sourceEvent) || isNearestBottle(sourceEvent, siblings, nowMinutes));
-  // Bedtime carries Log now to pin its start to now; endTime (the default wake) is untouched.
-  const isLogNowBedtime = type === "bedtime";
+  // Bedtime Log now pins its start to now (endTime/default wake untouched); same
+  // focus window as naps — next sleep, through start + grace (isFocusBedtime).
+  const isLogNowBedtime = isFocusBedtime(sourceEvent, siblings, nowMinutes);
   const showLogNow = mode === "edit" && (isLogNowBottle || isLogNowBedtime);
 
   const errors = validateForm(

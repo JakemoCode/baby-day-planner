@@ -1661,15 +1661,15 @@ describe("Drawer now-shortcut buttons", () => {
       ...overrides,
     });
 
-    it("shows Log now and offers no wake/end-time field", () => {
-      const bedtime = projectedBedtime();
+    it("shows Log now (next sleep, within window) and offers no wake/end-time field", () => {
+      const bedtime = projectedBedtime(); // start 7:00 PM
       render(
         <EventEditDrawerV3
           open
           mode="edit"
           event={bedtime}
           owners={owners}
-          nowMinutes={20 * 60}
+          nowMinutes={18 * 60 + 50} // 6:50 PM — upcoming next sleep
           bedtimeThreshold={THRESHOLD}
           defaultWakeTime={DEFAULT_WAKE_TIME}
           existingEvents={[bedtime]}
@@ -1681,8 +1681,52 @@ describe("Drawer now-shortcut buttons", () => {
       expect(screen.queryByLabelText("End time")).toBeNull();
     });
 
+    it("hides Log now once Now is past start + grace (8 PM on a 6 PM bedtime)", () => {
+      const bedtime = projectedBedtime({ startTime: 18 * 60 }); // 6 PM
+      render(
+        <EventEditDrawerV3
+          open
+          mode="edit"
+          event={bedtime}
+          owners={owners}
+          nowMinutes={20 * 60} // 8 PM — well past 6:15 grace
+          bedtimeThreshold={THRESHOLD}
+          defaultWakeTime={DEFAULT_WAKE_TIME}
+          existingEvents={[bedtime]}
+          onSave={vi.fn()}
+          onCancel={vi.fn()}
+        />,
+      );
+      expect(screen.queryByRole("button", { name: "Log now" })).toBeNull();
+    });
+
+    it("hides Log now while a nap is still upcoming before bedtime", () => {
+      const bedtime = projectedBedtime(); // 7 PM
+      const nap = projectedNap({
+        id: "nap-x",
+        eventKey: "nap_x",
+        startTime: 16 * 60,
+        endTime: 17 * 60,
+      });
+      render(
+        <EventEditDrawerV3
+          open
+          mode="edit"
+          event={bedtime}
+          owners={owners}
+          nowMinutes={14 * 60} // 2 PM — the 4 PM nap is next, not bedtime
+          bedtimeThreshold={THRESHOLD}
+          defaultWakeTime={DEFAULT_WAKE_TIME}
+          existingEvents={[bedtime, nap]}
+          onSave={vi.fn()}
+          onCancel={vi.fn()}
+        />,
+      );
+      expect(screen.queryByRole("button", { name: "Log now" })).toBeNull();
+    });
+
     it("pins bedtime startTime to Now on Save, leaving the default wake (endTime) untouched", async () => {
-      const now = 20 * 60 + 30; // 8:30 PM
+      const now = 18 * 60 + 55; // 6:55 PM — within the bedtime window
       const onSave = vi.fn();
       const bedtime = projectedBedtime();
       render(

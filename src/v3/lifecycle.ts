@@ -129,6 +129,26 @@ export function isNearestBottle(event: Event, allEvents: Event[], nowMinutes: Ti
   return nearest !== undefined && nearest.id === event.id;
 }
 
+/**
+ * Bedtime's analog of {@link isFocusNap}: bedtime earns the drawer **Log now**
+ * shortcut when it's the next sleep — no nap is active or still upcoming before it —
+ * and Now hasn't passed its start by more than {@link NAP_END_GRACE_MIN}. Bedtime's
+ * `endTime` is next-morning wake, so (unlike {@link isActiveNap}) the post-start
+ * window is bounded by the grace, not the event's own end — otherwise the shortcut
+ * would linger all night.
+ */
+export function isFocusBedtime(event: Event, allEvents: Event[], nowMinutes: TimeMin): boolean {
+  if (event.type !== "bedtime" || isRenderSynthetic(event)) return false;
+  if (nowMinutes >= event.startTime + NAP_END_GRACE_MIN) return false;
+  const napOwnsShortcut = allEvents.some(
+    (e) =>
+      e.type === "nap" &&
+      !isRenderSynthetic(e) &&
+      (isActiveNap(e, nowMinutes) || (e.startTime > nowMinutes && e.startTime < event.startTime)),
+  );
+  return !napOwnsShortcut;
+}
+
 // ---------------------------------------------------------------------------
 // Legacy lifecycle migration
 // ---------------------------------------------------------------------------
