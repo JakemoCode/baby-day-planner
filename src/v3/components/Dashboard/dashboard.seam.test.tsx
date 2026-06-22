@@ -136,7 +136,7 @@ describe("Dashboard seam — real projectDay + new panels", () => {
           owners={owners}
           putdownLeadMinutes={settings.putdownLeadMinutes}
         />
-        <NextBottlePanel nextBottle={nb} actuals={actuals} nowMinutes={now} owners={owners} />
+        <NextBottlePanel nextBottle={nb} events={projected} nowMinutes={now} owners={owners} />
         <NextSleepPanel
           nextSleep={ns}
           bedtime={bedtime}
@@ -158,18 +158,41 @@ describe("Dashboard seam — real projectDay + new panels", () => {
     expect(next?.type === "bottle" || next?.type === "nap").toBe(true);
     expect(next?.startTime).toBeGreaterThan(11 * 60 + 45);
 
-    // Panel totals: in-progress nap (10:45–11:45 placeholder, now=11:00)
-    // contributes only elapsed 15 min, not the full placeholder duration.
-    const bTotals = bottleTotals(actuals, now);
-    expect(bTotals).toEqual({ count: 2, oz: 9 });
+    // Bottle totals read the PROJECTION (ADR-0006): the two real feeds (7:00@4, 10:15@5)
+    // plus the 7:00 cascade's 10:00@5 forecast, which crossed Now and was promoted to
+    // recorded (the 10:15 actual is an untagged extra, so no-absorption keeps the 10:00
+    // slot — BOTTLE_SPEC §3.2). 3 feeds · 14oz.
+    const bTotals = bottleTotals(projected, now);
+    expect(bTotals).toEqual({ count: 3, oz: 14 });
 
+    // Nap totals still read actuals: completed 9:00–10:00 (60 min) + in-progress
+    // 10:45–now (15 min) = 75 min.
     const nTotals = napTotals(actuals, now);
-    // completed 9:00–10:00 (60 min) + in-progress 10:45–now (15 min)
     expect(nTotals).toEqual({ count: 2, totalMinutes: 75 });
 
     // Rendered text matches.
-    expect(screen.getByText(/today: 2 bottles · 9oz/i)).toBeVisible();
+    expect(screen.getByText(/today: 3 bottles · 14oz/i)).toBeVisible();
     expect(screen.getByText(/today: 2 naps · 1h 15m/i)).toBeVisible();
+  });
+
+  it("a forecast bottle that crossed Now counts toward the daily total (read from projection, not actuals)", () => {
+    const now = (11 * 60) as TimeMin;
+
+    // One real recorded bottle at 7:00@5. The cascade forecasts the next at 10:00@5,
+    // which has crossed Now (11:00) and is promoted to recorded (ADR-0006) — never
+    // persisted, so it lives only in the projection.
+    const actuals: Event[] = [bottleActual((7 * 60) as TimeMin, 5)];
+
+    const projected = projectDay({ day, settings, actuals, nowMinutes: now });
+    const nb = nextBottle(projected, now);
+
+    // The bug: totals over raw actuals miss the promoted forecast.
+    expect(bottleTotals(actuals, now)).toEqual({ count: 1, oz: 5 });
+    // The fix: totals over the projection count it (7:00 + promoted 10:00).
+    expect(bottleTotals(projected, now)).toEqual({ count: 2, oz: 10 });
+
+    render(<NextBottlePanel nextBottle={nb} events={projected} nowMinutes={now} owners={owners} />);
+    expect(screen.getByText(/today: 2 bottles · 10oz/i)).toBeVisible();
   });
 
   it("past bedtime threshold with bedtime completed: NextEventCard shows the end-of-day empty copy", () => {

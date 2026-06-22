@@ -49,7 +49,7 @@ describe("NextBottlePanel a11y", () => {
     const { container } = render(
       <NextBottlePanel
         nextBottle={nextProjected((13 * 60) as TimeMin)}
-        actuals={actuals}
+        events={actuals}
         nowMinutes={(11 * 60) as TimeMin}
         owners={owners}
       />,

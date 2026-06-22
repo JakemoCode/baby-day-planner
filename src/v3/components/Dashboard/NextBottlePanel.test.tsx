@@ -48,7 +48,7 @@ describe("NextBottlePanel", () => {
     render(
       <NextBottlePanel
         nextBottle={nextProjected((13 * 60) as TimeMin)}
-        actuals={actuals}
+        events={actuals}
         nowMinutes={(11 * 60) as TimeMin}
         owners={owners}
       />,
@@ -64,7 +64,7 @@ describe("NextBottlePanel", () => {
     render(
       <NextBottlePanel
         nextBottle={undefined}
-        actuals={[bottle({ startTime: (7 * 60) as TimeMin, amountOz: 4 })]}
+        events={[bottle({ startTime: (7 * 60) as TimeMin, amountOz: 4 })]}
         nowMinutes={(20 * 60) as TimeMin}
         owners={owners}
       />,
@@ -78,7 +78,7 @@ describe("NextBottlePanel", () => {
     render(
       <NextBottlePanel
         nextBottle={nextProjected((7 * 60) as TimeMin)}
-        actuals={[]}
+        events={[]}
         nowMinutes={(6 * 60 + 30) as TimeMin}
         owners={owners}
       />,
