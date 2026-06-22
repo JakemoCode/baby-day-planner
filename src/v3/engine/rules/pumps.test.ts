@@ -137,6 +137,125 @@ describe("R9.1 — eventKey deduplication across collisions", () => {
   });
 });
 
+describe("R9.4 — reality wins: a projected pump never lands on a manually-entered pump block", () => {
+  it("a manually-added pump block (uuid key) suppresses the wake-anchored projection that overlaps it", () => {
+    // Kelly adds a pump session at wake (uuid eventKey, so the time-based dedup
+    // never matches it), then the wake-anchored first pump re-projects on top.
+    // Reality wins: the manual block stays, the overlapping projection is dropped.
+    const manual = aRecordedPump(7 * 60, "pump_abc123uuid");
+
+    const ctx = aContext({
+      day: aDay({ wakeTime: 7 * 60 + 10 }),
+      settings: aSettings({
+        pumpTimes: [{ time: 6 * 60 }, { time: 10 * 60 }],
+        pumpOwnerSlot: "parent2",
+      }),
+      actuals: [manual],
+    });
+
+    const out = projectDay(
+      {
+        day: ctx.day,
+        settings: ctx.settings,
+        actuals: ctx.actuals,
+        nowMinutes: ctx.nowMinutes,
+      },
+      { rules: ALL },
+    );
+
+    const morningPumps = out.filter((e) => e.type === "pump" && e.startTime < 10 * 60);
+    expect(morningPumps).toHaveLength(1);
+    expect(morningPumps[0]!.id).toBe(manual.id);
+  });
+
+  it("a scheduled pump starting exactly when a committed block ends is not suppressed (half-open)", () => {
+    // Committed block 7:00–7:25; the next scheduled pump at 7:25 abuts it.
+    // Back-to-back sessions are distinct — adjacency must not count as overlap.
+    // (First entry 7:00 anchors to wake and is itself suppressed by the manual block.)
+    const manual = aRecordedPump(7 * 60, "pump_uuid_abuts", 25);
+
+    const ctx = aContext({
+      day: aDay({ wakeTime: 7 * 60 }),
+      settings: aSettings({
+        pumpTimes: [{ time: 7 * 60 }, { time: 7 * 60 + 25 }, { time: 11 * 60 }],
+        pumpOwnerSlot: "parent2",
+        defaultPumpDurationMinutes: 25,
+      }),
+      actuals: [manual],
+    });
+
+    const out = projectDay(
+      { day: ctx.day, settings: ctx.settings, actuals: ctx.actuals, nowMinutes: ctx.nowMinutes },
+      { rules: ALL },
+    );
+
+    const pumpStarts = out
+      .filter((e) => e.type === "pump")
+      .map((p) => p.startTime)
+      .sort((a, b) => a - b);
+    // manual 7:00 + adjacent 7:25 (survives) + 11:00.
+    expect(pumpStarts).toEqual([7 * 60, 7 * 60 + 25, 11 * 60]);
+  });
+
+  it("a short-duration candidate whose block ends before a committed block survives", () => {
+    // Second entry at 9:30 with an explicit 10-min duration ends at 9:40, before the
+    // committed 9:45–10:10 block — no overlap (the default 25-min duration WOULD overlap),
+    // so it must not be suppressed.
+    const manual = aRecordedPump(9 * 60 + 45, "pump_uuid_late", 25);
+
+    const ctx = aContext({
+      day: aDay({ wakeTime: 7 * 60 }),
+      settings: aSettings({
+        pumpTimes: [{ time: 7 * 60 }, { time: 9 * 60 + 30, durationMinutes: 10 }],
+        pumpOwnerSlot: "parent2",
+      }),
+      actuals: [manual],
+    });
+
+    const out = projectDay(
+      { day: ctx.day, settings: ctx.settings, actuals: ctx.actuals, nowMinutes: ctx.nowMinutes },
+      { rules: ALL },
+    );
+
+    const pumpStarts = out
+      .filter((e) => e.type === "pump")
+      .map((p) => p.startTime)
+      .sort((a, b) => a - b);
+    expect(pumpStarts).toEqual([7 * 60, 9 * 60 + 30, 9 * 60 + 45]);
+  });
+
+  it("a manual pump that does not overlap any projection leaves the scheduled pumps intact", () => {
+    // Manual overnight pump at 3:00 must NOT suppress the 6:00→wake morning pump.
+    const manual = aRecordedPump(3 * 60, "pump_overnight_uuid");
+
+    const ctx = aContext({
+      day: aDay({ wakeTime: 7 * 60 }),
+      settings: aSettings({
+        pumpTimes: [{ time: 6 * 60 }, { time: 10 * 60 }],
+        pumpOwnerSlot: "parent2",
+      }),
+      actuals: [manual],
+    });
+
+    const out = projectDay(
+      {
+        day: ctx.day,
+        settings: ctx.settings,
+        actuals: ctx.actuals,
+        nowMinutes: ctx.nowMinutes,
+      },
+      { rules: ALL },
+    );
+
+    const pumpStarts = out
+      .filter((e) => e.type === "pump")
+      .map((p) => p.startTime)
+      .sort((a, b) => a - b);
+    // overnight 3:00 (manual) + 7:00 (wake-anchored) + 10:00 scheduled.
+    expect(pumpStarts).toEqual([3 * 60, 7 * 60, 10 * 60]);
+  });
+});
+
 describe("R9.1 — empty pumpTimes emits nothing", () => {
   it("no pumps in settings → no pump events emitted", () => {
     const ctx = aContext({

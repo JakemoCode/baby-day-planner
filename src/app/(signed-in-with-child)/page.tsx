@@ -139,7 +139,7 @@ export default function DashboardPage() {
       />
       <NextBottlePanel
         nextBottle={upcomingBottle}
-        actuals={actuals}
+        events={projected}
         nowMinutes={nowMinutes}
         owners={settings.owners}
       />

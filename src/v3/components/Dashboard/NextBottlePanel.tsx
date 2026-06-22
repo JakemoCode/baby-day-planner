@@ -11,7 +11,13 @@ import styles from "./NextBottlePanel.module.css";
 
 export type NextBottlePanelProps = {
   nextBottle: Event | undefined;
-  actuals: Event[];
+  /**
+   * Engine projection, NOT raw actuals. A forecast bottle that crossed Now is
+   * promoted to `recorded` only in the projection (ADR-0006, never persisted),
+   * so totals must read the projection to count it (DOMAIN §2 — babies don't
+   * skip feeds). Matches PumpVolumeCard's `projected` source.
+   */
+  events: Event[];
   nowMinutes: TimeMin;
   owners: OwnersConfig;
 };
@@ -20,9 +26,9 @@ function pluralBottles(n: number): string {
   return n === 1 ? "bottle" : "bottles";
 }
 
-export function NextBottlePanel({ nextBottle, actuals, nowMinutes, owners }: NextBottlePanelProps) {
-  const last = lastBottle(actuals, nowMinutes);
-  const totals = bottleTotals(actuals, nowMinutes);
+export function NextBottlePanel({ nextBottle, events, nowMinutes, owners }: NextBottlePanelProps) {
+  const last = lastBottle(events, nowMinutes);
+  const totals = bottleTotals(events, nowMinutes);
   const delta = nextBottle ? formatStartDelta(nextBottle.startTime - nowMinutes) : null;
 
   return (
