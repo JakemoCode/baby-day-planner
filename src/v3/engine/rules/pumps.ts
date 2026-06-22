@@ -5,6 +5,7 @@
  */
 
 import type { Context, Event, TimeMin } from "../../schemas";
+import { isRecorded } from "../../schemas";
 import type { Rule } from "../evaluator";
 import { hasType, projectedEvent } from "../helpers";
 import { missingScheduledEvents } from "./missingScheduledEvents";
@@ -53,7 +54,27 @@ function missingPumps(events: readonly Event[], ctx: Context): PumpTarget[] {
       ...(s.durationMinutes !== undefined ? { durationMinutes: s.durationMinutes } : {}),
     });
   }
-  return missingScheduledEvents(candidates, events.filter(isPump));
+  const existingPumps = events.filter(isPump);
+  // R9.4: reality wins. The wake-anchored first pump's eventKey encodes the moving
+  // wake time, so eventKey dedup alone misses a manually-entered pump it now lands
+  // on (a uuid-keyed FAB-add, or one frozen at a prior wake). The projected block
+  // has no delete affordance, so we suppress it at the source: drop any candidate
+  // whose block overlaps a committed pump block.
+  const committedBlocks = existingPumps.filter((p) => isRecorded(p.lifecycle));
+  const withoutKeyCollisions = missingScheduledEvents(candidates, existingPumps);
+  return withoutKeyCollisions.filter((c) => !overlapsCommittedPump(c, ctx, committedBlocks));
+}
+
+/** True if the candidate pump's projected block intersects any committed pump block. */
+function overlapsCommittedPump(
+  candidate: PumpTarget,
+  ctx: Context,
+  committed: readonly Event[],
+): boolean {
+  const duration = candidate.durationMinutes ?? ctx.settings.defaultPumpDurationMinutes;
+  const start = candidate.startTime;
+  const end = start + duration;
+  return committed.some((p) => p.endTime !== undefined && start < p.endTime && p.startTime < end);
 }
 
 /** Format a TimeMin as `pump_HH:MM` (zero-padded, 24-hour, cross-day safe). */

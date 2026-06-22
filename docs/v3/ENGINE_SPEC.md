@@ -626,10 +626,23 @@ Override: if `day.wakeTime` is set AND there's at least one entry in
 - **Why**: nursing parents pump first thing in the morning; settings
   shouldn't have to track day-by-day variation in wake time.
 
-### R9.4 Actual pump replaces projected at the same eventKey
+### R9.4 Reality wins: an actual pump suppresses a projected one
 
-If an actual pump exists with eventKey `pump_07:00`, no projected pump
-is emitted at that key.
+Two suppression paths, both "reality wins":
+
+1. **Same eventKey** — if an actual pump exists with eventKey
+   `pump_07:00`, no projected pump is emitted at that key.
+2. **Block overlap** — a projected pump whose block overlaps any
+   committed (recorded/completed) pump block is dropped. This catches
+   the manually-added pump (uuid eventKey, so path 1 misses it) and the
+   wake-anchored first pump (R9.3) whose key encodes the *moving* wake
+   time: once a morning pump is entered, re-anchoring after a wake-time
+   edit must not project a second block on top of it. The projected
+   block has no delete affordance, so it is suppressed at the source.
+
+   Limitation: blocks fully separate if wake is moved more than one
+   pump-block width past the manual pump; that residual is tracked in
+   FAST_FOLLOW.
 
 ### R9.5 Pumps are `kind: "instant"` chips
 
