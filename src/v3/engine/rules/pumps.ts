@@ -60,20 +60,21 @@ function missingPumps(events: readonly Event[], ctx: Context): PumpTarget[] {
   // on (a uuid-keyed FAB-add, or one frozen at a prior wake). The projected block
   // has no delete affordance, so we suppress it at the source: drop any candidate
   // whose block overlaps a committed pump block.
-  const committedBlocks = existingPumps.filter((p) => isRecorded(p.lifecycle));
-  const withoutKeyCollisions = missingScheduledEvents(candidates, existingPumps);
-  return withoutKeyCollisions.filter((c) => !overlapsCommittedPump(c, ctx, committedBlocks));
+  const committed = existingPumps.filter((p) => isRecorded(p.lifecycle));
+  const fallbackDuration = ctx.settings.defaultPumpDurationMinutes;
+  return missingScheduledEvents(candidates, existingPumps).filter(
+    (c) => !overlapsCommittedPump(c, fallbackDuration, committed),
+  );
 }
 
 /** True if the candidate pump's projected block intersects any committed pump block. */
 function overlapsCommittedPump(
   candidate: PumpTarget,
-  ctx: Context,
+  fallbackDuration: number,
   committed: readonly Event[],
 ): boolean {
-  const duration = candidate.durationMinutes ?? ctx.settings.defaultPumpDurationMinutes;
   const start = candidate.startTime;
-  const end = start + duration;
+  const end = start + (candidate.durationMinutes ?? fallbackDuration);
   return committed.some((p) => p.endTime !== undefined && start < p.endTime && p.startTime < end);
 }
 
