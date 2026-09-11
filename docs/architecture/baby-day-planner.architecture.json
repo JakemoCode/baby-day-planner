@@ -1,0 +1,213 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Baby Day Planner — V3 Architecture",
+    "output": "baby-day-planner.html",
+    "quality_profile": "showcase",
+    "viewBox": [1300, 600],
+    "repository": {
+      "url": "https://github.com/JakemoCode/baby-day-planner",
+      "provider": "github",
+      "revision": "5d659b8a12ecea0a046e71017d429b786042f0ec"
+    },
+    "views": [
+      {
+        "id": "read-path",
+        "label": "Read path",
+        "focus": ["parents", "routes", "pages", "hooks", "repos", "firestore"],
+        "note": "Follow a page load from the browser down to the nested Firestore documents."
+      },
+      {
+        "id": "forecast-loop",
+        "label": "Forecast loop",
+        "focus": ["pages", "hooks", "engine", "rules"],
+        "note": "The pure engine recomputes the whole day and hands a sorted Event list back to the UI."
+      },
+      {
+        "id": "write-and-access",
+        "label": "Write path and access",
+        "focus": ["repos", "converters", "firestore", "secrules", "auth"],
+        "note": "Every document is shaped by the defaulters and gated by the security rules."
+      }
+    ]
+  },
+  "components": [
+    {
+      "id": "parents",
+      "type": "external",
+      "label": "Parents",
+      "sublabel": "Phone browser",
+      "pos": [40, 258],
+      "size": [140, 68]
+    },
+    {
+      "id": "routes",
+      "type": "frontend",
+      "label": "App Router",
+      "sublabel": "src/app route groups",
+      "tag": "Next.js 16",
+      "brand": "next-js",
+      "pos": [240, 258],
+      "size": [150, 68],
+      "sources": [
+        { "path": "src/app/(signed-in-with-child)/page.tsx", "line": 1, "label": "dashboard route" }
+      ]
+    },
+    {
+      "id": "pages",
+      "type": "frontend",
+      "label": "Page components",
+      "sublabel": "Dashboard · Timeline",
+      "tag": "React 19",
+      "brand": "react",
+      "pos": [450, 258],
+      "size": [160, 68],
+      "sources": [
+        { "path": "src/v3/components/Dashboard/NextEventCard.tsx", "line": 1, "label": "dashboard card" },
+        { "path": "src/v3/components/Timeline/Block.tsx", "line": 1, "label": "timeline block" }
+      ]
+    },
+    {
+      "id": "hooks",
+      "type": "frontend",
+      "label": "useV3* hooks",
+      "sublabel": "live subscriptions",
+      "pos": [670, 258],
+      "size": [150, 68],
+      "sources": [
+        { "path": "src/v3/hooks/useV3Projection.ts", "line": 21, "end_line": 33, "label": "projection hook" },
+        { "path": "src/v3/hooks/useDayPageState.ts", "line": 1, "label": "page state machine" }
+      ]
+    },
+    {
+      "id": "engine",
+      "type": "backend",
+      "label": "Projection engine",
+      "sublabel": "projectDay → evaluator",
+      "tag": "pure, no I/O",
+      "pos": [670, 70],
+      "size": [150, 68],
+      "sources": [
+        { "path": "src/v3/engine/projectDay.ts", "line": 16, "end_line": 24, "label": "projectDay" },
+        { "path": "src/v3/engine/evaluator.ts", "line": 1, "label": "rule evaluator" }
+      ]
+    },
+    {
+      "id": "rules",
+      "type": "backend",
+      "label": "Rule families",
+      "sublabel": "naps · bottles · owners",
+      "pos": [880, 70],
+      "size": [150, 68],
+      "sources": [
+        { "path": "src/v3/engine/rules/index.ts", "line": 17, "end_line": 26, "label": "rule registry" },
+        { "path": "src/v3/engine/rules/naps.ts", "line": 1, "label": "nap cascade" }
+      ]
+    },
+    {
+      "id": "repos",
+      "type": "backend",
+      "label": "Repositories",
+      "sublabel": "one per collection",
+      "pos": [880, 258],
+      "size": [150, 68],
+      "sources": [
+        { "path": "src/v3/repositories/events.ts", "line": 1, "label": "events repository" },
+        { "path": "src/lib/firestore/paths.ts", "line": 1, "label": "path builders" }
+      ]
+    },
+    {
+      "id": "converters",
+      "type": "backend",
+      "label": "Defaulters + converters",
+      "sublabel": "src/v3/firestore",
+      "pos": [880, 446],
+      "size": [150, 68],
+      "sources": [
+        { "path": "src/v3/firestore/eventDefaults.ts", "line": 1, "label": "event defaults" },
+        { "path": "src/v3/firestore/converters.ts", "line": 1, "label": "converters" }
+      ]
+    },
+    {
+      "id": "firestore",
+      "type": "database",
+      "label": "Cloud Firestore",
+      "sublabel": "children/{id}/days/events",
+      "brand": "firebase",
+      "pos": [1100, 258],
+      "size": [160, 68],
+      "sources": [
+        { "path": "src/lib/firebase/client.ts", "line": 27, "end_line": 29, "label": "SDK init" }
+      ]
+    },
+    {
+      "id": "secrules",
+      "type": "security",
+      "label": "firestore.rules",
+      "sublabel": "canAccessChild(childId)",
+      "pos": [1100, 446],
+      "size": [160, 68],
+      "sources": [
+        { "path": "firestore.rules", "line": 36, "end_line": 50, "label": "access predicates" }
+      ]
+    },
+    {
+      "id": "auth",
+      "type": "security",
+      "label": "Firebase Auth",
+      "sublabel": "sign-in + invite tokens",
+      "brand": "firebase",
+      "pos": [240, 446],
+      "size": [150, 68],
+      "sources": [
+        { "path": "src/lib/auth/AuthProvider.tsx", "line": 1, "label": "auth provider" }
+      ]
+    }
+  ],
+  "boundaries": [
+    { "kind": "security-group", "label": "Firebase project", "wraps": ["firestore", "secrules"] }
+  ],
+  "connections": [
+    { "id": "browse", "from": "parents", "to": "routes", "label": "HTTPS", "variant": "emphasis" },
+    { "id": "render", "from": "routes", "to": "pages", "label": "renders client tree", "labelDy": -28 },
+    { "id": "subscribe", "from": "pages", "to": "hooks", "label": "reads live state", "labelDy": -35 },
+    { "id": "project", "from": "hooks", "to": "engine", "label": "day + settings + actuals", "labelDy": -55 },
+    { "id": "run-rules", "from": "engine", "to": "rules", "label": "topo-sorts by dependsOn", "labelDy": -28 },
+    { "id": "forecast", "from": "engine", "to": "pages", "label": "sorted Event[] forecast", "variant": "emphasis", "fromSide": "left", "toSide": "top", "via": [[600, 104], [600, 190], [530, 190]] },
+    { "id": "persist", "from": "hooks", "to": "repos", "label": "onSnapshot + writes", "labelDy": -28 },
+    { "id": "shape", "from": "repos", "to": "converters", "label": "shape docs in and out", "labelDy": 64 },
+    { "id": "store", "from": "converters", "to": "firestore", "label": "typed collection paths", "labelDy": 34 },
+    { "id": "gate-routes", "from": "auth", "to": "routes", "label": "gates signed-in and has-child", "variant": "security" },
+    { "id": "gate-docs", "from": "secrules", "to": "firestore", "label": "per-document access checks", "variant": "security" }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Client",
+      "items": [
+        "Route groups gate on auth state and selected child",
+        "Components live per page: Dashboard, Timeline, Tomorrow",
+        "useV3* hooks own the live Firestore subscriptions"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Projection engine",
+      "items": [
+        "projectDay takes events, settings and now, returns a sorted Event list",
+        "Nine rule families, topo-sorted by dependsOn",
+        "Pure and sub-millisecond, so a 30s tick recomputes the whole day"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "Data and access",
+      "items": [
+        "Days and events nest under children/{childId}",
+        "Defaulters and converters own the persisted shape",
+        "firestore.rules gates every path through canAccessChild"
+      ]
+    }
+  ]
+}
