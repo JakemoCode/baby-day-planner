@@ -47,6 +47,14 @@ the button records (or replaces) at the actual sit-down moment.
 The bottle window is the next-most-urgent action; it activates only
 after the nap auto-promotes to completed.
 
+**Visibility is a time window, not a lifecycle state.** Do not filter
+"Log Bottle Time" to `projected` bottles. After the Now-cross
+auto-promote flips a slot to `recorded`, the button stays visible
+for the full ±15min window in both directions. Tapping it moves the
+recorded event's `startTime` to Now, which confirms the engine's
+guess at the real sit-down moment. Jake rejected the lifecycle filter
+in the PR #257 review.
+
 **Putdown-bottle special case** (bottle anchored to putdown.startTime
 via the [[putdown bottle-anchor rule]]): during the ±15min window
 the nap hasn't started yet, so Log Bottle is the active mode. After
