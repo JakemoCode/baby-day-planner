@@ -79,6 +79,71 @@ async function logBottleAt(startTime: number): Promise<Event[]> {
   return renderProjection(project([saved]), settings, NOW).filter((e) => e.type === "bottle");
 }
 
+/** Opens the drawer on `target` over the current projection and saves it at `startTime`. */
+async function editBottle(actuals: Event[], target: Event, startTime: number): Promise<Event> {
+  const settings = ctxWith([]).settings;
+  const saveEvent = vi.fn().mockResolvedValue(undefined);
+  const { result } = renderHook(() =>
+    useDrawer({
+      saveEvent,
+      deleteOptimistic: vi.fn(),
+      forecast: {
+        projection: project(actuals),
+        intervalMinutes: forecastIntervalMinutes(settings),
+      },
+    }),
+  );
+  act(() => result.current.openEdit(target));
+  await act(async () => {
+    await result.current.onSave({
+      ...target,
+      startTime,
+      lifecycle: { state: "completed", committedAt: NOW },
+    });
+  });
+  return saveEvent.mock.calls[0]![0] as Event;
+}
+
+function slotAt(actuals: Event[], startTime: number): Event {
+  const slot = project(actuals).find((e) => e.type === "bottle" && e.startTime === startTime);
+  if (!slot) throw new Error(`no bottle at ${startTime}: ${bottleTimes(actuals).join(",")}`);
+  return slot;
+}
+
+function bottleTimes(actuals: Event[]): number[] {
+  return project(actuals)
+    .filter((e) => e.type === "bottle")
+    .map((e) => e.startTime)
+    .sort((a, b) => a - b);
+}
+
+describe("seam: editing a moved forecast again keeps standing in for the same slot (R5.14)", () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date(2026, 10, 5, 15, 30));
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  // The fourth slot lands at 16:30 (nap snap). 13:15 is within one interval of 16:10.
+  it("16:30 moved to 16:00, then to 16:10: the 13:15 forecast survives", async () => {
+    const first = await editBottle([], slotAt([], 16 * 60 + 30), 16 * 60);
+    const second = await editBottle([first], first, 16 * 60 + 10);
+    const times = bottleTimes([second]);
+    expect(times).toContain(13 * 60 + 15);
+    expect(times).toContain(16 * 60 + 10);
+    expect(times).not.toContain(16 * 60 + 30);
+  });
+
+  it("13:15 moved to 14:05, then corrected to 14:00: the 13:15 slot stays gone", async () => {
+    const first = await editBottle([], slotAt([], 13 * 60 + 15), 14 * 60 + 5);
+    const second = await editBottle([first], first, 14 * 60);
+    const before16 = bottleTimes([second]).filter((t) => t < 16 * 60);
+    expect(before16).toEqual([7 * 60 + 10, 10 * 60 + 10, 14 * 60]);
+  });
+});
+
 describe("seam: a bottle logged after the fact replaces its forecast slot (R5.14)", () => {
   beforeEach(() => {
     vi.useFakeTimers({ toFake: ["Date"] });

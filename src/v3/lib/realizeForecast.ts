@@ -26,13 +26,20 @@ export function withRealizeTag(input: RealizeTagInput): Event {
   if (mode === "create") {
     return loggedAfterTheFactRealizes(input) ? { ...saved, realizedForecast: true } : saved;
   }
+  if (saved.startTime === source.startTime) return saved;
   const slotTime = slotTimeOf(source);
-  // A FAB bottle doc has no slot of its own; it keeps the tag it was created with.
-  if (slotTime === null || saved.startTime === source.startTime) return saved;
-  if (saved.startTime > slotTime) return { ...saved, realizedForecast: true };
-  const untagged = { ...saved };
-  delete untagged.realizedForecast;
-  return untagged;
+  if (slotTime === null) {
+    // A FAB bottle doc has no slot of its own. Its absorbed slot is gone from the
+    // projection, so it keeps its tag, unless moved into the future, where it is an extra.
+    return saved.startTime > input.nowMinutes ? untagged(saved) : saved;
+  }
+  return saved.startTime > slotTime ? { ...saved, realizedForecast: true } : untagged(saved);
+}
+
+function untagged(event: Event): Event {
+  const out = { ...event };
+  delete out.realizedForecast;
+  return out;
 }
 
 /** The slot an edited bottle stands in for: its forecast time, or the time its recorded id names. */

@@ -75,7 +75,9 @@ function setup({
   setOwnerOverride,
   suppressRecurring,
   saveNewEvent,
+  forecast,
 }: {
+  forecast?: { projection: Event[]; intervalMinutes: number };
   saveEvent?: ((event: Event) => Promise<void>) & ReturnType<typeof vi.fn>;
   deleteOptimistic?: ((eventId: string) => Promise<void>) & ReturnType<typeof vi.fn>;
   setOwnerOverride?: ((eventKey: string, owner: Event["owner"]) => Promise<void>) &
@@ -104,6 +106,7 @@ function setup({
       suppressions,
       ...(setOwnerOverride ? { setOwnerOverride } : {}),
       ...(saveNewEvent ? { saveNewEvent } : {}),
+      ...(forecast ? { forecast } : {}),
     }),
   );
   return {
@@ -275,6 +278,57 @@ describe("useDrawer", () => {
     });
 
     expect(saveEvent).toHaveBeenCalledWith(expect.objectContaining({ realizedForecast: true }));
+  });
+
+  it("R5.14: a projected bottle moved later is saved under its slot's id, not the new time's", async () => {
+    const projected = makeEvent({
+      id: "proj_bottle_t600",
+      type: "bottle",
+      kind: "instant",
+      eventKey: "bottle_1",
+      startTime: 10 * 60,
+    });
+    const saveEvent = makeSaveEvent();
+    const { result } = setup({ saveEvent });
+
+    act(() => result.current.openEdit(projected));
+    await act(async () => {
+      await result.current.onSave({ ...projected, startTime: 10 * 60 + 30 });
+    });
+
+    expect(saveEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "recorded_bottle_t600", startTime: 10 * 60 + 30 }),
+    );
+  });
+
+  it("R5.14: when the slot's id already holds a doc, a moved forecast takes the new time's id", async () => {
+    const projected = makeEvent({
+      id: "proj_bottle_t600",
+      type: "bottle",
+      kind: "instant",
+      eventKey: "bottle_1",
+      startTime: 10 * 60,
+    });
+    const movedEarlierFeed = makeEvent({
+      id: "recorded_bottle_t600",
+      type: "bottle",
+      kind: "instant",
+      eventKey: "bottle_2",
+      startTime: 14 * 60,
+      lifecycle: { state: "completed", committedAt: 14 * 60 },
+    });
+    const saveEvent = makeSaveEvent();
+    const { result } = setup({
+      saveEvent,
+      forecast: { projection: [projected, movedEarlierFeed], intervalMinutes: 180 },
+    });
+
+    act(() => result.current.openEdit(projected));
+    await act(async () => {
+      await result.current.onSave({ ...projected, startTime: 10 * 60 + 30 });
+    });
+
+    expect(saveEvent).toHaveBeenCalledWith(expect.objectContaining({ id: "recorded_bottle_t630" }));
   });
 
   it("R5.14: time-edit of a recorded slot doc to later than its id time keeps absorbing the slot", async () => {

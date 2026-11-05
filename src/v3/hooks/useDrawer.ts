@@ -125,8 +125,15 @@ export function useDrawer({
       if (!isActual) {
         // Projected with time/amount/label change: re-ID deterministically so
         // subsequent edits route through update rather than create. ADR-0007:
-        // bottles key off startTime (renumber-independent), naps/bedtime off eventKey.
-        await saveEvent({ ...realize("edit", source, event), id: recordedIdForEvent(event) });
+        // bottles key off the slot's startTime (renumber-independent), naps/bedtime off
+        // eventKey. R5.14 reads a bottle's slot from that id, so it names the slot, not
+        // the new time, unless a feed already holds it (a slot stranded by a long move).
+        const slotId = recordedIdForEvent(source);
+        const slotIdTaken = forecast.projection.some((e) => e.id === slotId);
+        await saveEvent({
+          ...realize("edit", source, event),
+          id: slotIdTaken ? recordedIdForEvent(event) : slotId,
+        });
       } else {
         await saveEvent(realize("edit", source, event));
       }

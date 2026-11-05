@@ -135,8 +135,13 @@ describe("R5.14 withRealizeTag: moving a slot", () => {
     expect(out.realizedForecast).toBe(true);
   });
 
-  it("a FAB bottle doc keeps whatever tag it was created with", () => {
+  it("a FAB bottle doc moved within the past keeps the tag it was created with", () => {
     const doc = bottle("bottle_abc", 14 * 60 + 5, { realizedForecast: true });
     expect(edit(doc, 14 * 60 + 20).realizedForecast).toBe(true);
+  });
+
+  it("a FAB bottle doc moved into the future drops its tag: a future FAB bottle is an extra", () => {
+    const doc = bottle("bottle_abc", 14 * 60 + 5, { realizedForecast: true });
+    expect("realizedForecast" in edit(doc, 18 * 60)).toBe(false);
   });
 });
