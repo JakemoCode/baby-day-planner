@@ -26,7 +26,7 @@ Jake's lived experience in `DOMAIN.md` §1–§7 wins over research notes in §8
 
 ## Engine
 
-- **Bottle cascade.** Read `docs/v3/ENGINE_SPEC.md` §R5 (R5.1, R5.3, R5.8, R5.9), `docs/v3/BOTTLE_SPEC.md` and `DOMAIN.md` §2 before changing it. Cite the R-number in the test and the PR. Do not re-derive cascade semantics from the code. A recorded bottle cascades the forecast forward from itself and never absorbs a forecast slot. The one exception is a projected bottle edited in the drawer, which is tagged `realizedForecast: true` and absorbs the one imminent slot it realized (BOTTLE_SPEC §4).
+- **Bottle cascade.** Read `docs/v3/ENGINE_SPEC.md` §R5 (R5.1, R5.3, R5.8, R5.9), `docs/v3/BOTTLE_SPEC.md` and `DOMAIN.md` §2 before changing it. Cite the R-number in the test and the PR. Do not re-derive cascade semantics from the code. A recorded bottle cascades the forecast forward from itself and never absorbs an earlier forecast slot, unless it is tagged `realizedForecast: true`: then it absorbs the one slot just before it. `useDrawer` sets the tag for a forecast moved later and for a bottle logged after the fact (ENGINE_SPEC §R5.14).
 - **Events that copy an existing type.** When a path creates an event of a type that already has a canonical path (nap converted to bedtime, say), copy that path's field shape and lifecycle. Valid states are `projected | recorded | completed` (DATA_MODEL R2.1). Before picking one, grep the rules that key off lifecycle (`putdown.ts` fires only for `projected` and `recorded`). A second click-test bug in the same conversion path means the shape is wrong, not the symptom.
 
 ## Comments
