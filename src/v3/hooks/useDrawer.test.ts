@@ -77,7 +77,11 @@ function setup({
   saveNewEvent,
   forecast,
 }: {
-  forecast?: { projection: Event[]; intervalMinutes: number };
+  forecast?: {
+    projection: Event[];
+    intervalMinutes: number;
+    projectWithout?: (id: string) => Event[];
+  };
   saveEvent?: ((event: Event) => Promise<void>) & ReturnType<typeof vi.fn>;
   deleteOptimistic?: ((eventId: string) => Promise<void>) & ReturnType<typeof vi.fn>;
   setOwnerOverride?: ((eventKey: string, owner: Event["owner"]) => Promise<void>) &
@@ -289,7 +293,10 @@ describe("useDrawer", () => {
       startTime: 10 * 60,
     });
     const saveEvent = makeSaveEvent();
-    const { result } = setup({ saveEvent });
+    const { result } = setup({
+      saveEvent,
+      forecast: { projection: [projected], intervalMinutes: 180 },
+    });
 
     act(() => result.current.openEdit(projected));
     await act(async () => {
@@ -299,6 +306,26 @@ describe("useDrawer", () => {
     expect(saveEvent).toHaveBeenCalledWith(
       expect.objectContaining({ id: "recorded_bottle_t600", startTime: 10 * 60 + 30 }),
     );
+  });
+
+  // /tomorrow passes no projection, so it cannot see whether the slot's id is taken.
+  it("R5.14: with no projection to check, a moved forecast takes the new time's id", async () => {
+    const projected = makeEvent({
+      id: "proj_bottle_t600",
+      type: "bottle",
+      kind: "instant",
+      eventKey: "bottle_1",
+      startTime: 10 * 60,
+    });
+    const saveEvent = makeSaveEvent();
+    const { result } = setup({ saveEvent });
+
+    act(() => result.current.openEdit(projected));
+    await act(async () => {
+      await result.current.onSave({ ...projected, startTime: 10 * 60 + 30 });
+    });
+
+    expect(saveEvent).toHaveBeenCalledWith(expect.objectContaining({ id: "recorded_bottle_t630" }));
   });
 
   it("R5.14: when the slot's id already holds a doc, a moved forecast takes the new time's id", async () => {

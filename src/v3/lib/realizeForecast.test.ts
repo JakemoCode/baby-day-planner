@@ -135,13 +135,42 @@ describe("R5.14 withRealizeTag: moving a slot", () => {
     expect(out.realizedForecast).toBe(true);
   });
 
-  it("a FAB bottle doc moved within the past keeps the tag it was created with", () => {
+  // A FAB doc has no slot id; it is re-decided against the projection without it,
+  // where the slot it absorbed is back (PROJECTION stands in for that here).
+  function editFab(doc: Event, startTime: number, without?: Event[]): Event {
+    return withRealizeTag({
+      mode: "edit",
+      source: doc,
+      saved: { ...doc, startTime },
+      projection: PROJECTION.filter((e) => e.startTime !== 13 * 60 + 15),
+      ...(without ? { projectionWithoutSource: without } : {}),
+      nowMinutes: NOW,
+      intervalMinutes: INTERVAL,
+    });
+  }
+
+  it("a FAB bottle doc moved a little within the past still realizes the slot it absorbed", () => {
     const doc = bottle("bottle_abc", 14 * 60 + 5, { realizedForecast: true });
-    expect(edit(doc, 14 * 60 + 20).realizedForecast).toBe(true);
+    expect(editFab(doc, 14 * 60 + 20, PROJECTION).realizedForecast).toBe(true);
+  });
+
+  it("a FAB bottle doc moved to 09:00 drops its tag: 10:10 is the nearer slot, after it", () => {
+    const doc = bottle("bottle_abc", 14 * 60 + 5, { realizedForecast: true });
+    expect("realizedForecast" in editFab(doc, 9 * 60, PROJECTION)).toBe(false);
+  });
+
+  it("an untagged past FAB bottle doc moved just after a slot realizes it", () => {
+    const doc = bottle("bottle_abc", 16 * 60 + 30);
+    expect(editFab(doc, 13 * 60 + 25, PROJECTION).realizedForecast).toBe(true);
   });
 
   it("a FAB bottle doc moved into the future drops its tag: a future FAB bottle is an extra", () => {
     const doc = bottle("bottle_abc", 14 * 60 + 5, { realizedForecast: true });
-    expect("realizedForecast" in edit(doc, 18 * 60)).toBe(false);
+    expect("realizedForecast" in editFab(doc, 18 * 60, PROJECTION)).toBe(false);
+  });
+
+  it("without the projection minus the doc, a moved FAB bottle drops its tag", () => {
+    const doc = bottle("bottle_abc", 14 * 60 + 5, { realizedForecast: true });
+    expect("realizedForecast" in editFab(doc, 14 * 60 + 20)).toBe(false);
   });
 });

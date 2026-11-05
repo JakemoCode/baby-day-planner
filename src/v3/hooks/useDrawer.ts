@@ -66,10 +66,15 @@ type UseDrawerOptions = {
    */
   saveNewEvent?: (event: Event) => Promise<void> | void;
   /**
-   * The projection the drawer is opened over and one forecast interval. Without it a
-   * bottle logged after the fact cannot realize its forecast slot (R5.14).
+   * The projection the drawer is opened over, one forecast interval, and the projection
+   * recomputed without a given doc. Without it a bottle logged after the fact cannot
+   * realize its forecast slot, and a moved forecast keeps its new time's id (R5.14).
    */
-  forecast?: { projection: readonly Event[]; intervalMinutes: number };
+  forecast?: {
+    projection: readonly Event[];
+    intervalMinutes: number;
+    projectWithout?: (id: string) => readonly Event[];
+  };
 };
 
 const NO_FORECAST = { projection: [], intervalMinutes: 0 } as const;
@@ -98,7 +103,17 @@ export function useDrawer({
 
   // R5.14: the one site that sets or clears `realizedForecast`.
   const realize = (mode: "create" | "edit", source: Event, saved: Event): Event =>
-    withRealizeTag({ mode, source, saved, nowMinutes: currentLocalMinutes(), ...forecast });
+    withRealizeTag({
+      mode,
+      source,
+      saved,
+      nowMinutes: currentLocalMinutes(),
+      projection: forecast.projection,
+      intervalMinutes: forecast.intervalMinutes,
+      ...(mode === "edit" && saved.type === "bottle" && forecast.projectWithout
+        ? { projectionWithoutSource: forecast.projectWithout(source.id) }
+        : {}),
+    });
 
   const onSave = async (event: Event) => {
     if (drawer.open && drawer.mode === "edit") {
@@ -127,12 +142,14 @@ export function useDrawer({
         // subsequent edits route through update rather than create. ADR-0007:
         // bottles key off the slot's startTime (renumber-independent), naps/bedtime off
         // eventKey. R5.14 reads a bottle's slot from that id, so it names the slot, not
-        // the new time, unless a feed already holds it (a slot stranded by a long move).
+        // the new time, unless a feed may already hold it: a slot stranded by a long
+        // move, or no projection to check (/tomorrow).
         const slotId = recordedIdForEvent(source);
-        const slotIdTaken = forecast.projection.some((e) => e.id === slotId);
+        const slotIdFree =
+          forecast.projection.length > 0 && !forecast.projection.some((e) => e.id === slotId);
         await saveEvent({
           ...realize("edit", source, event),
-          id: slotIdTaken ? recordedIdForEvent(event) : slotId,
+          id: slotIdFree ? slotId : recordedIdForEvent(event),
         });
       } else {
         await saveEvent(realize("edit", source, event));

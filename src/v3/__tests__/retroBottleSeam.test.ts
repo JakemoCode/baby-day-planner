@@ -56,6 +56,13 @@ function fabTemplate(): Event {
 }
 
 async function logBottleAt(startTime: number): Promise<Event[]> {
+  const saved = await createBottle(startTime);
+  return renderProjection(project([saved]), ctxWith([]).settings, NOW).filter(
+    (e) => e.type === "bottle",
+  );
+}
+
+async function createBottle(startTime: number): Promise<Event> {
   const settings = ctxWith([]).settings;
   const saveNewEvent = vi.fn().mockResolvedValue(undefined);
   const { result } = renderHook(() =>
@@ -75,8 +82,7 @@ async function logBottleAt(startTime: number): Promise<Event[]> {
       lifecycle: { state: "completed", committedAt: NOW },
     });
   });
-  const saved = saveNewEvent.mock.calls[0]![0] as Event;
-  return renderProjection(project([saved]), settings, NOW).filter((e) => e.type === "bottle");
+  return saveNewEvent.mock.calls[0]![0] as Event;
 }
 
 /** Opens the drawer on `target` over the current projection and saves it at `startTime`. */
@@ -90,6 +96,7 @@ async function editBottle(actuals: Event[], target: Event, startTime: number): P
       forecast: {
         projection: project(actuals),
         intervalMinutes: forecastIntervalMinutes(settings),
+        projectWithout: (id) => project(actuals.filter((a) => a.id !== id)),
       },
     }),
   );
@@ -134,6 +141,13 @@ describe("seam: editing a moved forecast again keeps standing in for the same sl
     expect(times).toContain(13 * 60 + 15);
     expect(times).toContain(16 * 60 + 10);
     expect(times).not.toContain(16 * 60 + 30);
+  });
+
+  it("a bottle logged at 14:05, then corrected to 09:00: the 07:10 forecast survives", async () => {
+    const logged = await createBottle(14 * 60 + 5);
+    const corrected = await editBottle([logged], logged, 9 * 60);
+    const before12 = bottleTimes([corrected]).filter((t) => t < 12 * 60);
+    expect(before12).toEqual([7 * 60 + 10, 9 * 60]);
   });
 
   it("13:15 moved to 14:05, then corrected to 14:00: the 13:15 slot stays gone", async () => {

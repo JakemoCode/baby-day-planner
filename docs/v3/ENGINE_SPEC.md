@@ -446,7 +446,7 @@ before it stays as a second feed. The drawer decides the tag
 | Time-edit of a `recorded_bottle_t<T>` doc | the slot at `T` | the new time is later than `T`; otherwise the tag is removed |
 | Create, `startTime <= now` (logged after the fact, DOMAIN.md §2) | the nearest forecast slot | the bottle just before it in the projection is a `proj_` slot within one interval, and no `proj_` slot after it is closer |
 | Create, `startTime > now` | none | never: a future FAB bottle is an extra (BOTTLE_SPEC §4) |
-| Time-edit of a FAB bottle doc | the slot absorbed at create, no longer in the projection | keeps its tag; moved past now, the tag is removed |
+| Time-edit of a FAB bottle doc | the nearest forecast slot in the projection recomputed without the doc | the create rule above holds at the new time; otherwise, or with no such projection, the tag is removed |
 
 A projected bottle's doc id names its slot, not its new time, so a later
 edit still knows which slot it stands in for. When a doc already holds

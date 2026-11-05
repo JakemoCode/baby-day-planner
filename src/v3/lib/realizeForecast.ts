@@ -18,6 +18,11 @@ export type RealizeTagInput = {
   nowMinutes: TimeMin;
   /** One forecast interval (`forecastIntervalMinutes`). */
   intervalMinutes: number;
+  /**
+   * Edit only: the projection without the edited doc, where any slot it absorbed is
+   * back. A FAB bottle doc has no slot id, so its tag is re-decided against this.
+   */
+  projectionWithoutSource?: readonly Event[];
 };
 
 export function withRealizeTag(input: RealizeTagInput): Event {
@@ -29,9 +34,12 @@ export function withRealizeTag(input: RealizeTagInput): Event {
   if (saved.startTime === source.startTime) return saved;
   const slotTime = slotTimeOf(source);
   if (slotTime === null) {
-    // A FAB bottle doc has no slot of its own. Its absorbed slot is gone from the
-    // projection, so it keeps its tag, unless moved into the future, where it is an extra.
-    return saved.startTime > input.nowMinutes ? untagged(saved) : saved;
+    // Without that projection, untag: a forecast slot reappears beside the feed, where
+    // a stale tag could silently absorb a slot the bottle no longer stands in for.
+    const without = input.projectionWithoutSource;
+    return without && loggedAfterTheFactRealizes({ ...input, projection: without })
+      ? { ...saved, realizedForecast: true }
+      : untagged(saved);
   }
   return saved.startTime > slotTime ? { ...saved, realizedForecast: true } : untagged(saved);
 }

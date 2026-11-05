@@ -14,13 +14,14 @@ import { useV3Events } from "./useV3Events";
 import { useV3Templates } from "./useV3Templates";
 import { useV3Projection } from "./useV3Projection";
 import { forecastIntervalMinutes } from "../engine/bottleIntervalRules";
+import { projectDay } from "../engine/projectDay";
 import { useDrawer, type DrawerState, type UseDrawerResult } from "./useDrawer";
 import { useDayDrawerSuppressions } from "./useDayDrawerSuppressions";
 import { useReconcileActiveDay } from "./useReconcileActiveDay";
 import { useCurrentLocalDate } from "./useCurrentLocalDate";
 import { updateDayOwnerOverride } from "../repositories/days";
 import { createEventOnCalendarDay } from "../repositories/eventRouting";
-import { currentLocalDate } from "../ui/time";
+import { currentLocalDate, currentLocalMinutes } from "../ui/time";
 
 export type UseDayPageStateResult = {
   day: Day | null;
@@ -92,8 +93,21 @@ export function useDayPageState(db: Firestore, childId: string): UseDayPageState
       : {}),
     suppressions: drawerSuppressions,
     saveNewEvent,
-    ...(settings
-      ? { forecast: { projection: projected, intervalMinutes: forecastIntervalMinutes(settings) } }
+    ...(day && settings
+      ? {
+          forecast: {
+            projection: projected,
+            intervalMinutes: forecastIntervalMinutes(settings),
+            projectWithout: (id: string) =>
+              projectDay({
+                day,
+                settings,
+                actuals: actuals.filter((a) => a.id !== id),
+                nowMinutes: currentLocalMinutes(),
+                ...(template ? { template } : {}),
+              }),
+          },
+        }
       : {}),
   });
 
