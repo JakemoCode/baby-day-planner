@@ -13,6 +13,8 @@ import {
   ownerOverrideKeyFor,
   recordedIdForEvent,
 } from "../lib/eventConventions";
+import { withRealizeTag } from "../lib/realizeForecast";
+import { currentLocalMinutes } from "../ui/time";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -63,7 +65,19 @@ type UseDrawerOptions = {
    * clock time falls on. Edits always use `saveEvent` (they keep their day).
    */
   saveNewEvent?: (event: Event) => Promise<void> | void;
+  /**
+   * The projection the drawer is opened over, one forecast interval, and the projection
+   * recomputed without a given doc. Without it a bottle logged after the fact cannot
+   * realize its forecast slot, and a recorded bottle's time-edit drops its tag (R5.14).
+   */
+  forecast?: {
+    projection: readonly Event[];
+    intervalMinutes: number;
+    projectWithout?: (id: string) => readonly Event[];
+  };
 };
+
+const NO_FORECAST = { projection: [], intervalMinutes: 0 } as const;
 
 export function useDrawer({
   saveEvent,
@@ -71,6 +85,7 @@ export function useDrawer({
   setOwnerOverride,
   suppressions = [],
   saveNewEvent,
+  forecast = NO_FORECAST,
 }: UseDrawerOptions): UseDrawerResult {
   const [drawer, setDrawer] = useState<DrawerState>({ open: false });
 
@@ -85,6 +100,25 @@ export function useDrawer({
   const close = () => {
     setDrawer({ open: false });
   };
+
+  // R5.14: the one site that sets or clears `realizedForecast`.
+  const realize = (mode: "create" | "edit", source: Event, saved: Event): Event =>
+    withRealizeTag({
+      mode,
+      source,
+      saved,
+      nowMinutes: currentLocalMinutes(),
+      projection: forecast.projection,
+      intervalMinutes: forecast.intervalMinutes,
+      // Only a recorded bottle's time-edit reads it, and it costs a full projectDay.
+      ...(mode === "edit" &&
+      saved.type === "bottle" &&
+      !isEngineEmittedId(source.id) &&
+      saved.startTime !== source.startTime &&
+      forecast.projectWithout
+        ? { projectionWithoutSource: forecast.projectWithout(source.id) }
+        : {}),
+    });
 
   const onSave = async (event: Event) => {
     if (drawer.open && drawer.mode === "edit") {
@@ -112,21 +146,13 @@ export function useDrawer({
         // Projected with time/amount/label change: re-ID deterministically so
         // subsequent edits route through update rather than create. ADR-0007:
         // bottles key off startTime (renumber-independent), naps/bedtime off eventKey.
-        // MOVING a projected bottle realizes/relocates that forecast slot (BOTTLE_SPEC
-        // §4): tag it so the cascade absorbs the slot instead of re-emitting it beside
-        // the feed. Gated on a time change — a same-time edit lands on the slot and the
-        // cascade's anchorReached path handles it. FAB-add (create mode) stays untagged.
-        const movedBottle = event.type === "bottle" && event.startTime !== source.startTime;
-        await saveEvent({
-          ...event,
-          ...(movedBottle && { realizedForecast: true }),
-          id: recordedIdForEvent(event),
-        });
+        await saveEvent({ ...realize("edit", source, event), id: recordedIdForEvent(event) });
       } else {
-        await saveEvent(event);
+        await saveEvent(realize("edit", source, event));
       }
     } else {
-      await (saveNewEvent ?? saveEvent)(event);
+      const created = drawer.open ? realize("create", drawer.template, event) : event;
+      await (saveNewEvent ?? saveEvent)(created);
     }
     setDrawer({ open: false });
   };

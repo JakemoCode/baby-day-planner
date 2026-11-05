@@ -16,6 +16,7 @@ import { projectDay } from "../projectDay";
 import { recordedIdForEvent } from "../../lib/eventConventions";
 import { RULES as NAP_RULES } from "./naps";
 import { RULES as BOTTLE_RULES } from "./bottles";
+import { ALL_RULES } from "./index";
 
 const ALL: Rule[] = [...BOTTLE_RULES];
 const ALL_WITH_NAPS: Rule[] = [...NAP_RULES, ...BOTTLE_RULES];
@@ -2021,13 +2022,12 @@ describe("R5 realize/relocate — editing a forecast bottle moves it, never dupl
     expect(times).toContain(16 * 60 + 10);
   });
 
-  // Editing earlier already worked via the re-seed; the tag must not break it.
-  it("realized bottle earlier than its slot still produces a single moved bottle at 16:00", () => {
-    const times = runWith(
-      aRecordedBottle({ id: "rec", eventKey: "bottle_1", start: 16 * 60, realizedForecast: true }),
-    );
+  // R5.14: a forecast moved earlier is untagged; the re-seed takes its slot.
+  it("R5.14: forecast moved earlier (untagged) is a single bottle at 16:00 and 13:10 survives", () => {
+    const times = runWith(aRecordedBottle({ id: "rec", eventKey: "bottle_1", start: 16 * 60 }));
     expect(times).toContain(16 * 60);
     expect(times).not.toContain(16 * 60 + 10);
+    expect(times).toContain(13 * 60 + 10);
   });
 
   // A realized bottle absorbs ONLY the imminent slot — a full-interval-earlier forecast survives.
@@ -2041,5 +2041,43 @@ describe("R5 realize/relocate — editing a forecast bottle moves it, never dupl
       }),
     );
     expect(times).toContain(13 * 60 + 10);
+  });
+});
+
+describe("R5.14 a bottle logged after the fact realizes its forecast slot (DOMAIN.md §2)", () => {
+  // Wake 7:00, buffer 10, interval 180, now 15:30, nothing logged: forecast slots
+  // 7:10, 10:10 and 13:15 are past (the nap rules snap the third).
+  function bottlesBefore16(logged: Event): number[] {
+    const ctx = aContext({
+      day: aDay({ wakeTime: 7 * 60 }),
+      settings: aSettings({
+        bottleChain: { bufferAfterWakeMinutes: 10 },
+        defaultBottleIntervalMinutes: 180,
+      }),
+      nowMinutes: 15 * 60 + 30,
+      actuals: [logged],
+    });
+    return projectDay(
+      { day: ctx.day, settings: ctx.settings, actuals: ctx.actuals, nowMinutes: ctx.nowMinutes },
+      { rules: [...ALL_RULES] },
+    )
+      .filter((e) => e.type === "bottle" && e.startTime < 16 * 60)
+      .map((b) => b.startTime)
+      .sort((a, b) => a - b);
+  }
+
+  it("a tagged bottle at 14:05 replaces the 13:15 slot: one bottle, not two", () => {
+    const logged = aRecordedBottle({ id: "b", start: 14 * 60 + 5, realizedForecast: true });
+    expect(bottlesBefore16(logged)).toEqual([7 * 60 + 10, 10 * 60 + 10, 14 * 60 + 5]);
+  });
+
+  it("a tagged bottle at 13:20 replaces the 13:15 slot", () => {
+    const logged = aRecordedBottle({ id: "b", start: 13 * 60 + 20, realizedForecast: true });
+    expect(bottlesBefore16(logged)).toEqual([7 * 60 + 10, 10 * 60 + 10, 13 * 60 + 20]);
+  });
+
+  it("an untagged bottle at 13:05 takes the 13:15 slot by re-seed and keeps 10:10", () => {
+    const logged = aRecordedBottle({ id: "b", start: 13 * 60 + 5 });
+    expect(bottlesBefore16(logged)).toEqual([7 * 60 + 10, 10 * 60 + 10, 13 * 60 + 5]);
   });
 });

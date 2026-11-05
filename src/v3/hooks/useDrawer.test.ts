@@ -75,7 +75,13 @@ function setup({
   setOwnerOverride,
   suppressRecurring,
   saveNewEvent,
+  forecast,
 }: {
+  forecast?: {
+    projection: Event[];
+    intervalMinutes: number;
+    projectWithout?: (id: string) => Event[];
+  };
   saveEvent?: ((event: Event) => Promise<void>) & ReturnType<typeof vi.fn>;
   deleteOptimistic?: ((eventId: string) => Promise<void>) & ReturnType<typeof vi.fn>;
   setOwnerOverride?: ((eventKey: string, owner: Event["owner"]) => Promise<void>) &
@@ -104,6 +110,7 @@ function setup({
       suppressions,
       ...(setOwnerOverride ? { setOwnerOverride } : {}),
       ...(saveNewEvent ? { saveNewEvent } : {}),
+      ...(forecast ? { forecast } : {}),
     }),
   );
   return {
@@ -275,6 +282,69 @@ describe("useDrawer", () => {
     });
 
     expect(saveEvent).toHaveBeenCalledWith(expect.objectContaining({ realizedForecast: true }));
+  });
+
+  it("R5.14: a moved forecast keeps the new time's id (ADR-0007)", async () => {
+    const projected = makeEvent({
+      id: "proj_bottle_t600",
+      type: "bottle",
+      kind: "instant",
+      eventKey: "bottle_1",
+      startTime: 10 * 60,
+    });
+    const saveEvent = makeSaveEvent();
+    const { result } = setup({
+      saveEvent,
+      forecast: { projection: [projected], intervalMinutes: 180 },
+    });
+
+    act(() => result.current.openEdit(projected));
+    await act(async () => {
+      await result.current.onSave({ ...projected, startTime: 10 * 60 + 30 });
+    });
+
+    expect(saveEvent).toHaveBeenCalledWith(expect.objectContaining({ id: "recorded_bottle_t630" }));
+  });
+
+  it("R5.14: a recorded bottle's time-edit is decided against the projection without it", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date(2026, 10, 5, 15, 30));
+    const recordedSlot = makeEvent({
+      id: "recorded_bottle_t600",
+      type: "bottle",
+      kind: "instant",
+      eventKey: "bottle_1",
+      startTime: 10 * 60,
+      lifecycle: { state: "recorded", annotatedAt: 10 * 60 },
+    });
+    const slotItTook = makeEvent({
+      id: "proj_bottle_t600",
+      type: "bottle",
+      kind: "instant",
+      eventKey: "bottle_1",
+      startTime: 10 * 60,
+      lifecycle: { state: "recorded", annotatedAt: 10 * 60 },
+    });
+    const projectWithout = vi.fn((_id: string) => [slotItTook]);
+    const saveEvent = makeSaveEvent();
+    const { result } = setup({
+      saveEvent,
+      forecast: { projection: [recordedSlot], intervalMinutes: 180, projectWithout },
+    });
+
+    act(() => result.current.openEdit(recordedSlot));
+    try {
+      await act(async () => {
+        await result.current.onSave({ ...recordedSlot, startTime: 10 * 60 + 40 });
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+
+    expect(projectWithout).toHaveBeenCalledWith("recorded_bottle_t600");
+    expect(saveEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "recorded_bottle_t600", realizedForecast: true }),
+    );
   });
 
   // The tag is bottle-only: a projected nap edit must NOT carry it.

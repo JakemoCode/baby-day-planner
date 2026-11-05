@@ -1,8 +1,9 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import type { Event } from "../schemas";
 import { NO_OWNER } from "../schemas";
 import { useV3Events } from "./useV3Events";
+import { useDrawer } from "./useDrawer";
 
 const watchEventsMock = vi.fn();
 const createEventMock = vi.fn().mockResolvedValue(undefined);
@@ -198,5 +199,64 @@ describe("useV3Events", () => {
       expect(unsub).toHaveBeenCalledTimes(1);
       expect(watchEventsMock).toHaveBeenCalledTimes(1);
     });
+  });
+});
+
+describe("R5.14: a drawer edit that drops the realize tag clears it from the stored doc", () => {
+  beforeEach(() => {
+    watchEventsMock.mockReset();
+    updateEventMock.mockClear();
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date(2026, 10, 5, 15, 30));
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  // A bottle logged at 14:05 realized the 13:15 slot. Corrected to 09:00, the 10:10
+  // slot is nearer and after it, so the tag must go: updateDoc merges, so an absent
+  // key would leave `true` stored and the 07:10 forecast would stay absorbed.
+  it("writes realizedForecast: false through updateEvent and the optimistic state", async () => {
+    let cb: ((events: Event[]) => void) | undefined;
+    watchEventsMock.mockImplementation((_db, _cid, _did, callback) => {
+      cb = callback;
+      return () => {};
+    });
+    const logged = baseEvent({
+      id: "bottle_fab",
+      startTime: 14 * 60 + 5,
+      realizedForecast: true,
+    });
+    const slot = (id: string, startTime: number): Event =>
+      baseEvent({ id, startTime, lifecycle: { state: "recorded", annotatedAt: startTime } });
+    const withoutLogged = [
+      slot("proj_bottle_t430", 7 * 60 + 10),
+      slot("proj_bottle_t610", 10 * 60 + 10),
+      slot("proj_bottle_t795", 13 * 60 + 15),
+    ];
+    const { result } = renderHook(() => {
+      const events = useV3Events("child-1", "day-1");
+      const drawer = useDrawer({
+        saveEvent: events.saveEvent,
+        deleteOptimistic: events.deleteOptimistic,
+        forecast: {
+          projection: [withoutLogged[0]!, withoutLogged[1]!, logged],
+          intervalMinutes: 180,
+          projectWithout: () => withoutLogged,
+        },
+      });
+      return { events, drawer };
+    });
+    act(() => cb!([logged]));
+    await waitFor(() => expect(result.current.events.events).toHaveLength(1));
+
+    act(() => result.current.drawer.openEdit(logged));
+    await act(async () => {
+      await result.current.drawer.onSave({ ...logged, startTime: 9 * 60 });
+    });
+
+    const patch = updateEventMock.mock.calls[0]![4] as Partial<Event>;
+    expect(patch.realizedForecast).toBe(false);
+    expect(result.current.events.events[0]!.realizedForecast).toBe(false);
   });
 });

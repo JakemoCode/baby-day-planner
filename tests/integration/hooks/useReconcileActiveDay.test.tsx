@@ -189,4 +189,25 @@ describe("useReconcileActiveDay (emulator-backed)", () => {
     expect(stillToday?.status).toBe("active");
     expect(stillToday?.date).toBe(TODAY);
   });
+
+  it("waits for settings before creating today's day, then uses the real wake time", async () => {
+    const { result, rerender } = renderHook(
+      ({ wake }: { wake: number | null }) => useReconcileActiveDay("child-1", TODAY, wake),
+      { initialProps: { wake: null as number | null } },
+    );
+
+    // Long enough for the active-day read and a write to have landed if the hook ran early.
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    expect(result.current.done).toBe(false);
+    expect(await getDay(testDb, "child-1", "day-child-1-2026-05-21")).toBeNull();
+
+    rerender({ wake: 6 * 60 + 15 });
+
+    await waitFor(() => {
+      expect(result.current.done).toBe(true);
+    });
+    const created = await getDay(testDb, "child-1", "day-child-1-2026-05-21");
+    expect(created?.status).toBe("active");
+    expect(created?.wakeTime).toBe(6 * 60 + 15);
+  });
 });

@@ -13,13 +13,15 @@ import { useV3Settings } from "./useV3Settings";
 import { useV3Events } from "./useV3Events";
 import { useV3Templates } from "./useV3Templates";
 import { useV3Projection } from "./useV3Projection";
+import { forecastIntervalMinutes } from "../engine/bottleIntervalRules";
+import { projectDay } from "../engine/projectDay";
 import { useDrawer, type DrawerState, type UseDrawerResult } from "./useDrawer";
 import { useDayDrawerSuppressions } from "./useDayDrawerSuppressions";
 import { useReconcileActiveDay } from "./useReconcileActiveDay";
 import { useCurrentLocalDate } from "./useCurrentLocalDate";
 import { updateDayOwnerOverride } from "../repositories/days";
 import { createEventOnCalendarDay } from "../repositories/eventRouting";
-import { currentLocalDate } from "../ui/time";
+import { currentLocalDate, currentLocalMinutes } from "../ui/time";
 
 export type UseDayPageStateResult = {
   day: Day | null;
@@ -48,7 +50,8 @@ export function useDayPageState(db: Firestore, childId: string): UseDayPageState
   // so a view left open overnight auto-advances instead of staying pinned to a stale
   // active day (which mixed yesterday's recorded events with today's fresh ones). §F68.
   const today = useCurrentLocalDate();
-  useReconcileActiveDay(childId, today, settings?.defaultWakeTime ?? 7 * 60);
+  // Null until the settings doc arrives; the hook waits rather than rolling over at a placeholder.
+  useReconcileActiveDay(childId, today, settings?.defaultWakeTime ?? null);
   const { events: actuals, saveEvent, deleteOptimistic } = useV3Events(childId, day?.id ?? "");
   const { templates } = useV3Templates(childId);
   const drawerSuppressions = useDayDrawerSuppressions(db, childId, day?.id);
@@ -68,6 +71,18 @@ export function useDayPageState(db: Firestore, childId: string): UseDayPageState
     [db, childId, day, settings, saveEvent],
   );
 
+  const template = useMemo<OwnershipTemplate | undefined>(() => {
+    if (!day?.templateId) return undefined;
+    return templates.find((t) => t.id === day.templateId);
+  }, [day, templates]);
+
+  const projected = useV3Projection({
+    day,
+    settings,
+    actuals,
+    ...(template ? { template } : {}),
+  });
+
   const { drawer, openCreate, openEdit, close, onSave, onDelete } = useDrawer({
     saveEvent,
     deleteOptimistic,
@@ -79,18 +94,22 @@ export function useDayPageState(db: Firestore, childId: string): UseDayPageState
       : {}),
     suppressions: drawerSuppressions,
     saveNewEvent,
-  });
-
-  const template = useMemo<OwnershipTemplate | undefined>(() => {
-    if (!day?.templateId) return undefined;
-    return templates.find((t) => t.id === day.templateId);
-  }, [day, templates]);
-
-  const projected = useV3Projection({
-    day,
-    settings,
-    actuals,
-    ...(template ? { template } : {}),
+    ...(day && settings
+      ? {
+          forecast: {
+            projection: projected,
+            intervalMinutes: forecastIntervalMinutes(settings),
+            projectWithout: (id: string) =>
+              projectDay({
+                day,
+                settings,
+                actuals: actuals.filter((a) => a.id !== id),
+                nowMinutes: currentLocalMinutes(),
+                ...(template ? { template } : {}),
+              }),
+          },
+        }
+      : {}),
   });
 
   return {

@@ -20,22 +20,28 @@ export type UseReconcileActiveDayResult = {
  * On mount, reconciles the active day with today. Promotes from a confirmed
  * TomorrowPlan if one exists, otherwise uses settings defaults. Deterministic
  * day id makes concurrent calls idempotent.
+ *
+ * `defaultWakeTime` is null until the settings doc has loaded, and the
+ * reconcile waits for it: a day created from a placeholder wake time is
+ * a day the household starts at the wrong hour.
  */
 export function useReconcileActiveDay(
   childId: string,
   today: string,
-  defaultWakeTime: TimeMin,
+  defaultWakeTime: TimeMin | null,
 ): UseReconcileActiveDayResult {
   const [done, setDone] = useState(false);
   const [error, setError] = useState<Error | undefined>(undefined);
   // Ref keeps the latest defaultWakeTime available to the effect without adding it
-  // as a dep — settings loading async would otherwise re-fire the reconcile a second time.
+  // as a dep, because a later settings edit would otherwise re-fire the reconcile.
   const wakeTimeRef = useRef(defaultWakeTime);
   useEffect(() => {
     wakeTimeRef.current = defaultWakeTime;
   });
+  const settingsReady = defaultWakeTime !== null;
 
   useEffect(() => {
+    if (!settingsReady) return;
     let cancelled = false;
 
     async function reconcile() {
@@ -56,12 +62,16 @@ export function useReconcileActiveDay(
 
       // Active day is stale or missing; promote from confirmed plan or settings defaults.
       const plan = await loadTomorrowPlan(db, childId, today);
+      // A superseded run (today or childId moved, settings doc deleted, StrictMode
+      // double-mount) must not write; the replacement effect does the rollover.
+      const wakeTime = wakeTimeRef.current;
+      if (cancelled || wakeTime === null) return;
       if (plan?.status === "confirmed") {
-        await promoteFromPlan(db, childId, plan, wakeTimeRef.current);
+        await promoteFromPlan(db, childId, plan, wakeTime);
       } else {
         await startNewDay(db, childId, {
           newDate: today,
-          newWakeTime: wakeTimeRef.current,
+          newWakeTime: wakeTime,
         });
       }
 
@@ -79,7 +89,7 @@ export function useReconcileActiveDay(
     return () => {
       cancelled = true;
     };
-  }, [childId, today]);
+  }, [childId, today, settingsReady]);
 
   return error !== undefined ? { done, error } : { done };
 }

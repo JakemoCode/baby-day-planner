@@ -1,6 +1,6 @@
 /** Amount-conditional bottle interval lookup, consumed by the R5 cascade. */
 
-import type { BottleIntervalRule } from "../schemas";
+import type { BottleIntervalRule, Settings } from "../schemas";
 
 /**
  * Returns the narrowest matching rule's intervalMinutes, or fallbackMinutes
@@ -23,4 +23,21 @@ export function intervalForAmount(
     return aSpan - bSpan;
   });
   return matches[0]!.intervalMinutes;
+}
+
+/**
+ * Spacing between forecast slots: projections carry the default amount. Shared by
+ * the R5 cascade and the R5.14 realize tag so both measure "one interval" alike.
+ */
+export function forecastIntervalMinutes(
+  settings: Pick<
+    Settings,
+    "bottleIntervalRules" | "defaultBottleAmountOz" | "defaultBottleIntervalMinutes"
+  >,
+): number {
+  return intervalForAmount(
+    settings.bottleIntervalRules,
+    settings.defaultBottleAmountOz,
+    settings.defaultBottleIntervalMinutes,
+  );
 }
