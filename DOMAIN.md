@@ -88,6 +88,11 @@ than the nominal interval would have allowed.
 a bottle (sometimes several). This is normal at younger ages
 and tapers off as the baby grows.
 
+A feed logged after the fact stands in for the forecast feed it
+corresponds to: the household is correcting the record, not adding a
+feed. The forecast slot nearest before or at that time, within one
+interval, yields to it.
+
 **The "midnight rule" — bottles belong to the calendar day
 they happen on.** A bottle's day is determined by its clock
 time, not by which wake-to-next-wake window it falls in. A
