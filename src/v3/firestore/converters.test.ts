@@ -26,6 +26,7 @@ describe("v3DayConverter", () => {
       wakeTime: 7 * 60 + 30,
       suppressedRecurringIds: ["dinner"],
       suppressedDaycareDay: false,
+      suppressedNapKeys: [],
       suppressedDreamFeed: false,
       templateId: "tpl-saturday",
     };

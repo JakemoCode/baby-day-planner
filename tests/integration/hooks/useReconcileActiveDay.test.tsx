@@ -50,6 +50,7 @@ const todaysActiveDay: Day = {
   wakeTime: 7 * 60,
   suppressedRecurringIds: [],
   suppressedDaycareDay: false,
+  suppressedNapKeys: [],
 };
 
 const yesterdaysActiveDay: Day = {
@@ -60,6 +61,7 @@ const yesterdaysActiveDay: Day = {
   wakeTime: 7 * 60,
   suppressedRecurringIds: [],
   suppressedDaycareDay: false,
+  suppressedNapKeys: [],
 };
 
 const aPlan = (overrides: Partial<TomorrowPlan> = {}): TomorrowPlan => ({

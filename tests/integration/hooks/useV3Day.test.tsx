@@ -47,6 +47,7 @@ const activeDay: Day = {
   wakeTime: 7 * 60,
   suppressedRecurringIds: [],
   suppressedDaycareDay: false,
+  suppressedNapKeys: [],
 };
 
 describe("useV3Day (emulator-backed)", () => {

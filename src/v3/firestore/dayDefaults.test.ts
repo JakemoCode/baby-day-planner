@@ -20,6 +20,7 @@ describe("withV3DayDefaults", () => {
       suppressedRecurringIds: ["recurring-1"],
       suppressedDaycareDay: true,
       suppressedDreamFeed: false,
+      suppressedNapKeys: ["nap_2"],
       templateId: "tpl-saturday",
     };
     expect(withV3DayDefaults(v3)).toEqual(v3);
@@ -37,6 +38,16 @@ describe("withV3DayDefaults", () => {
       status: "active",
     });
     expect(out!.suppressedRecurringIds).toEqual([]);
+  });
+
+  it("R3.11: a Day written before suppressedNapKeys existed reads as no skipped naps", () => {
+    const out = withV3DayDefaults({
+      id: "d-1",
+      childId: "child-1",
+      date: "2026-05-09",
+      status: "active",
+    });
+    expect(out!.suppressedNapKeys).toEqual([]);
   });
 
   it("fills missing suppressedDaycareDay with false", () => {

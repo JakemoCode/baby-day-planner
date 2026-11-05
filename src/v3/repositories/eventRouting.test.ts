@@ -26,6 +26,7 @@ const aDay = (overrides: Partial<Day>): Day => ({
   wakeTime: 7 * 60,
   suppressedRecurringIds: [],
   suppressedDaycareDay: false,
+  suppressedNapKeys: [],
   suppressedDreamFeed: false,
   ...overrides,
 });

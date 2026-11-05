@@ -11,6 +11,7 @@ const day: Day = {
   wakeTime: 7 * 60,
   suppressedRecurringIds: [],
   suppressedDaycareDay: false,
+  suppressedNapKeys: [],
 };
 
 describe("HistoryDayCard a11y", () => {

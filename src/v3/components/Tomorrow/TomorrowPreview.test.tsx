@@ -23,6 +23,7 @@ const tomorrowDay: Day = {
   wakeTime: 7 * 60,
   suppressedRecurringIds: [],
   suppressedDaycareDay: false,
+  suppressedNapKeys: [],
 };
 
 describe("TomorrowPreview (V3)", () => {

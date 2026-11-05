@@ -1,6 +1,6 @@
 /**
- * V3 Day defensive defaults. Fills `suppressedRecurringIds` (default `[]`)
- * and `suppressedDaycareDay` (default `false`) on read — engine rules crash on
+ * V3 Day defensive defaults. Fills the per-day suppression fields on read
+ * (arrays default `[]`, booleans `false`), because engine rules crash on
  * `.includes`/boolean checks if these are undefined. Applied in
  * `v3DayConverter.fromFirestore` so all read paths receive a fully-shaped Day.
  */
@@ -18,6 +18,7 @@ export function withV3DayDefaults(input: Partial<Day> | null): Day | null {
     suppressedRecurringIds: input.suppressedRecurringIds ?? [],
     suppressedDaycareDay: input.suppressedDaycareDay ?? false,
     suppressedDreamFeed: input.suppressedDreamFeed ?? false,
+    suppressedNapKeys: input.suppressedNapKeys ?? [],
   };
 
   if (input.wakeTime !== undefined) {

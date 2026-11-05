@@ -91,6 +91,7 @@ export default function WelcomePage() {
       suppressedRecurringIds: [],
       suppressedDaycareDay: false,
       suppressedDreamFeed: false,
+      suppressedNapKeys: [],
       ownerOverrides,
     };
   }, [previewSettings, ownerOverrides]);
@@ -142,6 +143,7 @@ export default function WelcomePage() {
         suppressedRecurringIds: [],
         suppressedDaycareDay: false,
         suppressedDreamFeed: false,
+        suppressedNapKeys: [],
         ...(Object.keys(ownerOverrides).length > 0 ? { ownerOverrides } : {}),
       };
 

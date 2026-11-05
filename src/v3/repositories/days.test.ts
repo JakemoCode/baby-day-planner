@@ -5,7 +5,7 @@
 
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import type { RulesTestEnvironment } from "@firebase/rules-unit-testing";
-import type { Firestore } from "firebase/firestore";
+import { doc, setDoc, type Firestore } from "firebase/firestore";
 import {
   ALLOWED_USER,
   seedAllowedUser,
@@ -27,12 +27,16 @@ import {
   startNewDay,
   suppressDaycareForDay,
   suppressDreamFeedForDay,
+  suppressNapForDay,
   suppressRecurringForDay,
+  unsuppressNapForDay,
   updateDay,
   updateDayOwnerOverride,
   watchActiveDay,
 } from "./days";
 import type { TomorrowPlan } from "../schemas";
+import { projectDay } from "../engine/projectDay";
+import { aSettings } from "../__tests__/factories";
 
 const day = (overrides: Partial<Day>): Day => ({
   id: "day-1",
@@ -41,6 +45,7 @@ const day = (overrides: Partial<Day>): Day => ({
   status: "active",
   suppressedRecurringIds: [],
   suppressedDaycareDay: false,
+  suppressedNapKeys: [],
   ...overrides,
 });
 
@@ -209,6 +214,42 @@ describe("v3 days repository", () => {
     await suppressDreamFeedForDay(database, "child-1", "day-1");
     const got = await getDay(database, "child-1", "day-1");
     expect(got?.suppressedDreamFeed).toBe(true);
+  });
+
+  it("R3.11: suppressNapForDay round-trips and the re-read day drops the projected nap", async () => {
+    const database = db();
+    await createDay(database, day({ wakeTime: 7 * 60 }));
+    await suppressNapForDay(database, "child-1", "day-1", "nap_2");
+    const got = await getDay(database, "child-1", "day-1");
+    expect(got?.suppressedNapKeys).toEqual(["nap_2"]);
+    const naps = projectDay({ day: got!, settings: aSettings(), actuals: [] })
+      .filter((e) => e.type === "nap")
+      .map((e) => e.eventKey);
+    expect(naps).not.toContain("nap_2");
+    expect(naps).toContain("nap_3");
+  });
+
+  it("R3.11: suppressNapForDay works on a day written before suppressedNapKeys existed", async () => {
+    const database = db();
+    await setDoc(doc(database, "children/child-1/days/day-1"), {
+      id: "day-1",
+      childId: "child-1",
+      date: "2026-05-09",
+      status: "active",
+      suppressedRecurringIds: [],
+      suppressedDaycareDay: false,
+    });
+    expect((await getDay(database, "child-1", "day-1"))?.suppressedNapKeys).toEqual([]);
+    await suppressNapForDay(database, "child-1", "day-1", "nap_3");
+    expect((await getDay(database, "child-1", "day-1"))?.suppressedNapKeys).toEqual(["nap_3"]);
+  });
+
+  it("R3.11: unsuppressNapForDay restores one skipped nap and keeps the others", async () => {
+    const database = db();
+    await createDay(database, day({ suppressedNapKeys: ["nap_2", "nap_3"] }));
+    await unsuppressNapForDay(database, "child-1", "day-1", "nap_2");
+    const got = await getDay(database, "child-1", "day-1");
+    expect(got?.suppressedNapKeys).toEqual(["nap_3"]);
   });
 
   // Previously minted `day-${date}-${Date.now()}` ids, racing concurrent

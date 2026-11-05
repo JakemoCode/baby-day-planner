@@ -11,6 +11,7 @@ const day = (id: string, date: string): Day => ({
   wakeTime: 7 * 60,
   suppressedRecurringIds: [],
   suppressedDaycareDay: false,
+  suppressedNapKeys: [],
 });
 
 describe("HistoryList (V3)", () => {
