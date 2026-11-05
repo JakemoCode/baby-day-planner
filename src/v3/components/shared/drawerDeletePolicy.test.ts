@@ -49,6 +49,20 @@ describe("hasSuppressionDelete", () => {
   it("is false for a normal rhythm bottle", () => {
     expect(hasSuppressionDelete(ev({ type: "bottle", eventKey: "bottle_1" }))).toBe(false);
   });
+
+  it("R3.11: is true for an engine-emitted nap slot", () => {
+    expect(hasSuppressionDelete(ev({ type: "nap", id: "proj_nap_2", eventKey: "nap_2" }))).toBe(
+      true,
+    );
+  });
+
+  it("R3.11: is false for a recorded nap, which resets instead", () => {
+    expect(
+      hasSuppressionDelete(
+        ev({ type: "nap", id: "recorded_nap_2", eventKey: "nap_2", lifecycle: recorded(750) }),
+      ),
+    ).toBe(false);
+  });
 });
 
 describe("drawerDestructiveAction", () => {
@@ -81,19 +95,33 @@ describe("drawerDestructiveAction", () => {
     ).toBe("none");
   });
 
-  it("is none for an engine-emitted (auto-promoted) nap with no doc", () => {
+  it("R3.11: is delete (skip today) for an auto-promoted nap whose time passed", () => {
     expect(
       drawerDestructiveAction(
         ev({ type: "nap", id: "proj_nap_1", eventKey: "nap_1", lifecycle: recorded(420) }),
         opts,
       ),
-    ).toBe("none");
+    ).toBe("delete");
   });
 
-  it("is none for a plain projected nap (no doc, no suppression)", () => {
+  it("R3.11: is delete (skip today) for a projected nap", () => {
     expect(
       drawerDestructiveAction(
         ev({ type: "nap", id: "proj_nap_1", eventKey: "nap_1", lifecycle: { state: "projected" } }),
+        opts,
+      ),
+    ).toBe("delete");
+  });
+
+  it("is none for a projected bedtime (no doc, no suppression)", () => {
+    expect(
+      drawerDestructiveAction(
+        ev({
+          type: "bedtime",
+          id: "proj_bedtime",
+          eventKey: "bedtime",
+          lifecycle: { state: "projected" },
+        }),
         opts,
       ),
     ).toBe("none");
@@ -252,7 +280,7 @@ describe("canDeleteEvent (visibility wrapper)", () => {
   it("is false when the action is none", () => {
     expect(
       canDeleteEvent(
-        ev({ type: "nap", id: "proj_nap_1", lifecycle: { state: "projected" } }),
+        ev({ type: "bedtime", id: "proj_bedtime", lifecycle: { state: "projected" } }),
         opts,
       ),
     ).toBe(false);

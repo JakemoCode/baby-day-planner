@@ -6,6 +6,7 @@ import {
   isDreamFeed,
   isEngineEmittedId,
   isRecordedBottleId,
+  isSkippableNap,
   recordedIdFor,
 } from "../../lib/eventConventions";
 
@@ -15,7 +16,8 @@ export function hasSuppressionDelete(event: Event): boolean {
     event.type === "daily_recurring" ||
     event.type === "daycare_dropoff" ||
     event.type === "daycare_pickup" ||
-    (event.type === "bottle" && isDreamFeed(event))
+    (event.type === "bottle" && isDreamFeed(event)) ||
+    isSkippableNap(event)
   );
 }
 
@@ -26,11 +28,11 @@ export function hasSuppressionDelete(event: Event): boolean {
  *   projection. Deleting its `recorded_*` doc lets the engine re-project the
  *   slot, so the user isn't *deleting* anything — they're undoing an anchor.
  * - `"delete"` — a real doc the user genuinely wants gone: a FAB-created
- *   one-off (uuid id), pump, extra, bedtime, or a suppression-type skip.
+ *   one-off (uuid id), pump, extra, bedtime, or a suppression-type skip
+ *   (including a doc-less nap slot, R3.11).
  * - `"none"` — nothing to act on: create mode, no handler, or an
- *   engine-emitted (`proj_*`) event that has no Firestore doc at all
- *   (auto-promoted naps/bottles/bedtime AND wake_windows — §F70: a no-op
- *   button must not appear).
+ *   engine-emitted (`proj_*`) event that has no Firestore doc and no
+ *   suppression (bottles, bedtime, wake_windows: a no-op button must not appear).
  */
 export type DrawerDestructiveAction = "delete" | "reset" | "none";
 

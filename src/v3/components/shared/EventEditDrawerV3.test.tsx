@@ -895,8 +895,7 @@ describe("EventEditDrawerV3", () => {
     expect(screen.getByRole("button", { name: "Delete" })).toBeVisible();
   });
 
-  it("delete button is HIDDEN for an auto-promoted nap (proj_ id + recorded lifecycle)", () => {
-    // Auto-promoted nap has no Firestore doc; engine re-emits it next pass so Delete is a visual no-op.
+  it("R3.11: an auto-promoted nap (proj_ id, time passed) offers Skip today, not Delete", () => {
     render(
       <EventEditDrawerV3
         open
@@ -914,7 +913,32 @@ describe("EventEditDrawerV3", () => {
         onDelete={() => {}}
       />,
     );
+    expect(screen.getByRole("button", { name: "Skip today" })).toBeVisible();
     expect(screen.queryByRole("button", { name: "Delete" })).toBeNull();
+  });
+
+  it("R3.11: Skip today on a projected nap confirms, then routes the nap through onDelete", async () => {
+    const onDelete = vi.fn();
+    render(
+      <EventEditDrawerV3
+        open
+        mode="edit"
+        event={projectedNap({ id: "proj_nap_2", eventKey: "nap_2", label: "Nap 2" })}
+        owners={owners}
+        nowMinutes={NOW}
+        bedtimeThreshold={THRESHOLD}
+        defaultWakeTime={DEFAULT_WAKE_TIME}
+        onSave={() => {}}
+        onCancel={() => {}}
+        onDelete={onDelete}
+      />,
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Skip today" }));
+    const dialog = screen.getByRole("dialog", { name: "Skip Nap 2 today?" });
+    expect(within(dialog).getByText(/carries on from the last sleep/i)).toBeVisible();
+    await userEvent.click(within(dialog).getByRole("button", { name: "Skip today" }));
+    expect(onDelete).toHaveBeenCalledTimes(1);
+    expect(onDelete.mock.calls[0]![0]).toMatchObject({ id: "proj_nap_2", eventKey: "nap_2" });
   });
 
   it("delete button is shown for a PROJECTED daily_recurring event", () => {
