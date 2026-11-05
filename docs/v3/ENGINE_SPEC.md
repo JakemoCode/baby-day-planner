@@ -218,6 +218,31 @@ duration falls outside `[settings.napDurationMin, napDurationMax]`
   nap from picking the wrong AM/PM, without prescribing what a "real"
   nap looks like for any given child.
 
+### R3.11 A skipped nap slot emits no nap; its wake window runs on to the next sleep
+
+`Day.suppressedNapKeys: string[]` lists the nap slots (`nap_N`) the
+household skipped today via the drawer's "Skip today". For a skipped
+slot with no recorded nap, the cascade emits no nap and no separate
+wake window. `wake_window_N` starts at the previous sleep's end and
+runs until the next sleep the cascade emits: the next nap, or bedtime.
+
+- Later slots keep the times they would have had. The skipped nap's
+  span still advances the cascade's clock, so `nap_{N+1}` and bedtime
+  do not slide earlier into the hole. A missed nap did not move
+  (DOMAIN.md §3), so the next nap does not take its place.
+- A recorded nap in a skipped slot wins (R3.3, reality wins). A
+  recorded nap in a later slot clamps against the real previous
+  sleep's end (R3.6), not the skipped slot's projected end.
+- The terminator check (R3.1, R7.5) runs first. A slot that would
+  become bedtime is bedtime, and skipping it does nothing.
+- Resets on the next day's fresh Day doc. Missing on older docs reads
+  as `[]`.
+- **Why**: daycare days often drop the second nap. Before this rule
+  the only way to make the forecast stop showing it was to record
+  something else over the slot.
+- **Edge case it prevents**: skipping Nap 2 and seeing Nap 3 jump into
+  Nap 2's old time, which reads as if the skip did nothing.
+
 ---
 
 ## §4 Wake Windows
