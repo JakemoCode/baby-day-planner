@@ -464,7 +464,7 @@ tag, and a tag there would absorb the slot before it as well.
 > **R5.12 retired.** The bottle count cap (EDGE_CASES EC-B10b) went
 > with `bottlesPerDay` (R5.8). The number is not reused.
 
-> **R5.13 — Deleted.** The "confirm if recorded too soon" engine flag is
+> **R5.13 deleted.** The "confirm if recorded too soon" engine flag is
 > fully removed. Predict-don't-prescribe: the drawer's existing 15-min
 > accidental-duplicate guard (UX layer) is the only protection needed
 > at record-time. Smaller bottles legitimately produce shorter intervals

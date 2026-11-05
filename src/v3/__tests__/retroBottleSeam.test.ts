@@ -62,53 +62,45 @@ async function logBottleAt(startTime: number): Promise<Event[]> {
   );
 }
 
-async function createBottle(startTime: number): Promise<Event> {
-  const settings = ctxWith([]).settings;
-  const saveNewEvent = vi.fn().mockResolvedValue(undefined);
-  const { result } = renderHook(() =>
-    useDrawer({
-      saveEvent: vi.fn(),
-      deleteOptimistic: vi.fn(),
-      saveNewEvent,
-      forecast: { projection: project([]), intervalMinutes: forecastIntervalMinutes(settings) },
-    }),
-  );
-  const template = fabTemplate();
-  act(() => result.current.openCreate(template));
-  await act(async () => {
-    await result.current.onSave({
-      ...template,
-      startTime,
-      lifecycle: { state: "completed", committedAt: NOW },
-    });
-  });
-  return saveNewEvent.mock.calls[0]![0] as Event;
+function createBottle(startTime: number): Promise<Event> {
+  return saveViaDrawer([], "create", fabTemplate(), startTime);
 }
 
-/** Opens the drawer on `target` over the current projection and saves it at `startTime`. */
-async function editBottle(actuals: Event[], target: Event, startTime: number): Promise<Event> {
-  const settings = ctxWith([]).settings;
-  const saveEvent = vi.fn().mockResolvedValue(undefined);
+function editBottle(actuals: Event[], target: Event, startTime: number): Promise<Event> {
+  return saveViaDrawer(actuals, "edit", target, startTime);
+}
+
+/** Opens the real drawer on `source` over the projection of `actuals`, saves it at `startTime`, and returns the doc written. */
+async function saveViaDrawer(
+  actuals: Event[],
+  mode: "create" | "edit",
+  source: Event,
+  startTime: number,
+): Promise<Event> {
+  const save = vi.fn().mockResolvedValue(undefined);
   const { result } = renderHook(() =>
     useDrawer({
-      saveEvent,
+      saveEvent: save,
+      saveNewEvent: save,
       deleteOptimistic: vi.fn(),
       forecast: {
         projection: project(actuals),
-        intervalMinutes: forecastIntervalMinutes(settings),
+        intervalMinutes: forecastIntervalMinutes(ctxWith([]).settings),
         projectWithout: (id) => project(actuals.filter((a) => a.id !== id)),
       },
     }),
   );
-  act(() => result.current.openEdit(target));
+  act(() =>
+    mode === "create" ? result.current.openCreate(source) : result.current.openEdit(source),
+  );
   await act(async () => {
     await result.current.onSave({
-      ...target,
+      ...source,
       startTime,
       lifecycle: { state: "completed", committedAt: NOW },
     });
   });
-  return saveEvent.mock.calls[0]![0] as Event;
+  return save.mock.calls[0]![0] as Event;
 }
 
 function slotAt(actuals: Event[], startTime: number): Event {
