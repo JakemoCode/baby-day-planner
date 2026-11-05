@@ -333,10 +333,13 @@ describe("useDrawer", () => {
     });
 
     act(() => result.current.openEdit(recordedSlot));
-    await act(async () => {
-      await result.current.onSave({ ...recordedSlot, startTime: 10 * 60 + 40 });
-    });
-    vi.useRealTimers();
+    try {
+      await act(async () => {
+        await result.current.onSave({ ...recordedSlot, startTime: 10 * 60 + 40 });
+      });
+    } finally {
+      vi.useRealTimers();
+    }
 
     expect(projectWithout).toHaveBeenCalledWith("recorded_bottle_t600");
     expect(saveEvent).toHaveBeenCalledWith(

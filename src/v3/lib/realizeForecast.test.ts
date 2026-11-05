@@ -108,7 +108,7 @@ describe("R5.14 withRealizeTag: moving a slot", () => {
 
   it("a projected bottle moved earlier is not tagged (a tag would absorb 13:15 too)", () => {
     const slot = bottle("proj_bottle_t975", 16 * 60 + 15, { lifecycle: { state: "projected" } });
-    expect(edit(slot, 16 * 60).realizedForecast).toBeUndefined();
+    expect(edit(slot, 16 * 60).realizedForecast).toBe(false);
   });
 
   it("an amount-only edit of a recorded slot doc keeps its tag", () => {
@@ -145,7 +145,7 @@ describe("R5.14 withRealizeTag: moving a slot", () => {
 
   it("a FAB bottle doc moved to 09:00 drops its tag: 10:10 is the nearer slot, after it", () => {
     const doc = bottle("bottle_abc", 14 * 60 + 5, { realizedForecast: true });
-    expect("realizedForecast" in editRecorded(doc, 9 * 60, PROJECTION)).toBe(false);
+    expect(editRecorded(doc, 9 * 60, PROJECTION).realizedForecast).toBe(false);
   });
 
   it("an untagged past FAB bottle doc moved just after a slot realizes it", () => {
@@ -155,7 +155,7 @@ describe("R5.14 withRealizeTag: moving a slot", () => {
 
   it("a FAB bottle doc moved into the future drops its tag: a future FAB bottle is an extra", () => {
     const doc = bottle("bottle_abc", 14 * 60 + 5, { realizedForecast: true });
-    expect("realizedForecast" in editRecorded(doc, 18 * 60, PROJECTION)).toBe(false);
+    expect(editRecorded(doc, 18 * 60, PROJECTION).realizedForecast).toBe(false);
   });
 
   it("a realized forecast doc moved later than its slot stays tagged", () => {
@@ -165,17 +165,17 @@ describe("R5.14 withRealizeTag: moving a slot", () => {
 
   it("a realized forecast doc moved to just before the next slot drops its tag", () => {
     const doc = bottle("recorded_bottle_t845", 14 * 60 + 5, { realizedForecast: true });
-    expect("realizedForecast" in editRecorded(doc, 13 * 60, PROJECTION)).toBe(false);
+    expect(editRecorded(doc, 13 * 60, PROJECTION).realizedForecast).toBe(false);
   });
 
   // Its id names the time it was first saved (16:00), not the 16:15 slot it took.
   it("a forecast first saved at 16:00, moved to 16:10, is untagged: 16:15 is nearer", () => {
     const doc = bottle("recorded_bottle_t960", 16 * 60);
-    expect("realizedForecast" in editRecorded(doc, 16 * 60 + 10, PROJECTION)).toBe(false);
+    expect(editRecorded(doc, 16 * 60 + 10, PROJECTION).realizedForecast).toBe(false);
   });
 
   it("without the projection minus the doc, a moved FAB bottle drops its tag", () => {
     const doc = bottle("bottle_abc", 14 * 60 + 5, { realizedForecast: true });
-    expect("realizedForecast" in editRecorded(doc, 14 * 60 + 20)).toBe(false);
+    expect(editRecorded(doc, 14 * 60 + 20).realizedForecast).toBe(false);
   });
 });

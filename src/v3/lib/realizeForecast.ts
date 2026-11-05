@@ -46,10 +46,10 @@ export function withRealizeTag(input: RealizeTagInput): Event {
     : untagged(saved);
 }
 
+// Explicit false, not a deleted key: saveEvent updates an existing doc with a merge
+// (updateDoc and the optimistic spread), so an absent key would keep a stored `true`.
 function untagged(event: Event): Event {
-  const out = { ...event };
-  delete out.realizedForecast;
-  return out;
+  return { ...event, realizedForecast: false };
 }
 
 /**

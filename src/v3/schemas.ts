@@ -139,7 +139,8 @@ export type Event = {
    * bottle only. `true` ⇒ this recorded bottle stands in for the forecast slot just
    * before it, so the cascade absorbs that slot instead of re-emitting it beside the
    * feed (ENGINE_SPEC §R5.14). Set by useDrawer for a forecast moved later and for a
-   * bottle logged after the fact; absent on a future FAB-added extra.
+   * bottle logged after the fact; absent on a future FAB-added extra. A drawer edit
+   * that drops it writes `false`, since an update merges and would keep a stored `true`.
    */
   realizedForecast?: boolean;
   /** pump only. Per-side recorded output in ounces; session total = left + right. */
