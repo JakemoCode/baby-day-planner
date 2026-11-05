@@ -15,7 +15,12 @@ import {
   recordedLifecycle,
 } from "../../lifecycle";
 import { isRenderSynthetic } from "../../lib/syntheticEvents";
-import { isDreamFeed, isEngineEmittedId, recordedIdFor } from "../../lib/eventConventions";
+import {
+  isDreamFeed,
+  isEngineEmittedId,
+  isSkippableNap,
+  recordedIdFor,
+} from "../../lib/eventConventions";
 import { formatHM24, formatTimeForDisplay, nextDayAt, parseHM24 } from "../../ui/time";
 import { OwnerPickerV3 } from "./OwnerPickerV3";
 import { formToEvent, type FormState } from "./formToEvent";
@@ -231,6 +236,13 @@ function confirmCopyFor(action: DrawerDestructiveAction, event: Event) {
       confirmLabel: "Skip today",
     };
   }
+  if (isSkippableNap(event)) {
+    return {
+      title: `Skip ${event.label} today?`,
+      body: "The day carries on from the last sleep. Restore it under Skipped today.",
+      confirmLabel: "Skip today",
+    };
+  }
   return {
     title: `Delete this ${event.type === "extra" ? "event" : event.type.replace("_", " ")}?`,
     body: "This cannot be undone.",
@@ -294,8 +306,10 @@ export function EventEditDrawerV3({
   const showDestructive = destructiveAction !== "none";
   // "Reset" reverts a recorded rhythm slot to the cascade projection (§F71); it routes
   // through the same onDelete path (delete the doc → engine re-projects the slot).
-  const destructiveLabel = destructiveAction === "reset" ? "Reset" : "Delete";
   const confirmCopy = confirmCopyFor(destructiveAction, sourceEvent);
+  let destructiveLabel = "Delete";
+  if (destructiveAction === "reset") destructiveLabel = "Reset";
+  else if (isSkippableNap(sourceEvent)) destructiveLabel = "Skip today";
 
   const schema = DRAWER_FIELD_SCHEMA[type];
   const showVolumes = schema

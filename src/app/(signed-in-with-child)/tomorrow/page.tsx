@@ -105,6 +105,7 @@ function TomorrowPageInner({
       suppressedRecurringIds: [],
       suppressedDaycareDay: false,
       suppressedDreamFeed: false,
+      suppressedNapKeys: [],
     };
     if (planState.templateId) day.templateId = planState.templateId;
     // Preview Day must carry ownerOverrides so the engine applies them when projecting.

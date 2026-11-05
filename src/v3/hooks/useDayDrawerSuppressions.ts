@@ -11,12 +11,14 @@ import type { DrawerSuppression } from "./useDrawer";
 import {
   suppressDaycareForDay,
   suppressDreamFeedForDay,
+  suppressNapForDay,
   suppressRecurringForDay,
 } from "../repositories/days";
 import {
   DAYCARE_DROPOFF_EVENT_KEY,
   DAYCARE_PICKUP_EVENT_KEY,
   DREAM_FEED_EVENT_KEY,
+  isSkippableNap,
   recurringIdFromEventKey,
 } from "../lib/eventConventions";
 
@@ -39,6 +41,10 @@ export function useDayDrawerSuppressions(
     {
       matches: (e) => e.type === "bottle" && e.eventKey === DREAM_FEED_EVENT_KEY,
       apply: () => suppressDreamFeedForDay(db, childId, dayId),
+    },
+    {
+      matches: isSkippableNap,
+      apply: (e) => suppressNapForDay(db, childId, dayId, e.eventKey),
     },
   ];
 }

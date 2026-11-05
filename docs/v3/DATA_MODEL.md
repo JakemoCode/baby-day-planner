@@ -277,6 +277,19 @@ A bedtime event at `19:00` with endTime `"30:00"` displays as part of
 today's timeline. The next day starts when "Start New Day" is tapped
 (typically next morning).
 
+### R14.7 Per-day suppressions live on the Day doc and reset each day
+
+"Skip today" writes to the Day doc, never to an event or a template, so
+tomorrow's fresh Day starts clean. `withV3DayDefaults` reads a missing
+field as its default.
+
+| Field | Default | Skips | Rule |
+|---|---|---|---|
+| `suppressedRecurringIds: string[]` | `[]` | one recurring template's event | ENGINE_SPEC R11.6 |
+| `suppressedDaycareDay: boolean` | `false` | daycare dropoff and pickup | ENGINE_SPEC R21.5 |
+| `suppressedDreamFeed: boolean` | `false` | the dream feed | DOMAIN.md §5 |
+| `suppressedNapKeys: string[]` | `[]` | a projected nap slot (`nap_N`) | ENGINE_SPEC R3.11 |
+
 ---
 
 ## §19 Settings

@@ -12,6 +12,7 @@ const days: Day[] = [
     wakeTime: 7 * 60,
     suppressedRecurringIds: [],
     suppressedDaycareDay: false,
+    suppressedNapKeys: [],
   },
   {
     id: "d2",
@@ -21,6 +22,7 @@ const days: Day[] = [
     wakeTime: 7 * 60,
     suppressedRecurringIds: [],
     suppressedDaycareDay: false,
+    suppressedNapKeys: [],
   },
 ];
 

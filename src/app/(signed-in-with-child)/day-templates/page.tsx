@@ -59,6 +59,7 @@ export default function DayTemplatesPage() {
       suppressedRecurringIds: [],
       suppressedDaycareDay: false,
       suppressedDreamFeed: false,
+      suppressedNapKeys: [],
     }),
     [settings?.defaultWakeTime],
   );

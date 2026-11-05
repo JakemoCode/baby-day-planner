@@ -4,6 +4,11 @@
   padding: 0 var(--space-4) var(--space-4);
 }
 
+/* Wraps the "Skipped today" restore row (R3.11) between the wake card and the timeline. */
+.skippedContainer {
+  margin-top: var(--space-3);
+}
+
 /* Wraps the EditableWakeTime card above the timeline. */
 .wakeTimeContainer {
   margin-top: 14px;

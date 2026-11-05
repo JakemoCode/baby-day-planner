@@ -7,6 +7,11 @@ export function isEngineEmittedId(id: string): boolean {
   return id.startsWith(ENGINE_PROJECTED_ID_PREFIX);
 }
 
+/** A nap slot with no doc behind it (projected or auto-promoted); R3.11 lets it be skipped for the day. */
+export function isSkippableNap(e: { type: string; id: string }): boolean {
+  return e.type === "nap" && isEngineEmittedId(e.id);
+}
+
 /** Dream-feed sentinel: type "bottle" but skipped by the cascade (fixed post-bedtime slot, not an anchor). */
 export const DREAM_FEED_EVENT_KEY = "bottle_dream";
 

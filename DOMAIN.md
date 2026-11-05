@@ -160,6 +160,12 @@ trajectory. A nap that lands at or after the bedtime
 threshold IS bedtime — there's no separate event type from
 the baby's perspective; it's just the last sleep of the day.
 
+**Naps get missed.** Daycare is the usual reason: the room is
+loud, the schedule slips, or he fights it and the second nap
+never happens. A missed nap is not a nap that moved; it is a nap
+that did not occur, and the cascade carries on from whenever he
+next actually sleeps.
+
 **Overnight wake-ups are normal interruptions, not new naps.**
 A baby waking during the bedtime block (e.g., crying for a
 bottle at 2 AM, then going back to sleep) is part of normal

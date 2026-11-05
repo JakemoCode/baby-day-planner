@@ -175,6 +175,8 @@ export type Day = {
   suppressedDaycareDay: boolean;
   /** Per-day dream-feed opt-out. R5.5 skips emission when true. */
   suppressedDreamFeed?: boolean;
+  /** Per-day skipped nap slots (`nap_N`). R3.11 drops the projected nap. */
+  suppressedNapKeys: string[];
   /** Optional template id selected for this day. */
   templateId?: string;
   /**

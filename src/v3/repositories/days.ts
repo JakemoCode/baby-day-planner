@@ -4,6 +4,7 @@
  */
 
 import {
+  arrayRemove,
   arrayUnion,
   collection,
   doc,
@@ -74,6 +75,7 @@ export async function getOrCreatePlannedDay(
     suppressedRecurringIds: [],
     suppressedDaycareDay: false,
     suppressedDreamFeed: false,
+    suppressedNapKeys: [],
   };
   await setDoc(dayRef(db, childId, newDay.id), newDay);
   return newDay;
@@ -121,6 +123,30 @@ export async function suppressRecurringForDay(
 ): Promise<void> {
   await updateDoc(dayRef(db, childId, dayId), {
     suppressedRecurringIds: arrayUnion(recurringId),
+  });
+}
+
+/** Skip a projected nap slot (`nap_N`) for today only (R3.11). arrayUnion keeps repeats safe. */
+export async function suppressNapForDay(
+  db: Firestore,
+  childId: string,
+  dayId: string,
+  napKey: string,
+): Promise<void> {
+  await updateDoc(dayRef(db, childId, dayId), {
+    suppressedNapKeys: arrayUnion(napKey),
+  });
+}
+
+/** Undo a "Skip today" on a nap slot (R3.11). */
+export async function unsuppressNapForDay(
+  db: Firestore,
+  childId: string,
+  dayId: string,
+  napKey: string,
+): Promise<void> {
+  await updateDoc(dayRef(db, childId, dayId), {
+    suppressedNapKeys: arrayRemove(napKey),
   });
 }
 
@@ -328,6 +354,7 @@ export async function startNewDay(
       suppressedRecurringIds: [],
       suppressedDaycareDay: false,
       suppressedDreamFeed: false,
+      suppressedNapKeys: [],
       ...(input.templateId !== undefined ? { templateId: input.templateId } : {}),
       ...(input.ownerOverrides !== undefined ? { ownerOverrides: input.ownerOverrides } : {}),
     };
