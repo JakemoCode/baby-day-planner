@@ -682,6 +682,120 @@ describe("EventEditDrawerV3", () => {
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
+  it("treats a recorded copy of its own eventKey as itself, not as an overlapping neighbour", () => {
+    const source = projectedNap({
+      id: "proj_nap_2",
+      eventKey: "nap_2",
+      label: "Nap 2",
+      startTime: 7 * 60 + 20,
+      endTime: 8 * 60,
+    });
+    const savedCopy: Event = {
+      ...source,
+      id: "recorded_nap_2",
+      lifecycle: { state: "recorded", annotatedAt: 8 * 60 },
+    };
+    render(
+      <EventEditDrawerV3
+        open
+        mode="edit"
+        event={source}
+        owners={owners}
+        nowMinutes={NOW}
+        bedtimeThreshold={THRESHOLD}
+        defaultWakeTime={DEFAULT_WAKE_TIME}
+        existingEvents={[savedCopy]}
+        onSave={() => {}}
+        onCancel={() => {}}
+      />,
+    );
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(screen.getByRole("button", { name: "Save" })).toBeEnabled();
+  });
+
+  it("still flags a different recorded bottle that shares the edited bottle's eventKey", () => {
+    const source = projectedBottle({
+      id: "bottle-a",
+      eventKey: "bottle_2",
+      label: "Bottle 2",
+      startTime: 8 * 60,
+      lifecycle: { state: "recorded", annotatedAt: 8 * 60 },
+    });
+    const duplicateFromOtherClient = recordedBottleNeighbor({
+      id: "bottle-b",
+      eventKey: "bottle_2",
+      label: "Bottle 3",
+      startTime: 8 * 60 + 3,
+    });
+    render(
+      <EventEditDrawerV3
+        open
+        mode="edit"
+        event={source}
+        owners={owners}
+        nowMinutes={NOW}
+        bedtimeThreshold={THRESHOLD}
+        defaultWakeTime={DEFAULT_WAKE_TIME}
+        existingEvents={[duplicateFromOtherClient]}
+        onSave={() => {}}
+        onCancel={() => {}}
+      />,
+    );
+    expect(screen.getByRole("alert")).toHaveTextContent(/Within 10 min of Bottle 3/);
+  });
+
+  it("shows no validation and locks the form while a save is in flight", async () => {
+    let finishSave: () => void = () => {};
+    const onSave = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          finishSave = resolve;
+        }),
+    );
+    const source = projectedNap({
+      id: "proj_nap_2",
+      eventKey: "nap_2",
+      label: "Nap 2",
+      startTime: 7 * 60 + 20,
+      endTime: 8 * 60,
+    });
+    const drawer = (existing: Event[]) => (
+      <EventEditDrawerV3
+        open
+        mode="edit"
+        event={source}
+        owners={owners}
+        nowMinutes={NOW}
+        bedtimeThreshold={THRESHOLD}
+        defaultWakeTime={DEFAULT_WAKE_TIME}
+        existingEvents={existing}
+        onSave={onSave}
+        onDelete={() => {}}
+        onCancel={() => {}}
+      />
+    );
+    const { rerender } = render(drawer([source]));
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+    expect(onSave).toHaveBeenCalledTimes(1);
+
+    const unrelatedRecordedCopy: Event = {
+      ...source,
+      id: "nap-other",
+      eventKey: "nap_9",
+      label: "Nap 9",
+      lifecycle: { state: "recorded", annotatedAt: 8 * 60 },
+    };
+    rerender(drawer([unrelatedRecordedCopy]));
+
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(screen.getByRole("button", { name: /Sav/ })).toBeDisabled();
+    expect(screen.getByLabelText("Start time")).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Skip today" })).toBeDisabled();
+
+    finishSave();
+    await screen.findByRole("button", { name: "Save" });
+  });
+
   it("calls onCancel on Cancel + Escape", async () => {
     const onCancel = vi.fn();
     render(

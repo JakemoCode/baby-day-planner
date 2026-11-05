@@ -72,7 +72,7 @@ export type EventEditDrawerV3Props = {
   onDelete?: (event: Event) => void | Promise<void>;
   /**
    * Other events on the same day, used for overlap validation. Excludes
-   * the event being edited via id match. Only RECORDED neighbours flag
+   * the event being edited (see isSelf). Only RECORDED neighbours flag
    * an overlap — projected ones get freely recalculated by the engine.
    */
   existingEvents?: Event[];
@@ -91,15 +91,27 @@ function clockGapMin(a: TimeMin, b: TimeMin): number {
   return Math.min(raw, MINUTES_PER_DAY - raw);
 }
 
+/** The event being edited, under any id. Saving a projected event writes it under a recorded id
+ * and the optimistic projection shows that copy before the drawer closes; the eventKey is the
+ * identity that survives the re-id. Only an engine-emitted source gets re-id'd, and recorded
+ * bottle eventKeys are not unique (R5.4), so a persisted source matches by id alone. */
+type EditingIdentity = Pick<Event, "id" | "eventKey">;
+
+const isSelf = (e: Event, editing: EditingIdentity | undefined): boolean => {
+  if (editing === undefined) return false;
+  if (e.id === editing.id) return true;
+  return isEngineEmittedId(editing.id) && e.eventKey === editing.eventKey;
+};
+
 function findIntervalOverlap(
   type: EventType,
   startTime: TimeMin,
   endTime: TimeMin,
-  editingId: string | undefined,
+  editing: EditingIdentity | undefined,
   existingEvents: Event[],
 ): Event | undefined {
   return existingEvents.find((e) => {
-    if (e.id === editingId) return false;
+    if (isSelf(e, editing)) return false;
     if (e.type !== type) return false;
     // Putdown synthetics share type "nap" for geometry but aren't real naps; skip.
     if (isRenderSynthetic(e)) return false;
@@ -113,7 +125,7 @@ function validateForm(
   type: EventType,
   startTime: TimeMin | undefined,
   endTime: TimeMin | undefined,
-  editingId: string | undefined,
+  editing: EditingIdentity | undefined,
   existingEvents: Event[] | undefined,
   dayWakeTime: TimeMin | undefined,
 ): FormErrors {
@@ -146,7 +158,7 @@ function validateForm(
     startTime !== undefined &&
     existingEvents
   ) {
-    const overlap = findIntervalOverlap(type, startTime, endTime, editingId, existingEvents);
+    const overlap = findIntervalOverlap(type, startTime, endTime, editing, existingEvents);
     if (overlap && overlap.endTime !== undefined) {
       const startStr = formatTimeForDisplay(overlap.startTime);
       const endStr = formatTimeForDisplay(overlap.endTime);
@@ -157,7 +169,7 @@ function validateForm(
   // bottle is a past forecast slot auto-promoted in the projection, not a logged feed (R5.14).
   if (!errors.startTime && type === "bottle" && startTime !== undefined && existingEvents) {
     const tooClose = existingEvents.find((e) => {
-      if (e.id === editingId) return false;
+      if (isSelf(e, editing)) return false;
       if (e.type !== "bottle") return false;
       if (isRenderSynthetic(e)) return false;
       if (isEngineEmittedId(e.id)) return false;
@@ -272,6 +284,9 @@ export function EventEditDrawerV3({
   const [pendingPastThresholdNap, setPendingPastThresholdNap] = useState<Event | null>(null);
   // True while the End-now short-nap confirm is open (fires on button press, not Save).
   const [shortNapConfirmOpen, setShortNapConfirmOpen] = useState(false);
+  // True from Save until the write settles. The optimistic projection changes under the open
+  // drawer during that window, so the form locks and validation stays quiet.
+  const [saving, setSaving] = useState(false);
   const titleId = useId();
   const startTimeId = useId();
   const endTimeId = useId();
@@ -335,14 +350,25 @@ export function EventEditDrawerV3({
   const isLogNowBedtime = isFocusBedtime(sourceEvent, siblings, nowMinutes);
   const showLogNow = mode === "edit" && (isLogNowBottle || isLogNowBedtime);
 
-  const errors = validateForm(
+  const liveErrors = validateForm(
     type,
     form.startTime,
     form.endTime,
-    sourceEvent.id,
+    sourceEvent,
     existingEvents,
     dayWakeTime,
   );
+  const errors: FormErrors = saving ? {} : liveErrors;
+  const locked = futureProjected || saving;
+
+  const submit = async (next: Event) => {
+    setSaving(true);
+    try {
+      await onSave(next);
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const applyStartTime = (next: TimeMin | undefined) => {
     // Naps and pumps preserve duration on startTime nudge. Extras don't auto-fill endTime.
@@ -379,7 +405,7 @@ export function EventEditDrawerV3({
   };
 
   const handleSave = () => {
-    if (hasErrors(errors)) return;
+    if (saving || hasErrors(errors)) return;
     if (form.startTime === undefined) return;
     const formForTransform: FormState = {
       startTime: form.startTime,
@@ -414,7 +440,7 @@ export function EventEditDrawerV3({
       return;
     }
 
-    void onSave(next);
+    void submit(next);
   };
 
   const handleConfirmChangeToBedtime = async () => {
@@ -437,17 +463,22 @@ export function EventEditDrawerV3({
       lifecycle: recordedLifecycle(nowMinutes),
     };
     // Delete original first to avoid a brief dual-chip state.
-    if (isRecorded(sourceEvent.lifecycle) && onDelete) {
-      await onDelete(sourceEvent);
+    setSaving(true);
+    try {
+      if (isRecorded(sourceEvent.lifecycle) && onDelete) {
+        await onDelete(sourceEvent);
+      }
+      await onSave(bedtimeBase);
+    } finally {
+      setSaving(false);
     }
-    await onSave(bedtimeBase);
   };
 
   const handleKeepAsNap = () => {
     if (!pendingPastThresholdNap) return;
     const napCandidate = pendingPastThresholdNap;
     setPendingPastThresholdNap(null);
-    void onSave(napCandidate);
+    void submit(napCandidate);
   };
 
   const handleDismissPrompt = () => {
@@ -468,7 +499,7 @@ export function EventEditDrawerV3({
           type="text"
           className={styles.input}
           value={form.label}
-          disabled={futureProjected}
+          disabled={locked}
           onChange={(e) => setForm((prev) => ({ ...prev, label: e.target.value }))}
           placeholder="Pediatrician, library trip…"
         />
@@ -487,13 +518,14 @@ export function EventEditDrawerV3({
             value={timeInputValue(form.startTime)}
             onChange={(e) => handleStartTimeChange(e.target.value)}
             required
-            disabled={futureProjected}
+            disabled={locked}
             {...(errors.startTime ? { "aria-invalid": true } : {})}
           />
           {(showStartNow || showLogNow) && (
             <button
               type="button"
               className={`${styles.nowButton} ${styles.nowStart}`}
+              disabled={saving}
               onClick={handleStartNow}
             >
               {showStartNow ? "Start now" : "Log now"}
@@ -519,13 +551,14 @@ export function EventEditDrawerV3({
             className={styles.input}
             value={timeInputValue(form.endTime)}
             onChange={(e) => setForm((prev) => ({ ...prev, endTime: parseHM24(e.target.value) }))}
-            disabled={futureProjected}
+            disabled={locked}
             {...(errors.endTime ? { "aria-invalid": true } : {})}
           />
           {showEndNow && (
             <button
               type="button"
               className={`${styles.nowButton} ${styles.nowEnd}`}
+              disabled={saving}
               onClick={handleEndNow}
             >
               End now
@@ -548,7 +581,7 @@ export function EventEditDrawerV3({
           min="0"
           className={styles.input}
           value={form.amountOz ?? ""}
-          disabled={futureProjected}
+          disabled={locked}
           onChange={(e) => {
             const raw = e.target.value;
             setForm((prev) => ({
@@ -571,7 +604,7 @@ export function EventEditDrawerV3({
               min="0"
               className={styles.input}
               value={form.pumpLeftOz}
-              disabled={futureProjected}
+              disabled={locked}
               onChange={(e) =>
                 setForm((prev) => ({ ...prev, pumpLeftOz: Number(e.target.value) || 0 }))
               }
@@ -585,7 +618,7 @@ export function EventEditDrawerV3({
               min="0"
               className={styles.input}
               value={form.pumpRightOz}
-              disabled={futureProjected}
+              disabled={locked}
               onChange={(e) =>
                 setForm((prev) => ({ ...prev, pumpRightOz: Number(e.target.value) || 0 }))
               }
@@ -645,7 +678,12 @@ export function EventEditDrawerV3({
 
         <div className={styles.actions}>
           {showDestructive && (
-            <button type="button" className={styles.delete} onClick={() => setConfirmOpen(true)}>
+            <button
+              type="button"
+              className={styles.delete}
+              disabled={saving}
+              onClick={() => setConfirmOpen(true)}
+            >
               {destructiveLabel}
             </button>
           )}
@@ -655,10 +693,10 @@ export function EventEditDrawerV3({
           <button
             type="button"
             className={styles.save}
-            disabled={hasErrors(errors) || form.startTime === undefined}
+            disabled={saving || hasErrors(errors) || form.startTime === undefined}
             onClick={handleSave}
           >
-            Save
+            {saving ? "Saving…" : "Save"}
           </button>
         </div>
       </div>
