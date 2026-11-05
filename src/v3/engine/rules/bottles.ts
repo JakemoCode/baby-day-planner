@@ -6,7 +6,7 @@
 
 import type { Context, Event } from "../../schemas";
 import type { Rule } from "../evaluator";
-import { intervalForAmount } from "../bottleIntervalRules";
+import { forecastIntervalMinutes, intervalForAmount } from "../bottleIntervalRules";
 import { isBedtime, isBottle, isProjected, projectedEvent } from "../helpers";
 import { MINUTES_PER_DAY } from "../../ui/time";
 import { DREAM_FEED_EVENT_KEY, isDreamFeed } from "../../lib/eventConventions";
@@ -147,12 +147,11 @@ function bottleCascadeInputs(events: Event[], ctx: Context): CascadeInputs | nul
 /**
  * Full-day projected bottle TIMES: walk wake+buffer → cap at cadence. When the
  * cursor reaches a recorded bottle, the cascade RE-SEEDS forward from it (R5.1).
- * An ordinary recorded bottle (FAB-add extra) never absorbs a forecast slot
- * (ENGINE_SPEC §R5.1/5.9) — it re-cascades the forecast forward and keeps its own
- * chronological number; earlier forecast slots survive. The ONE exception is a
- * bottle tagged `realizedForecast` (a drawer edit of a projection, BOTTLE_SPEC §4):
- * it absorbs the imminent slot it realized so editing a forecast moves it rather
- * than duplicating it. Recorded anchors are
+ * An untagged recorded bottle (a future FAB-add extra) never absorbs an earlier
+ * forecast slot (ENGINE_SPEC §R5.1/5.9): it re-cascades the forecast forward and
+ * earlier slots survive. A bottle tagged `realizedForecast` (R5.14: a forecast moved
+ * later, or a bottle logged after the fact) absorbs the slot just before it, so the
+ * feed replaces that slot instead of sitting beside it. Recorded anchors are
  * NOT returned — only projection times. Deterministic in (anchors, settings) ⇒
  * idempotent across evaluator passes. Fills the whole day to the time cap (no
  * count cap), so morning forecasts survive a later recorded bottle (§F66, no persist-on-view).
@@ -161,13 +160,7 @@ function computeBottleProjectionTimes(inputs: CascadeInputs, ctx: Context): numb
   const { wakeTime, cap, seedTime, anchors, snap } = inputs;
   const defaultInterval = ctx.settings.defaultBottleIntervalMinutes;
   const rules = ctx.settings.bottleIntervalRules;
-  // Projections carry the default amount, so they advance by the default amount's
-  // interval (which the rules may shorten/lengthen) — not the raw default minutes.
-  const projInterval = intervalForAmount(
-    rules,
-    ctx.settings.defaultBottleAmountOz,
-    defaultInterval,
-  );
+  const projInterval = forecastIntervalMinutes(ctx.settings);
 
   // The cursor has reached this recorded bottle → re-seed the forecast forward from
   // it. NO look-ahead absorption: a recorded feed never deletes an earlier forecast
@@ -197,8 +190,8 @@ function computeBottleProjectionTimes(inputs: CascadeInputs, ctx: Context): numb
       consume(anchor!);
       continue;
     }
-    // Realize/relocate (BOTTLE_SPEC §4): absorb the imminent slot a realized bottle
-    // moved (the one adjacent to it), instead of re-emitting it beside the feed.
+    // R5.14 realize: absorb the slot a realized bottle stands in for (the one just
+    // before it), instead of re-emitting it beside the feed.
     if (anchor?.realizedForecast === true && placed >= anchor.startTime - projInterval) {
       consume(anchor);
       continue;
@@ -266,7 +259,7 @@ function projectBottleChain(events: Event[], ctx: Context): Event[] {
  * EC-B3/EC-B4). Firestore eventKeys stay stable: recorded bottles keep their
  * pinned eventKey; projected bottles fill the slots after the highest recorded
  * number (so the owner-by-index mapping in R12.6 is unaffected). Engine-side
- * only — the label is a render concept, the eventKey is the persisted identity.
+ * only. The label is a render concept; a bottle's identity is its doc id (ADR-0007).
  */
 const RuleRenumberBottlesChronologically: Rule = {
   id: "R5.4",
@@ -294,7 +287,8 @@ const RuleRenumberBottlesChronologically: Rule = {
         if (e.eventKey === next.eventKey && e.label === next.label) return e;
         return { ...e, eventKey: next.eventKey, label: next.label };
       }
-      // Recorded: eventKey is the frozen Firestore identity; only the display label renumbers.
+      // Recorded: the stored eventKey never changes (R5.5) but is not unique across
+      // clients; identity is the doc id (ADR-0007). Only the display label renumbers.
       if (e.label === next.label) return e;
       return { ...e, label: next.label };
     });

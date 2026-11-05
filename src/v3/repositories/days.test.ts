@@ -377,6 +377,52 @@ describe("v3 days repository", () => {
     expect(bottle!.lifecycle.state).toBe("recorded");
   });
 
+  // R5.14: a recorded_bottle_t<T> doc moved to another time keeps its id; the freeze
+  // of the forecast at T must not overwrite the user's doc.
+  it("freeze never overwrites a bottle doc that already exists", async () => {
+    const database = db();
+    await createDay(database, day({ id: "day-yesterday", date: "2026-05-08" }));
+    await createEvent(database, "child-1", {
+      id: "recorded_bottle_t795",
+      dayId: "day-yesterday",
+      eventKey: "bottle_3",
+      type: "bottle",
+      kind: "instant",
+      startTime: 14 * 60 + 5,
+      amountOz: 5,
+      label: "Bottle 3",
+      hasPutdown: false,
+      owner: NO_OWNER,
+      realizedForecast: true,
+      lifecycle: { state: "completed", committedAt: 15 * 60 + 30 },
+    });
+    const forecastAt795: Event = {
+      id: "proj_bottle_t795",
+      dayId: "day-yesterday",
+      eventKey: "bottle_3",
+      type: "bottle",
+      kind: "instant",
+      startTime: 795,
+      label: "Bottle 3",
+      hasPutdown: false,
+      owner: NO_OWNER,
+      lifecycle: { state: "projected" },
+    };
+
+    await startNewDay(database, "child-1", {
+      newDayId: "day-today",
+      newDate: "2026-05-09",
+      newWakeTime: 7 * 60,
+      freezeForecast: forecastSnapshotDocs([forecastAt795], "day-yesterday"),
+    });
+
+    const events = await listEvents(database, "child-1", "day-yesterday");
+    expect(events).toHaveLength(1);
+    expect(events[0]!.startTime).toBe(14 * 60 + 5);
+    expect(events[0]!.amountOz).toBe(5);
+    expect(events[0]!.lifecycle.state).toBe("completed");
+  });
+
   it("startNewDay archives the previous active day in the same call", async () => {
     const database = db();
     await createDay(database, day({ id: "day-yesterday", date: "2026-05-08" }));

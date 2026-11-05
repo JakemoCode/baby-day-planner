@@ -294,16 +294,21 @@ export async function startNewDay(
 
   return runTransaction(db, async (tx) => {
     if (activeDoc) {
-      tx.update(activeDoc.ref, { status: "archived" });
       // §F66 Slice 4: freeze the closing day's forecast bottles into its history,
-      // since archived days read static docs (no recompute). Deterministic ids ⇒
-      // idempotent if rollover runs twice. Skipped when there's no day to archive.
-      for (const e of input.freezeForecast ?? []) {
-        const ref = doc(db, eventsCollectionPath(childId, activeDoc.id), e.id).withConverter(
+      // since archived days read static docs (no recompute). Create-if-absent: a
+      // recorded_bottle_t<T> doc keeps its id after a time-edit, so the forecast at T
+      // must not overwrite it (R5.14). Transactions read before they write.
+      const freezeRefs = (input.freezeForecast ?? []).map((e) => ({
+        e,
+        ref: doc(db, eventsCollectionPath(childId, activeDoc.id), e.id).withConverter(
           v3EventConverter,
-        );
-        tx.set(ref, e);
-      }
+        ),
+      }));
+      const existing = await Promise.all(freezeRefs.map(({ ref }) => tx.get(ref)));
+      tx.update(activeDoc.ref, { status: "archived" });
+      freezeRefs.forEach(({ e, ref }, i) => {
+        if (!existing[i]!.exists()) tx.set(ref, e);
+      });
     }
     if (bedtimeToTrim) {
       tx.update(bedtimeToTrim.ref, {

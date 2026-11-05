@@ -359,7 +359,9 @@ Legacy docs without these fields are coerced via `deriveKind` and
 ### R20.4 `eventKey` uniqueness within a day is NOT enforced at the database
 
 Multiple docs with same eventKey can exist (Start+End pair, or stale
-manual overrides). Engine must dedupe by eventKey.
+manual overrides). Engine must dedupe by eventKey, except bottles: their
+identity is the doc id (ADR-0007), and two clients can compute the same
+`bottle_N` for different feeds (ENGINE_SPEC §R5.14).
 
 ### R20.5 Day collection: `days/{dayId}` with subcollection `events/`
 

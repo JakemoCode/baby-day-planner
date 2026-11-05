@@ -410,6 +410,36 @@ describe("EventEditDrawerV3", () => {
     expect(screen.getByRole("alert")).toHaveTextContent(/Within 10 min of Bottle 2/);
   });
 
+  it("R5.14: a past forecast slot auto-promoted to recorded does not block a logged bottle", async () => {
+    const pastForecastSlot = recordedBottleNeighbor({
+      id: "proj_bottle_t795",
+      startTime: 13 * 60 + 15,
+      label: "Bottle 3",
+      lifecycle: { state: "recorded", annotatedAt: 13 * 60 + 15 },
+    });
+    const onSave = vi.fn();
+    render(
+      <EventEditDrawerV3
+        open
+        mode="create"
+        event={projectedBottle({ id: "bottle_new", startTime: 15 * 60 + 30 })}
+        owners={owners}
+        nowMinutes={15 * 60 + 30}
+        bedtimeThreshold={THRESHOLD}
+        defaultWakeTime={DEFAULT_WAKE_TIME}
+        existingEvents={[pastForecastSlot]}
+        onSave={onSave}
+        onCancel={() => {}}
+      />,
+    );
+    const start = screen.getByLabelText("Start time");
+    await userEvent.clear(start);
+    await userEvent.type(start, "13:20");
+    expect(screen.queryByRole("alert")).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: /save/i }));
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ startTime: 13 * 60 + 20 }));
+  });
+
   it("flags a bottle across the midnight wrap (11:58 PM neighbor, edit to 12:01 AM)", async () => {
     const recordedBottle = recordedBottleNeighbor({ startTime: 23 * 60 + 58 });
     const source = projectedBottle({

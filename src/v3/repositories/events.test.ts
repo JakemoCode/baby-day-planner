@@ -223,6 +223,38 @@ describe("v3 events repository", () => {
       expect(naps[0]!.startTime).toBe(15 * 60 + 35);
     });
 
+    // ADR-0007: bottle identity is the doc id. Each client computes `bottle_{max+1}`
+    // from its own view, so two real feeds can share an eventKey (R5.14).
+    it("keeps two bottle docs that share an eventKey", async () => {
+      const database = db();
+      await createEvent(
+        database,
+        "child-1",
+        ev({
+          id: "bottle_phone",
+          eventKey: "bottle_9",
+          startTime: 14 * 60 + 5,
+          lifecycle: { state: "completed", committedAt: 15 * 60 + 30 },
+        }),
+      );
+      await createEvent(
+        database,
+        "child-1",
+        ev({
+          id: "bottle_tablet",
+          eventKey: "bottle_9",
+          startTime: 15 * 60,
+          lifecycle: { state: "completed", committedAt: 15 * 60 + 5 },
+        }),
+      );
+
+      const { deleted } = await reconcileDuplicateEventDocs(database, "child-1", "day-1");
+
+      expect(deleted).toEqual([]);
+      const remaining = await listEvents(database, "child-1", "day-1");
+      expect(remaining.map((e) => e.id).sort()).toEqual(["bottle_phone", "bottle_tablet"]);
+    });
+
     it("is a no-op on a clean day (idempotent)", async () => {
       const database = db();
       await createEvent(database, "child-1", ev({ id: "e-a", eventKey: "bottle_1" }));

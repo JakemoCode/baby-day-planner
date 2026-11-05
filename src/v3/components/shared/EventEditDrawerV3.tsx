@@ -15,7 +15,7 @@ import {
   recordedLifecycle,
 } from "../../lifecycle";
 import { isRenderSynthetic } from "../../lib/syntheticEvents";
-import { isDreamFeed, recordedIdFor } from "../../lib/eventConventions";
+import { isDreamFeed, isEngineEmittedId, recordedIdFor } from "../../lib/eventConventions";
 import { formatHM24, formatTimeForDisplay, nextDayAt, parseHM24 } from "../../ui/time";
 import { OwnerPickerV3 } from "./OwnerPickerV3";
 import { formToEvent, type FormState } from "./formToEvent";
@@ -148,12 +148,14 @@ function validateForm(
       errors.endTime = `Overlaps ${overlap.label} (${startStr} – ${endStr}).`;
     }
   }
-  // Bottles are instant: flag another recorded bottle logged within 10 min.
+  // Bottles are instant: flag another recorded bottle logged within 10 min. A `proj_`
+  // bottle is a past forecast slot auto-promoted in the projection, not a logged feed (R5.14).
   if (!errors.startTime && type === "bottle" && startTime !== undefined && existingEvents) {
     const tooClose = existingEvents.find((e) => {
       if (e.id === editingId) return false;
       if (e.type !== "bottle") return false;
       if (isRenderSynthetic(e)) return false;
+      if (isEngineEmittedId(e.id)) return false;
       if (!isRecorded(e.lifecycle)) return false;
       return clockGapMin(e.startTime, startTime) < BOTTLE_MIN_GAP_MIN;
     });

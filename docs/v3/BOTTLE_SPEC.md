@@ -127,6 +127,30 @@ a distinct extra feed that **inserts and never deletes a forecast** (PR A).
 > Known gap (no sane edit path reaches it): a forecast moved >1 interval strands its
 > old slot — identity-based absorption tracked in §F73.
 
+**Revised (Jake, 2026-11-05): a FAB bottle logged after the fact realizes its slot.**
+A bottle created with `startTime <= now` (typed in later from the daycare app) is
+the household correcting the record, not an extra (DOMAIN.md §2). If the nearest
+forecast feed falls before or at that time, within one interval, it yields to the
+logged feed: the doc is tagged `realizedForecast` and the cascade absorbs that slot
+(a slot exactly at the time is taken by the re-seed, untagged). If the nearest one
+is still ahead, that one yields instead: the R5.1 re-seed takes it untagged, and the
+forecast carries on from the logged feed. A FAB bottle with a future time stays an
+extra and never realizes a slot. The tag is only set when the slot is earlier than
+the new time, for projection edits and recorded-bottle time-edits too: a tag on an
+earlier move made the cascade absorb the previous slot as well. A recorded bottle's
+time-edit finds its slot by recomputing the projection without it, since its id
+names the time it was first saved. Full rule: ENGINE_SPEC §R5.14.
+
+Retroactive bottles also exposed three identity bugs, fixed with R5.14:
+- The drawer's 10-minute duplicate check skips `proj_` neighbours. Past forecast
+  slots render as recorded (evaluator auto-promote) but nobody logged them.
+- `eventKey` dedupe (`renderProjection`, `reconcileDuplicateEventDocs`) skips
+  bottles. Each client computes `bottle_{max+1}` from its own view, so two real
+  feeds can share a key; bottle identity is the doc id (ADR-0007).
+- The day-close freeze creates bottle docs only when absent. A moved
+  `recorded_bottle_t<T>` doc keeps its id, and the freeze used to overwrite it with
+  the forecast for `T`.
+
 ---
 
 ## §5 How it shipped — one PR (#303)
