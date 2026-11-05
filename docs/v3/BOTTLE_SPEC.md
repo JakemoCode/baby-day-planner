@@ -129,10 +129,12 @@ a distinct extra feed that **inserts and never deletes a forecast** (PR A).
 
 **Revised (Jake, 2026-11-05): a FAB bottle logged after the fact realizes its slot.**
 A bottle created with `startTime <= now` (typed in later from the daycare app) is
-the household correcting the record, not an extra (DOMAIN.md §2). The forecast slot
-it corresponds to yields: when the nearest slot is before it, the doc is tagged
-`realizedForecast` and the cascade absorbs that slot; when the nearest slot is after
-it, the R5.1 re-seed already takes it. A FAB bottle with a future time stays an
+the household correcting the record, not an extra (DOMAIN.md §2). If the nearest
+forecast feed falls before or at that time, within one interval, it yields to the
+logged feed: the doc is tagged `realizedForecast` and the cascade absorbs that slot
+(a slot exactly at the time is taken by the re-seed, untagged). If the nearest one
+is still ahead, that one yields instead: the R5.1 re-seed takes it untagged, and the
+forecast carries on from the logged feed. A FAB bottle with a future time stays an
 extra and never realizes a slot. The tag is only set when the slot is earlier than
 the new time, for projection edits and recorded-bottle time-edits too: a tag on an
 earlier move made the cascade absorb the previous slot as well. A recorded bottle's

@@ -432,6 +432,11 @@ bottles are added via FAB or via the cascade once recordings start.
 
 ### R5.14 A bottle that realizes a forecast slot absorbs it
 
+DOMAIN.md §2: if the nearest forecast feed falls before or at a logged
+feed's time, within one interval, it yields to the logged feed. If the
+nearest one is still ahead, that one yields instead, and the forecast
+carries on from the logged feed.
+
 A recorded bottle tagged `realizedForecast: true` absorbs the last
 forecast slot before it, if that slot is within one projected interval
 (the default amount's interval). Untagged, the cascade only takes the
