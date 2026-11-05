@@ -76,13 +76,15 @@ export function renderProjection(
 /**
  * Collapse events sharing `(type, eventKey)` — orphans from inconsistent write-path id conventions.
  * Most-recent annotation wins; stable id tie-break. Projections pass through (deterministic, but deduped defensively).
+ * Bottles are exempt: their identity is the doc id (ADR-0007), and clients compute
+ * `bottle_N` from their own view, so two real feeds can share a key.
  */
 function dedupBySlotKey(events: Event[]): Event[] {
   const winnerByKey = new Map<string, Event>();
   const positionalKeys: string[] = [];
   for (let i = 0; i < events.length; i++) {
     const e = events[i]!;
-    const key = e.eventKey ? `${e.type}:${e.eventKey}` : `::no-key::${i}`;
+    const key = e.eventKey && e.type !== "bottle" ? `${e.type}:${e.eventKey}` : `::no-key::${i}`;
     const incumbent = winnerByKey.get(key);
     if (!incumbent) {
       winnerByKey.set(key, e);

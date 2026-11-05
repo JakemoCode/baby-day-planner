@@ -148,6 +148,26 @@ describe("renderProjection — composed render-layer pipeline", () => {
       expect(nap4s[0]!.startTime).toBe(15 * 60 + 35);
     });
 
+    // ADR-0007: bottle identity is the doc id; two clients can compute the same
+    // `bottle_N` for different feeds (R5.14).
+    it("keeps two recorded bottles that share an eventKey", () => {
+      const fromPhone: Event = projectedBottle({
+        id: "bottle_phone",
+        eventKey: "bottle_9",
+        startTime: 14 * 60 + 5,
+        lifecycle: { state: "completed", committedAt: 15 * 60 + 30 },
+      });
+      const fromTablet: Event = projectedBottle({
+        id: "bottle_tablet",
+        eventKey: "bottle_9",
+        startTime: 15 * 60,
+        lifecycle: { state: "completed", committedAt: 15 * 60 + 5 },
+      });
+      const out = renderProjection([fromPhone, fromTablet], baseSettings, 15 * 60 + 30);
+      const bottles = out.filter((e) => e.type === "bottle").map((e) => e.id);
+      expect(bottles).toEqual(["bottle_phone", "bottle_tablet"]);
+    });
+
     it("leaves non-duplicate events untouched", () => {
       const napA: Event = projectedNap({ id: "n-a", eventKey: "nap_1" });
       const napB: Event = projectedNap({ id: "n-b", eventKey: "nap_2", startTime: 13 * 60 });

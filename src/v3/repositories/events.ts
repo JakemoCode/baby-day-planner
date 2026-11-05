@@ -71,8 +71,8 @@ export function watchEvents(
 
 /**
  * Detect and remove duplicate docs sharing `(type, eventKey)`. Keeps the
- * most-recently-annotated; mirrors Pass 0 dedup in renderProjection.ts.
- * Idempotent; returns deleted doc ids.
+ * most-recently-annotated; mirrors Pass 0 dedup in renderProjection.ts, bottles
+ * exempt (ADR-0007: a bottle's identity is its doc id). Idempotent; returns deleted doc ids.
  */
 export async function reconcileDuplicateEventDocs(
   db: Firestore,
@@ -82,7 +82,7 @@ export async function reconcileDuplicateEventDocs(
   const events = await listEvents(db, childId, dayId);
   const groups = new Map<string, Event[]>();
   for (const e of events) {
-    if (!e.eventKey) continue;
+    if (!e.eventKey || e.type === "bottle") continue;
     const key = `${e.type}:${e.eventKey}`;
     const list = groups.get(key) ?? [];
     list.push(e);
