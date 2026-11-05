@@ -418,8 +418,8 @@ from R5.10 while still rendering an actionable forecast from minute one.
 
 **Anchoring after a recorded bottle**: cascade re-seeds forward from
 the *latest* recorded bottle's startTime per R5.1. Earlier placeholder
-projections survive — a recorded bottle never absorbs an earlier
-forecast slot (R5.9, §F66).
+projections survive: a recorded bottle never absorbs an earlier
+forecast slot (R5.9, §F66) unless it carries `realizedForecast` (R5.14).
 
 Babies commonly feed more often than any preset cadence; additional
 bottles are added via FAB or via the cascade once recordings start.
@@ -429,6 +429,34 @@ bottles are added via FAB or via the cascade once recordings start.
 - **Edge case it prevents**: empty bottle row first thing in the
   morning, leaving the user no visual sense of when the next feeds
   should land.
+
+### R5.14 A bottle that realizes a forecast slot absorbs it
+
+A recorded bottle tagged `realizedForecast: true` absorbs the last
+forecast slot before it, if that slot is within one projected interval
+(the default amount's interval). Untagged, the cascade only takes the
+first slot at or after a recorded bottle (R5.1 re-seed), so a slot
+before it stays as a second feed. The drawer decides the tag
+(`realizeTagFor` in `src/v3/lib/realizeForecast.ts`, called from
+`useDrawer`):
+
+| Save | Slot it stands in for | Tagged when |
+|---|---|---|
+| Edit of a projected bottle | the slot edited (`source.startTime`) | the new time is later than the slot |
+| Time-edit of a `recorded_bottle_t<T>` doc | the slot at `T` | the new time is later than `T`; otherwise the tag is removed |
+| Create, `startTime <= now` (logged after the fact, DOMAIN.md §2) | the nearest forecast slot | the bottle just before it in the projection is a `proj_` slot within one interval, and no `proj_` slot after it is closer |
+| Create, `startTime > now` | none | never: a future FAB bottle is an extra (BOTTLE_SPEC §4) |
+
+A slot at or after the new time is taken by the re-seed, so it needs no
+tag, and a tag there would absorb the slot before it as well.
+
+- **Why**: a feed logged after the fact corrects the record (DOMAIN.md
+  §2); it is not an extra.
+- **Edge case it prevents**: a 14:05 bottle logged at 15:30 leaving the
+  13:15 forecast beside it, counted in totals and frozen into history.
+
+> **R5.12 — Retired.** The bottle count cap (EDGE_CASES EC-B10b) went
+> with `bottlesPerDay` (R5.8). The number is not reused.
 
 > **R5.13 — Deleted.** The "confirm if recorded too soon" engine flag is
 > fully removed. Predict-don't-prescribe: the drawer's existing 15-min
