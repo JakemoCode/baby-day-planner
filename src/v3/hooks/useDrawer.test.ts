@@ -284,7 +284,7 @@ describe("useDrawer", () => {
     expect(saveEvent).toHaveBeenCalledWith(expect.objectContaining({ realizedForecast: true }));
   });
 
-  it("R5.14: a projected bottle moved later is saved under its slot's id, not the new time's", async () => {
+  it("R5.14: a moved forecast keeps the new time's id (ADR-0007)", async () => {
     const projected = makeEvent({
       id: "proj_bottle_t600",
       type: "bottle",
@@ -303,62 +303,12 @@ describe("useDrawer", () => {
       await result.current.onSave({ ...projected, startTime: 10 * 60 + 30 });
     });
 
-    expect(saveEvent).toHaveBeenCalledWith(
-      expect.objectContaining({ id: "recorded_bottle_t600", startTime: 10 * 60 + 30 }),
-    );
-  });
-
-  // /tomorrow passes no projection, so it cannot see whether the slot's id is taken.
-  it("R5.14: with no projection to check, a moved forecast takes the new time's id", async () => {
-    const projected = makeEvent({
-      id: "proj_bottle_t600",
-      type: "bottle",
-      kind: "instant",
-      eventKey: "bottle_1",
-      startTime: 10 * 60,
-    });
-    const saveEvent = makeSaveEvent();
-    const { result } = setup({ saveEvent });
-
-    act(() => result.current.openEdit(projected));
-    await act(async () => {
-      await result.current.onSave({ ...projected, startTime: 10 * 60 + 30 });
-    });
-
     expect(saveEvent).toHaveBeenCalledWith(expect.objectContaining({ id: "recorded_bottle_t630" }));
   });
 
-  it("R5.14: when the slot's id already holds a doc, a moved forecast takes the new time's id", async () => {
-    const projected = makeEvent({
-      id: "proj_bottle_t600",
-      type: "bottle",
-      kind: "instant",
-      eventKey: "bottle_1",
-      startTime: 10 * 60,
-    });
-    const movedEarlierFeed = makeEvent({
-      id: "recorded_bottle_t600",
-      type: "bottle",
-      kind: "instant",
-      eventKey: "bottle_2",
-      startTime: 14 * 60,
-      lifecycle: { state: "completed", committedAt: 14 * 60 },
-    });
-    const saveEvent = makeSaveEvent();
-    const { result } = setup({
-      saveEvent,
-      forecast: { projection: [projected, movedEarlierFeed], intervalMinutes: 180 },
-    });
-
-    act(() => result.current.openEdit(projected));
-    await act(async () => {
-      await result.current.onSave({ ...projected, startTime: 10 * 60 + 30 });
-    });
-
-    expect(saveEvent).toHaveBeenCalledWith(expect.objectContaining({ id: "recorded_bottle_t630" }));
-  });
-
-  it("R5.14: time-edit of a recorded slot doc to later than its id time keeps absorbing the slot", async () => {
+  it("R5.14: a recorded bottle's time-edit is decided against the projection without it", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date(2026, 10, 5, 15, 30));
     const recordedSlot = makeEvent({
       id: "recorded_bottle_t600",
       type: "bottle",
@@ -367,14 +317,28 @@ describe("useDrawer", () => {
       startTime: 10 * 60,
       lifecycle: { state: "recorded", annotatedAt: 10 * 60 },
     });
+    const slotItTook = makeEvent({
+      id: "proj_bottle_t600",
+      type: "bottle",
+      kind: "instant",
+      eventKey: "bottle_1",
+      startTime: 10 * 60,
+      lifecycle: { state: "recorded", annotatedAt: 10 * 60 },
+    });
+    const projectWithout = vi.fn((_id: string) => [slotItTook]);
     const saveEvent = makeSaveEvent();
-    const { result } = setup({ saveEvent });
+    const { result } = setup({
+      saveEvent,
+      forecast: { projection: [recordedSlot], intervalMinutes: 180, projectWithout },
+    });
 
     act(() => result.current.openEdit(recordedSlot));
     await act(async () => {
       await result.current.onSave({ ...recordedSlot, startTime: 10 * 60 + 40 });
     });
+    vi.useRealTimers();
 
+    expect(projectWithout).toHaveBeenCalledWith("recorded_bottle_t600");
     expect(saveEvent).toHaveBeenCalledWith(
       expect.objectContaining({ id: "recorded_bottle_t600", realizedForecast: true }),
     );

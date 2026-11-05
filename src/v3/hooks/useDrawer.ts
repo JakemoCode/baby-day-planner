@@ -68,7 +68,7 @@ type UseDrawerOptions = {
   /**
    * The projection the drawer is opened over, one forecast interval, and the projection
    * recomputed without a given doc. Without it a bottle logged after the fact cannot
-   * realize its forecast slot, and a moved forecast keeps its new time's id (R5.14).
+   * realize its forecast slot, and a recorded bottle's time-edit drops its tag (R5.14).
    */
   forecast?: {
     projection: readonly Event[];
@@ -140,17 +140,8 @@ export function useDrawer({
       if (!isActual) {
         // Projected with time/amount/label change: re-ID deterministically so
         // subsequent edits route through update rather than create. ADR-0007:
-        // bottles key off the slot's startTime (renumber-independent), naps/bedtime off
-        // eventKey. R5.14 reads a bottle's slot from that id, so it names the slot, not
-        // the new time, unless a feed may already hold it: a slot stranded by a long
-        // move, or no projection to check (/tomorrow).
-        const slotId = recordedIdForEvent(source);
-        const slotIdFree =
-          forecast.projection.length > 0 && !forecast.projection.some((e) => e.id === slotId);
-        await saveEvent({
-          ...realize("edit", source, event),
-          id: slotIdFree ? slotId : recordedIdForEvent(event),
-        });
+        // bottles key off startTime (renumber-independent), naps/bedtime off eventKey.
+        await saveEvent({ ...realize("edit", source, event), id: recordedIdForEvent(event) });
       } else {
         await saveEvent(realize("edit", source, event));
       }

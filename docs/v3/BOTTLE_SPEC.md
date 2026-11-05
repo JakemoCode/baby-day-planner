@@ -134,9 +134,10 @@ it corresponds to yields: when the nearest slot is before it, the doc is tagged
 `realizedForecast` and the cascade absorbs that slot; when the nearest slot is after
 it, the R5.1 re-seed already takes it. A FAB bottle with a future time stays an
 extra and never realizes a slot. The tag is only set when the slot is earlier than
-the new time, for projection edits and `recorded_bottle_t<T>` time-edits too: a tag
-on an earlier move made the cascade absorb the previous slot as well. Full rule:
-ENGINE_SPEC §R5.14.
+the new time, for projection edits and recorded-bottle time-edits too: a tag on an
+earlier move made the cascade absorb the previous slot as well. A recorded bottle's
+time-edit finds its slot by recomputing the projection without it, since its id
+names the time it was first saved. Full rule: ENGINE_SPEC §R5.14.
 
 Retroactive bottles also exposed three identity bugs, fixed with R5.14:
 - The drawer's 10-minute duplicate check skips `proj_` neighbours. Past forecast

@@ -6,7 +6,7 @@
  */
 
 import type { Event, TimeMin } from "../schemas";
-import { isDreamFeed, isEngineEmittedId, recordedBottleSlotTime } from "./eventConventions";
+import { isDreamFeed, isEngineEmittedId } from "./eventConventions";
 
 export type RealizeTagInput = {
   mode: "create" | "edit";
@@ -19,8 +19,8 @@ export type RealizeTagInput = {
   /** One forecast interval (`forecastIntervalMinutes`). */
   intervalMinutes: number;
   /**
-   * Edit only: the projection without the edited doc, where any slot it absorbed is
-   * back. A FAB bottle doc has no slot id, so its tag is re-decided against this.
+   * Edit of a recorded bottle: the projection without that doc, where the slot it
+   * stood in for is back. Its tag is re-decided against this.
    */
   projectionWithoutSource?: readonly Event[];
 };
@@ -32,27 +32,24 @@ export function withRealizeTag(input: RealizeTagInput): Event {
     return loggedAfterTheFactRealizes(input) ? { ...saved, realizedForecast: true } : saved;
   }
   if (saved.startTime === source.startTime) return saved;
-  const slotTime = slotTimeOf(source);
-  if (slotTime === null) {
-    // Without that projection, untag: a forecast slot reappears beside the feed, where
-    // a stale tag could silently absorb a slot the bottle no longer stands in for.
-    const without = input.projectionWithoutSource;
-    return without && loggedAfterTheFactRealizes({ ...input, projection: without })
+  // A forecast edited in the drawer stands in for its own slot.
+  if (isEngineEmittedId(source.id)) {
+    return saved.startTime > source.startTime
       ? { ...saved, realizedForecast: true }
       : untagged(saved);
   }
-  return saved.startTime > slotTime ? { ...saved, realizedForecast: true } : untagged(saved);
+  // Without that projection, untag: a forecast slot reappears beside the feed, where
+  // a stale tag could silently absorb a slot the bottle no longer stands in for.
+  const without = input.projectionWithoutSource;
+  return without && loggedAfterTheFactRealizes({ ...input, projection: without })
+    ? { ...saved, realizedForecast: true }
+    : untagged(saved);
 }
 
 function untagged(event: Event): Event {
   const out = { ...event };
   delete out.realizedForecast;
   return out;
-}
-
-/** The slot an edited bottle stands in for: its forecast time, or the time its recorded id names. */
-function slotTimeOf(source: Event): TimeMin | null {
-  return isEngineEmittedId(source.id) ? source.startTime : recordedBottleSlotTime(source.id);
 }
 
 /**

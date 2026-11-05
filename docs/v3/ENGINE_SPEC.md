@@ -442,16 +442,14 @@ before it stays as a second feed. The drawer decides the tag
 
 | Save | Slot it stands in for | Tagged when |
 |---|---|---|
-| Edit of a projected bottle `proj_bottle_t<T>` | the slot at `T`; the doc is saved as `recorded_bottle_t<T>` | the new time is later than `T` |
-| Time-edit of a `recorded_bottle_t<T>` doc | the slot at `T` | the new time is later than `T`; otherwise the tag is removed |
+| Time-edit of a projected bottle `proj_bottle_t<T>` | the slot at `T` | the new time is later than `T` |
 | Create, `startTime <= now` (logged after the fact, DOMAIN.md §2) | the nearest forecast slot | the bottle just before it in the projection is a `proj_` slot within one interval, and no `proj_` slot after it is closer |
 | Create, `startTime > now` | none | never: a future FAB bottle is an extra (BOTTLE_SPEC §4) |
-| Time-edit of a FAB bottle doc | the nearest forecast slot in the projection recomputed without the doc | the create rule above holds at the new time; otherwise, or with no such projection, the tag is removed |
+| Time-edit of any recorded bottle | the nearest forecast slot in the projection recomputed without the doc | the create rule above holds at the new time; otherwise, or with no such projection, the tag is removed |
 
-A projected bottle's doc id names its slot, not its new time, so a later
-edit still knows which slot it stands in for. When a doc already holds
-that id (a slot stranded by a move of more than one interval), the
-drawer falls back to the new time's id rather than overwrite it.
+A recorded bottle does not store which slot it stands in for, and its
+`recorded_bottle_t<T>` id names the time it was first saved, not a slot.
+Recomputing the projection without the doc brings that slot back.
 
 A slot at or after the new time is taken by the re-seed, so it needs no
 tag, and a tag there would absorb the slot before it as well.

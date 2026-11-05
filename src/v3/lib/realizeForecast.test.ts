@@ -111,17 +111,6 @@ describe("R5.14 withRealizeTag: moving a slot", () => {
     expect(edit(slot, 16 * 60).realizedForecast).toBeUndefined();
   });
 
-  it("a recorded slot doc moved later than its id time is tagged", () => {
-    const doc = bottle("recorded_bottle_t795", 13 * 60 + 15);
-    expect(edit(doc, 14 * 60).realizedForecast).toBe(true);
-  });
-
-  it("a tagged recorded slot doc moved back to or before its id time drops the tag", () => {
-    const doc = bottle("recorded_bottle_t795", 14 * 60, { realizedForecast: true });
-    expect(edit(doc, 13 * 60).realizedForecast).toBeUndefined();
-    expect("realizedForecast" in edit(doc, 13 * 60)).toBe(false);
-  });
-
   it("an amount-only edit of a recorded slot doc keeps its tag", () => {
     const doc = bottle("recorded_bottle_t795", 14 * 60, { realizedForecast: true });
     const out = withRealizeTag({
@@ -135,9 +124,9 @@ describe("R5.14 withRealizeTag: moving a slot", () => {
     expect(out.realizedForecast).toBe(true);
   });
 
-  // A FAB doc has no slot id; it is re-decided against the projection without it,
-  // where the slot it absorbed is back (PROJECTION stands in for that here).
-  function editFab(doc: Event, startTime: number, without?: Event[]): Event {
+  // A recorded doc is re-decided against the projection without it, where the slot it
+  // stood in for is back (PROJECTION stands in for that here).
+  function editRecorded(doc: Event, startTime: number, without?: Event[]): Event {
     return withRealizeTag({
       mode: "edit",
       source: doc,
@@ -151,26 +140,42 @@ describe("R5.14 withRealizeTag: moving a slot", () => {
 
   it("a FAB bottle doc moved a little within the past still realizes the slot it absorbed", () => {
     const doc = bottle("bottle_abc", 14 * 60 + 5, { realizedForecast: true });
-    expect(editFab(doc, 14 * 60 + 20, PROJECTION).realizedForecast).toBe(true);
+    expect(editRecorded(doc, 14 * 60 + 20, PROJECTION).realizedForecast).toBe(true);
   });
 
   it("a FAB bottle doc moved to 09:00 drops its tag: 10:10 is the nearer slot, after it", () => {
     const doc = bottle("bottle_abc", 14 * 60 + 5, { realizedForecast: true });
-    expect("realizedForecast" in editFab(doc, 9 * 60, PROJECTION)).toBe(false);
+    expect("realizedForecast" in editRecorded(doc, 9 * 60, PROJECTION)).toBe(false);
   });
 
   it("an untagged past FAB bottle doc moved just after a slot realizes it", () => {
     const doc = bottle("bottle_abc", 16 * 60 + 30);
-    expect(editFab(doc, 13 * 60 + 25, PROJECTION).realizedForecast).toBe(true);
+    expect(editRecorded(doc, 13 * 60 + 25, PROJECTION).realizedForecast).toBe(true);
   });
 
   it("a FAB bottle doc moved into the future drops its tag: a future FAB bottle is an extra", () => {
     const doc = bottle("bottle_abc", 14 * 60 + 5, { realizedForecast: true });
-    expect("realizedForecast" in editFab(doc, 18 * 60, PROJECTION)).toBe(false);
+    expect("realizedForecast" in editRecorded(doc, 18 * 60, PROJECTION)).toBe(false);
+  });
+
+  it("a realized forecast doc moved later than its slot stays tagged", () => {
+    const doc = bottle("recorded_bottle_t795", 13 * 60 + 15);
+    expect(editRecorded(doc, 14 * 60, PROJECTION).realizedForecast).toBe(true);
+  });
+
+  it("a realized forecast doc moved to just before the next slot drops its tag", () => {
+    const doc = bottle("recorded_bottle_t845", 14 * 60 + 5, { realizedForecast: true });
+    expect("realizedForecast" in editRecorded(doc, 13 * 60, PROJECTION)).toBe(false);
+  });
+
+  // Its id names the time it was first saved (16:00), not the 16:15 slot it took.
+  it("a forecast first saved at 16:00, moved to 16:10, is untagged: 16:15 is nearer", () => {
+    const doc = bottle("recorded_bottle_t960", 16 * 60);
+    expect("realizedForecast" in editRecorded(doc, 16 * 60 + 10, PROJECTION)).toBe(false);
   });
 
   it("without the projection minus the doc, a moved FAB bottle drops its tag", () => {
     const doc = bottle("bottle_abc", 14 * 60 + 5, { realizedForecast: true });
-    expect("realizedForecast" in editFab(doc, 14 * 60 + 20)).toBe(false);
+    expect("realizedForecast" in editRecorded(doc, 14 * 60 + 20)).toBe(false);
   });
 });
