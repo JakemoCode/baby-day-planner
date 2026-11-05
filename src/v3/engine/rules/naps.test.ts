@@ -485,6 +485,102 @@ describe("Cascade invariant — wake_window/nap boundaries", () => {
     );
     assertInvariant(out, 7 * 60);
   });
+
+  // R3.11: a skipped slot leaves no uncovered time between wake and bedtime.
+  function assertContiguousToBedtime(events: Event[], wakeTime: number) {
+    const chain = events
+      .filter((e) => e.type === "wake_window" || e.type === "nap" || e.type === "bedtime")
+      .sort((a, b) => a.startTime - b.startTime);
+    expect(chain[0]?.startTime).toBe(wakeTime);
+    expect(chain.at(-1)?.type).toBe("bedtime");
+    for (let i = 1; i < chain.length; i++) {
+      const prev = chain[i - 1]!;
+      expect({ after: prev.eventKey, start: chain[i]!.startTime }).toEqual({
+        after: prev.eventKey,
+        start: prev.endTime,
+      });
+    }
+  }
+
+  it.each([
+    { name: "R3.11 skipped nap_2", skipped: ["nap_2"], actuals: [] as Event[] },
+    { name: "R3.11 skipped nap_2 and nap_3", skipped: ["nap_2", "nap_3"], actuals: [] as Event[] },
+    {
+      name: "R3.11 skipped nap_2 then recorded nap_3",
+      skipped: ["nap_2"],
+      actuals: [aRecordedNap({ eventKey: "nap_3", start: 12 * 60, end: 12 * 60 + 45 })],
+    },
+  ])("$name: invariant holds and the chain has no gap", ({ skipped, actuals }) => {
+    const out = projectDay(
+      {
+        day: aDay({ wakeTime: 7 * 60, suppressedNapKeys: skipped }),
+        settings: aSettings({ wakeWindowsMinutes: [120, 150, 180], defaultNapLengthMinutes: 60 }),
+        actuals,
+        nowMinutes: 7 * 60,
+      },
+      { rules: ALL_RULES },
+    );
+    assertInvariant(out, 7 * 60);
+    assertContiguousToBedtime(out, 7 * 60);
+  });
+});
+
+describe("R3.11: a skipped nap slot emits no nap; its wake window runs on to the next sleep", () => {
+  // wake 07:00, WWs [120,150,180], 60-min naps, threshold 19:00, earliest bedtime 18:00.
+  // Unskipped: nap_1 09:00-10:00, nap_2 12:30-13:30, nap_3 16:30-17:30, bedtime 20:30.
+  function run(suppressedNapKeys: string[], actuals: Event[] = []): Event[] {
+    return projectDay(
+      {
+        day: aDay({ wakeTime: 7 * 60, suppressedNapKeys }),
+        settings: aSettings({ wakeWindowsMinutes: [120, 150, 180], defaultNapLengthMinutes: 60 }),
+        actuals,
+        nowMinutes: 7 * 60,
+      },
+      { rules: ALL_RULES },
+    );
+  }
+  const span = (events: Event[], key: string) => {
+    const e = events.find((x) => x.eventKey === key);
+    return e ? [e.startTime, e.endTime] : undefined;
+  };
+
+  it("skipping nap_2 drops it and wake_window_3; wake_window_2 runs to nap_3, which keeps its time", () => {
+    const out = run(["nap_2"]);
+    expect(span(out, "nap_2")).toBeUndefined();
+    expect(span(out, "wake_window_3")).toBeUndefined();
+    expect(span(out, "wake_window_2")).toEqual([10 * 60, 16 * 60 + 30]);
+    expect(span(out, "nap_3")).toEqual([16 * 60 + 30, 17 * 60 + 30]);
+    expect(span(out, "bedtime")?.[0]).toBe(20 * 60 + 30);
+  });
+
+  it("skipping nap_2 and nap_3 leaves one wake window from nap_1's end to bedtime", () => {
+    const out = run(["nap_2", "nap_3"]);
+    expect(out.filter((e) => e.type === "nap").map((e) => e.eventKey)).toEqual(["nap_1"]);
+    expect(span(out, "wake_window_2")).toEqual([10 * 60, 20 * 60 + 30]);
+    expect(span(out, "bedtime")?.[0]).toBe(20 * 60 + 30);
+  });
+
+  it("a recorded nap in a skipped slot wins over the skip", () => {
+    const out = run(
+      ["nap_2"],
+      [aRecordedNap({ eventKey: "nap_2", start: 12 * 60 + 40, end: 13 * 60 + 40 })],
+    );
+    expect(span(out, "nap_2")).toEqual([12 * 60 + 40, 13 * 60 + 40]);
+    expect(span(out, "wake_window_2")).toEqual([10 * 60, 12 * 60 + 40]);
+  });
+
+  it("a recorded nap_3 earlier than skipped nap_2's projected end keeps its recorded start", () => {
+    const out = run(
+      ["nap_2"],
+      [aRecordedNap({ eventKey: "nap_3", start: 12 * 60, end: 12 * 60 + 45 })],
+    );
+    expect(span(out, "nap_3")).toEqual([12 * 60, 12 * 60 + 45]);
+    expect(span(out, "wake_window_2")).toEqual([10 * 60, 12 * 60]);
+  });
+
+  it("skipping a slot that would become bedtime changes nothing", () => {
+    expect(run(["nap_4"])).toEqual(run([]));
+  });
 });
 
 describe("R7.6 — bedtimeThreshold triggers bedtime substitution in the cascade", () => {

@@ -2,6 +2,7 @@
  * R3.1 — Sleep cascade: alternates wake_window/nap from wakeTime, substitutes
  * bedtime when the next projected nap would exceed bedtimeThreshold.
  * Recorded naps anchor their slot; a recorded bedtime terminates the cascade.
+ * R3.11: a skipped slot (`Day.suppressedNapKeys`) emits no nap; its wake window runs on.
  */
 
 import type { Context, Event, Settings } from "../../schemas";
@@ -40,8 +41,14 @@ function projectSleepCascade(ctx: Context, existing: Event[]): Event[] {
   // Recorded bedtime pins the cascade terminator; no projected bedtime is emitted past it.
   const manualBedtime = existing.find((e) => isBedtime(e) && !isProjected(e));
 
+  const skipped = new Set(ctx.day.suppressedNapKeys);
+
   const projected: Event[] = [];
   let cursor = wakeTime;
+  // R3.11: set while skipped slots are open. The emitted wake window keeps the real
+  // previous sleep's end and slot number; `cursor` still advances through the
+  // skipped nap's span so later slots keep their times.
+  let openWw: { n: number; start: number } | undefined;
 
   // Defensive cap against pathological inputs (threshold misconfigured beyond day length).
   const HARD_CAP = 48;
@@ -57,14 +64,19 @@ function projectSleepCascade(ctx: Context, existing: Event[]): Event[] {
       : baseWw;
 
     const wwStart = cursor;
+    const ww = openWw ?? { n, start: wwStart };
 
-    if (manualBedtime && wwStart >= manualBedtime.startTime) break; // no orphan WWs past recorded bedtime
+    // No orphan WWs past recorded bedtime; an open skipped-slot WW closes at it.
+    if (manualBedtime && wwStart >= manualBedtime.startTime) {
+      if (openWw) projected.push(buildWakeWindow(ctx, ww.n, ww.start, manualBedtime.startTime));
+      break;
+    }
 
     const napKey = `nap_${n}`;
     const existingNap = existingNapByKey.get(napKey);
 
     // Clamp recorded nap start to wwStart (R3.6 inversion guard: user may have shifted nap before WW end).
-    const napStart = existingNap ? Math.max(wwStart, existingNap.startTime) : wwStart + wwMinutes;
+    const napStart = existingNap ? Math.max(ww.start, existingNap.startTime) : wwStart + wwMinutes;
 
     // Cascade terminator (DOMAIN §1/§3): a PROJECTED nap ends the day —
     // becoming bedtime — when it would either end after bedtimeThreshold
@@ -80,12 +92,18 @@ function projectSleepCascade(ctx: Context, existing: Event[]): Event[] {
       const crowdsManualBedtime =
         manualBedtime !== undefined && manualBedtime.startTime - projectedNapEnd < followingWw;
       if (projectedNapEnd > threshold || crowdsManualBedtime) {
-        projected.push(...terminateCascade(ctx, n, wwStart, wwMinutes, manualBedtime));
+        projected.push(...terminateCascade(ctx, ww, wwStart + wwMinutes, manualBedtime));
         break;
+      }
+      if (skipped.has(napKey)) {
+        openWw = ww;
+        cursor = projectedNapEnd;
+        continue;
       }
     }
 
-    projected.push(buildWakeWindow(ctx, n, wwStart, napStart));
+    projected.push(buildWakeWindow(ctx, ww.n, ww.start, napStart));
+    openWw = undefined;
 
     if (existingNap) {
       // Use raw endTime (not render-time effectiveEndOf) so past naps don't stretch future WWs.
@@ -113,19 +131,18 @@ function projectSleepCascade(ctx: Context, existing: Event[]): Event[] {
 
 /**
  * Emits the closing wake-window + projected bedtime (if no manual bedtime).
- * Bedtime anchor = manualBedtime.startTime ?? max(earliestBedtime, wwStart + wwMinutes).
+ * Bedtime anchor = manualBedtime.startTime ?? max(earliestBedtime, wwEnd).
  */
 function terminateCascade(
   ctx: Context,
-  n: number,
-  wwStart: number,
-  wwMinutes: number,
+  ww: { n: number; start: number },
+  wwEnd: number,
   manualBedtime: Event | undefined,
 ): Event[] {
   const anchor = manualBedtime
     ? manualBedtime.startTime
-    : Math.max(ctx.settings.earliestBedtime, wwStart + wwMinutes);
-  const out: Event[] = [buildWakeWindow(ctx, n, wwStart, anchor)];
+    : Math.max(ctx.settings.earliestBedtime, wwEnd);
+  const out: Event[] = [buildWakeWindow(ctx, ww.n, ww.start, anchor)];
   if (!manualBedtime) {
     out.push(buildProjectedBedtime(ctx, anchor, ctx.settings));
   }

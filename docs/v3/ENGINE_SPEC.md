@@ -233,6 +233,9 @@ runs until the next sleep the cascade emits: the next nap, or bedtime.
 - A recorded nap in a skipped slot wins (R3.3, reality wins). A
   recorded nap in a later slot clamps against the real previous
   sleep's end (R3.6), not the skipped slot's projected end.
+- The merged window keeps slot N's key, so it takes `wake_window_N`'s
+  owner (R12.3). `wake_window_{N+1}` is not emitted while the skip
+  stands, so an owner set on it does not show until the nap is restored.
 - The terminator check (R3.1, R7.5) runs first. A slot that would
   become bedtime is bedtime, and skipping it does nothing.
 - Resets on the next day's fresh Day doc. Missing on older docs reads
