@@ -48,7 +48,8 @@ export function useDayPageState(db: Firestore, childId: string): UseDayPageState
   // so a view left open overnight auto-advances instead of staying pinned to a stale
   // active day (which mixed yesterday's recorded events with today's fresh ones). §F68.
   const today = useCurrentLocalDate();
-  useReconcileActiveDay(childId, today, settings?.defaultWakeTime ?? 7 * 60);
+  // Null until the settings doc arrives; the hook waits rather than rolling over at a placeholder.
+  useReconcileActiveDay(childId, today, settings?.defaultWakeTime ?? null);
   const { events: actuals, saveEvent, deleteOptimistic } = useV3Events(childId, day?.id ?? "");
   const { templates } = useV3Templates(childId);
   const drawerSuppressions = useDayDrawerSuppressions(db, childId, day?.id);
