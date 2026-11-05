@@ -445,7 +445,7 @@ before it stays as a second feed. The drawer decides the tag
 | Time-edit of a projected bottle `proj_bottle_t<T>` | the slot at `T` | the new time is later than `T` |
 | Create, `startTime <= now` (logged after the fact, DOMAIN.md §2) | the nearest forecast slot | the bottle just before it in the projection is a `proj_` slot within one interval, and no `proj_` slot after it is closer |
 | Create, `startTime > now` | none | never: a future FAB bottle is an extra (BOTTLE_SPEC §4) |
-| Time-edit of any recorded bottle | the nearest forecast slot in the projection recomputed without the doc | the create rule above holds at the new time; otherwise, or with no such projection, it is set to `false` (an update merges, so a deleted key would keep `true`) |
+| Time-edit of any recorded bottle | the nearest forecast slot in the projection recomputed without the doc | the create rule above holds at the new time, which for a `recorded_bottle_t<T>` doc may be after now (it began as a forecast); otherwise, or with no such projection, it is set to `false` (an update merges, so a deleted key would keep `true`) |
 
 A recorded bottle does not store which slot it stands in for, and its
 `recorded_bottle_t<T>` id names the time it was first saved, not a slot.

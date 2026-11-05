@@ -6,7 +6,7 @@
  */
 
 import type { Event, TimeMin } from "../schemas";
-import { isDreamFeed, isEngineEmittedId } from "./eventConventions";
+import { isDreamFeed, isEngineEmittedId, isRecordedBottleId } from "./eventConventions";
 
 export type RealizeTagInput = {
   mode: "create" | "edit";
@@ -40,8 +40,14 @@ export function withRealizeTag(input: RealizeTagInput): Event {
   }
   // Without that projection, untag: a forecast slot reappears beside the feed, where
   // a stale tag could silently absorb a slot the bottle no longer stands in for.
+  // A recorded_bottle_t<T> doc began as a forecast, so unlike a FAB bottle it may
+  // stand in for a slot after now.
   const without = input.projectionWithoutSource;
-  return without && loggedAfterTheFactRealizes({ ...input, projection: without })
+  return without &&
+    loggedAfterTheFactRealizes(
+      { ...input, projection: without },
+      { pastOnly: !isRecordedBottleId(source.id) },
+    )
     ? { ...saved, realizedForecast: true }
     : untagged(saved);
 }
@@ -57,10 +63,10 @@ function untagged(event: Event): Event {
  * Tag only when that slot is the bottle just before it, within one interval, with no
  * closer slot after it.
  */
-function loggedAfterTheFactRealizes(input: RealizeTagInput): boolean {
+function loggedAfterTheFactRealizes(input: RealizeTagInput, { pastOnly = true } = {}): boolean {
   const { saved, projection, nowMinutes, intervalMinutes } = input;
   const t = saved.startTime;
-  if (t > nowMinutes) return false;
+  if (pastOnly && t > nowMinutes) return false;
   const others = projection.filter(
     (e) => e.type === "bottle" && !isDreamFeed(e) && e.id !== saved.id,
   );

@@ -168,6 +168,11 @@ describe("R5.14 withRealizeTag: moving a slot", () => {
     expect(editRecorded(doc, 13 * 60, PROJECTION).realizedForecast).toBe(false);
   });
 
+  it("a realized forecast doc moved later, past now, stays tagged", () => {
+    const doc = bottle("recorded_bottle_t990", 16 * 60 + 30, { realizedForecast: true });
+    expect(editRecorded(doc, 16 * 60 + 40, PROJECTION).realizedForecast).toBe(true);
+  });
+
   // Its id names the time it was first saved (16:00), not the 16:15 slot it took.
   it("a forecast first saved at 16:00, moved to 16:10, is untagged: 16:15 is nearer", () => {
     const doc = bottle("recorded_bottle_t960", 16 * 60);

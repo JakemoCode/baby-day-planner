@@ -142,6 +142,13 @@ describe("seam: editing a moved forecast again keeps standing in for the same sl
     expect(before12).toEqual([7 * 60 + 10, 9 * 60]);
   });
 
+  it("16:30 moved to 16:45, then to 16:50, both after now: the 16:30 slot stays gone", async () => {
+    const first = await editBottle([], slotAt([], 16 * 60 + 30), 16 * 60 + 45);
+    const second = await editBottle([first], first, 16 * 60 + 50);
+    const after16 = bottleTimes([second]).filter((t) => t >= 16 * 60 && t < 18 * 60);
+    expect(after16).toEqual([16 * 60 + 50]);
+  });
+
   it("13:15 moved to 14:05, then corrected to 14:00: the 13:15 slot stays gone", async () => {
     const first = await editBottle([], slotAt([], 13 * 60 + 15), 14 * 60 + 5);
     const second = await editBottle([first], first, 14 * 60);

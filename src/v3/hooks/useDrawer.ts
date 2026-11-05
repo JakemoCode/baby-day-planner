@@ -110,7 +110,12 @@ export function useDrawer({
       nowMinutes: currentLocalMinutes(),
       projection: forecast.projection,
       intervalMinutes: forecast.intervalMinutes,
-      ...(mode === "edit" && saved.type === "bottle" && forecast.projectWithout
+      // Only a recorded bottle's time-edit reads it, and it costs a full projectDay.
+      ...(mode === "edit" &&
+      saved.type === "bottle" &&
+      !isEngineEmittedId(source.id) &&
+      saved.startTime !== source.startTime &&
+      forecast.projectWithout
         ? { projectionWithoutSource: forecast.projectWithout(source.id) }
         : {}),
     });
