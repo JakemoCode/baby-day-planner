@@ -13,6 +13,7 @@ import { useV3Settings } from "./useV3Settings";
 import { useV3Events } from "./useV3Events";
 import { useV3Templates } from "./useV3Templates";
 import { useV3Projection } from "./useV3Projection";
+import { forecastIntervalMinutes } from "../engine/bottleIntervalRules";
 import { useDrawer, type DrawerState, type UseDrawerResult } from "./useDrawer";
 import { useDayDrawerSuppressions } from "./useDayDrawerSuppressions";
 import { useReconcileActiveDay } from "./useReconcileActiveDay";
@@ -68,6 +69,18 @@ export function useDayPageState(db: Firestore, childId: string): UseDayPageState
     [db, childId, day, settings, saveEvent],
   );
 
+  const template = useMemo<OwnershipTemplate | undefined>(() => {
+    if (!day?.templateId) return undefined;
+    return templates.find((t) => t.id === day.templateId);
+  }, [day, templates]);
+
+  const projected = useV3Projection({
+    day,
+    settings,
+    actuals,
+    ...(template ? { template } : {}),
+  });
+
   const { drawer, openCreate, openEdit, close, onSave, onDelete } = useDrawer({
     saveEvent,
     deleteOptimistic,
@@ -79,18 +92,9 @@ export function useDayPageState(db: Firestore, childId: string): UseDayPageState
       : {}),
     suppressions: drawerSuppressions,
     saveNewEvent,
-  });
-
-  const template = useMemo<OwnershipTemplate | undefined>(() => {
-    if (!day?.templateId) return undefined;
-    return templates.find((t) => t.id === day.templateId);
-  }, [day, templates]);
-
-  const projected = useV3Projection({
-    day,
-    settings,
-    actuals,
-    ...(template ? { template } : {}),
+    ...(settings
+      ? { forecast: { projection: projected, intervalMinutes: forecastIntervalMinutes(settings) } }
+      : {}),
   });
 
   return {

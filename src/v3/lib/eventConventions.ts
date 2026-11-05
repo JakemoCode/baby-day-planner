@@ -47,9 +47,15 @@ function recordedBottleIdFor(startTime: number): string {
 }
 
 /** True for the deterministic recorded-bottle doc id, independent of the live startTime. */
-const RECORDED_BOTTLE_ID = /^recorded_bottle_t\d+$/;
+const RECORDED_BOTTLE_ID = /^recorded_bottle_t(\d+)$/;
 export function isRecordedBottleId(id: string): boolean {
   return RECORDED_BOTTLE_ID.test(id);
+}
+
+/** The forecast time a recorded bottle id names (it does not follow later time-edits); null for other ids. */
+export function recordedBottleSlotTime(id: string): number | null {
+  const match = RECORDED_BOTTLE_ID.exec(id);
+  return match ? Number(match[1]) : null;
 }
 
 /**

@@ -277,6 +277,28 @@ describe("useDrawer", () => {
     expect(saveEvent).toHaveBeenCalledWith(expect.objectContaining({ realizedForecast: true }));
   });
 
+  it("R5.14: time-edit of a recorded slot doc to later than its id time keeps absorbing the slot", async () => {
+    const recordedSlot = makeEvent({
+      id: "recorded_bottle_t600",
+      type: "bottle",
+      kind: "instant",
+      eventKey: "bottle_1",
+      startTime: 10 * 60,
+      lifecycle: { state: "recorded", annotatedAt: 10 * 60 },
+    });
+    const saveEvent = makeSaveEvent();
+    const { result } = setup({ saveEvent });
+
+    act(() => result.current.openEdit(recordedSlot));
+    await act(async () => {
+      await result.current.onSave({ ...recordedSlot, startTime: 10 * 60 + 40 });
+    });
+
+    expect(saveEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "recorded_bottle_t600", realizedForecast: true }),
+    );
+  });
+
   // The tag is bottle-only: a projected nap edit must NOT carry it.
   it("projected NAP edit does not tag realizedForecast", async () => {
     const projected = makeEvent({ id: "proj_nap_5", eventKey: "nap_5" });

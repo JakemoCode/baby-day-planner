@@ -6,7 +6,7 @@
 
 import type { Context, Event } from "../../schemas";
 import type { Rule } from "../evaluator";
-import { intervalForAmount } from "../bottleIntervalRules";
+import { forecastIntervalMinutes, intervalForAmount } from "../bottleIntervalRules";
 import { isBedtime, isBottle, isProjected, projectedEvent } from "../helpers";
 import { MINUTES_PER_DAY } from "../../ui/time";
 import { DREAM_FEED_EVENT_KEY, isDreamFeed } from "../../lib/eventConventions";
@@ -161,13 +161,7 @@ function computeBottleProjectionTimes(inputs: CascadeInputs, ctx: Context): numb
   const { wakeTime, cap, seedTime, anchors, snap } = inputs;
   const defaultInterval = ctx.settings.defaultBottleIntervalMinutes;
   const rules = ctx.settings.bottleIntervalRules;
-  // Projections carry the default amount, so they advance by the default amount's
-  // interval (which the rules may shorten/lengthen) — not the raw default minutes.
-  const projInterval = intervalForAmount(
-    rules,
-    ctx.settings.defaultBottleAmountOz,
-    defaultInterval,
-  );
+  const projInterval = forecastIntervalMinutes(ctx.settings);
 
   // The cursor has reached this recorded bottle → re-seed the forecast forward from
   // it. NO look-ahead absorption: a recorded feed never deletes an earlier forecast
