@@ -5,7 +5,7 @@
 
 import React, { useEffect } from "react";
 import { describe, expect, it, vi } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { Event, OwnersConfig, TimeMin } from "../../schemas";
 import { NO_OWNER } from "../../schemas";
@@ -127,6 +127,93 @@ describe("EventEditDrawerV3", () => {
     );
     expect(screen.getByLabelText("Amount (oz)")).toHaveValue(null);
     expect(screen.queryByLabelText("End time")).not.toBeInTheDocument();
+  });
+
+  describe("amount stepper", () => {
+    const renderBottle = (amountOz?: number) =>
+      render(
+        <EventEditDrawerV3
+          open
+          mode="edit"
+          event={projectedBottle(amountOz === undefined ? {} : { amountOz })}
+          owners={owners}
+          nowMinutes={NOW}
+          bedtimeThreshold={THRESHOLD}
+          defaultWakeTime={DEFAULT_WAKE_TIME}
+          onSave={() => {}}
+          onCancel={() => {}}
+        />,
+      );
+
+    it("+ adds a quarter ounce and - takes one away", async () => {
+      renderBottle(4);
+      await userEvent.click(screen.getByRole("button", { name: "Add a quarter ounce" }));
+      expect(screen.getByLabelText("Amount (oz)")).toHaveValue(4.25);
+      await userEvent.click(screen.getByRole("button", { name: "Remove a quarter ounce" }));
+      await userEvent.click(screen.getByRole("button", { name: "Remove a quarter ounce" }));
+      expect(screen.getByLabelText("Amount (oz)")).toHaveValue(3.75);
+    });
+
+    it("+ on an empty amount starts at a quarter ounce; - never goes below zero", async () => {
+      renderBottle();
+      await userEvent.click(screen.getByRole("button", { name: "Add a quarter ounce" }));
+      expect(screen.getByLabelText("Amount (oz)")).toHaveValue(0.25);
+      await userEvent.click(screen.getByRole("button", { name: "Remove a quarter ounce" }));
+      await userEvent.click(screen.getByRole("button", { name: "Remove a quarter ounce" }));
+      expect(screen.getByLabelText("Amount (oz)")).toHaveValue(0);
+    });
+
+    it("stepping leaves no float tail and keeps finer values: 4.1 + a quarter is 4.35, 4.125 + a quarter is 4.375", async () => {
+      renderBottle(4.1);
+      await userEvent.click(screen.getByRole("button", { name: "Add a quarter ounce" }));
+      expect(screen.getByLabelText("Amount (oz)")).toHaveValue(4.35);
+      cleanup();
+      renderBottle(4.125);
+      await userEvent.click(screen.getByRole("button", { name: "Add a quarter ounce" }));
+      expect(screen.getByLabelText("Amount (oz)")).toHaveValue(4.375);
+    });
+
+    it("typing still works and the stepped value is what gets saved", async () => {
+      const onSave = vi.fn();
+      render(
+        <EventEditDrawerV3
+          open
+          mode="edit"
+          event={projectedBottle({ amountOz: 4 })}
+          owners={owners}
+          nowMinutes={NOW}
+          bedtimeThreshold={THRESHOLD}
+          defaultWakeTime={DEFAULT_WAKE_TIME}
+          onSave={onSave}
+          onCancel={() => {}}
+        />,
+      );
+      const input = screen.getByLabelText("Amount (oz)");
+      await userEvent.clear(input);
+      await userEvent.type(input, "5");
+      await userEvent.click(screen.getByRole("button", { name: "Add a quarter ounce" }));
+      await userEvent.click(screen.getByRole("button", { name: "Save" }));
+      expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ amountOz: 5.25 }));
+    });
+
+    it("the stepper is disabled while the amount is locked", () => {
+      render(
+        <EventEditDrawerV3
+          open
+          mode="edit"
+          event={projectedBottle({ startTime: NOW + 4 * 60 })}
+          owners={owners}
+          nowMinutes={NOW}
+          bedtimeThreshold={THRESHOLD}
+          defaultWakeTime={DEFAULT_WAKE_TIME}
+          onSave={() => {}}
+          onCancel={() => {}}
+        />,
+      );
+      expect(screen.getByLabelText("Amount (oz)")).toBeDisabled();
+      expect(screen.getByRole("button", { name: "Add a quarter ounce" })).toBeDisabled();
+      expect(screen.getByRole("button", { name: "Remove a quarter ounce" })).toBeDisabled();
+    });
   });
 
   it("drawer heading for a bottle includes its chronological number", () => {
