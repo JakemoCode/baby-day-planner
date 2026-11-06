@@ -29,7 +29,6 @@ import {
   suppressDreamFeedForDay,
   suppressNapForDay,
   suppressRecurringForDay,
-  unsuppressNapForDay,
   updateDay,
   updateDayOwnerOverride,
   watchActiveDay,
@@ -242,14 +241,6 @@ describe("v3 days repository", () => {
     expect((await getDay(database, "child-1", "day-1"))?.suppressedNapKeys).toEqual([]);
     await suppressNapForDay(database, "child-1", "day-1", "nap_3");
     expect((await getDay(database, "child-1", "day-1"))?.suppressedNapKeys).toEqual(["nap_3"]);
-  });
-
-  it("R3.11: unsuppressNapForDay restores one skipped nap and keeps the others", async () => {
-    const database = db();
-    await createDay(database, day({ suppressedNapKeys: ["nap_2", "nap_3"] }));
-    await unsuppressNapForDay(database, "child-1", "day-1", "nap_2");
-    const got = await getDay(database, "child-1", "day-1");
-    expect(got?.suppressedNapKeys).toEqual(["nap_3"]);
   });
 
   // Previously minted `day-${date}-${Date.now()}` ids, racing concurrent

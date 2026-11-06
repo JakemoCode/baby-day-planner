@@ -17,7 +17,8 @@ import { napTotals } from "../components/Dashboard/dashboardStats";
 import { nextSleep } from "../selectors";
 import { isInProgress } from "../lib/effectiveEnd";
 import { isRenderSynthetic } from "../lib/syntheticEvents";
-import { aDay, aSettings } from "./factories";
+import { aDay, aRecordedNap, aSettings } from "./factories";
+import { withRealizeTag } from "../lib/realizeForecast";
 import type { Event } from "../schemas";
 
 // wake 07:00, WWs [120,150,180], 60-min naps: nap_1 09:00, nap_2 12:30, nap_3 16:30.
@@ -40,7 +41,7 @@ describe("seam: skip an auto-promoted nap → dashboard moves on to the next rea
     expect(napTotals(view, NOW)).toEqual({ count: 2, totalMinutes: 90 });
   });
 
-  it("the tapped nap offers Skip today and routes to the nap suppression keyed by its slot", () => {
+  it("the tapped nap offers Delete and routes to the nap suppression keyed by its slot", () => {
     const nap2 = dashboardView([]).find((e) => e.eventKey === "nap_2" && !isRenderSynthetic(e))!;
     expect(drawerDestructiveAction(nap2, { mode: "edit", hasOnDelete: true })).toBe("delete");
     const matching = useDayDrawerSuppressions({} as Firestore, "child_test", "day_test").filter(
@@ -56,5 +57,41 @@ describe("seam: skip an auto-promoted nap → dashboard moves on to the next rea
     expect(napTotals(view, NOW)).toEqual({ count: 1, totalMinutes: 60 });
     const next = nextSleep(view, NOW);
     expect([next?.eventKey, next?.startTime]).toEqual(["nap_3", 16 * 60 + 30]);
+  });
+});
+
+describe("seam: after deleting nap_2 the FAB re-adds the nap into the slot the cascade expects (R3.12)", () => {
+  it("a 12:50 FAB nap records as nap_3 and the day re-flows in slot order", () => {
+    const day = aDay({ wakeTime: 7 * 60, suppressedNapKeys: ["nap_2"] });
+    const before = projectDay(
+      { day, settings, actuals: [], nowMinutes: NOW },
+      { rules: ALL_RULES },
+    );
+    const template = aRecordedNap({ id: "nap_9b2c", eventKey: "nap_4", start: NOW, end: NOW + 45 });
+    const saved = withRealizeTag({
+      mode: "create",
+      source: template,
+      saved: aRecordedNap({
+        id: "nap_9b2c",
+        eventKey: "nap_4",
+        start: 12 * 60 + 50,
+        end: 13 * 60 + 35,
+      }),
+      projection: before,
+      nowMinutes: NOW,
+      intervalMinutes: 180,
+    });
+    expect([saved.eventKey, saved.id]).toEqual(["nap_3", "recorded_nap_3"]);
+
+    const after = projectDay(
+      { day, settings, actuals: [saved], nowMinutes: NOW },
+      { rules: ALL_RULES },
+    );
+    const naps = after.filter((e) => e.type === "nap" && !isRenderSynthetic(e));
+    const inTimeOrder = [...naps].sort((a, b) => a.startTime - b.startTime).map((e) => e.eventKey);
+    expect(inTimeOrder).toEqual(naps.map((e) => e.eventKey));
+    expect(inTimeOrder.slice(0, 2)).toEqual(["nap_1", "nap_3"]);
+    const ww2 = after.find((e) => e.eventKey === "wake_window_2");
+    expect([ww2?.startTime, ww2?.endTime]).toEqual([10 * 60, 12 * 60 + 50]);
   });
 });

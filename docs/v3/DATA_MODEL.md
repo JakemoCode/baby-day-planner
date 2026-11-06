@@ -279,7 +279,7 @@ today's timeline. The next day starts when "Start New Day" is tapped
 
 ### R14.7 Per-day suppressions live on the Day doc and reset each day
 
-"Skip today" writes to the Day doc, never to an event or a template, so
+A per-day skip (deleting a projected nap, or "Skip today" on a recurring event) writes to the Day doc, never to an event or a template, so
 tomorrow's fresh Day starts clean. `withV3DayDefaults` reads a missing
 field as its default.
 

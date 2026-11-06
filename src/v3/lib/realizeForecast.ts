@@ -3,10 +3,20 @@
  * bottle absorbs the last forecast slot before it (bottles.ts realize branch); a slot
  * at or after it is already taken by the R5.1 re-seed, so the tag is set only when the
  * slot the bottle stands in for lies before it. Called from useDrawer, the one tagging site.
+ *
+ * ENGINE_SPEC §R3.12: a nap logged from the FAB records into the first projected nap
+ * slot still open at its start, one that ends after it (its key, label and recorded id),
+ * instead of minting a new slot the cascade would place after every projected one.
  */
 
 import type { Event, TimeMin } from "../schemas";
-import { isDreamFeed, isEngineEmittedId, isRecordedBottleId } from "./eventConventions";
+import {
+  isDreamFeed,
+  isEngineEmittedId,
+  isRecordedBottleId,
+  recordedIdForEvent,
+} from "./eventConventions";
+import { isRenderSynthetic } from "./syntheticEvents";
 
 export type RealizeTagInput = {
   mode: "create" | "edit";
@@ -27,6 +37,7 @@ export type RealizeTagInput = {
 
 export function withRealizeTag(input: RealizeTagInput): Event {
   const { mode, source, saved } = input;
+  if (saved.type === "nap") return mode === "create" ? intoFirstProjectedSlot(input) : saved;
   if (saved.type !== "bottle" || isDreamFeed(saved)) return saved;
   if (mode === "create") {
     return loggedAfterTheFactRealizes(input) ? { ...saved, realizedForecast: true } : saved;
@@ -50,6 +61,23 @@ export function withRealizeTag(input: RealizeTagInput): Event {
     )
     ? { ...saved, realizedForecast: true }
     : untagged(saved);
+}
+
+/**
+ * DOMAIN.md §3: a nap he does take is the nap it was. A FAB nap at any time takes the
+ * first projected slot that ends after its start, so a nap set inside or ahead of a slot
+ * is that slot and order follows the clock; one later than every projected slot is the
+ * new slot the FAB minted.
+ */
+function intoFirstProjectedSlot(input: RealizeTagInput): Event {
+  const { saved, projection } = input;
+  const slot = projection
+    .filter((e) => e.type === "nap" && isEngineEmittedId(e.id) && !isRenderSynthetic(e))
+    .filter((e) => (e.endTime ?? e.startTime) > saved.startTime)
+    .sort((a, b) => a.startTime - b.startTime)[0];
+  if (!slot) return saved;
+  const keyed = { ...saved, eventKey: slot.eventKey, label: slot.label };
+  return { ...keyed, id: recordedIdForEvent(keyed) };
 }
 
 // Explicit false, not a deleted key: saveEvent updates an existing doc with a merge

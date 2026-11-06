@@ -4,7 +4,6 @@
  */
 
 import {
-  arrayRemove,
   arrayUnion,
   collection,
   doc,
@@ -135,18 +134,6 @@ export async function suppressNapForDay(
 ): Promise<void> {
   await updateDoc(dayRef(db, childId, dayId), {
     suppressedNapKeys: arrayUnion(napKey),
-  });
-}
-
-/** Undo a "Skip today" on a nap slot (R3.11). */
-export async function unsuppressNapForDay(
-  db: Firestore,
-  childId: string,
-  dayId: string,
-  napKey: string,
-): Promise<void> {
-  await updateDoc(dayRef(db, childId, dayId), {
-    suppressedNapKeys: arrayRemove(napKey),
   });
 }
 

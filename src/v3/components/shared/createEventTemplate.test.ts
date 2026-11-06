@@ -137,12 +137,24 @@ describe("buildCreateTemplate (V3)", () => {
     expect(tpl.eventKey).toBe("bottle_5");
   });
 
-  // nap removed from CreatableType (PR #146); parents edit projected chips instead.
-  it("throws if called with type='nap' (not a CreatableType anymore)", () => {
+  it("builds a nap in the next free slot with the default nap length", () => {
+    const t = buildCreateTemplate({
+      type: "nap",
+      dayId: "d-1",
+      actuals: [],
+      settings: settings(),
+      nowMinutes: NOW,
+    });
+    expect([t.type, t.kind, t.eventKey, t.label]).toEqual(["nap", "block", "nap_1", "Nap 1"]);
+    expect(t.endTime).toBe(NOW + settings().defaultNapLengthMinutes);
+    expect(t.lifecycle.state).toBe("projected");
+  });
+
+  it("throws if called with an unsupported type", () => {
     expect(() =>
       buildCreateTemplate({
-        // @ts-expect-error — nap is no longer a CreatableType.
-        type: "nap",
+        // @ts-expect-error — not a CreatableType.
+        type: "wake_window",
         dayId: "d-1",
         actuals: [],
         settings: settings(),

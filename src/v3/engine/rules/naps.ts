@@ -47,7 +47,7 @@ function projectSleepCascade(ctx: Context, existing: Event[]): Event[] {
   let cursor = wakeTime;
   // R3.11: set while skipped slots are open. The emitted wake window keeps the real
   // previous sleep's end and slot number; `cursor` still advances through the
-  // skipped nap's span so later slots keep their times.
+  // skipped nap's span so later naps keep their times, while bedtime anchors to ww.start.
   let openWw: { n: number; start: number } | undefined;
 
   // Defensive cap against pathological inputs (threshold misconfigured beyond day length).
@@ -92,7 +92,9 @@ function projectSleepCascade(ctx: Context, existing: Event[]): Event[] {
       const crowdsManualBedtime =
         manualBedtime !== undefined && manualBedtime.startTime - projectedNapEnd < followingWw;
       if (projectedNapEnd > threshold || crowdsManualBedtime) {
-        projected.push(...terminateCascade(ctx, ww, wwStart + wwMinutes, manualBedtime));
+        // Bedtime counts the wake window from the real last sleep (ww.start), not from a
+        // skipped slot's projected end, so skipping the last nap brings bedtime earlier (R3.11).
+        projected.push(...terminateCascade(ctx, ww, ww.start + wwMinutes, manualBedtime));
         break;
       }
       if (skipped.has(napKey)) {

@@ -184,3 +184,86 @@ describe("R5.14 withRealizeTag: moving a slot", () => {
     expect(editRecorded(doc, 14 * 60 + 20).realizedForecast).toBe(false);
   });
 });
+
+function nap(id: string, eventKey: string, startTime: number, extra: Partial<Event> = {}): Event {
+  return {
+    id,
+    dayId: "day_test",
+    eventKey,
+    type: "nap",
+    kind: "block",
+    label: `Nap ${eventKey.replace("nap_", "")}`,
+    startTime,
+    endTime: startTime + 60,
+    hasPutdown: false,
+    owner: NO_OWNER,
+    lifecycle: { state: "projected" },
+    ...extra,
+  };
+}
+
+// Nap 2 was deleted today (not in the projection); nap_1 is recorded, nap_3 is still a forecast.
+const NAP_PROJECTION = [
+  nap("recorded_nap_1", "nap_1", 9 * 60, {
+    lifecycle: { state: "completed", committedAt: 10 * 60 },
+  }),
+  nap("proj_nap_3", "nap_3", 16 * 60 + 30),
+];
+
+function createNap(startTime: number, projection: Event[] = NAP_PROJECTION): Event {
+  const template = nap("nap_7f3a", "nap_4", NOW);
+  return withRealizeTag({
+    mode: "create",
+    source: template,
+    saved: { ...template, startTime, endTime: startTime + 45 },
+    projection,
+    nowMinutes: NOW,
+    intervalMinutes: INTERVAL,
+  });
+}
+
+describe("R3.12 withRealizeTag: a nap logged from the FAB", () => {
+  it("records into the first projected slot that ends after its start, with its key, label and recorded id", () => {
+    const out = createNap(15 * 60);
+    expect([out.eventKey, out.label, out.id]).toEqual(["nap_3", "Nap 3", "recorded_nap_3"]);
+    expect([out.startTime, out.endTime]).toEqual([15 * 60, 15 * 60 + 45]);
+  });
+
+  it("at a future time takes the first open slot too, so a nap set ahead cannot sort before a lower slot", () => {
+    const out = createNap(16 * 60);
+    expect([out.eventKey, out.id]).toEqual(["nap_3", "recorded_nap_3"]);
+  });
+
+  it("set to start inside a projected slot is that slot, not the one after it", () => {
+    const out = createNap(16 * 60 + 45);
+    expect([out.eventKey, out.id]).toEqual(["nap_3", "recorded_nap_3"]);
+  });
+
+  it("set to start exactly when a projected slot ends takes the slot after it", () => {
+    const out = createNap(17 * 60 + 30, [...NAP_PROJECTION, nap("proj_nap_4", "nap_4", 19 * 60)]);
+    expect(out.eventKey).toBe("nap_4");
+  });
+
+  it("with no projected nap left stays the new slot", () => {
+    const out = createNap(15 * 60, [NAP_PROJECTION[0]!]);
+    expect([out.eventKey, out.id]).toEqual(["nap_4", "nap_7f3a"]);
+  });
+
+  it("never takes a recorded nap's slot", () => {
+    const out = createNap(9 * 60 + 20);
+    expect(out.eventKey).toBe("nap_3");
+  });
+
+  it("later than every projected slot keeps the new slot, so slot order follows the clock", () => {
+    const earlierSlots = NAP_PROJECTION.map((e) =>
+      e.eventKey === "nap_3" ? { ...e, startTime: 14 * 60, endTime: 15 * 60 } : e,
+    );
+    const out = createNap(NOW, earlierSlots);
+    expect([out.eventKey, out.id]).toEqual(["nap_4", "nap_7f3a"]);
+  });
+
+  it("earlier than two projected slots takes the first of them, not the closer later one", () => {
+    const out = createNap(11 * 60, [...NAP_PROJECTION, nap("proj_nap_2", "nap_2", 12 * 60 + 30)]);
+    expect(out.eventKey).toBe("nap_2");
+  });
+});

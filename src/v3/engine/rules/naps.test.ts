@@ -553,11 +553,37 @@ describe("R3.11: a skipped nap slot emits no nap; its wake window runs on to the
     expect(span(out, "bedtime")?.[0]).toBe(20 * 60 + 30);
   });
 
-  it("skipping nap_2 and nap_3 leaves one wake window from nap_1's end to bedtime", () => {
+  it("skipping the last nap brings bedtime to the real last sleep's end plus a wake window", () => {
+    // nap_3 skipped: awake since nap_2 ended at 13:30; 13:30 + 180 = 16:30 < earliestBedtime 18:00.
+    const out = run(["nap_3"]);
+    expect(span(out, "nap_3")).toBeUndefined();
+    expect(span(out, "wake_window_3")).toEqual([13 * 60 + 30, 18 * 60]);
+    expect(span(out, "bedtime")?.[0]).toBe(18 * 60);
+  });
+
+  it("skipping nap_2 and nap_3 leaves one wake window from nap_1's end to an earlier bedtime", () => {
     const out = run(["nap_2", "nap_3"]);
     expect(out.filter((e) => e.type === "nap").map((e) => e.eventKey)).toEqual(["nap_1"]);
-    expect(span(out, "wake_window_2")).toEqual([10 * 60, 20 * 60 + 30]);
-    expect(span(out, "bedtime")?.[0]).toBe(20 * 60 + 30);
+    expect(span(out, "wake_window_2")).toEqual([10 * 60, 18 * 60]);
+    expect(span(out, "bedtime")?.[0]).toBe(18 * 60);
+  });
+
+  it("skipping the last nap with a low earliest bedtime lands bedtime at last sleep plus the window", () => {
+    const out = projectDay(
+      {
+        day: aDay({ wakeTime: 7 * 60, suppressedNapKeys: ["nap_3"] }),
+        settings: aSettings({
+          wakeWindowsMinutes: [120, 150, 180],
+          defaultNapLengthMinutes: 60,
+          earliestBedtime: 15 * 60,
+        }),
+        actuals: [],
+        nowMinutes: 7 * 60,
+      },
+      { rules: ALL_RULES },
+    );
+    expect(span(out, "bedtime")?.[0]).toBe(16 * 60 + 30);
+    expect(span(out, "wake_window_3")).toEqual([13 * 60 + 30, 16 * 60 + 30]);
   });
 
   it("a recorded nap in a skipped slot wins over the skip", () => {

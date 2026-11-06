@@ -221,21 +221,29 @@ duration falls outside `[settings.napDurationMin, napDurationMax]`
 ### R3.11 A skipped nap slot emits no nap; its wake window runs on to the next sleep
 
 `Day.suppressedNapKeys: string[]` lists the nap slots (`nap_N`) the
-household skipped today via the drawer's "Skip today". For a skipped
-slot with no recorded nap, the cascade emits no nap and no separate
-wake window. `wake_window_N` starts at the previous sleep's end and
-runs until the next sleep the cascade emits: the next nap, or bedtime.
+household deleted today via the drawer's "Delete" on a projected nap.
+For a skipped slot with no recorded nap, the cascade emits no nap and
+no separate wake window. `wake_window_N` starts at the previous sleep's
+end and runs until the next sleep the cascade emits: the next nap, or
+bedtime.
 
-- Later slots keep the times they would have had. The skipped nap's
-  span still advances the cascade's clock, so `nap_{N+1}` and bedtime
-  do not slide earlier into the hole. A missed nap did not move
-  (DOMAIN.md §3), so the next nap does not take its place.
+- Later naps keep the times they would have had. The skipped nap's
+  span still advances the cascade's clock for nap placement, so
+  `nap_{N+1}` does not slide earlier into the hole. A missed nap did
+  not move (DOMAIN.md §3), so the next nap does not take its place.
+- Bedtime does move. The terminator counts the wake window from the
+  real last sleep's end (the open window's start), not from the
+  skipped slot's projected end: `bedtime = max(earliestBedtime,
+  lastRealSleepEnd + WW)`. Skipping the last nap of the day therefore
+  brings bedtime earlier, which is what a missed nap does to a baby
+  (DOMAIN.md §1, §3). Skipping a middle nap leaves bedtime where the
+  following nap puts it.
 - A recorded nap in a skipped slot wins (R3.3, reality wins). A
   recorded nap in a later slot clamps against the real previous
   sleep's end (R3.6), not the skipped slot's projected end.
 - The merged window keeps slot N's key, so it takes `wake_window_N`'s
   owner (R12.3). `wake_window_{N+1}` is not emitted while the skip
-  stands, so an owner set on it does not show until the nap is restored.
+  stands, so an owner set on it does not show for the rest of the day.
 - The terminator check (R3.1, R7.5) runs first. A slot that would
   become bedtime is bedtime, and skipping it does nothing.
 - Resets on the next day's fresh Day doc. Missing on older docs reads
@@ -245,6 +253,27 @@ runs until the next sleep the cascade emits: the next nap, or bedtime.
   something else over the slot.
 - **Edge case it prevents**: skipping Nap 2 and seeing Nap 3 jump into
   Nap 2's old time, which reads as if the skip did nothing.
+
+### R3.12 A nap logged from the FAB records into the first projected slot still open at its start
+
+The FAB mints a new slot (`nap_{max+1}`), which the cascade would place
+after every projected nap. `withRealizeTag`
+(`src/v3/lib/realizeForecast.ts`) instead gives the saved event the key,
+label and recorded id of the first projected (`proj_`) nap whose end is
+after the nap's start, whether that start is past or ahead of now. A
+nap set inside a projected slot's span, or ahead of it, is that slot,
+so slot order follows the clock and the cascade re-flows from it. A nap
+that starts at or after the end of every projected slot stays the new
+slot. With no projected nap left,
+which is the case after deleting the last nap of the day, the new slot
+stands and the cascade places it from the real last sleep.
+
+- Why: after a deleted nap (R3.11), the FAB is the way to log the nap
+  that did happen later. Keyed as a new slot it would sort before a
+  projected slot with a lower number and the wake windows would follow
+  slot order, not the clock.
+- There is no undo for a deletion beyond this. Tomorrow's Day starts
+  clean (DATA_MODEL R14.7).
 
 ---
 
