@@ -4,12 +4,11 @@ import type { TimeMin } from "@/v3/schemas";
 import { useNowMinutes } from "@/hooks/useNowMinutes";
 import { useDayPageState } from "@/v3/hooks/useDayPageState";
 import { db } from "@/lib/firebase/client";
-import { editWakeTime, unsuppressNapForDay } from "@/v3/repositories/days";
+import { editWakeTime } from "@/v3/repositories/days";
 import { LoadingState } from "@/components/shared/LoadingState";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { AddEventFAB } from "@/v3/components/shared/AddEventFAB";
 import { DrawerShell } from "@/v3/components/shared/DrawerShell";
-import { SkippedNaps } from "@/v3/components/shared/SkippedNaps";
 import { EditableWakeTime } from "@/v3/components/Dashboard/EditableWakeTime";
 import { TimelineV3 } from "@/v3/components/Timeline/TimelineV3";
 import styles from "./page.module.css";
@@ -62,15 +61,6 @@ export default function TimelinePage() {
             wakeTime={day.wakeTime}
             onChange={(t) => void handleEditWakeTime(t)}
             variant="card"
-          />
-        </div>
-      )}
-
-      {day.suppressedNapKeys.length > 0 && (
-        <div className={styles.skippedContainer}>
-          <SkippedNaps
-            napKeys={day.suppressedNapKeys}
-            onRestore={(key) => void unsuppressNapForDay(db, CHILD_ID, day.id, key)}
           />
         </div>
       )}

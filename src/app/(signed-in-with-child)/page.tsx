@@ -11,13 +11,12 @@ import { useNowMinutes } from "@/hooks/useNowMinutes";
 import { useV3TomorrowPlan } from "@/v3/hooks/useV3TomorrowPlan";
 import { useDayPageState } from "@/v3/hooks/useDayPageState";
 import { isEngineEmittedId, recordedIdForEvent } from "@/v3/lib/eventConventions";
-import { promoteFromPlan, startNewDay, unsuppressNapForDay } from "@/v3/repositories/days";
+import { promoteFromPlan, startNewDay } from "@/v3/repositories/days";
 import { forecastSnapshotDocs } from "@/v3/lib/forecastSnapshot";
 import { deleteEvent, listEvents, reconcileDuplicateEventDocs } from "@/v3/repositories/events";
 import { db } from "@/lib/firebase/client";
 import { DashboardSkeleton } from "@/v3/components/Dashboard/DashboardSkeleton";
 import { DrawerShell } from "@/v3/components/shared/DrawerShell";
-import { SkippedNaps } from "@/v3/components/shared/SkippedNaps";
 import { NowBanner } from "@/v3/components/Dashboard/NowBanner";
 import { ContextualActionButton } from "@/v3/components/Dashboard/ContextualActionButton";
 import { NextBottlePanel } from "@/v3/components/Dashboard/NextBottlePanel";
@@ -152,11 +151,6 @@ export default function DashboardPage() {
         putdownLeadMinutes={settings.putdownLeadMinutes}
         owners={settings.owners}
       />
-      <SkippedNaps
-        napKeys={day.suppressedNapKeys}
-        onRestore={(key) => void unsuppressNapForDay(db, CHILD_ID, day.id, key)}
-      />
-
       {/* `projected` (not `actuals`) so scheduled pumps from pumpTimes (R9.1) show the
           card before any volume is recorded; recorded pumps carry the volume that sums. */}
       {projected.some((e) => e.type === "pump") && (

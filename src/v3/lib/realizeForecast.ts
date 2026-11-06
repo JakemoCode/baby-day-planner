@@ -3,10 +3,20 @@
  * bottle absorbs the last forecast slot before it (bottles.ts realize branch); a slot
  * at or after it is already taken by the R5.1 re-seed, so the tag is set only when the
  * slot the bottle stands in for lies before it. Called from useDrawer, the one tagging site.
+ *
+ * ENGINE_SPEC §R3.12: a nap logged from the FAB at or before now records into the
+ * nearest projected nap slot (its key, label and recorded id) instead of minting a new
+ * slot the cascade would place after every projected one.
  */
 
 import type { Event, TimeMin } from "../schemas";
-import { isDreamFeed, isEngineEmittedId, isRecordedBottleId } from "./eventConventions";
+import {
+  isDreamFeed,
+  isEngineEmittedId,
+  isRecordedBottleId,
+  recordedIdForEvent,
+} from "./eventConventions";
+import { isRenderSynthetic } from "./syntheticEvents";
 
 export type RealizeTagInput = {
   mode: "create" | "edit";
@@ -27,6 +37,7 @@ export type RealizeTagInput = {
 
 export function withRealizeTag(input: RealizeTagInput): Event {
   const { mode, source, saved } = input;
+  if (saved.type === "nap") return mode === "create" ? intoNearestNapSlot(input) : saved;
   if (saved.type !== "bottle" || isDreamFeed(saved)) return saved;
   if (mode === "create") {
     return loggedAfterTheFactRealizes(input) ? { ...saved, realizedForecast: true } : saved;
@@ -50,6 +61,23 @@ export function withRealizeTag(input: RealizeTagInput): Event {
     )
     ? { ...saved, realizedForecast: true }
     : untagged(saved);
+}
+
+/**
+ * DOMAIN.md §3: a nap he does take is the nap it was. A past-time FAB nap takes the
+ * nearest projected slot by clock distance; a future-time one is a new slot as before.
+ */
+function intoNearestNapSlot(input: RealizeTagInput): Event {
+  const { saved, projection, nowMinutes } = input;
+  if (saved.startTime > nowMinutes) return saved;
+  const slot = projection
+    .filter((e) => e.type === "nap" && isEngineEmittedId(e.id) && !isRenderSynthetic(e))
+    .reduce<
+      Event | undefined
+    >((best, e) => (best && Math.abs(best.startTime - saved.startTime) <= Math.abs(e.startTime - saved.startTime) ? best : e), undefined);
+  if (!slot) return saved;
+  const keyed = { ...saved, eventKey: slot.eventKey, label: slot.label };
+  return { ...keyed, id: recordedIdForEvent(keyed) };
 }
 
 // Explicit false, not a deleted key: saveEvent updates an existing doc with a merge

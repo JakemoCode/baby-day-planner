@@ -254,6 +254,23 @@ bedtime.
 - **Edge case it prevents**: skipping Nap 2 and seeing Nap 3 jump into
   Nap 2's old time, which reads as if the skip did nothing.
 
+### R3.12 A nap logged from the FAB at or before now records into the nearest projected slot
+
+The FAB mints a new slot (`nap_{max+1}`), which the cascade would place
+after every projected nap. For a nap whose start is at or before now,
+`withRealizeTag` (`src/v3/lib/realizeForecast.ts`) instead gives the
+saved event the key, label and recorded id of the nearest projected
+(`proj_`) nap by clock distance, so the cascade treats it as that slot
+and re-flows from it. A future-time FAB nap stays a new slot. With no
+projected nap left, the new slot stands.
+
+- Why: after a deleted nap (R3.11), the FAB is the way to log the nap
+  that did happen later. Keyed as a new slot it would sort before a
+  projected slot with a lower number and the wake windows would follow
+  slot order, not the clock.
+- There is no undo for a deletion beyond this. Tomorrow's Day starts
+  clean (DATA_MODEL R14.7).
+
 ---
 
 ## §4 Wake Windows

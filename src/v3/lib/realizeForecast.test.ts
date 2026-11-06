@@ -184,3 +184,63 @@ describe("R5.14 withRealizeTag: moving a slot", () => {
     expect(editRecorded(doc, 14 * 60 + 20).realizedForecast).toBe(false);
   });
 });
+
+function nap(id: string, eventKey: string, startTime: number, extra: Partial<Event> = {}): Event {
+  return {
+    id,
+    dayId: "day_test",
+    eventKey,
+    type: "nap",
+    kind: "block",
+    label: `Nap ${eventKey.replace("nap_", "")}`,
+    startTime,
+    endTime: startTime + 60,
+    hasPutdown: false,
+    owner: NO_OWNER,
+    lifecycle: { state: "projected" },
+    ...extra,
+  };
+}
+
+// Nap 2 was deleted today (not in the projection); nap_1 is recorded, nap_3 is still a forecast.
+const NAP_PROJECTION = [
+  nap("recorded_nap_1", "nap_1", 9 * 60, {
+    lifecycle: { state: "completed", committedAt: 10 * 60 },
+  }),
+  nap("proj_nap_3", "nap_3", 16 * 60 + 30),
+];
+
+function createNap(startTime: number, projection: Event[] = NAP_PROJECTION): Event {
+  const template = nap("nap_7f3a", "nap_4", NOW);
+  return withRealizeTag({
+    mode: "create",
+    source: template,
+    saved: { ...template, startTime, endTime: startTime + 45 },
+    projection,
+    nowMinutes: NOW,
+    intervalMinutes: INTERVAL,
+  });
+}
+
+describe("R3.12 withRealizeTag: a nap logged from the FAB", () => {
+  it("at a past time records into the nearest projected slot, with its key, label and recorded id", () => {
+    const out = createNap(15 * 60);
+    expect([out.eventKey, out.label, out.id]).toEqual(["nap_3", "Nap 3", "recorded_nap_3"]);
+    expect([out.startTime, out.endTime]).toEqual([15 * 60, 15 * 60 + 45]);
+  });
+
+  it("at a future time stays the new slot the FAB minted", () => {
+    const out = createNap(17 * 60);
+    expect([out.eventKey, out.id]).toEqual(["nap_4", "nap_7f3a"]);
+  });
+
+  it("with no projected nap left stays the new slot", () => {
+    const out = createNap(15 * 60, [NAP_PROJECTION[0]!]);
+    expect([out.eventKey, out.id]).toEqual(["nap_4", "nap_7f3a"]);
+  });
+
+  it("never takes a recorded nap's slot", () => {
+    const out = createNap(9 * 60 + 20);
+    expect(out.eventKey).toBe("nap_3");
+  });
+});
