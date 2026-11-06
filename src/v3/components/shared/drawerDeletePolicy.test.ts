@@ -95,7 +95,7 @@ describe("drawerDestructiveAction", () => {
     ).toBe("none");
   });
 
-  it("R3.11: is delete (skip today) for an auto-promoted nap whose time passed", () => {
+  it("R3.11: is delete (deleted today) for an auto-promoted nap whose time passed", () => {
     expect(
       drawerDestructiveAction(
         ev({ type: "nap", id: "proj_nap_1", eventKey: "nap_1", lifecycle: recorded(420) }),
@@ -104,7 +104,7 @@ describe("drawerDestructiveAction", () => {
     ).toBe("delete");
   });
 
-  it("R3.11: is delete (skip today) for a projected nap", () => {
+  it("R3.11: is delete (deleted today) for a projected nap", () => {
     expect(
       drawerDestructiveAction(
         ev({ type: "nap", id: "proj_nap_1", eventKey: "nap_1", lifecycle: { state: "projected" } }),
