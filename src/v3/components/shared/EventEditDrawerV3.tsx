@@ -363,7 +363,7 @@ export function EventEditDrawerV3({
   const stepAmount = (delta: number) =>
     setForm((prev) => ({
       ...prev,
-      amountOz: Math.max(0, Math.round(((prev.amountOz ?? 0) + delta) * 100) / 100),
+      amountOz: Math.max(0, Math.round(((prev.amountOz ?? 0) + delta) * 1e6) / 1e6),
     }));
 
   const submit = async (next: Event) => {

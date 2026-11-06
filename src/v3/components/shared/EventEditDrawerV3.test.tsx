@@ -5,7 +5,7 @@
 
 import React, { useEffect } from "react";
 import { describe, expect, it, vi } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { Event, OwnersConfig, TimeMin } from "../../schemas";
 import { NO_OWNER } from "../../schemas";
@@ -163,10 +163,14 @@ describe("EventEditDrawerV3", () => {
       expect(screen.getByLabelText("Amount (oz)")).toHaveValue(0);
     });
 
-    it("stepping keeps two decimals, so 4.1 + a quarter is 4.35, not a float tail", async () => {
+    it("stepping leaves no float tail and keeps finer values: 4.1 + a quarter is 4.35, 4.125 + a quarter is 4.375", async () => {
       renderBottle(4.1);
       await userEvent.click(screen.getByRole("button", { name: "Add a quarter ounce" }));
       expect(screen.getByLabelText("Amount (oz)")).toHaveValue(4.35);
+      cleanup();
+      renderBottle(4.125);
+      await userEvent.click(screen.getByRole("button", { name: "Add a quarter ounce" }));
+      expect(screen.getByLabelText("Amount (oz)")).toHaveValue(4.375);
     });
 
     it("typing still works and the stepped value is what gets saved", async () => {
