@@ -51,7 +51,7 @@ export function buildCreateTemplate({
 
   if (type === "nap") {
     // A nap logged by hand. The FAB mints the next slot; the save re-keys it into the
-    // first projected slot at or after it (R3.12).
+    // first projected slot that ends after its start (R3.12).
     const nextN = nextFreeSlot("nap", actuals, projected);
     return {
       id: newEventId("nap"),

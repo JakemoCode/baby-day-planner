@@ -1,6 +1,6 @@
 /**
- * R3.12 seam: a FAB nap set a few minutes ahead takes the first projected slot at or after
- * it, so naps sort in clock order and the wake windows follow the clock.
+ * R3.12 seam: a FAB nap set a few minutes ahead takes the first projected slot that ends
+ * after its start, so naps sort in clock order and the wake windows follow the clock.
  */
 
 import { describe, expect, it } from "vitest";

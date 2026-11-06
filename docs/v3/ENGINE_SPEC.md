@@ -254,15 +254,17 @@ bedtime.
 - **Edge case it prevents**: skipping Nap 2 and seeing Nap 3 jump into
   Nap 2's old time, which reads as if the skip did nothing.
 
-### R3.12 A nap logged from the FAB records into the first projected slot at or after it
+### R3.12 A nap logged from the FAB records into the first projected slot still open at its start
 
 The FAB mints a new slot (`nap_{max+1}`), which the cascade would place
 after every projected nap. `withRealizeTag`
 (`src/v3/lib/realizeForecast.ts`) instead gives the saved event the key,
-label and recorded id of the first projected (`proj_`) nap at or after
-its start, whether that start is past or ahead of now, so slot order
-follows the clock and the cascade re-flows from it. A nap later than
-every projected slot stays the new slot. With no projected nap left,
+label and recorded id of the first projected (`proj_`) nap whose end is
+after the nap's start, whether that start is past or ahead of now. A
+nap set inside a projected slot's span, or ahead of it, is that slot,
+so slot order follows the clock and the cascade re-flows from it. A nap
+that starts at or after the end of every projected slot stays the new
+slot. With no projected nap left,
 which is the case after deleting the last nap of the day, the new slot
 stands and the cascade places it from the real last sleep.
 
