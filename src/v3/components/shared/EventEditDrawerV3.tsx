@@ -250,9 +250,9 @@ function confirmCopyFor(action: DrawerDestructiveAction, event: Event) {
   }
   if (isSkippableNap(event)) {
     return {
-      title: `Skip ${event.label} today?`,
-      body: "The day carries on from the last sleep. Restore it under Skipped today.",
-      confirmLabel: "Skip today",
+      title: `Delete ${event.label}?`,
+      body: "It didn't happen today. The rest of today re-forecasts from the last sleep.",
+      confirmLabel: "Delete",
     };
   }
   return {
@@ -322,9 +322,7 @@ export function EventEditDrawerV3({
   // "Reset" reverts a recorded rhythm slot to the cascade projection (§F71); it routes
   // through the same onDelete path (delete the doc → engine re-projects the slot).
   const confirmCopy = confirmCopyFor(destructiveAction, sourceEvent);
-  let destructiveLabel = "Delete";
-  if (destructiveAction === "reset") destructiveLabel = "Reset";
-  else if (isSkippableNap(sourceEvent)) destructiveLabel = "Skip today";
+  const destructiveLabel = destructiveAction === "reset" ? "Reset" : "Delete";
 
   const schema = DRAWER_FIELD_SCHEMA[type];
   const showVolumes = schema

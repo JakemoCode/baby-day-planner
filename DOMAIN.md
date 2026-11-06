@@ -164,7 +164,9 @@ the baby's perspective; it's just the last sleep of the day.
 loud, the schedule slips, or he fights it and the second nap
 never happens. A missed nap is not a nap that moved; it is a nap
 that did not occur, and the cascade carries on from whenever he
-next actually sleeps.
+next actually sleeps. When the missed nap was the last one of the
+day, bedtime comes earlier: he has been awake since the nap before
+it.
 
 **Overnight wake-ups are normal interruptions, not new naps.**
 A baby waking during the bedtime block (e.g., crying for a

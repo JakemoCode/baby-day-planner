@@ -40,7 +40,7 @@ describe("seam: skip an auto-promoted nap → dashboard moves on to the next rea
     expect(napTotals(view, NOW)).toEqual({ count: 2, totalMinutes: 90 });
   });
 
-  it("the tapped nap offers Skip today and routes to the nap suppression keyed by its slot", () => {
+  it("the tapped nap offers Delete and routes to the nap suppression keyed by its slot", () => {
     const nap2 = dashboardView([]).find((e) => e.eventKey === "nap_2" && !isRenderSynthetic(e))!;
     expect(drawerDestructiveAction(nap2, { mode: "edit", hasOnDelete: true })).toBe("delete");
     const matching = useDayDrawerSuppressions({} as Firestore, "child_test", "day_test").filter(

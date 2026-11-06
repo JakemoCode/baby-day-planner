@@ -15,7 +15,7 @@ describe("SkippedNaps (R3.11 undo)", () => {
       "Restore Nap 2",
       "Restore Nap 3",
     ]);
-    expect(screen.getByText("Skipped today")).toBeVisible();
+    expect(screen.getByText("Deleted today")).toBeVisible();
   });
 
   it("orders nap_10 after nap_9", () => {

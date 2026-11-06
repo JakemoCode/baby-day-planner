@@ -790,7 +790,7 @@ describe("EventEditDrawerV3", () => {
     expect(screen.queryByRole("alert")).toBeNull();
     expect(screen.getByRole("button", { name: /Sav/ })).toBeDisabled();
     expect(screen.getByLabelText("Start time")).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Skip today" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Delete" })).toBeDisabled();
 
     finishSave();
     await screen.findByRole("button", { name: "Save" });
@@ -1039,7 +1039,7 @@ describe("EventEditDrawerV3", () => {
     expect(screen.getByRole("button", { name: "Delete" })).toBeVisible();
   });
 
-  it("R3.11: an auto-promoted nap (proj_ id, time passed) offers Skip today, not Delete", () => {
+  it("R3.11: an auto-promoted nap (proj_ id, time passed) offers Delete", () => {
     render(
       <EventEditDrawerV3
         open
@@ -1057,11 +1057,11 @@ describe("EventEditDrawerV3", () => {
         onDelete={() => {}}
       />,
     );
-    expect(screen.getByRole("button", { name: "Skip today" })).toBeVisible();
-    expect(screen.queryByRole("button", { name: "Delete" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Delete" })).toBeVisible();
+    expect(screen.queryByRole("button", { name: "Reset" })).toBeNull();
   });
 
-  it("R3.11: Skip today on a projected nap confirms, then routes the nap through onDelete", async () => {
+  it("R3.11: Delete on a projected nap confirms, then routes the nap through onDelete", async () => {
     const onDelete = vi.fn();
     render(
       <EventEditDrawerV3
@@ -1077,10 +1077,10 @@ describe("EventEditDrawerV3", () => {
         onDelete={onDelete}
       />,
     );
-    await userEvent.click(screen.getByRole("button", { name: "Skip today" }));
-    const dialog = screen.getByRole("dialog", { name: "Skip Nap 2 today?" });
-    expect(within(dialog).getByText(/carries on from the last sleep/i)).toBeVisible();
-    await userEvent.click(within(dialog).getByRole("button", { name: "Skip today" }));
+    await userEvent.click(screen.getByRole("button", { name: "Delete" }));
+    const dialog = screen.getByRole("dialog", { name: "Delete Nap 2?" });
+    expect(within(dialog).getByText(/didn't happen today/i)).toBeVisible();
+    await userEvent.click(within(dialog).getByRole("button", { name: "Delete" }));
     expect(onDelete).toHaveBeenCalledTimes(1);
     expect(onDelete.mock.calls[0]![0]).toMatchObject({ id: "proj_nap_2", eventKey: "nap_2" });
   });

@@ -11,7 +11,7 @@ export type SkippedNapsProps = {
 
 const slotOf = (napKey: string) => Number(napKey.replace("nap_", ""));
 
-/** Undo for the drawer's "Skip today" on a nap: a skipped nap no longer renders, so restore lives here. */
+/** Undo for deleting a projected nap: a deleted nap no longer renders, so restore lives here. */
 export function SkippedNaps({ napKeys, onRestore }: SkippedNapsProps) {
   const labelId = useId();
   if (napKeys.length === 0) return null;
@@ -20,7 +20,7 @@ export function SkippedNaps({ napKeys, onRestore }: SkippedNapsProps) {
   return (
     <section className={styles.card} aria-labelledby={labelId}>
       <h2 id={labelId} className={styles.label}>
-        Skipped today
+        Deleted today
       </h2>
       <div className={styles.actions}>
         {sorted.map((key) => (

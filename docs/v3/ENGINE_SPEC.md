@@ -221,15 +221,23 @@ duration falls outside `[settings.napDurationMin, napDurationMax]`
 ### R3.11 A skipped nap slot emits no nap; its wake window runs on to the next sleep
 
 `Day.suppressedNapKeys: string[]` lists the nap slots (`nap_N`) the
-household skipped today via the drawer's "Skip today". For a skipped
-slot with no recorded nap, the cascade emits no nap and no separate
-wake window. `wake_window_N` starts at the previous sleep's end and
-runs until the next sleep the cascade emits: the next nap, or bedtime.
+household deleted today via the drawer's "Delete" on a projected nap.
+For a skipped slot with no recorded nap, the cascade emits no nap and
+no separate wake window. `wake_window_N` starts at the previous sleep's
+end and runs until the next sleep the cascade emits: the next nap, or
+bedtime.
 
-- Later slots keep the times they would have had. The skipped nap's
-  span still advances the cascade's clock, so `nap_{N+1}` and bedtime
-  do not slide earlier into the hole. A missed nap did not move
-  (DOMAIN.md §3), so the next nap does not take its place.
+- Later naps keep the times they would have had. The skipped nap's
+  span still advances the cascade's clock for nap placement, so
+  `nap_{N+1}` does not slide earlier into the hole. A missed nap did
+  not move (DOMAIN.md §3), so the next nap does not take its place.
+- Bedtime does move. The terminator counts the wake window from the
+  real last sleep's end (the open window's start), not from the
+  skipped slot's projected end: `bedtime = max(earliestBedtime,
+  lastRealSleepEnd + WW)`. Skipping the last nap of the day therefore
+  brings bedtime earlier, which is what a missed nap does to a baby
+  (DOMAIN.md §1, §3). Skipping a middle nap leaves bedtime where the
+  following nap puts it.
 - A recorded nap in a skipped slot wins (R3.3, reality wins). A
   recorded nap in a later slot clamps against the real previous
   sleep's end (R3.6), not the skipped slot's projected end.

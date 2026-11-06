@@ -138,7 +138,7 @@ export async function suppressNapForDay(
   });
 }
 
-/** Undo a "Skip today" on a nap slot (R3.11). */
+/** Undo deleting a projected nap slot (R3.11). */
 export async function unsuppressNapForDay(
   db: Firestore,
   childId: string,
