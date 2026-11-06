@@ -2,6 +2,8 @@
 
 import { Fragment, useEffect, useId, useState, type ReactNode } from "react";
 import styles from "./EventEditDrawer.module.css";
+
+const OZ_STEP = 0.25;
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import type { Event, EventType, OwnerRef, OwnersConfig, TimeMin } from "../../schemas";
 import { isRecorded, NO_OWNER } from "../../schemas";
@@ -358,6 +360,11 @@ export function EventEditDrawerV3({
   );
   const errors: FormErrors = saving ? {} : liveErrors;
   const locked = futureProjected || saving;
+  const stepAmount = (delta: number) =>
+    setForm((prev) => ({
+      ...prev,
+      amountOz: Math.max(0, Math.round(((prev.amountOz ?? 0) + delta) * 100) / 100),
+    }));
 
   const submit = async (next: Event) => {
     setSaving(true);
@@ -571,24 +578,47 @@ export function EventEditDrawerV3({
       </div>
     ),
     amount: (
-      <label className={styles.field}>
-        <span className={styles.label}>Amount (oz)</span>
-        <input
-          type="number"
-          step="0.5"
-          min="0"
-          className={styles.input}
-          value={form.amountOz ?? ""}
-          disabled={locked}
-          onChange={(e) => {
-            const raw = e.target.value;
-            setForm((prev) => ({
-              ...prev,
-              amountOz: raw === "" ? undefined : Number(raw),
-            }));
-          }}
-        />
-      </label>
+      <div className={styles.field}>
+        <label className={styles.label} htmlFor="drawer-amount-oz">
+          Amount (oz)
+        </label>
+        <div className={styles.fieldRow}>
+          <button
+            type="button"
+            className={styles.stepButton}
+            aria-label="Remove a quarter ounce"
+            disabled={locked}
+            onClick={() => stepAmount(-OZ_STEP)}
+          >
+            -
+          </button>
+          <input
+            id="drawer-amount-oz"
+            type="number"
+            step={OZ_STEP}
+            min="0"
+            className={styles.input}
+            value={form.amountOz ?? ""}
+            disabled={locked}
+            onChange={(e) => {
+              const raw = e.target.value;
+              setForm((prev) => ({
+                ...prev,
+                amountOz: raw === "" ? undefined : Number(raw),
+              }));
+            }}
+          />
+          <button
+            type="button"
+            className={styles.stepButton}
+            aria-label="Add a quarter ounce"
+            disabled={locked}
+            onClick={() => stepAmount(OZ_STEP)}
+          >
+            +
+          </button>
+        </div>
+      </div>
     ),
     volumes: (
       <div className={styles.field}>

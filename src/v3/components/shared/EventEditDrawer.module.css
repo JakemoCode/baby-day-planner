@@ -138,6 +138,42 @@
 }
 
 /* Hover/active fill follows each button's own hue (currentColor = its text). */
+/* Quarter-ounce stepper on either side of the amount input. */
+.stepButton {
+  flex: 0 0 auto;
+  min-width: var(--tap-target-min);
+  min-height: var(--tap-target-min);
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-fg);
+  font-size: var(--text-lg);
+  font-family: inherit;
+  line-height: 1;
+  cursor: pointer;
+  transition: background var(--motion-fast) var(--easing-out);
+}
+
+.stepButton:hover {
+  background: color-mix(in srgb, currentColor 10%, transparent);
+}
+
+.stepButton:active {
+  background: color-mix(in srgb, currentColor 18%, transparent);
+}
+
+.stepButton:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+  border-color: transparent;
+}
+
+.stepButton:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
 .nowButton:hover {
   background: color-mix(in srgb, currentColor 10%, transparent);
 }
