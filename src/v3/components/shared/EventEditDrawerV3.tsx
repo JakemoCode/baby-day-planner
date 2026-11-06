@@ -583,15 +583,6 @@ export function EventEditDrawerV3({
           Amount (oz)
         </label>
         <div className={styles.fieldRow}>
-          <button
-            type="button"
-            className={styles.stepButton}
-            aria-label="Remove a quarter ounce"
-            disabled={locked}
-            onClick={() => stepAmount(-OZ_STEP)}
-          >
-            -
-          </button>
           <input
             id="drawer-amount-oz"
             type="number"
@@ -610,7 +601,16 @@ export function EventEditDrawerV3({
           />
           <button
             type="button"
-            className={styles.stepButton}
+            className={`${styles.stepButton} ${styles.stepMinus}`}
+            aria-label="Remove a quarter ounce"
+            disabled={locked}
+            onClick={() => stepAmount(-OZ_STEP)}
+          >
+            -
+          </button>
+          <button
+            type="button"
+            className={`${styles.stepButton} ${styles.stepPlus}`}
             aria-label="Add a quarter ounce"
             disabled={locked}
             onClick={() => stepAmount(OZ_STEP)}

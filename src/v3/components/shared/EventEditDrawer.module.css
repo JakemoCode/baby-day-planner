@@ -151,21 +151,29 @@
   outline-offset: 2px;
 }
 
-/* Quarter-ounce stepper on either side of the amount input. */
+/* Quarter-ounce stepper to the right of the amount input: - then +. */
 .stepButton {
   flex: 0 0 auto;
-  min-width: var(--tap-target-min);
+  min-width: calc(var(--tap-target-min) * 1.5);
   min-height: var(--tap-target-min);
   padding: 0 var(--space-3);
   border-radius: var(--radius-md);
-  border: 1px solid var(--color-border);
-  background: var(--color-surface);
-  color: var(--color-fg);
+  border: 2px solid currentColor;
+  background: transparent;
   font-size: var(--text-lg);
   font-family: inherit;
+  font-weight: var(--weight-semibold);
   line-height: 1;
   cursor: pointer;
   transition: background var(--motion-fast) var(--easing-out);
+}
+
+.stepMinus {
+  color: var(--color-owner-parent-1);
+}
+
+.stepPlus {
+  color: var(--color-success);
 }
 
 .stepButton:hover {
@@ -178,8 +186,7 @@
 
 .stepButton:focus-visible {
   outline: 2px solid var(--color-accent);
-  outline-offset: 1px;
-  border-color: transparent;
+  outline-offset: 2px;
 }
 
 .stepButton:disabled {
