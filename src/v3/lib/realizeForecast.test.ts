@@ -223,15 +223,15 @@ function createNap(startTime: number, projection: Event[] = NAP_PROJECTION): Eve
 }
 
 describe("R3.12 withRealizeTag: a nap logged from the FAB", () => {
-  it("at a past time records into the first projected slot at or after it, with its key, label and recorded id", () => {
+  it("records into the first projected slot at or after it, with its key, label and recorded id", () => {
     const out = createNap(15 * 60);
     expect([out.eventKey, out.label, out.id]).toEqual(["nap_3", "Nap 3", "recorded_nap_3"]);
     expect([out.startTime, out.endTime]).toEqual([15 * 60, 15 * 60 + 45]);
   });
 
-  it("at a future time stays the new slot the FAB minted", () => {
-    const out = createNap(17 * 60);
-    expect([out.eventKey, out.id]).toEqual(["nap_4", "nap_7f3a"]);
+  it("at a future time takes the first projected slot at or after it too, so a nap set ahead cannot sort before a lower slot", () => {
+    const out = createNap(16 * 60);
+    expect([out.eventKey, out.id]).toEqual(["nap_3", "recorded_nap_3"]);
   });
 
   it("with no projected nap left stays the new slot", () => {

@@ -1,6 +1,6 @@
 /**
- * R3.12: a future-time FAB nap keeps the minted nap_{max+1} key even when a lower-numbered
- * projected slot lies later on the clock, so the wake windows follow slot order, not the clock.
+ * R3.12 seam: a FAB nap set a few minutes ahead takes the first projected slot at or after
+ * it, so naps sort in clock order and the wake windows follow the clock.
  */
 
 import { describe, expect, it } from "vitest";

@@ -4,9 +4,9 @@
  * at or after it is already taken by the R5.1 re-seed, so the tag is set only when the
  * slot the bottle stands in for lies before it. Called from useDrawer, the one tagging site.
  *
- * ENGINE_SPEC §R3.12: a nap logged from the FAB at or before now records into the
- * first projected nap slot at or after it (its key, label and recorded id) instead of
- * minting a new slot the cascade would place after every projected one.
+ * ENGINE_SPEC §R3.12: a nap logged from the FAB records into the first projected nap
+ * slot at or after it (its key, label and recorded id) instead of minting a new slot
+ * the cascade would place after every projected one.
  */
 
 import type { Event, TimeMin } from "../schemas";
@@ -64,13 +64,12 @@ export function withRealizeTag(input: RealizeTagInput): Event {
 }
 
 /**
- * DOMAIN.md §3: a nap he does take is the nap it was. A past-time FAB nap takes the
- * first projected slot at or after it, so slot order follows the clock; a future-time
- * one, or one later than every projected slot, is the new slot the FAB minted.
+ * DOMAIN.md §3: a nap he does take is the nap it was. A FAB nap at any time takes the
+ * first projected slot at or after it, so slot order follows the clock; one later than
+ * every projected slot is the new slot the FAB minted.
  */
 function intoFirstProjectedSlot(input: RealizeTagInput): Event {
-  const { saved, projection, nowMinutes } = input;
-  if (saved.startTime > nowMinutes) return saved;
+  const { saved, projection } = input;
   const slot = projection
     .filter((e) => e.type === "nap" && isEngineEmittedId(e.id) && !isRenderSynthetic(e))
     .filter((e) => e.startTime >= saved.startTime)

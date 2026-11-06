@@ -50,8 +50,8 @@ export function buildCreateTemplate({
   }
 
   if (type === "nap") {
-    // A nap he took that the forecast did not have. The FAB mints the next slot; a
-    // past-time save re-keys it into the first projected slot at or after it (R3.12).
+    // A nap logged by hand. The FAB mints the next slot; the save re-keys it into the
+    // first projected slot at or after it (R3.12).
     const nextN = nextFreeSlot("nap", actuals, projected);
     return {
       id: newEventId("nap"),
