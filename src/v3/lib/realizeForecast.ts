@@ -5,8 +5,8 @@
  * slot the bottle stands in for lies before it. Called from useDrawer, the one tagging site.
  *
  * ENGINE_SPEC §R3.12: a nap logged from the FAB at or before now records into the
- * nearest projected nap slot (its key, label and recorded id) instead of minting a new
- * slot the cascade would place after every projected one.
+ * first projected nap slot at or after it (its key, label and recorded id) instead of
+ * minting a new slot the cascade would place after every projected one.
  */
 
 import type { Event, TimeMin } from "../schemas";
@@ -37,7 +37,7 @@ export type RealizeTagInput = {
 
 export function withRealizeTag(input: RealizeTagInput): Event {
   const { mode, source, saved } = input;
-  if (saved.type === "nap") return mode === "create" ? intoNearestNapSlot(input) : saved;
+  if (saved.type === "nap") return mode === "create" ? intoFirstProjectedSlot(input) : saved;
   if (saved.type !== "bottle" || isDreamFeed(saved)) return saved;
   if (mode === "create") {
     return loggedAfterTheFactRealizes(input) ? { ...saved, realizedForecast: true } : saved;
@@ -65,16 +65,16 @@ export function withRealizeTag(input: RealizeTagInput): Event {
 
 /**
  * DOMAIN.md §3: a nap he does take is the nap it was. A past-time FAB nap takes the
- * nearest projected slot by clock distance; a future-time one is a new slot as before.
+ * first projected slot at or after it, so slot order follows the clock; a future-time
+ * one, or one later than every projected slot, is the new slot the FAB minted.
  */
-function intoNearestNapSlot(input: RealizeTagInput): Event {
+function intoFirstProjectedSlot(input: RealizeTagInput): Event {
   const { saved, projection, nowMinutes } = input;
   if (saved.startTime > nowMinutes) return saved;
   const slot = projection
     .filter((e) => e.type === "nap" && isEngineEmittedId(e.id) && !isRenderSynthetic(e))
-    .reduce<
-      Event | undefined
-    >((best, e) => (best && Math.abs(best.startTime - saved.startTime) <= Math.abs(e.startTime - saved.startTime) ? best : e), undefined);
+    .filter((e) => e.startTime >= saved.startTime)
+    .sort((a, b) => a.startTime - b.startTime)[0];
   if (!slot) return saved;
   const keyed = { ...saved, eventKey: slot.eventKey, label: slot.label };
   return { ...keyed, id: recordedIdForEvent(keyed) };

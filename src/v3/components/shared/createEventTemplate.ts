@@ -8,7 +8,7 @@ import { projectedLifecycle } from "../../lifecycle";
 import { isRecorded, NO_OWNER } from "../../schemas";
 import type { Event, EventType, Settings, TimeMin } from "../../schemas";
 
-export type CreatableType = "bottle" | "pump" | "extra";
+export type CreatableType = "nap" | "bottle" | "pump" | "extra";
 
 export type BuildTemplateInput = {
   type: CreatableType;
@@ -45,6 +45,25 @@ export function buildCreateTemplate({
       amountOz: settings.defaultBottleAmountOz,
       hasPutdown: false,
       owner: NO_OWNER, // owner required; new events start unassigned
+      lifecycle: projectedLifecycle(),
+    };
+  }
+
+  if (type === "nap") {
+    // A nap he took that the forecast did not have. The FAB mints the next slot; a
+    // past-time save re-keys it into the first projected slot at or after it (R3.12).
+    const nextN = nextFreeSlot("nap", actuals, projected);
+    return {
+      id: newEventId("nap"),
+      dayId,
+      eventKey: `nap_${nextN}`,
+      type: "nap",
+      kind: "block",
+      label: `Nap ${nextN}`,
+      startTime: nowMinutes,
+      endTime: nowMinutes + settings.defaultNapLengthMinutes,
+      hasPutdown: false,
+      owner: NO_OWNER,
       lifecycle: projectedLifecycle(),
     };
   }

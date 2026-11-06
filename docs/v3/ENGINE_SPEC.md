@@ -243,7 +243,7 @@ bedtime.
   sleep's end (R3.6), not the skipped slot's projected end.
 - The merged window keeps slot N's key, so it takes `wake_window_N`'s
   owner (R12.3). `wake_window_{N+1}` is not emitted while the skip
-  stands, so an owner set on it does not show until the nap is restored.
+  stands, so an owner set on it does not show for the rest of the day.
 - The terminator check (R3.1, R7.5) runs first. A slot that would
   become bedtime is bedtime, and skipping it does nothing.
 - Resets on the next day's fresh Day doc. Missing on older docs reads
@@ -254,15 +254,17 @@ bedtime.
 - **Edge case it prevents**: skipping Nap 2 and seeing Nap 3 jump into
   Nap 2's old time, which reads as if the skip did nothing.
 
-### R3.12 A nap logged from the FAB at or before now records into the nearest projected slot
+### R3.12 A nap logged from the FAB at or before now records into the first projected slot at or after it
 
 The FAB mints a new slot (`nap_{max+1}`), which the cascade would place
 after every projected nap. For a nap whose start is at or before now,
 `withRealizeTag` (`src/v3/lib/realizeForecast.ts`) instead gives the
-saved event the key, label and recorded id of the nearest projected
-(`proj_`) nap by clock distance, so the cascade treats it as that slot
-and re-flows from it. A future-time FAB nap stays a new slot. With no
-projected nap left, the new slot stands.
+saved event the key, label and recorded id of the first projected
+(`proj_`) nap at or after its start, so slot order follows the clock
+and the cascade re-flows from it. A future-time FAB nap, or one later
+than every projected slot, stays the new slot. With no projected nap
+left, which is the case after deleting the last nap of the day, the new
+slot stands and the cascade places it from the real last sleep.
 
 - Why: after a deleted nap (R3.11), the FAB is the way to log the nap
   that did happen later. Keyed as a new slot it would sort before a

@@ -223,7 +223,7 @@ function createNap(startTime: number, projection: Event[] = NAP_PROJECTION): Eve
 }
 
 describe("R3.12 withRealizeTag: a nap logged from the FAB", () => {
-  it("at a past time records into the nearest projected slot, with its key, label and recorded id", () => {
+  it("at a past time records into the first projected slot at or after it, with its key, label and recorded id", () => {
     const out = createNap(15 * 60);
     expect([out.eventKey, out.label, out.id]).toEqual(["nap_3", "Nap 3", "recorded_nap_3"]);
     expect([out.startTime, out.endTime]).toEqual([15 * 60, 15 * 60 + 45]);
@@ -242,5 +242,18 @@ describe("R3.12 withRealizeTag: a nap logged from the FAB", () => {
   it("never takes a recorded nap's slot", () => {
     const out = createNap(9 * 60 + 20);
     expect(out.eventKey).toBe("nap_3");
+  });
+
+  it("later than every projected slot keeps the new slot, so slot order follows the clock", () => {
+    const earlierSlots = NAP_PROJECTION.map((e) =>
+      e.eventKey === "nap_3" ? { ...e, startTime: 14 * 60, endTime: 15 * 60 } : e,
+    );
+    const out = createNap(NOW, earlierSlots);
+    expect([out.eventKey, out.id]).toEqual(["nap_4", "nap_7f3a"]);
+  });
+
+  it("earlier than two projected slots takes the first of them, not the closer later one", () => {
+    const out = createNap(11 * 60, [...NAP_PROJECTION, nap("proj_nap_2", "nap_2", 12 * 60 + 30)]);
+    expect(out.eventKey).toBe("nap_2");
   });
 });

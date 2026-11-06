@@ -8,13 +8,12 @@ describe("FABTypePicker", () => {
     expect(screen.queryByRole("dialog")).toBeNull();
   });
 
-  it("renders bottle / pump / custom options when open (no nap — physiology cascade)", () => {
+  it("renders nap / bottle / pump / custom options when open", () => {
     render(<FABTypePicker open onSelect={() => {}} onCancel={() => {}} />);
     expect(screen.getByRole("button", { name: /bottle/i })).toBeVisible();
     expect(screen.getByRole("button", { name: /pump/i })).toBeVisible();
     expect(screen.getByRole("button", { name: /custom/i })).toBeVisible();
-    // Nap removed from FAB picker (PR #146): parents adjust naps via drawer-edit on existing chips.
-    expect(screen.queryByRole("button", { name: /^nap$/i })).toBeNull();
+    expect(screen.getByRole("button", { name: /^nap/i })).toBeVisible();
   });
 
   it("invokes onSelect with the chosen type", async () => {
